@@ -1,0 +1,1 @@
+CREATE CONSTRAINT milestone_id IF NOT EXISTS FOR (n:Milestone) REQUIRE n.id IS UNIQUE;

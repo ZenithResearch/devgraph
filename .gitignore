@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+build/
+*.egg-info/
+
+# Generated Neo4j backup/restore artifacts are never source artifacts.
+.devgraph-backups/
+.devgraph-restores/
+.devgraph-disposable-restore-*.json
+*.dump
+
+# Operator credentials, signing profiles, and local runtime state are not source.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials/
+secrets/
+.devgraph/
+.DS_Store
+dist/
+
+# Local test/build caches.
+.coverage
+htmlcov/
+node_modules/
+target/

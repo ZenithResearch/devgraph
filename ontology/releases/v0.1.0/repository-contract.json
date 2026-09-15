@@ -1,0 +1,43 @@
+{
+  "$schema": "https://zenith-research.ca/ontology/schemas/zenith-repository-contract-v1",
+  "schema_version": 1,
+  "ontology_version": "0.1.0",
+  "class_id": "https://zenith-research.ca/ontology/terms/ZenithRepository",
+  "description": "A sovereign Git project that makes knowledge inputs, source representations, outputs, and archive state consistently traversable.",
+  "required_entries": [
+    "README.md",
+    "AGENTS.md",
+    "<repo_name>.md",
+    "capture/",
+    "notes/",
+    "docs/",
+    "src/",
+    "out/",
+    "archive/"
+  ],
+  "entry_roles": {
+    "README.md": "human_entry_point_and_source_output_declaration",
+    "AGENTS.md": "agent_entry_point",
+    "<repo_name>.md": "repository_map_of_content",
+    "capture/": "unprocessed_or_source_inputs",
+    "notes/": "working_knowledge",
+    "docs/": "curated_documentation",
+    "src/": "source_representation",
+    "out/": "generated_or_deliverable_outputs",
+    "archive/": "non_destructive_terminal_storage"
+  },
+  "conformance_does_not_imply": [
+    "network_admission",
+    "machine_authority",
+    "issuer_or_validator_trust",
+    "deployment",
+    "publication",
+    "deliverable_correctness"
+  ],
+  "devgraph_runtime_projection": {
+    "runtime_label": false,
+    "reference_class": "ExternalLink",
+    "optional_metadata_class": "SyncShadow",
+    "output_evidence_class": "Artifact"
+  }
+}

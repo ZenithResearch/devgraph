@@ -1,0 +1,1 @@
+CREATE CONSTRAINT sync_shadow_id IF NOT EXISTS FOR (n:SyncShadow) REQUIRE n.id IS UNIQUE;

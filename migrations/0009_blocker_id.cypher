@@ -1,0 +1,1 @@
+CREATE CONSTRAINT blocker_id IF NOT EXISTS FOR (n:Blocker) REQUIRE n.id IS UNIQUE;

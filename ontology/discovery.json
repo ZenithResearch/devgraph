@@ -1,0 +1,30 @@
+{
+  "canonical_authority": {
+    "name": "Devgraph",
+    "release_tag": "ontology-v0.6.0",
+    "repository": "https://github.com/ZenithResearch/devgraph",
+    "source_path": "ontology/"
+  },
+  "compatibility_policy": "Consumers pin version and bundle_digest; additive changes require a new versioned release.",
+  "current": {
+    "bundle_digest": "11d670a57b2052b4de00509559d081b524bf953c6da2544a25f33976857f8f4f",
+    "context_url": "https://zenith-research.ca/ontology/v0.6.0/context.jsonld",
+    "manifest_sha256": "24c7f491bd009036032255436fa6cc5a2b9fd36e4d041ba55b58feaa5e8e2b4b",
+    "manifest_url": "https://zenith-research.ca/ontology/v0.6.0/manifest.json",
+    "ontology_url": "https://zenith-research.ca/ontology/v0.6.0/ontology.jsonld",
+    "operations_url": "https://zenith-research.ca/ontology/v0.6.0/operations.json",
+    "release": "v0.6.0",
+    "repository_contract_url": "https://zenith-research.ca/ontology/v0.6.0/repository-contract.json",
+    "version": "0.6.0"
+  },
+  "ontology_id": "https://zenith-research.ca/ontology",
+  "schema_version": 1,
+  "supported_versions": [
+    "0.1.0",
+    "0.2.0",
+    "0.3.0",
+    "0.4.0",
+    "0.5.0",
+    "0.6.0"
+  ]
+}

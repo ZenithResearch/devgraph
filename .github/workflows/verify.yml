@@ -1,0 +1,54 @@
+---
+name: Devgraph verification
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Repository verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.10"
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.11.6"
+      - name: Sync locked environment
+        run: uv sync --locked
+      - name: Test suite
+        run: uv run pytest -q
+      - name: Install Node.js for frontend tests
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+      - name: Frontend tests
+        run: node --test tests/frontend/*.test.mjs
+      - name: Repository verification
+        run: bash docs/dev/verification.md
+      - name: Lint
+        run: uv run ruff check src tests scripts integrations
+      - name: Whitespace
+        run: git diff --check
+      - name: Build Python and beta packages
+        run: |
+          uv build --out-dir "$RUNNER_TEMP/devgraph-python"
+          uv run python scripts/build_beta.py --output-dir "$RUNNER_TEMP/devgraph-beta"

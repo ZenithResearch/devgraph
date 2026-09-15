@@ -1,0 +1,279 @@
+{
+  "@context": "https://zenith-research.ca/ontology/v0.3.0/context.jsonld",
+  "@graph": [
+    {
+      "@id": "https://zenith-research.ca/ontology",
+      "@type": "owl:Ontology",
+      "label": "Zenith Ontology",
+      "comment": "Canonical vocabulary for Zenith work, evidence, provenance, readiness, repository structure, and transport-neutral Devgraph operations.",
+      "versionIRI": "https://zenith-research.ca/ontology/v0.3.0/ontology.jsonld",
+      "versionInfo": "0.3.0",
+      "canonicalAuthority": "https://github.com/ZenithResearch/devgraph"
+    },
+    {
+      "@id": "zn:Todo",
+      "@type": "owl:Class",
+      "label": "Todo",
+      "comment": "Common base for committed or proposed work objects.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Proposal",
+      "@type": "owl:Class",
+      "label": "Proposal",
+      "comment": "Proposed work whose acceptance requires Decision provenance.",
+      "subClassOf": "zn:Todo",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Initiative",
+      "@type": "owl:Class",
+      "label": "Initiative",
+      "comment": "Strategic work container larger than a Project.",
+      "subClassOf": "zn:Todo",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Project",
+      "@type": "owl:Class",
+      "label": "Project",
+      "comment": "Delivery container for issues, tasks, and milestones.",
+      "subClassOf": "zn:Todo",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Issue",
+      "@type": "owl:Class",
+      "label": "Issue",
+      "comment": "PR-boundary work object.",
+      "subClassOf": "zn:Todo",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Task",
+      "@type": "owl:Class",
+      "label": "Task",
+      "comment": "Commit-boundary execution slice.",
+      "subClassOf": "zn:Todo",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Requirement",
+      "@type": "owl:Class",
+      "label": "Requirement",
+      "comment": "Required behavior or condition.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:AcceptanceCriterion",
+      "@type": "owl:Class",
+      "label": "Acceptance Criterion",
+      "comment": "Checkable condition for accepting work or a requirement.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Blocker",
+      "@type": "owl:Class",
+      "label": "Blocker",
+      "comment": "Explicit impediment to work.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Decision",
+      "@type": "owl:Class",
+      "label": "Decision",
+      "comment": "Accepted design or scope choice with provenance.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Handoff",
+      "@type": "owl:Class",
+      "label": "Handoff",
+      "comment": "Context package transferred across actors or sessions.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:ReviewPacket",
+      "@type": "owl:Class",
+      "label": "Review Packet",
+      "comment": "Reviewable bundle of work, evidence, and criteria.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Milestone",
+      "@type": "owl:Class",
+      "label": "Milestone",
+      "comment": "Grouped delivery marker.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:Artifact",
+      "@type": "owl:Class",
+      "label": "Artifact",
+      "comment": "Evidence or output object.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:ExternalLink",
+      "@type": "owl:Class",
+      "label": "External Link",
+      "comment": "Reference to an external URL or system object without ownership semantics.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:SyncShadow",
+      "@type": "owl:Class",
+      "label": "Sync Shadow",
+      "comment": "Non-authoritative external metadata snapshot.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:StatusSet",
+      "@type": "owl:Class",
+      "label": "Status Set",
+      "comment": "Named status vocabulary.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:StatusValue",
+      "@type": "owl:Class",
+      "label": "Status Value",
+      "comment": "One value belonging to a Status Set.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:StatusTransition",
+      "@type": "owl:Class",
+      "label": "Status Transition",
+      "comment": "Allowed lifecycle transition.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:EventReceipt",
+      "@type": "owl:Class",
+      "label": "Event Receipt",
+      "comment": "Mutation and local outbox evidence; not external delivery proof.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:HermesSessionRef",
+      "@type": "owl:Class",
+      "label": "Hermes Session Reference",
+      "comment": "Reference and safe metrics for an external Hermes session, never a raw transcript.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:ReadinessAssessment",
+      "@type": "owl:Class",
+      "label": "Readiness Assessment",
+      "comment": "Evidence record evaluating work readiness against the canonical rubric.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:ZenithRepository",
+      "@type": "owl:Class",
+      "label": "Zenith Repository",
+      "comment": "Sovereign Git project conforming to the canonical Zenith filesystem contract. Conformance does not imply network admission, authority, deployment, or delivery correctness.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:CONTAINS",
+      "@type": "owl:ObjectProperty",
+      "label": "contains",
+      "comment": "Hierarchical work containment."
+    },
+    {
+      "@id": "zn:DEPENDS_ON",
+      "@type": "owl:ObjectProperty",
+      "label": "depends on",
+      "comment": "Source work cannot complete before target work."
+    },
+    {
+      "@id": "zn:BLOCKS",
+      "@type": "owl:ObjectProperty",
+      "label": "blocks",
+      "comment": "Source prevents target work from progressing."
+    },
+    {
+      "@id": "zn:HAS_REQUIREMENT",
+      "@type": "owl:ObjectProperty",
+      "label": "has requirement"
+    },
+    {
+      "@id": "zn:HAS_ACCEPTANCE_CRITERION",
+      "@type": "owl:ObjectProperty",
+      "label": "has acceptance criterion"
+    },
+    {
+      "@id": "zn:ACCEPTED_BY_DECISION",
+      "@type": "owl:ObjectProperty",
+      "label": "accepted by decision"
+    },
+    {
+      "@id": "zn:HAS_DECISION",
+      "@type": "owl:ObjectProperty",
+      "label": "has decision"
+    },
+    {
+      "@id": "zn:HAS_HANDOFF",
+      "@type": "owl:ObjectProperty",
+      "label": "has handoff"
+    },
+    {
+      "@id": "zn:HAS_REVIEW_PACKET",
+      "@type": "owl:ObjectProperty",
+      "label": "has review packet"
+    },
+    {
+      "@id": "zn:HAS_MILESTONE",
+      "@type": "owl:ObjectProperty",
+      "label": "has milestone"
+    },
+    {
+      "@id": "zn:HAS_ARTIFACT",
+      "@type": "owl:ObjectProperty",
+      "label": "has artifact"
+    },
+    {
+      "@id": "zn:HAS_EXTERNAL_LINK",
+      "@type": "owl:ObjectProperty",
+      "label": "has external link"
+    },
+    {
+      "@id": "zn:HAS_SYNC_SHADOW",
+      "@type": "owl:ObjectProperty",
+      "label": "has sync shadow"
+    },
+    {
+      "@id": "zn:EMITTED_EVENT",
+      "@type": "owl:ObjectProperty",
+      "label": "emitted event",
+      "comment": "Links a mutation subject to local receipt evidence; it does not assert external delivery."
+    },
+    {
+      "@id": "zn:ATTRIBUTED_TO_HERMES_SESSION",
+      "@type": "owl:ObjectProperty",
+      "label": "attributed to Hermes session"
+    },
+    {
+      "@id": "zn:HAS_READINESS_ASSESSMENT",
+      "@type": "owl:ObjectProperty",
+      "label": "has readiness assessment"
+    },
+    {
+      "@id": "zn:IDENTIFIED_GAP",
+      "@type": "owl:ObjectProperty",
+      "label": "identified gap"
+    },
+    {
+      "@id": "zn:USES_RUBRIC",
+      "@type": "owl:ObjectProperty",
+      "label": "uses rubric"
+    },
+    {
+      "@id": "zn:SUPPORTED_BY",
+      "@type": "owl:ObjectProperty",
+      "label": "supported by"
+    }
+  ]
+}

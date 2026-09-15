@@ -1,0 +1,4 @@
+interface:
+  display_name: "Devgraph"
+  short_description: "Read and manage your local work graph"
+  default_prompt: "Use $devgraph to inspect my work and its Arena."

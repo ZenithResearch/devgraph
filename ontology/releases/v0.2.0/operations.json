@@ -1,0 +1,134 @@
+{
+  "$schema": "https://zenith-research.ca/ontology/schemas/operation-catalog-v1",
+  "schema_version": 1,
+  "ontology_version": "0.2.0",
+  "namespace": "urn:zenith:devgraph:operation:",
+  "transport_policy": {
+    "semantic_names_are_canonical": true,
+    "secs_opcodes_are_receiver_local": true,
+    "numeric_opcodes_are_ontology_identifiers": false,
+    "actor_authority_and_scopes_derive_from_verified_transport_context": true
+  },
+  "operations": [
+    {
+      "name": "get_work_object",
+      "id": "urn:zenith:devgraph:operation:get_work_object:v1",
+      "mutation": false,
+      "required_scopes": ["devgraph.read"],
+      "request_schema_id": "urn:zenith:devgraph:schema:get-work-object-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-object:v1"
+    },
+    {
+      "name": "query_work_objects",
+      "id": "urn:zenith:devgraph:operation:query_work_objects:v1",
+      "mutation": false,
+      "required_scopes": ["devgraph.read"],
+      "request_schema_id": "urn:zenith:devgraph:schema:query-work-objects-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-object-list:v1"
+    },
+    {
+      "name": "create_work_object",
+      "id": "urn:zenith:devgraph:operation:create_work_object:v1",
+      "mutation": true,
+      "required_scopes": ["devgraph.write"],
+      "request_schema_id": "urn:zenith:devgraph:schema:create-work-object-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "update_work_object_content",
+      "id": "urn:zenith:devgraph:operation:update_work_object_content:v1",
+      "mutation": true,
+      "required_scopes": ["devgraph.write"],
+      "request_schema_id": "urn:zenith:devgraph:schema:update-work-object-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "archive_work_object",
+      "id": "urn:zenith:devgraph:operation:archive_work_object:v1",
+      "mutation": true,
+      "required_scopes": ["devgraph.write"],
+      "request_schema_id": "urn:zenith:devgraph:schema:archive-work-object-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "transition_work_object_status",
+      "id": "urn:zenith:devgraph:operation:transition_work_object_status:v1",
+      "mutation": true,
+      "required_scopes": ["devgraph.write"],
+      "request_schema_id": "urn:zenith:devgraph:schema:transition-work-object-status-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "accept_proposal",
+      "id": "urn:zenith:devgraph:operation:accept_proposal:v1",
+      "mutation": true,
+      "required_scopes": ["devgraph.write"],
+      "request_schema_id": "urn:zenith:devgraph:schema:accept-proposal-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "convert_accepted_proposal_to_issue",
+      "id": "urn:zenith:devgraph:operation:convert_accepted_proposal_to_issue:v1",
+      "mutation": true,
+      "required_scopes": ["devgraph.write"],
+      "request_schema_id": "urn:zenith:devgraph:schema:convert-proposal-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "children_of",
+      "id": "urn:zenith:devgraph:operation:children_of:v1",
+      "mutation": false,
+      "required_scopes": ["devgraph.read"],
+      "request_schema_id": "urn:zenith:devgraph:schema:children-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-object-list:v1"
+    },
+    {
+      "name": "blockers_for",
+      "id": "urn:zenith:devgraph:operation:blockers_for:v1",
+      "mutation": false,
+      "required_scopes": ["devgraph.read"],
+      "request_schema_id": "urn:zenith:devgraph:schema:blockers-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-object-list:v1"
+    },
+    {
+      "name": "export_internal_by_ids",
+      "id": "urn:zenith:devgraph:operation:export_internal_by_ids:v1",
+      "mutation": false,
+      "required_scopes": ["devgraph.export.internal"],
+      "request_schema_id": "urn:zenith:devgraph:schema:export-by-ids-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:internal-export:v1"
+    },
+    {
+      "name": "export_redacted_by_ids",
+      "id": "urn:zenith:devgraph:operation:export_redacted_by_ids:v1",
+      "mutation": false,
+      "required_scopes": ["devgraph.export.redacted"],
+      "request_schema_id": "urn:zenith:devgraph:schema:export-by-ids-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:redacted-export:v1"
+    },
+    {
+      "name": "export_public_safe_summary_by_ids",
+      "id": "urn:zenith:devgraph:operation:export_public_safe_summary_by_ids:v1",
+      "mutation": false,
+      "required_scopes": ["devgraph.export.redacted"],
+      "request_schema_id": "urn:zenith:devgraph:schema:export-by-ids-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:public-safe-summary:v1"
+    },
+    {
+      "name": "health_live",
+      "id": "urn:zenith:devgraph:operation:health_live:v1",
+      "mutation": false,
+      "required_scopes": [],
+      "request_schema_id": "urn:zenith:devgraph:schema:empty-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:liveness:v1"
+    },
+    {
+      "name": "health_ready",
+      "id": "urn:zenith:devgraph:operation:health_ready:v1",
+      "mutation": false,
+      "required_scopes": [],
+      "request_schema_id": "urn:zenith:devgraph:schema:empty-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:readiness:v1"
+    }
+  ]
+}

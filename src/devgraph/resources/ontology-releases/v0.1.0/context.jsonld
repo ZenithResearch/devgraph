@@ -1,0 +1,40 @@
+{
+  "@context": {
+    "zn": "https://zenith-research.ca/ontology/terms/",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "label": "rdfs:label",
+    "comment": "rdfs:comment",
+    "domain": {
+      "@id": "rdfs:domain",
+      "@type": "@id"
+    },
+    "range": {
+      "@id": "rdfs:range",
+      "@type": "@id"
+    },
+    "subClassOf": {
+      "@id": "rdfs:subClassOf",
+      "@type": "@id"
+    },
+    "versionIRI": {
+      "@id": "owl:versionIRI",
+      "@type": "@id"
+    },
+    "versionInfo": "owl:versionInfo",
+    "runtimeLabel": {
+      "@id": "zn:runtimeLabel",
+      "@type": "xsd:boolean"
+    },
+    "canonicalAuthority": {
+      "@id": "zn:canonicalAuthority",
+      "@type": "@id"
+    },
+    "semanticOperation": {
+      "@id": "zn:semanticOperation",
+      "@type": "@id"
+    }
+  }
+}

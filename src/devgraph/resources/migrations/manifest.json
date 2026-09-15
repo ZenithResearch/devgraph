@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "migrations": [
+    {
+      "version": 1,
+      "name": "todo_id",
+      "payload_path": "migrations/0001_todo_id.cypher",
+      "checksum": "63cff468225d176586e56986f3a0ac22d653ae56dc225f21d5664ec7897c86ad",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 2,
+      "name": "proposal_id",
+      "payload_path": "migrations/0002_proposal_id.cypher",
+      "checksum": "05b90bb9e472306335771548931908b1c9c4d74291c2c468a7183f0b1f2d97ae",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 3,
+      "name": "initiative_id",
+      "payload_path": "migrations/0003_initiative_id.cypher",
+      "checksum": "bf50f681c4bc5678f14f40d6c5c1fa39ce370a02a373924c8646372a816bc93f",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 4,
+      "name": "project_id",
+      "payload_path": "migrations/0004_project_id.cypher",
+      "checksum": "9c2e4d25fb91166332052d683ffcb0527cdd40e30245c9b5e631e1ca2f3b5979",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 5,
+      "name": "issue_id",
+      "payload_path": "migrations/0005_issue_id.cypher",
+      "checksum": "0c1965f92fbe250609a5d75cd1669cf2ded2ae8825632491ceecd35dee7ea171",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 6,
+      "name": "task_id",
+      "payload_path": "migrations/0006_task_id.cypher",
+      "checksum": "cbc965b78117ba4c1c3af85010d0794db3e4345fc9e310efc24fd604556388a4",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 7,
+      "name": "requirement_id",
+      "payload_path": "migrations/0007_requirement_id.cypher",
+      "checksum": "ed8b705c75880e2d7b1aedc341f8480c2c29fdc5ed3f7e785f96b018f95cbef6",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 8,
+      "name": "acceptance_criterion_id",
+      "payload_path": "migrations/0008_acceptance_criterion_id.cypher",
+      "checksum": "42fd4b55e5d6c8503f69fbe2fd784df39ff2bc60182d487bd5394d4613034e98",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 9,
+      "name": "blocker_id",
+      "payload_path": "migrations/0009_blocker_id.cypher",
+      "checksum": "1bc5cb0021a52a046c714426bd07f24126796fef62a5bbeb27da05f9d7abb0f4",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 10,
+      "name": "decision_id",
+      "payload_path": "migrations/0010_decision_id.cypher",
+      "checksum": "5bfd583d7571590a5c50ca47feaf14cc8dd15ca83ef370b581a21883a8439d6b",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 11,
+      "name": "handoff_id",
+      "payload_path": "migrations/0011_handoff_id.cypher",
+      "checksum": "00f03f87fb56c7bd22517c15d95972fa411eb6a890db12eb9ac30cb7b851013b",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 12,
+      "name": "review_packet_id",
+      "payload_path": "migrations/0012_review_packet_id.cypher",
+      "checksum": "e26965b7b9e8724e58f5cc34e1fffbfc28dc299f24751051cb398c3747d5fa35",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 13,
+      "name": "milestone_id",
+      "payload_path": "migrations/0013_milestone_id.cypher",
+      "checksum": "6932a360d0c1768c5899add1aa2d0be80bd229440390b4b683c3de12f2f66fd7",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 14,
+      "name": "artifact_id",
+      "payload_path": "migrations/0014_artifact_id.cypher",
+      "checksum": "28314636210f9a2a9f1e90d5fe33f608d929e34550523be6668509d85284cb13",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 15,
+      "name": "external_link_id",
+      "payload_path": "migrations/0015_external_link_id.cypher",
+      "checksum": "38c905afc6106bee686c8c5f596e4f073706a6b63738f5c708029b9845520dec",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 16,
+      "name": "sync_shadow_id",
+      "payload_path": "migrations/0016_sync_shadow_id.cypher",
+      "checksum": "cf827428728bae9cabf60b6a4871c71549e1b4c1c2bfb22c07e9df83554586b4",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 17,
+      "name": "status_set_id",
+      "payload_path": "migrations/0017_status_set_id.cypher",
+      "checksum": "a3ed30dd3995f2d0ae0755bba846058f20e32446a17989a872a220b71f9c9bff",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 18,
+      "name": "status_value_id",
+      "payload_path": "migrations/0018_status_value_id.cypher",
+      "checksum": "7dcef583662b4c0aef112b9de64e1511bae4da5f3873fb4a0549d4c387dcb772",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 19,
+      "name": "status_transition_id",
+      "payload_path": "migrations/0019_status_transition_id.cypher",
+      "checksum": "e1acd26adf28fa54e8e3326b5b619002fae0a9c6bcdd5dbd91dba6f8afacaed1",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 20,
+      "name": "event_receipt_id",
+      "payload_path": "migrations/0020_event_receipt_id.cypher",
+      "checksum": "25c35f87b3dea680afc4d1ac4aabf1dfe4384600bf3687f1006745230344fc5f",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 21,
+      "name": "hermes_session_ref_id",
+      "payload_path": "migrations/0021_hermes_session_ref_id.cypher",
+      "checksum": "855b318ba6e22284890b960759a387a6213a8c8958db23653d11bc26e1934b62",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 22,
+      "name": "readiness_assessment_id",
+      "payload_path": "migrations/0022_readiness_assessment_id.cypher",
+      "checksum": "a7d8c3e95c120daec9e1c2c4014efba966080bca8e2c0d3de886dd09337a15d5",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 23,
+      "name": "canonical_work_object_persistence_v1",
+      "payload_path": "migrations/0023_canonical_work_object_persistence_v1.cypher",
+      "checksum": "b70078405dff459146b5893ee159697db682c76ba0001a6c2ad2512084b78592",
+      "posture": "forward_only",
+      "kind": "transactional_data"
+    },
+    {
+      "version": 24,
+      "name": "event_receipt_idempotency_claim_digest",
+      "payload_path": "migrations/0024_event_receipt_idempotency_claim_digest.cypher",
+      "checksum": "36962f74ffc040efd9ad6ecab050a65ae5abc6543684f77b971dbec66bf82879",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 25,
+      "name": "work_mutation_guard_id",
+      "payload_path": "migrations/0025_work_mutation_guard_id.cypher",
+      "checksum": "824d6e8bb92d3beb410451c59a959f2000ba1edada1d6734f313667ac44124b3",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 26,
+      "name": "arena_id",
+      "payload_path": "migrations/0026_arena_id.cypher",
+      "checksum": "70774d449a1b7a47286ff28dfb80f299f3e10cac83c4fb593bcf5c0ecb158d19",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    }
+  ]
+}

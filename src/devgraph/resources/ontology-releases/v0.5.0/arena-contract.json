@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "id": "urn:zenith:ontology:arena-contract:v1",
+  "ontology_version": "0.5.0",
+  "runtime_binding": false,
+  "arena": {
+    "class": "Arena",
+    "subclass_of_todo": false,
+    "meaning": "Continuing area of responsibility that groups related work.",
+    "nested_arenas": false
+  },
+  "direct_membership": {
+    "predicate": "CONTAINS_WORK",
+    "direction": "Arena_to_Work",
+    "allowed_kinds": [
+      "Initiative",
+      "Task"
+    ],
+    "minimum_arenas_per_member": 0,
+    "maximum_arenas_per_member": 1,
+    "maximum_members_per_arena": null,
+    "requires_no_incoming_work_parent": true,
+    "work_parent_predicate": "HAS_CHILD",
+    "archived_parent_counts_as_parent": true,
+    "bare_todo_is_concrete_kind": false,
+    "duplicate_membership_edges_allowed": false
+  },
+  "derived_membership": {
+    "follow": "incoming_HAS_CHILD_to_work_root",
+    "inherit_root_arena": true,
+    "persist_inherited_edges": false,
+    "reject_multiple_parents_or_cycles": true,
+    "dependencies_and_blockers_confer_membership": false
+  },
+  "transitions": {
+    "adding_work_parent": "Remove direct Arena membership atomically before or with assigning a Work parent; inherit the new root Arena.",
+    "removing_work_parent": "Do not invent direct Arena membership; explicit Arena assignment is optional.",
+    "moving_direct_member": "Replace its prior direct Arena membership atomically.",
+    "archiving_arena": "Preserve Arena and membership references; do not cascade Work archive or completion."
+  },
+  "authority": {
+    "membership_grants_scopes": false,
+    "membership_changes_work_priority": false,
+    "membership_changes_work_status": false
+  },
+  "examples": [
+    {
+      "name": "initiative_in_arena",
+      "arena": "arena-research",
+      "kind": "Initiative",
+      "id": "initiative-planning",
+      "incoming_work_parents": [],
+      "existing_direct_arenas": [],
+      "allowed": true
+    },
+    {
+      "name": "standalone_task_in_arena",
+      "arena": "arena-research",
+      "kind": "Task",
+      "id": "task-review-notes",
+      "incoming_work_parents": [],
+      "existing_direct_arenas": [],
+      "allowed": true
+    },
+    {
+      "name": "task_already_has_issue_parent",
+      "arena": "arena-research",
+      "kind": "Task",
+      "id": "task-build",
+      "incoming_work_parents": [
+        {
+          "kind": "Issue",
+          "id": "issue-build",
+          "archived": false
+        }
+      ],
+      "existing_direct_arenas": [],
+      "allowed": false
+    },
+    {
+      "name": "archived_parent_still_counts",
+      "arena": "arena-research",
+      "kind": "Task",
+      "id": "task-old",
+      "incoming_work_parents": [
+        {
+          "kind": "Issue",
+          "id": "issue-old",
+          "archived": true
+        }
+      ],
+      "existing_direct_arenas": [],
+      "allowed": false
+    },
+    {
+      "name": "parentless_project_is_not_direct_member",
+      "arena": "arena-research",
+      "kind": "Project",
+      "id": "project-orphan",
+      "incoming_work_parents": [],
+      "existing_direct_arenas": [],
+      "allowed": false
+    },
+    {
+      "name": "parentless_issue_is_not_direct_member",
+      "arena": "arena-research",
+      "kind": "Issue",
+      "id": "issue-orphan",
+      "incoming_work_parents": [],
+      "existing_direct_arenas": [],
+      "allowed": false
+    },
+    {
+      "name": "proposal_is_not_direct_member",
+      "arena": "arena-research",
+      "kind": "Proposal",
+      "id": "proposal-new",
+      "incoming_work_parents": [],
+      "existing_direct_arenas": [],
+      "allowed": false
+    },
+    {
+      "name": "bare_todo_is_not_concrete",
+      "arena": "arena-research",
+      "kind": "Todo",
+      "id": "todo-generic",
+      "incoming_work_parents": [],
+      "existing_direct_arenas": [],
+      "allowed": false
+    },
+    {
+      "name": "nested_arena_is_not_supported",
+      "arena": "arena-research",
+      "kind": "Arena",
+      "id": "arena-other",
+      "incoming_work_parents": [],
+      "existing_direct_arenas": [],
+      "allowed": false
+    },
+    {
+      "name": "second_arena_requires_move",
+      "arena": "arena-research",
+      "kind": "Task",
+      "id": "task-review",
+      "incoming_work_parents": [],
+      "existing_direct_arenas": [
+        "arena-operations"
+      ],
+      "allowed": false
+    }
+  ]
+}

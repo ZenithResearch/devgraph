@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "ontology_id": "https://zenith-research.ca/ontology",
+  "version": "0.6.0",
+  "release": "v0.6.0",
+  "published_at": "2026-09-14T04:52:18Z",
+  "canonical_base_url": "https://zenith-research.ca/ontology/v0.6.0",
+  "supported_versions": [
+    "0.1.0",
+    "0.2.0",
+    "0.3.0",
+    "0.4.0",
+    "0.5.0",
+    "0.6.0"
+  ],
+  "discovery_url": "https://zenith-research.ca/.well-known/zenith-ontology",
+  "authority": {
+    "name": "Devgraph",
+    "repository": "https://github.com/ZenithResearch/devgraph",
+    "source_path": "ontology/",
+    "release_tag": "ontology-v0.6.0"
+  },
+  "compatibility": {
+    "mode": "additive",
+    "runtime_schema": "devgraph-v0",
+    "minimum_consumer_version": "0.1.0"
+  },
+  "files": [
+    {
+      "source": "ontology/release-notes/v0.6.0.md",
+      "target": "README.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/context.jsonld",
+      "target": "context.jsonld",
+      "media_type": "application/ld+json"
+    },
+    {
+      "source": "ontology/ontology.jsonld",
+      "target": "ontology.jsonld",
+      "media_type": "application/ld+json"
+    },
+    {
+      "source": "ontology/operations.json",
+      "target": "operations.json",
+      "media_type": "application/json"
+    },
+    {
+      "source": "ontology/repository-contract.json",
+      "target": "repository-contract.json",
+      "media_type": "application/json"
+    },
+    {
+      "source": "ontology/classes.md",
+      "target": "classes.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/predicates.md",
+      "target": "predicates.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/rolodex.md",
+      "target": "rolodex.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/taxonomy.md",
+      "target": "taxonomy.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/invariants.md",
+      "target": "invariants.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/readiness.md",
+      "target": "readiness.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/compatibility/v0.6.0.md",
+      "target": "compatibility.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/neo4j/constraints.cypher",
+      "target": "constraints.cypher",
+      "media_type": "text/plain"
+    },
+    {
+      "source": "ontology/arenas.md",
+      "target": "arenas.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/arena-contract.json",
+      "target": "arena-contract.json",
+      "media_type": "application/json"
+    },
+    {
+      "source": "ontology/arena-runtime.md",
+      "target": "arena-runtime.md",
+      "media_type": "text/markdown"
+    }
+  ]
+}

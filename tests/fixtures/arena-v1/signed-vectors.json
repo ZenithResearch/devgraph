@@ -1,0 +1,744 @@
+[
+  {
+    "key": "named-work-native-test-0001",
+    "now": 1800000000,
+    "policy": {
+      "audience": "devgraph://receiver-local",
+      "policy_id": "named-native-test",
+      "policy_version": 1,
+      "rules": [
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.create.v1",
+          "resource": "Arena/gallery",
+          "resource_match": "exact",
+          "status": "active"
+        }
+      ],
+      "schema": "secs-devgraph-work-policy.v1",
+      "schema_version": 1
+    },
+    "projection": {
+      "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "Dw8PDw8PDw8PDw8P",
+      "operation": "devgraph.arena.create.v1",
+      "receiver_policy_digest_sha256": "57b23f2f641450bf8b1efb4bc6be75c77103721a77dab5cbde0119bd2fa7e643",
+      "receiver_policy_id": "named-native-test",
+      "receiver_policy_version": 1,
+      "replay_scope": "session:operation:nonce",
+      "request_digest_sha256": "e6cd044f24c2362ff91e490e965b6eeab1f10f596c9f2ae57aab72ded9d594b2",
+      "resources": [
+        "Arena/gallery"
+      ],
+      "schema": "secs-devgraph-work-authority.v1",
+      "schema_version": 1,
+      "secs_context_id": "ctx:sha256:d3d1ca1c9fed51186a0b78a07c4b2e86ac7a5c1faf6ef68e62c2cf7b1ee0ebc0",
+      "secs_verifier_key_id": "named-test-secs",
+      "secs_verifier_signature": "9PoQ49_nqLBYqQG_F7Xj0M7sCBQXz9RxorBJ2Slsjug_Fcjk89SXN7-WX-iQ38I4oT887Vaf14iqdVlhZb2YBw",
+      "secs_verifier_signature_suite": "Ed25519",
+      "session_id": "Dw8PDw8PDw8PDw8PDw8PDw",
+      "wallet_presentation_digest_sha256": "27f3ae9a55d03dfb7b2fe6d6fa19aa1506b00716a30609f4b92c268ad713f2dc"
+    },
+    "public_key": "RQigeqlBcH8-stuUyIl6gLLBGXR2tt4hOsJz332GxP8",
+    "request": {
+      "expected_version": null,
+      "id": "gallery",
+      "kind": "Arena",
+      "operation": "create",
+      "payload": {
+        "description": "Art: caf\u00e9 \ud83d\udc4b",
+        "id": "gallery",
+        "title": "Gallery"
+      },
+      "schema": "devgraph.arena-request.v1"
+    },
+    "wallet_presentation": {
+      "actor_public_key": "vtfSq2aNo--tYTmY8G96v3h186a3Z3qfPOlH1313YKY",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "Dw8PDw8PDw8PDw8P",
+      "operation": "devgraph.arena.create.v1",
+      "request_digest_sha256": "e6cd044f24c2362ff91e490e965b6eeab1f10f596c9f2ae57aab72ded9d594b2",
+      "resources": [
+        "Arena/gallery"
+      ],
+      "schema": "devgraph.work.wallet-presentation.v1",
+      "schema_version": 1,
+      "session_id": "Dw8PDw8PDw8PDw8PDw8PDw",
+      "signature": "3GYPQoc_eer0yYWV-eUxEZ6R_tO0ySsBQQ63TN1RTSHbdX33GZ-aCs0kEYR2tyvHD3Hkvrw_O4KMToTh0Qt0DA"
+    }
+  },
+  {
+    "key": "named-work-native-test-0001",
+    "now": 1800000000,
+    "policy": {
+      "audience": "devgraph://receiver-local",
+      "policy_id": "named-native-test",
+      "policy_version": 1,
+      "rules": [
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.patch.v1",
+          "resource": "Arena/gallery",
+          "resource_match": "exact",
+          "status": "active"
+        }
+      ],
+      "schema": "secs-devgraph-work-policy.v1",
+      "schema_version": 1
+    },
+    "projection": {
+      "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "EBAQEBAQEBAQEBAQ",
+      "operation": "devgraph.arena.patch.v1",
+      "receiver_policy_digest_sha256": "2baf4f1b215b8daa2ea25be27e6791a4c0257716641e360899284b41c05b5395",
+      "receiver_policy_id": "named-native-test",
+      "receiver_policy_version": 1,
+      "replay_scope": "session:operation:nonce",
+      "request_digest_sha256": "4a7b4d12c1be8b850141ba76d12f7936f20952fc81ed20118b94b7d61e5d8feb",
+      "resources": [
+        "Arena/gallery"
+      ],
+      "schema": "secs-devgraph-work-authority.v1",
+      "schema_version": 1,
+      "secs_context_id": "ctx:sha256:43284247312857034719c25a19f02bcba1376ebeb02e2de0f1b470f7ea1dd816",
+      "secs_verifier_key_id": "named-test-secs",
+      "secs_verifier_signature": "FmYvmC3xvQ9yj_5LGtZK38_XjA-WTyJbTDZrgh5R9x_u0RJczMZ-83nwpFu5DFvP1EOznxtpu7ef-Hlti4VJBw",
+      "secs_verifier_signature_suite": "Ed25519",
+      "session_id": "EBAQEBAQEBAQEBAQEBAQEA",
+      "wallet_presentation_digest_sha256": "256d8cf84e6dba13eecdd63334feb60bce8be5deb78b637a64c82fd53a80e247"
+    },
+    "public_key": "RQigeqlBcH8-stuUyIl6gLLBGXR2tt4hOsJz332GxP8",
+    "request": {
+      "expected_version": 1,
+      "id": "gallery",
+      "kind": "Arena",
+      "operation": "patch",
+      "payload": {
+        "description": "Gallery work"
+      },
+      "schema": "devgraph.arena-request.v1"
+    },
+    "wallet_presentation": {
+      "actor_public_key": "vtfSq2aNo--tYTmY8G96v3h186a3Z3qfPOlH1313YKY",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "EBAQEBAQEBAQEBAQ",
+      "operation": "devgraph.arena.patch.v1",
+      "request_digest_sha256": "4a7b4d12c1be8b850141ba76d12f7936f20952fc81ed20118b94b7d61e5d8feb",
+      "resources": [
+        "Arena/gallery"
+      ],
+      "schema": "devgraph.work.wallet-presentation.v1",
+      "schema_version": 1,
+      "session_id": "EBAQEBAQEBAQEBAQEBAQEA",
+      "signature": "FNG-tVcTl2kqd1FfVYSD9ezoF7eBjAcDPifrqDzdR3nDZPrT_XCXDDItSps_nVYkxJEISalfhd3RzdtMLGMWDA"
+    }
+  },
+  {
+    "key": "named-work-native-test-0001",
+    "now": 1800000000,
+    "policy": {
+      "audience": "devgraph://receiver-local",
+      "policy_id": "named-native-test",
+      "policy_version": 1,
+      "rules": [
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.archive.v1",
+          "resource": "Arena/gallery",
+          "resource_match": "exact",
+          "status": "active"
+        }
+      ],
+      "schema": "secs-devgraph-work-policy.v1",
+      "schema_version": 1
+    },
+    "projection": {
+      "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "ERERERERERERERER",
+      "operation": "devgraph.arena.archive.v1",
+      "receiver_policy_digest_sha256": "b8be90d0d9d6764c21ceb2da20bba0eb2c99eaea20984f22b2ba511845cf79fa",
+      "receiver_policy_id": "named-native-test",
+      "receiver_policy_version": 1,
+      "replay_scope": "session:operation:nonce",
+      "request_digest_sha256": "e04c8202a3b272041904e35517d7ea1b87709a777fe3bbd8045729b0a4369503",
+      "resources": [
+        "Arena/gallery"
+      ],
+      "schema": "secs-devgraph-work-authority.v1",
+      "schema_version": 1,
+      "secs_context_id": "ctx:sha256:06f6f08d3fbd4e40e993c2854e94abe3c1540b24169ffe32e05331c72d48fce7",
+      "secs_verifier_key_id": "named-test-secs",
+      "secs_verifier_signature": "C2AarUa_GegOvO4A9eeIP8Yx_aPq9T242_2Hea9u8K6eIj3sNgfONa_NLpcNyl6m-U0uVYx5JOwuFcJYal4HDQ",
+      "secs_verifier_signature_suite": "Ed25519",
+      "session_id": "EREREREREREREREREREREQ",
+      "wallet_presentation_digest_sha256": "b06b8aa7ad4ac00c368e7b5cf3ecc3c5888ac8ce9412f6cfe8a89f39df38eac9"
+    },
+    "public_key": "RQigeqlBcH8-stuUyIl6gLLBGXR2tt4hOsJz332GxP8",
+    "request": {
+      "expected_version": 1,
+      "id": "gallery",
+      "kind": "Arena",
+      "operation": "archive",
+      "payload": {},
+      "schema": "devgraph.arena-request.v1"
+    },
+    "wallet_presentation": {
+      "actor_public_key": "vtfSq2aNo--tYTmY8G96v3h186a3Z3qfPOlH1313YKY",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "ERERERERERERERER",
+      "operation": "devgraph.arena.archive.v1",
+      "request_digest_sha256": "e04c8202a3b272041904e35517d7ea1b87709a777fe3bbd8045729b0a4369503",
+      "resources": [
+        "Arena/gallery"
+      ],
+      "schema": "devgraph.work.wallet-presentation.v1",
+      "schema_version": 1,
+      "session_id": "EREREREREREREREREREREQ",
+      "signature": "OrxxICWLpaDAiWz4sVmWQicEiSA-c8qFPO3V3OHOOEHpOPXobj8p2x_5PKIXzGpF6Iupi-jQVMtS1lg483lrBQ"
+    }
+  },
+  {
+    "key": "named-work-native-test-0001",
+    "now": 1800000000,
+    "policy": {
+      "audience": "devgraph://receiver-local",
+      "policy_id": "named-native-test",
+      "policy_version": 1,
+      "rules": [
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Arena/gallery",
+          "resource_match": "exact",
+          "status": "active"
+        },
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Initiative/roadmap",
+          "resource_match": "exact",
+          "status": "active"
+        }
+      ],
+      "schema": "secs-devgraph-work-policy.v1",
+      "schema_version": 1
+    },
+    "projection": {
+      "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "EhISEhISEhISEhIS",
+      "operation": "devgraph.arena.member.set.v1",
+      "receiver_policy_digest_sha256": "a0bfc05de0e3f23de6bcbd240c1abae015a95916957e8a267e2f8b79182ad82a",
+      "receiver_policy_id": "named-native-test",
+      "receiver_policy_version": 1,
+      "replay_scope": "session:operation:nonce",
+      "request_digest_sha256": "a35f43e3cc57683829a449899f499b2f43c343606dd995373db25922631f34d8",
+      "resources": [
+        "Arena/gallery",
+        "Initiative/roadmap"
+      ],
+      "schema": "secs-devgraph-work-authority.v1",
+      "schema_version": 1,
+      "secs_context_id": "ctx:sha256:a7e44287443ed58474de9db5136ada65728df292081508bf25d9a8d5d426cd7f",
+      "secs_verifier_key_id": "named-test-secs",
+      "secs_verifier_signature": "-RYqWZ__eh6CyAfC4t5EPBQIq-z4EVpzKI7GJrP0OOplFsb6siVr6fWZNO0zFHRQji1V3UeM0_xQBqEgDbmmDw",
+      "secs_verifier_signature_suite": "Ed25519",
+      "session_id": "EhISEhISEhISEhISEhISEg",
+      "wallet_presentation_digest_sha256": "4b8ab8d4cd28f640db0bf05114d0981680523dfe58a629161308747d9cd779b8"
+    },
+    "public_key": "RQigeqlBcH8-stuUyIl6gLLBGXR2tt4hOsJz332GxP8",
+    "request": {
+      "expected_version": 1,
+      "id": "roadmap",
+      "kind": "Initiative",
+      "operation": "member.set",
+      "payload": {
+        "arena": {
+          "expected_version": 1,
+          "id": "gallery",
+          "kind": "Arena"
+        },
+        "previous_arena": null
+      },
+      "schema": "devgraph.arena-request.v1"
+    },
+    "wallet_presentation": {
+      "actor_public_key": "vtfSq2aNo--tYTmY8G96v3h186a3Z3qfPOlH1313YKY",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "EhISEhISEhISEhIS",
+      "operation": "devgraph.arena.member.set.v1",
+      "request_digest_sha256": "a35f43e3cc57683829a449899f499b2f43c343606dd995373db25922631f34d8",
+      "resources": [
+        "Arena/gallery",
+        "Initiative/roadmap"
+      ],
+      "schema": "devgraph.work.wallet-presentation.v1",
+      "schema_version": 1,
+      "session_id": "EhISEhISEhISEhISEhISEg",
+      "signature": "w9w8WrAb2wTHm0Ma86_xgmINcToFKVStR2Wcdivc3C65IjKQ4bSlBkk8FhmEJLwBB-S5B-10UaCApv6cvPUSDA"
+    }
+  },
+  {
+    "key": "named-work-native-test-0001",
+    "now": 1800000000,
+    "policy": {
+      "audience": "devgraph://receiver-local",
+      "policy_id": "named-native-test",
+      "policy_version": 1,
+      "rules": [
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Arena/gallery",
+          "resource_match": "exact",
+          "status": "active"
+        },
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Task/review",
+          "resource_match": "exact",
+          "status": "active"
+        }
+      ],
+      "schema": "secs-devgraph-work-policy.v1",
+      "schema_version": 1
+    },
+    "projection": {
+      "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "ExMTExMTExMTExMT",
+      "operation": "devgraph.arena.member.set.v1",
+      "receiver_policy_digest_sha256": "b38c3cc34f7d8e9ba0ccec6582a6328fd88700a0ace252159d66965f434265dc",
+      "receiver_policy_id": "named-native-test",
+      "receiver_policy_version": 1,
+      "replay_scope": "session:operation:nonce",
+      "request_digest_sha256": "c9fe917d4a089b5b42efb353cf3c6ae7d95d27ac28ec176c7db744d827d80ae8",
+      "resources": [
+        "Arena/gallery",
+        "Task/review"
+      ],
+      "schema": "secs-devgraph-work-authority.v1",
+      "schema_version": 1,
+      "secs_context_id": "ctx:sha256:ef43afe82fbc9e481d248c8f57c86f27d4a2f0bdb33afbc94f2a6a515f1a114b",
+      "secs_verifier_key_id": "named-test-secs",
+      "secs_verifier_signature": "5n5BqQmKHgN-Az9goDDQsIlVN83LavnXeuV678gb_AYpQB0GoDiNTUSDTJt71nepi7jNfSJdoR1QAmcIR1vUBQ",
+      "secs_verifier_signature_suite": "Ed25519",
+      "session_id": "ExMTExMTExMTExMTExMTEw",
+      "wallet_presentation_digest_sha256": "97d7a80814638723941b4ed9cc41b75b2149aa23c3e22c30b22d031118f97af8"
+    },
+    "public_key": "RQigeqlBcH8-stuUyIl6gLLBGXR2tt4hOsJz332GxP8",
+    "request": {
+      "expected_version": 1,
+      "id": "review",
+      "kind": "Task",
+      "operation": "member.set",
+      "payload": {
+        "arena": {
+          "expected_version": 1,
+          "id": "gallery",
+          "kind": "Arena"
+        },
+        "previous_arena": null
+      },
+      "schema": "devgraph.arena-request.v1"
+    },
+    "wallet_presentation": {
+      "actor_public_key": "vtfSq2aNo--tYTmY8G96v3h186a3Z3qfPOlH1313YKY",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "ExMTExMTExMTExMT",
+      "operation": "devgraph.arena.member.set.v1",
+      "request_digest_sha256": "c9fe917d4a089b5b42efb353cf3c6ae7d95d27ac28ec176c7db744d827d80ae8",
+      "resources": [
+        "Arena/gallery",
+        "Task/review"
+      ],
+      "schema": "devgraph.work.wallet-presentation.v1",
+      "schema_version": 1,
+      "session_id": "ExMTExMTExMTExMTExMTEw",
+      "signature": "U_iXZVkFFaODNYhgSpIEViFb19jdkLvafKU6DJ0nsNkHKAnWetJIAgPL8D1ZB4A6ESSvNLBBnFKfAicWhrYuDA"
+    }
+  },
+  {
+    "key": "named-work-native-test-0001",
+    "now": 1800000000,
+    "policy": {
+      "audience": "devgraph://receiver-local",
+      "policy_id": "named-native-test",
+      "policy_version": 1,
+      "rules": [
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Arena/gallery",
+          "resource_match": "exact",
+          "status": "active"
+        },
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Arena/research",
+          "resource_match": "exact",
+          "status": "active"
+        },
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Task/review",
+          "resource_match": "exact",
+          "status": "active"
+        }
+      ],
+      "schema": "secs-devgraph-work-policy.v1",
+      "schema_version": 1
+    },
+    "projection": {
+      "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "FBQUFBQUFBQUFBQU",
+      "operation": "devgraph.arena.member.set.v1",
+      "receiver_policy_digest_sha256": "d700bd2c15db8a48841233ddef6591a4f3c276c587e0b8bd60dd372eac80c88b",
+      "receiver_policy_id": "named-native-test",
+      "receiver_policy_version": 1,
+      "replay_scope": "session:operation:nonce",
+      "request_digest_sha256": "2804e108880b8e324fb08d6eb0a76ccab25bdfb62d703a7a697d2c56b7e02a00",
+      "resources": [
+        "Arena/gallery",
+        "Arena/research",
+        "Task/review"
+      ],
+      "schema": "secs-devgraph-work-authority.v1",
+      "schema_version": 1,
+      "secs_context_id": "ctx:sha256:c009e79e956bc64189dbd16646314091e648d00b1619d47e380c85e9aa36a7c8",
+      "secs_verifier_key_id": "named-test-secs",
+      "secs_verifier_signature": "CAg9S-101puNE8E6z63T-NdYBLaPbCr4trQlPi_8UHYQjGMkAu4KeSxkQKbaXex5j3plwIX2svORWkxhf5dOBA",
+      "secs_verifier_signature_suite": "Ed25519",
+      "session_id": "FBQUFBQUFBQUFBQUFBQUFA",
+      "wallet_presentation_digest_sha256": "9696be040b6be44ef52da16897b2020e69d787155f3b4d19206e4286fb518bf4"
+    },
+    "public_key": "RQigeqlBcH8-stuUyIl6gLLBGXR2tt4hOsJz332GxP8",
+    "request": {
+      "expected_version": 2,
+      "id": "review",
+      "kind": "Task",
+      "operation": "member.set",
+      "payload": {
+        "arena": {
+          "expected_version": 1,
+          "id": "research",
+          "kind": "Arena"
+        },
+        "previous_arena": {
+          "expected_version": 2,
+          "id": "gallery",
+          "kind": "Arena"
+        }
+      },
+      "schema": "devgraph.arena-request.v1"
+    },
+    "wallet_presentation": {
+      "actor_public_key": "vtfSq2aNo--tYTmY8G96v3h186a3Z3qfPOlH1313YKY",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "FBQUFBQUFBQUFBQU",
+      "operation": "devgraph.arena.member.set.v1",
+      "request_digest_sha256": "2804e108880b8e324fb08d6eb0a76ccab25bdfb62d703a7a697d2c56b7e02a00",
+      "resources": [
+        "Arena/gallery",
+        "Arena/research",
+        "Task/review"
+      ],
+      "schema": "devgraph.work.wallet-presentation.v1",
+      "schema_version": 1,
+      "session_id": "FBQUFBQUFBQUFBQUFBQUFA",
+      "signature": "uxPfXzNgF0nBnRskU02MxNuQ4VQfQSkVf6EULtjheWElE8sb4CTKlyLdrIFd6etUBmNzF8QEq9hpxdsRh5YaDw"
+    }
+  },
+  {
+    "key": "named-work-native-test-0001",
+    "now": 1800000000,
+    "policy": {
+      "audience": "devgraph://receiver-local",
+      "policy_id": "named-native-test",
+      "policy_version": 1,
+      "rules": [
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Arena/gallery",
+          "resource_match": "exact",
+          "status": "active"
+        },
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.arena.member.set.v1",
+          "resource": "Task/review",
+          "resource_match": "exact",
+          "status": "active"
+        }
+      ],
+      "schema": "secs-devgraph-work-policy.v1",
+      "schema_version": 1
+    },
+    "projection": {
+      "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "FRUVFRUVFRUVFRUV",
+      "operation": "devgraph.arena.member.set.v1",
+      "receiver_policy_digest_sha256": "b38c3cc34f7d8e9ba0ccec6582a6328fd88700a0ace252159d66965f434265dc",
+      "receiver_policy_id": "named-native-test",
+      "receiver_policy_version": 1,
+      "replay_scope": "session:operation:nonce",
+      "request_digest_sha256": "a54c773d3924592b569ce5b72179aa18af8fdc45b4a763d35fb1ef8c03c53e2b",
+      "resources": [
+        "Arena/gallery",
+        "Task/review"
+      ],
+      "schema": "secs-devgraph-work-authority.v1",
+      "schema_version": 1,
+      "secs_context_id": "ctx:sha256:8e3a8e382a7e805a819bb631d8c057f1216522f4318bb864e939749f64d78273",
+      "secs_verifier_key_id": "named-test-secs",
+      "secs_verifier_signature": "H6j0HbgdzDtaN7rCfRGsT8Yop8MLRs2pMxTVtiyqFaC8BQN2B8bWQusEhg9mQnyDXfTaqGB7vXIZ0gLMidkyAA",
+      "secs_verifier_signature_suite": "Ed25519",
+      "session_id": "FRUVFRUVFRUVFRUVFRUVFQ",
+      "wallet_presentation_digest_sha256": "c382a83754acd95b455a6d9dd54aa76397ee2e2cd70ed1b529943be8311a9f1a"
+    },
+    "public_key": "RQigeqlBcH8-stuUyIl6gLLBGXR2tt4hOsJz332GxP8",
+    "request": {
+      "expected_version": 2,
+      "id": "review",
+      "kind": "Task",
+      "operation": "member.set",
+      "payload": {
+        "arena": null,
+        "previous_arena": {
+          "expected_version": 2,
+          "id": "gallery",
+          "kind": "Arena"
+        }
+      },
+      "schema": "devgraph.arena-request.v1"
+    },
+    "wallet_presentation": {
+      "actor_public_key": "vtfSq2aNo--tYTmY8G96v3h186a3Z3qfPOlH1313YKY",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "FRUVFRUVFRUVFRUV",
+      "operation": "devgraph.arena.member.set.v1",
+      "request_digest_sha256": "a54c773d3924592b569ce5b72179aa18af8fdc45b4a763d35fb1ef8c03c53e2b",
+      "resources": [
+        "Arena/gallery",
+        "Task/review"
+      ],
+      "schema": "devgraph.work.wallet-presentation.v1",
+      "schema_version": 1,
+      "session_id": "FRUVFRUVFRUVFRUVFRUVFQ",
+      "signature": "EIuLBFFfB4Jbx0EUQHdfHAydigW8fx6RU64IXqTxc8v38MSDmP4SbIy-g2nQYSSccHcSSS0owEzLZjpbFWzEDQ"
+    }
+  },
+  {
+    "key": "named-work-native-test-0001",
+    "now": 1800000000,
+    "policy": {
+      "audience": "devgraph://receiver-local",
+      "policy_id": "named-native-test",
+      "policy_version": 1,
+      "rules": [
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.work.parent.set.v1",
+          "resource": "Arena/gallery",
+          "resource_match": "exact",
+          "status": "active"
+        },
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.work.parent.set.v1",
+          "resource": "Issue/issue",
+          "resource_match": "exact",
+          "status": "active"
+        },
+        {
+          "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+          "effect": "allow",
+          "not_after": 1800000600,
+          "not_before": 1799999990,
+          "operation": "devgraph.work.parent.set.v1",
+          "resource": "Task/review",
+          "resource_match": "exact",
+          "status": "active"
+        }
+      ],
+      "schema": "secs-devgraph-work-policy.v1",
+      "schema_version": 1
+    },
+    "projection": {
+      "actor_id": "pubkey:sha256:3537588d1ff1707dfaea197d415e1951679c0d10bff8d572148a39e09d08c425",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "FhYWFhYWFhYWFhYW",
+      "operation": "devgraph.work.parent.set.v1",
+      "receiver_policy_digest_sha256": "abcab203eeb3114b4c33b78d95a76c9861f9262cadb27149b63f6e85942d059f",
+      "receiver_policy_id": "named-native-test",
+      "receiver_policy_version": 1,
+      "replay_scope": "session:operation:nonce",
+      "request_digest_sha256": "3a4f5693a7f523d15135354a7803610c5aa4b211628e60556dd6be58114223ee",
+      "resources": [
+        "Arena/gallery",
+        "Issue/issue",
+        "Task/review"
+      ],
+      "schema": "secs-devgraph-work-authority.v1",
+      "schema_version": 1,
+      "secs_context_id": "ctx:sha256:794c4ac8a4c2a814516aaee2f1290497f5eba1f9320025de6696a69f280b4b12",
+      "secs_verifier_key_id": "named-test-secs",
+      "secs_verifier_signature": "_XH_4wg5zEthmc6TJ5dVoCciMG5EgSCHbPCwP9OyZjZ_Sla7yccgaPyKTTeEBVIfkbz1mMmz1HcN2b8ZuEXxCA",
+      "secs_verifier_signature_suite": "Ed25519",
+      "session_id": "FhYWFhYWFhYWFhYWFhYWFg",
+      "wallet_presentation_digest_sha256": "01a68bd9b46f4d88a2976920523521dce276aee985e0ffc747392048570ae53e"
+    },
+    "public_key": "RQigeqlBcH8-stuUyIl6gLLBGXR2tt4hOsJz332GxP8",
+    "request": {
+      "expected_version": 2,
+      "id": "review",
+      "kind": "Task",
+      "operation": "parent.set",
+      "payload": {
+        "parent": {
+          "expected_version": 1,
+          "id": "issue",
+          "kind": "Issue"
+        },
+        "previous_arena": {
+          "expected_version": 2,
+          "id": "gallery",
+          "kind": "Arena"
+        },
+        "previous_parent": null
+      },
+      "schema": "devgraph.work-request.v1"
+    },
+    "wallet_presentation": {
+      "actor_public_key": "vtfSq2aNo--tYTmY8G96v3h186a3Z3qfPOlH1313YKY",
+      "actor_signature_suite": "Ed25519",
+      "audience": "devgraph://receiver-local",
+      "expires_at": 1800000060,
+      "idempotency_key_digest_sha256": "4726f747f95b0237aead368eec615f7658c63ac76939fb1f00bee3e93836e24a",
+      "issued_at": 1800000000,
+      "nonce": "FhYWFhYWFhYWFhYW",
+      "operation": "devgraph.work.parent.set.v1",
+      "request_digest_sha256": "3a4f5693a7f523d15135354a7803610c5aa4b211628e60556dd6be58114223ee",
+      "resources": [
+        "Arena/gallery",
+        "Issue/issue",
+        "Task/review"
+      ],
+      "schema": "devgraph.work.wallet-presentation.v1",
+      "schema_version": 1,
+      "session_id": "FhYWFhYWFhYWFhYWFhYWFg",
+      "signature": "6NfvImXTKD7XoGF-hdhqRaOKMjtIS7jDY2eCBH_ceNmTEb3kqXOjzyIbi1HrmHslmPRV9aNKbzuFYw-WkHfKBA"
+    }
+  }
+]

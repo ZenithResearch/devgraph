@@ -1,0 +1,26 @@
+{
+  "name": "devgraph",
+  "version": "0.1.0-beta.1",
+  "description": "Inspect and manage a local Devgraph work graph through its CLI and signed operation boundaries.",
+  "author": {
+    "name": "Zenith Research"
+  },
+  "repository": "https://github.com/ZenithResearch/devgraph",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Devgraph",
+    "shortDescription": "Read and manage your local work graph.",
+    "longDescription": "Inspect Work, Arenas, observations, and supporting material. Use the Devgraph CLI for local reads and native Wallet/secS-authorized writes. Service installation and authority setup are separate.",
+    "developerName": "Zenith Research",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Show my active Devgraph initiatives and their Arenas.",
+      "Read the description and plan for a Devgraph task.",
+      "Check Devgraph readiness and my current write authority."
+    ]
+  }
+}

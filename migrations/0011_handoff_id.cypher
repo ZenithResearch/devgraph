@@ -1,0 +1,1 @@
+CREATE CONSTRAINT handoff_id IF NOT EXISTS FOR (n:Handoff) REQUIRE n.id IS UNIQUE;

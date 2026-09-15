@@ -1,0 +1,12 @@
+Devgraph
+Copyright (C) 2026 Devgraph contributors
+
+Devgraph's original source code, documentation, ontology, skills and plugin
+integrations are licensed under the GNU Affero General Public License,
+version 3 only (SPDX: AGPL-3.0-only). See LICENSE for the full terms.
+
+Canonical source: https://github.com/ZenithResearch/devgraph
+
+Third-party dependencies retain their own licenses. See THIRD_PARTY_NOTICES.md.
+Separately installed Neo4j, Java, Castalia Wallet, secS, Codex and Hermes are not
+licensed or distributed by this notice. Their own terms continue to apply.

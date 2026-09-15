@@ -1,0 +1,20 @@
+{
+  "name": "devgraph-beta",
+  "interface": {
+    "displayName": "Devgraph Beta"
+  },
+  "plugins": [
+    {
+      "name": "devgraph",
+      "source": {
+        "source": "local",
+        "path": "./plugins/devgraph"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+CREATE CONSTRAINT status_set_id IF NOT EXISTS FOR (n:StatusSet) REQUIRE n.id IS UNIQUE;

@@ -1,0 +1,1 @@
+CREATE CONSTRAINT status_value_id IF NOT EXISTS FOR (n:StatusValue) REQUIRE n.id IS UNIQUE;

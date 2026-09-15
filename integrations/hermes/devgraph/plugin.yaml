@@ -1,0 +1,10 @@
+name: devgraph
+version: 0.1.0-beta.1
+description: Bounded Devgraph reads and signed Work and Arena operations through the local CLI.
+author: ZenithResearch
+kind: standalone
+provides_tools:
+  - devgraph_status
+  - devgraph_read
+  - devgraph_work_operation
+  - devgraph_arena_operation

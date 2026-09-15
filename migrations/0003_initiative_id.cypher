@@ -1,0 +1,1 @@
+CREATE CONSTRAINT initiative_id IF NOT EXISTS FOR (n:Initiative) REQUIRE n.id IS UNIQUE;

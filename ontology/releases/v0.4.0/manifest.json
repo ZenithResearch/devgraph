@@ -1,0 +1,115 @@
+{
+  "authority": {
+    "name": "Devgraph",
+    "release_tag": "ontology-v0.4.0",
+    "repository": "https://github.com/ZenithResearch/devgraph",
+    "source_path": "ontology/"
+  },
+  "bundle_digest": "6377bced138d502efd485df5a91320f4d8a93c8dc791102d0f4ce26309a63fe0",
+  "bundle_digest_algorithm": "sha256-file-list-v1",
+  "canonical_base_url": "https://zenith-research.ca/ontology/v0.4.0",
+  "compatibility": {
+    "minimum_consumer_version": "0.1.0",
+    "mode": "additive",
+    "runtime_schema": "devgraph-v0"
+  },
+  "discovery_url": "https://zenith-research.ca/.well-known/zenith-ontology",
+  "files": [
+    {
+      "bytes": 1017,
+      "media_type": "text/markdown",
+      "path": "README.md",
+      "sha256": "8edcaef89bbf97f300ca07d3c2d6ad6c2ec4f9f9ae714d762b725cc71558bf59",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/README.md"
+    },
+    {
+      "bytes": 9950,
+      "media_type": "text/markdown",
+      "path": "classes.md",
+      "sha256": "0f64d1d8910aa4d91d844f99b0732d7fa4f1d04c6e71a099146e520176efab89",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/classes.md"
+    },
+    {
+      "bytes": 1036,
+      "media_type": "text/markdown",
+      "path": "compatibility.md",
+      "sha256": "45bc3aecfb4fd5f05f211f23d941b386abcb7187da5f4ae22bbec4ce5569820d",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/compatibility.md"
+    },
+    {
+      "bytes": 2268,
+      "media_type": "text/plain",
+      "path": "constraints.cypher",
+      "sha256": "efdebc302e08d2ee387c7d1bf611e18dc395228c39ca613172cb67c7f8faff0b",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/constraints.cypher"
+    },
+    {
+      "bytes": 956,
+      "media_type": "application/ld+json",
+      "path": "context.jsonld",
+      "sha256": "45bae6e66df778892ea90950dd3d0aab06371701a1d3f1e79d4d096fc90a46e8",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/context.jsonld"
+    },
+    {
+      "bytes": 3884,
+      "media_type": "text/markdown",
+      "path": "invariants.md",
+      "sha256": "7f6e8393a15982e7ef915d6de1a607473e219da36c9713366aafcc5cfa5f3f8c",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/invariants.md"
+    },
+    {
+      "bytes": 9823,
+      "media_type": "application/ld+json",
+      "path": "ontology.jsonld",
+      "sha256": "cddd86b90c4161fb25f6206f1460ff9cde0520c36eb8aaacdf64699e3e4f96b7",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/ontology.jsonld"
+    },
+    {
+      "bytes": 6028,
+      "media_type": "application/json",
+      "path": "operations.json",
+      "sha256": "96820a6327f48dce2c3f2fad6752d4e47b5e3753ac86229ff266dc9788955670",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/operations.json"
+    },
+    {
+      "bytes": 4263,
+      "media_type": "text/markdown",
+      "path": "predicates.md",
+      "sha256": "2c72fdb96baea91b729aa0f6e8f38ccf91c45ca46eae5d31b83cbe0a4ff2a093",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/predicates.md"
+    },
+    {
+      "bytes": 2910,
+      "media_type": "text/markdown",
+      "path": "readiness.md",
+      "sha256": "233f6e52611c41c4b9f3ec81b9924c3b2a89e6851490b485cd749a59682c4503",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/readiness.md"
+    },
+    {
+      "bytes": 1359,
+      "media_type": "application/json",
+      "path": "repository-contract.json",
+      "sha256": "17c97eaae310357431062638bcbc53fb8bb51755e88b53212dad684964b30e16",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/repository-contract.json"
+    },
+    {
+      "bytes": 3866,
+      "media_type": "text/markdown",
+      "path": "rolodex.md",
+      "sha256": "c7ecc27e99dc3f30714f203c6665ec67630cd9d2d6033789bbabc6d3c20219c5",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/rolodex.md"
+    },
+    {
+      "bytes": 2163,
+      "media_type": "text/markdown",
+      "path": "taxonomy.md",
+      "sha256": "b9125bac71a748d6a1ab39f426f34506cb655304856427aa6772a50adce523f1",
+      "url": "https://zenith-research.ca/ontology/v0.4.0/taxonomy.md"
+    }
+  ],
+  "ontology_id": "https://zenith-research.ca/ontology",
+  "published_at": "2026-09-02T21:43:54Z",
+  "release": "v0.4.0",
+  "schema_version": 1,
+  "version": "0.4.0"
+}
