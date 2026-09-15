@@ -18,9 +18,10 @@ is:
 - `accept_proposal` and `convert_proposal`.
 
 The original `create_issue`, `get_issue`, `list_issues`, and
-`transition_issue_to_review` methods remain compatibility wrappers. The Issue
-#14 historical remote gateway remains separate from the beta integrations. Its legacy
-four-operation bearer proof is not the production signed-write path.
+`transition_issue_to_review` methods remain compatibility wrappers. The draft
+[remote gateway](dev/remote-access.md) composes these four methods and remains
+separate from the beta integrations. Its legacy bearer mutation proof is not
+the production signed-write path.
 
 The client also provides `execute_named_work` and `execute_arena`, receiving an
 explicit `DevgraphWorkContext` projection from the native authority path, plus
@@ -30,7 +31,10 @@ credential never gains write authority from a client method or plugin.
 
 The client owns immutable strict response values, an immutable per-call
 credential context, and typed fail-closed errors. The credential is excluded
-from repr and model serialization, and validation errors hide raw inputs.
+from repr and model serialization, and formatted validation errors hide raw
+inputs. Generic Pydantic structured errors can retain rejected input; do not log
+them with credentials. The remote gateway uses a separate credential validation
+boundary with fixed diagnostics before constructing a client context.
 Caller-supplied idempotency keys are forwarded unchanged on writes and are
 absent from reads. Duplicate mutations preserve the server's null-work,
 original-receipt response.
