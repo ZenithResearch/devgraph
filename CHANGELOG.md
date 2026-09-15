@@ -1,9 +1,10 @@
 # Changelog
 
-## 0.1.0-beta.1 — 2026-09-15
+## 0.1.0-beta.2 — 2026-09-15
 
 First public beta, published as a clean source snapshot under AGPL-3.0-only.
-Earlier internal history is retained privately.
+Earlier internal history is retained privately. The beta.1 tag identifies the
+initial source candidate; its download release was not published.
 
 ### Included
 
@@ -24,6 +25,9 @@ Earlier internal history is retained privately.
 - Updated FastAPI and Starlette to address the dependency advisories identified
   in the beta audit while preserving the Python 3.10 baseline.
 - Pinned CI actions, limited checkout credentials, and bounded CI execution.
+- Made expression function dispatch explicit and added tests rejecting prototype
+  names and predictor overrides; confirmed provisioning output contains state
+  labels rather than credential values.
 - Removed internal planning/review archives from the public source snapshot.
 
 ### Beta limits

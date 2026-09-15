@@ -12,7 +12,7 @@ baseline; the package does not force an installed runtime downgrade.
 
 ## Setup
 
-The standalone `devgraph-0.1.0b1-hermes.tar.gz` archive includes this plugin
+The standalone `devgraph-0.1.0b2-hermes.tar.gz` archive includes this plugin
 and its canonical skill under `devgraph/skills/devgraph/`; a Devgraph source
 checkout is not required. Verify the archive checksum against the accompanying
 release manifest, then install it into the intended Hermes profile. This
@@ -21,7 +21,7 @@ profile's directory when applicable and set the archive's downloaded path:
 
 ```sh
 devgraph_profile="$HOME/.hermes"
-devgraph_archive="/absolute/path/to/devgraph-0.1.0b1-hermes.tar.gz"
+devgraph_archive="/absolute/path/to/devgraph-0.1.0b2-hermes.tar.gz"
 (
   set -eu
   test ! -e "$devgraph_profile/plugins/devgraph"
