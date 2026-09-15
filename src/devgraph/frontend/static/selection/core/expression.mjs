@@ -12,7 +12,6 @@ export function evaluateExpression(source, variables) {
     requireThat(tokens.length <= 512, 'expression_size', 'Expression has too many tokens.');
   }
   let at = 0;
-  const functions = {min: (...xs) => Math.min(...xs), max: (...xs) => Math.max(...xs), abs: Math.abs, sqrt: Math.sqrt};
   function expression(depth = 0) {
     let value = term(depth + 1);
     while (tokens[at] === '+' || tokens[at] === '-') { const op = tokens[at++], rhs = term(depth + 1); value = op === '+' ? value + rhs : value - rhs; }
@@ -34,11 +33,15 @@ export function evaluateExpression(source, variables) {
     if (token && /^(\d|\.)/.test(token)) return finite(Number(token), 'Expression number');
     requireThat(token && /^[A-Za-z_]/.test(token), 'expression_syntax', 'Expected a number or declared predictor.');
     if (tokens[at] === '(') {
-      requireThat(Object.hasOwn(functions, token), 'expression_function', 'Allowed functions: min, max, abs, sqrt.'); at++;
+      requireThat(['min', 'max', 'abs', 'sqrt'].includes(token), 'expression_function', 'Allowed functions: min, max, abs, sqrt.'); at++;
       const args = [expression(depth + 1)];
       while (tokens[at] === ',') { at++; args.push(expression(depth + 1)); }
       requireThat(tokens[at++] === ')' && args.length <= 16 && (!['abs', 'sqrt'].includes(token) || args.length === 1), 'expression_arguments', 'Invalid function arguments.');
-      return finite(functions[token](...args), 'Function result');
+      // Keep call targets explicit: expression input can only select these operations.
+      const result = token === 'min' ? Math.min(...args)
+        : token === 'max' ? Math.max(...args)
+        : token === 'abs' ? Math.abs(args[0]) : Math.sqrt(args[0]);
+      return finite(result, 'Function result');
     }
     requireThat(Object.hasOwn(variables, token), 'expression_variable', 'Unknown predictor: ' + token);
     return finite(variables[token], token);

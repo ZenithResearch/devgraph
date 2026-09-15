@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "devgraph"
-version = "0.1.0b1"
+version = "0.1.0b2"
 description = "Local work graph, ontology, and agent integrations"
 readme = "README.md"
 license = "AGPL-3.0-only"

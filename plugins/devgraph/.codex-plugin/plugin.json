@@ -1,6 +1,6 @@
 {
   "name": "devgraph",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Inspect and manage a local Devgraph work graph through its CLI and signed operation boundaries.",
   "author": {
     "name": "Zenith Research"

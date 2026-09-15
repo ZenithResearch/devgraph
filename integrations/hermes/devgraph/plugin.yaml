@@ -1,5 +1,5 @@
 name: devgraph
-version: 0.1.0-beta.1
+version: 0.1.0-beta.2
 description: Bounded Devgraph reads and signed Work and Arena operations through the local CLI.
 author: ZenithResearch
 kind: standalone
