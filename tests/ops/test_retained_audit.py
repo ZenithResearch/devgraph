@@ -343,6 +343,9 @@ def test_stalled_writer_bounds_callers_fails_closed_and_recovers(tmp_path, monke
                 break
         time.sleep(0.005)
     monkeypatch.setattr(log, "_connection", connection)
+    # The short timeout above proves stalled callers fail closed quickly. The
+    # recovery proof should allow a normal durable SQLite write on slower CI.
+    monkeypatch.setattr("devgraph.ops.retained_audit.AUDIT_WAIT_SECONDS", 1.0)
     log.check()
 
 
