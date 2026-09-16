@@ -52,6 +52,16 @@ none of these. Use the same private request and idempotency key after an unknown
 write outcome. Do not substitute a development verifier, writable bearer, or
 direct database access when signing or authorization fails.
 
+Before any Work write, shape the requested authority to the exact mutation:
+operation, Work kind, Work ID, expected version, idempotency key when applicable,
+and only directly mutated related resources. Avoid broad requests for wildcard
+Work kinds, all operations, all descendants, lifecycle authority, or unrelated
+Proposal/Initiative/Project/Issue/Task permissions when the user asked for one
+narrow edit. Split unrelated edits into separate narrow write requests. Use the
+exact owner-private request file, idempotency file, and evidence path permissions
+documented in [Work and Arena operations](references/work-api.md) when those
+files are involved.
+
 ## Interpret records accurately
 
 - `Arena` is a separate runtime type. It groups parentless Initiatives and
