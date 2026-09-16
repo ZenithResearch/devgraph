@@ -99,6 +99,23 @@ def test_registration_manifest_and_shared_skill(plugin, monkeypatch, tmp_path):
         assert json.loads(entry["handler"]({}, task_id="fixture"))["name"] == entry["name"]
 
 
+def test_packaged_skill_guides_narrow_work_authority():
+    skill = PLUGIN.parents[2] / "plugins/devgraph/skills/devgraph/SKILL.md"
+    reference = PLUGIN.parents[2] / "plugins/devgraph/skills/devgraph/references/work-api.md"
+    combined = skill.read_text() + "\n" + reference.read_text()
+    for phrase in (
+        "operation, Work kind, Work ID, expected version",
+        "wildcard Work kinds",
+        "all descendants",
+        "lifecycle authority",
+        "Split unrelated edits into separate narrow write requests",
+        "changing `Issue/example-issue` from version 7 to status `review`",
+        "Adding `Task/setup-api` version 3 as a dependency",
+        "evidence paths needed for that operation",
+    ):
+        assert phrase in combined
+
+
 def test_read_actual_process_is_bounded_and_drops_inherited_secrets(plugin, fake_cli, monkeypatch):
     install, audit, _ = fake_cli
     install('print(json.dumps({"items": [{"id": "example", "title": "A plan"}]}))')

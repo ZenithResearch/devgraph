@@ -68,6 +68,22 @@ Check `devgraph auth status --check` for the selected identity and
 does not prove current authority. Read current subject and related-record
 versions before constructing an update.
 
+Request the narrowest write authority that can satisfy the next mutation. Bind
+the exact operation, exact Work kind and ID, the expected version being changed,
+the idempotency key when the operation uses one, and only directly mutated
+related resources. Do not ask for wildcard Work kinds, all operations, all
+descendants of a parent, lifecycle authority, or unrelated
+Proposal/Initiative/Project/Issue/Task permissions when a single Issue or Task
+edit is enough. Split unrelated changes into separate requests so each request
+has its own small authority surface and idempotency key.
+
+For example, changing `Issue/example-issue` from version 7 to status `review`
+is one `status` request scoped to `Issue/example-issue` at expected version 7.
+Adding `Task/setup-api` version 3 as a dependency of `Task/write-client`
+version 5 is a separate `dependency.add` request scoped to
+`Task/write-client` and the target `Task/setup-api`. Do not combine those into
+a broad Work-level authority request over every Issue and Task under a Project.
+
 ```text
 devgraph work create|patch|status|archive|accept|convert|parent.set|dependency.add|dependency.remove|blocker.add|blocker.remove --request-file /absolute/private/request.json --idempotency-key-file /absolute/private/idempotency.txt
 ```
@@ -90,7 +106,9 @@ other operations require the current positive integer version. The CLI command
 must match the request's operation. Both files must be absolute, owner-private
 regular files in private directories. Idempotency keys contain 16–128 ASCII
 letters, digits, `.`, `_`, `~`, or `-`. Use private temporary files and preserve
-them through uncertain outcomes; do not place them in a repository.
+them through uncertain outcomes; do not place them in a repository. When a
+workflow records evidence files, give the signer/CLI only the exact private
+request, idempotency, and evidence paths needed for that operation.
 
 | Operation | Payload |
 |---|---|
