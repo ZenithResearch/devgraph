@@ -46,3 +46,12 @@ Devgraph’s license. Neither agent package includes Hermes or Codex itself.
 
 The project-selection page uses the repository’s dependency-free JavaScript
 modules. It does not require or redistribute the separate preview browser SDK.
+
+## Rust request protocol
+
+The source-only `devgraph-work-protocol` crate depends on `serde` (MIT OR Apache-2.0),
+`serde_json` (MIT OR Apache-2.0), and `sha2` (MIT OR Apache-2.0). Cargo resolves their
+transitive dependencies from the registry under the versions/checksums in
+`Cargo.lock`; their respective notices remain authoritative. This repository does
+not vendor those dependencies. The Devgraph crate itself follows the repository's
+AGPL-3.0-only license and does not change the licenses of separate native companions.

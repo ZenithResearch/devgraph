@@ -149,6 +149,13 @@ creation, restore-preflight checks, and disposable database verification. These
 operations require the appropriate operator-selected target and evidence; their
 presence in the package does not verify another installation's recovery posture.
 
+## Shared Rust request protocol
+
+The public `devgraph-work-protocol` crate provides the closed Work/Arena request
+parser, canonical bytes, complete resource inventory and domain-separated request
+digests for native and WASM consumers. It does not hold keys, issue grants or run
+operations. See [protocol source and verification](docs/dev/shared-work-protocol.md).
+
 ## Development checks
 
 ```sh

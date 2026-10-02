@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Publish the shared Rust Work/Arena request protocol and cross-language synthetic fixtures — native and WASM consumers can pin public source without importing private history or losing Arena resource bindings.
+
 ## 0.1.0-beta.2 — 2026-09-15
 
 First public beta, published as a clean source snapshot under AGPL-3.0-only.
