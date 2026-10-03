@@ -1027,12 +1027,19 @@ FRONTEND_HTML = r'''<!doctype html>
       for (const [key, value] of Object.entries(attributes)) if (element.getAttribute(key) !== String(value)) element.setAttribute(key, String(value));
     }
 
+    function solidArtwork(kind) {
+      const model = Topology.solid(kind), group = svgMake('g', { id: `graph-solid-${kind}`, 'stroke-linejoin': 'round' });
+      for (const face of model.faces) group.append(svgMake('path', { d: face.d, fill: face.fill, stroke: '#e9f6ff', 'stroke-opacity': '.22', 'stroke-width': '.018' }));
+      group.append(svgMake('path', { d: model.d, fill: 'url(#graph-solid-sheen)', stroke: '#e9f6ff', 'stroke-opacity': '.5', 'stroke-width': '.025' }));
+      return group;
+    }
+
     function ensureGraphScene(svg) {
       if (svg.querySelector('#scene-nodes')) return;
       svg.replaceChildren(); const defs = svgMake('defs');
-      for (const [id, bright, dark] of [['arena', '#b9e6ff', '#235f9e'], ['work', '#a8ffe0', '#137954'], ['observation', '#ffe5ad', '#9a6d20'], ['receipt', '#e3d8ff', '#6951ad']]) {
-        const gradient = svgMake('radialGradient', { id: `sphere-${id}`, cx: '30%', cy: '25%', r: '75%' }); gradient.append(svgMake('stop', { offset: '0%', 'stop-color': bright }), svgMake('stop', { offset: '100%', 'stop-color': dark })); defs.append(gradient);
-      }
+      const sheen = svgMake('linearGradient', { id: 'graph-solid-sheen', gradientUnits: 'userSpaceOnUse', x1: '-.65', y1: '-1', x2: '.65', y2: '1' });
+      sheen.append(svgMake('stop', { offset: '0%', 'stop-color': '#fff', 'stop-opacity': '.32' }), svgMake('stop', { offset: '48%', 'stop-color': '#fff', 'stop-opacity': '0' }), svgMake('stop', { offset: '100%', 'stop-color': '#07131d', 'stop-opacity': '.24' })); defs.append(sheen);
+      for (const kind of [...Object.keys(Topology.registry), 'other']) defs.append(solidArtwork(kind));
       const marker = svgMake('marker', { id: 'graph-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }); marker.append(svgMake('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#8aa99a' })); defs.append(marker);
       svg.append(defs, svgMake('rect', { id: 'scene-hit', class: 'graph-scene-hit', x: 0, y: 0 }), svgMake('g', { id: 'scene-edges' }), svgMake('g', { id: 'scene-nodes' }), svgMake('g', { id: 'scene-labels', 'pointer-events': 'none' }), svgMake('text', { id: 'scene-empty', x: '50%', y: '50%', 'text-anchor': 'middle', class: 'graph-node-kind' }));
     }
@@ -1065,15 +1072,16 @@ FRONTEND_HTML = r'''<!doctype html>
         const position = positions.get(node.key), r = position.radius; let group = existingNodes.get(node.key);
         if (!group) {
           group = svgMake('g', { tabindex: 0, role: 'button', 'data-node-key': node.key });
-          group.append(svgMake('title'), svgMake('circle', { class: 'graph-node-hit', cx: 0, cy: 0 }), svgMake('path', { class: 'graph-sphere' }), svgMake('circle', { class: 'graph-selection-ring', cx: 0, cy: 0 }));
+          group.append(svgMake('title'), svgMake('circle', { class: 'graph-node-hit', cx: 0, cy: 0 }), svgMake('use', { class: 'graph-solid', 'pointer-events': 'none' }), svgMake('path', { class: 'graph-sphere' }), svgMake('circle', { class: 'graph-selection-ring', cx: 0, cy: 0 }));
           nodeLayer.append(group);
         }
         const selected = node.key === state.selectedGraphKey, nearby = adjacent.has(node.key), count = graphView.index.degree.get(node.key) || 0;
         setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}${node.key === previewKey ? ' preview' : ''}`, tabindex: node.key === (graphView.index.byKey.has(state.selectedGraphKey) ? state.selectedGraphKey : nodes[0]?.key) ? 0 : -1, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.32' : '1', 'aria-pressed': selected, 'aria-label': `${Topology.visual(node.kind).label}: ${node.title}, ${node.status}, ${count} visible connections. Press Enter to read; arrow keys move the node.` });
-        group._parts ||= {title:group.querySelector('title'),hit:group.querySelector('.graph-node-hit'),shape:group.querySelector('.graph-sphere'),ring:group.querySelector('.graph-selection-ring')};
+        group._parts ||= {title:group.querySelector('title'),hit:group.querySelector('.graph-node-hit'),solid:group.querySelector('.graph-solid'),shape:group.querySelector('.graph-sphere'),ring:group.querySelector('.graph-selection-ring')};
         const titleText = `${Topology.visual(node.kind).label}: ${node.title} · ${node.status}`; if (group._parts.title.textContent !== titleText) group._parts.title.textContent = titleText;
         setSvg(group._parts.hit, { r: Math.max(14, r + 5) });
-        setSvg(group._parts.shape, { d: nodeShape(node.kind, r), fill: Topology.visual(node.kind).color });
+        setSvg(group._parts.solid, { href: `#graph-solid-${Object.hasOwn(Topology.registry,node.kind)?node.kind:'other'}`, transform: `scale(${r})` });
+        setSvg(group._parts.shape, { d: nodeShape(node.kind, r), fill: 'none' });
         setSvg(group._parts.ring, { r: r + 6, visibility: selected ? 'visible' : 'hidden' });
         occupied.push({ x: position.x - r - 2, y: position.y - r - 2, width: (r + 2) * 2, height: (r + 2) * 2 });
         if (graphView.labels !== 'none' && (labelKeys.has(node.key) || (graphView.labels === 'all' && candidates.length < 160))) {
@@ -1291,7 +1299,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function typeSample(kind) {
-      const v=Topology.visual(kind),svg=svgMake('svg',{viewBox:'-18 -18 36 36',class:'type-sample','aria-hidden':'true'}); svg.append(svgMake('path',{d:Topology.shape(kind,12),fill:v.color,stroke:'currentColor','stroke-width':.5})); return svg;
+      const svg=svgMake('svg',{viewBox:'-1.2 -1.2 2.4 2.4',class:'type-sample','aria-hidden':'true'}); svg.append(svgMake('use',{href:`#graph-solid-${Object.hasOwn(Topology.registry,kind)?kind:'other'}`})); return svg;
     }
 
     function renderTopologyControls() {
@@ -1499,7 +1507,7 @@ FRONTEND_HTML = r'''<!doctype html>
     document.addEventListener('pointerdown', event => { if (event.target.matches('input[type="range"], [role="separator"]')) state.controlDragging = true; });
     ['pointerup', 'pointercancel'].forEach(name => document.addEventListener(name, () => { state.controlDragging = false; flushPendingSnapshot(); }));
     document.getElementById('graph-details').classList.add('collapsed'); text('reader-toggle', 'Show details'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'false');
-    initializeTopologyControls();
+    ensureGraphScene(graphSvg); initializeTopologyControls();
     new ResizeObserver(resizeGraphViewport).observe(graphSvg); resizeGraphViewport(); syncZoomControls();
     document.getElementById('graph-reset').addEventListener('click', resetGraphView);
     document.getElementById('graph-settle').addEventListener('click', settleGraph); document.getElementById('graph-force-reset').addEventListener('click', resetForceStrengths);

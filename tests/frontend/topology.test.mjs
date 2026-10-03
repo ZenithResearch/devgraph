@@ -17,6 +17,37 @@ test('the visual registry gives all eight types different shapes and colors',()=
   assert.equal(T.visual('EventReceipt').label,'Record');
 });
 
+test('Work types use all five regular, closed Platonic solids',()=>{
+  const {Topology:T}=model();
+  assert.equal(new Set(T.kinds.map(kind=>T.visual(kind).shape)).size,5);
+  const expected={tetrahedron:[4,4,3],cube:[8,6,4],octahedron:[6,8,3],dodecahedron:[20,12,5],icosahedron:[12,20,3]};
+  for(const [name,[vertices,faces,sides]] of Object.entries(expected)) {
+    const mesh=T.solids[name],edges=new Map(),lengths=[];
+    assert.equal(mesh.vertices.length,vertices);assert.equal(mesh.faces.length,faces);
+    for(const face of mesh.faces) {
+      assert.equal(face.indices.length,sides);
+      for(let i=0;i<sides;i++) {
+        const a=face.indices[i],b=face.indices[(i+1)%sides],key=[a,b].sort((a,b)=>a-b).join(',');
+        edges.set(key,(edges.get(key)||0)+1);
+        lengths.push(Math.hypot(...mesh.vertices[a].map((v,j)=>v-mesh.vertices[b][j])));
+      }
+    }
+    assert.ok([...edges.values()].every(count=>count===2),'each edge borders two faces');
+    assert.equal(vertices-edges.size+faces,2,'closed convex surface');
+    assert.ok(Math.max(...lengths)-Math.min(...lengths)<1e-7,'all edges have equal length');
+  }
+});
+
+test('projected solids share cached, finite artwork bounded by the picking radius',()=>{
+  const {Topology:T}=model();
+  for(const kind of [...Object.keys(T.registry),'unknown','constructor']) {
+    const art=T.solid(kind);
+    assert.equal(art,T.solid(kind));assert.ok(art.faces.length>=2);
+    assert.ok(art.outline.every(p=>Math.hypot(p[0],p[1])<=1+1e-7));
+    for(const face of art.faces){assert.doesNotMatch(face.d,/NaN|Infinity/);assert.match(face.fill,/^#[0-9a-f]{6}$/);}
+  }
+});
+
 test('saved preferences preserve explicit none, remove obsolete values and exclude private fields',()=>{
   const {Topology:T}=model();
   const p=T.preferences({version:1,filters:{work_kind:['Task','Obsolete'],category:[],q:'  TITLE  '},token:'secret',nodes:[{description:'secret'}],readerWidth:900});

@@ -115,3 +115,24 @@ requires an independently approved compatible producer/provisioning; no new
 grants or sign-in workflow were activated by this UI change. See the
 [topology contract](../monitor-topology-v1.md) for exact limits and the
 revision-validated read's concurrency limits.
+
+## Platonic-solid visual revision
+
+The subsequent shape revision replaces flat symbols with lit, projected regular
+solids. The monitor's SVG nodes and legend were visually checked in the in-app
+browser; keyboard selection opened the correct Project details. A separate
+temporary loopback fixture exercised the shipped canvas renderer with all eight
+types at both scales. At 2× pixel density, a 1200×700 canvas, 60 warm redraws and
+no CPU throttling, drawing p95 was 0.60 ms for 250 nodes / 713 edges and 2.70 ms
+for 1,500 nodes / 4,463 edges. Frame intervals p95 were 9.10 and 9.30 ms. These
+are renderer-only observations in the in-app browser, not a controlled comparison
+with the earlier Chrome run or qualification of a smaller Mac.
+
+The geometry tests check regular edge lengths, expected face counts and closed
+surfaces for all five Platonic solids. The canvas regression check verifies
+1,500 items reuse eight type sprites plus one bounded unknown-type fallback
+across redraws and zoom. All 122 JavaScript tests passed. The verification script
+again passed 2,153 Python tests (five opt-in skips), generated-artifact checks and
+lint. `uv sync --locked`, the separate `ruff check src tests scripts integrations`,
+and `git diff --check` also exited 0. Commands use the same `UV_CACHE_DIR` shown
+above; the standalone JavaScript command remains `node --test tests/frontend/*.test.mjs`.

@@ -4,28 +4,73 @@
   const kinds = ['Proposal', 'Initiative', 'Project', 'Issue', 'Task'];
   const categories = ['arena', 'work', 'observation', 'receipt'];
   const registry = {
-    Proposal: { label: 'Proposal', color: '#b49bff', shape: 'triangle', description: 'A suggested change awaiting a decision' },
-    Initiative: { label: 'Initiative', color: '#7baaff', shape: 'circle', description: 'A larger effort spanning projects' },
-    Project: { label: 'Project', color: '#60c7ba', shape: 'square', description: 'A bounded delivery effort' },
-    Issue: { label: 'Issue', color: '#efbb63', shape: 'diamond', description: 'A trackable problem or implementation item' },
-    Task: { label: 'Task', color: '#9ad580', shape: 'hexagon', description: 'A concrete unit of work' },
-    Arena: { label: 'Arena', color: '#70d5ee', shape: 'capsule', description: 'A grouping of related work' },
-    InitiativeObservation: { label: 'Observation', color: '#e69cb7', shape: 'bubble', description: 'An interpretation supported by evidence' },
-    EventReceipt: { label: 'Record', color: '#b4bccb', shape: 'document', description: 'An unsigned record of a committed change' },
+    Proposal: { label: 'Proposal', color: '#b49bff', shape: 'tetrahedron', pose: [-.12,.38,.04], description: 'A suggested change awaiting a decision' },
+    Initiative: { label: 'Initiative', color: '#7baaff', shape: 'icosahedron', pose: [.18,.3,.08], description: 'A larger effort spanning projects' },
+    Project: { label: 'Project', color: '#60c7ba', shape: 'cube', pose: [-.42,.58,0], description: 'A bounded delivery effort' },
+    Issue: { label: 'Issue', color: '#efbb63', shape: 'octahedron', pose: [-.12,.42,0], description: 'A trackable problem or implementation item' },
+    Task: { label: 'Task', color: '#9ad580', shape: 'dodecahedron', pose: [-.2,.32,.08], description: 'A concrete unit of work' },
+    Arena: { label: 'Arena', color: '#70d5ee', shape: 'icosahedron', pose: [-.3,.65,.4], description: 'A grouping of related work' },
+    InitiativeObservation: { label: 'Observation', color: '#e69cb7', shape: 'tetrahedron', pose: [-.12,.38,Math.PI], description: 'An interpretation supported by evidence' },
+    EventReceipt: { label: 'Record', color: '#b4bccb', shape: 'cube', pose: [-.3,-.62,.3], description: 'An unsigned record of a committed change' },
   };
-  function visual(kind) { return registry[kind] || { label: kind, color: '#c6cbd2', shape: 'square', description: 'Other item type' }; }
-  function shape(kind, r) {
-    switch (visual(kind).shape) {
-      case 'square': return `M ${-r} ${-r} H ${r} V ${r} H ${-r} Z`;
-      case 'diamond': return `M 0 ${-r*1.25} L ${r*1.15} 0 L 0 ${r*1.25} L ${-r*1.15} 0 Z`;
-      case 'hexagon': return `M ${-r} 0 L ${-r/2} ${-r} H ${r/2} L ${r} 0 L ${r/2} ${r} H ${-r/2} Z`;
-      case 'triangle': return `M 0 ${-r*1.2} L ${r*1.1} ${r} H ${-r*1.1} Z`;
-      case 'capsule': return `M ${-r*.55} ${-r*.7} H ${r*.55} A ${r*.7} ${r*.7} 0 0 1 ${r*.55} ${r*.7} H ${-r*.55} A ${r*.7} ${r*.7} 0 0 1 ${-r*.55} ${-r*.7} Z`;
-      case 'bubble': return `M ${-r} ${-r} H ${r} V ${r*.65} H 0 L ${-r*.65} ${r*1.25} V ${r*.65} H ${-r} Z`;
-      case 'document': return `M ${-r*.8} ${-r} H ${r*.2} L ${r*.8} ${-r*.4} V ${r} H ${-r*.8} Z M ${r*.2} ${-r} V ${-r*.4} H ${r*.8}`;
-      default: return `M ${-r} 0 A ${r} ${r} 0 1 0 ${r} 0 A ${r} ${r} 0 1 0 ${-r} 0`;
+  function visual(kind) { return Object.hasOwn(registry,kind)?registry[kind]:{ label: kind, color: '#c6cbd2', shape: 'cube', pose: registry.Project.pose, description: 'Other item type' }; }
+  const subtract=(a,b)=>a.map((v,i)=>v-b[i]), dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0);
+  const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  const unit=a=>a.map(v=>v/Math.hypot(...a));
+  // Build the five regular convex solids once, including complete (back) faces.
+  // Coplanar vertices form one face, so cubes and dodecahedra are not triangulated.
+  function polyhedron(vertices) {
+    const faces=[],seen=new Set(),epsilon=1e-7;
+    for(let a=0;a<vertices.length;a++)for(let b=a+1;b<vertices.length;b++)for(let c=b+1;c<vertices.length;c++) {
+      let normal=cross(subtract(vertices[b],vertices[a]),subtract(vertices[c],vertices[a]));
+      if(Math.hypot(...normal)<epsilon)continue;normal=unit(normal);
+      const distances=vertices.map(v=>dot(normal,subtract(v,vertices[a])));
+      if(distances.some(d=>d>epsilon)&&distances.some(d=>d<-epsilon))continue;
+      const face=distances.flatMap((d,i)=>Math.abs(d)<epsilon?[i]:[]),key=face.join(',');
+      if(seen.has(key))continue;seen.add(key);
+      if(dot(normal,vertices[a])<0)normal=normal.map(v=>-v);
+      const center=[0,1,2].map(axis=>face.reduce((sum,i)=>sum+vertices[i][axis],0)/face.length);
+      const u=unit(subtract(vertices[face[0]],center)),v=cross(normal,u);
+      face.sort((i,j)=>Math.atan2(dot(subtract(vertices[i],center),v),dot(subtract(vertices[i],center),u))-Math.atan2(dot(subtract(vertices[j],center),v),dot(subtract(vertices[j],center),u)));
+      faces.push({indices:face,normal});
     }
+    return {vertices,faces};
   }
+  const phi=(1+Math.sqrt(5))/2,signs=[-1,1];
+  const cube=signs.flatMap(x=>signs.flatMap(y=>signs.map(z=>[x,y,z])));
+  const cycle=(a,b)=>signs.flatMap(s=>signs.flatMap(t=>[[0,s*a,t*b],[t*b,0,s*a],[s*a,t*b,0]]));
+  const solids={
+    tetrahedron:polyhedron([[0,-1,0],[Math.sqrt(8)/3,1/3,0],[-Math.sqrt(2)/3,1/3,Math.sqrt(2/3)],[-Math.sqrt(2)/3,1/3,-Math.sqrt(2/3)]]),
+    cube:polyhedron(cube),octahedron:polyhedron([[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]),
+    dodecahedron:polyhedron([...cube,...cycle(1/phi,phi)]),icosahedron:polyhedron(cycle(1,phi)),
+  };
+  function rotate(point,angles) {
+    let [x,y,z]=point;const [a,b,c]=angles;
+    [y,z]=[y*Math.cos(a)-z*Math.sin(a),y*Math.sin(a)+z*Math.cos(a)];
+    [x,z]=[x*Math.cos(b)+z*Math.sin(b),-x*Math.sin(b)+z*Math.cos(b)];
+    return [x*Math.cos(c)-y*Math.sin(c),x*Math.sin(c)+y*Math.cos(c),z];
+  }
+  function polygon(points,r=1) {return points.map((p,i)=>`${i?'L':'M'} ${(p[0]*r).toFixed(4)} ${(p[1]*r).toFixed(4)}`).join(' ')+' Z';}
+  function silhouette(points) {
+    const ordered=[...points].sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+    const turn=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+    const half=list=>{const hull=[];for(const p of list){while(hull.length>1&&turn(hull.at(-2),hull.at(-1),p)<=0)hull.pop();hull.push(p);}return hull.slice(0,-1);};
+    return [...half(ordered),...half(ordered.reverse())];
+  }
+  const artwork=new Map(),light=unit([-.6,-.8,1]);
+  function solid(kind) {
+    const key=Object.hasOwn(registry,kind)?kind:'other';if(artwork.has(key))return artwork.get(key);
+    const style=visual(kind),mesh=solids[style.shape],rotated=mesh.vertices.map(v=>rotate(v,style.pose));
+    const scale=1/Math.max(...rotated.map(v=>Math.hypot(v[0],v[1]))),points=rotated.map(v=>v.map(n=>n*scale));
+    const rgb=style.color.match(/\w\w/g).map(value=>parseInt(value,16));
+    const faces=mesh.faces.map(face=>({...face,normal:rotate(face.normal,style.pose)})).filter(face=>face.normal[2]>1e-7).map(face=>{
+      const diffuse=Math.max(0,dot(face.normal,light)),brightness=.38+.62*diffuse,shine=Math.max(0,(diffuse-.8)/.2)*.22;
+      const fill='#'+rgb.map(value=>Math.round(value*brightness+(255-value)*shine).toString(16).padStart(2,'0')).join('');
+      return {d:polygon(face.indices.map(i=>points[i])),fill};
+    });
+    const outline=silhouette(points),result={faces,outline,d:polygon(outline)};artwork.set(key,result);return result;
+  }
+  function shape(kind,r) {return polygon(solid(kind).outline,r);}
   function index(nodes, edges) {
     const byKey = new Map(nodes.map(n => [n.key, n])), adjacent = new Map(), degree = new Map();
     for (const e of edges) {
@@ -113,5 +158,5 @@
     view.pinnedKey=entry.pinned;view.repulsionStrength=entry.separation;view.edgeStrengths=new Map(entry.strengths);
     if(camera)Object.assign(view,entry.camera);
   }
-  root.DevgraphTopology={kinds,categories,registry,visual,shape,index,coordinates,layout,filters,query,preferences,capture,restore};
+  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,coordinates,layout,filters,query,preferences,capture,restore};
 })(globalThis);

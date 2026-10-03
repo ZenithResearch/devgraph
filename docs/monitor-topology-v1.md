@@ -117,6 +117,16 @@ opens a chooser. Browse visible items and search provide alternatives to
 picking tiny shapes. Canvas selection supports arrow-key positioning from the
 focused graph, just like SVG selection.
 
+Nodes use shaded, orthographically projected Platonic solids: Proposal is a
+tetrahedron, Initiative an icosahedron, Project a cube, Issue an octahedron, and
+Task a dodecahedron. Arena, Observation and Record reuse the icosahedron,
+tetrahedron and cube in distinct orientations and colors. Lighting, facets and
+silhouettes come from the same regular 3D meshes in both renderers. SVG reuses
+one definition per type; canvas caches one 256px sprite per type, including
+lighting, instead of drawing every facet on every frame. Solid orientation is
+fixed for recognition while the map camera orbits. All silhouettes fit inside
+the existing picking radius; hover and selection retain their white outline.
+
 Automatic layout uses a spatial-grid worker, bounded neighbors/iterations and
 a generation token. Filters, undo, gestures and credential changes invalidate
 stale results. Pointer movement never runs layout. Redraws are coalesced to

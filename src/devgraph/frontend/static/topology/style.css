@@ -18,7 +18,7 @@
 .graph-svg { min-height:460px; }
 .graph-node,.graph-node-hit { cursor:pointer; }
 .graph-svg.node-dragging .graph-node { cursor:grabbing; }
-.graph-sphere { filter:none !important; stroke:#17222b; stroke-width:1.5; }
+.graph-sphere { filter:none !important; stroke:transparent; stroke-width:1.5; }
 .graph-node.preview .graph-sphere { stroke:#fff; stroke-width:3; }
 .graph-node.selected .graph-sphere { stroke:#fff; stroke-width:3; }
 .graph-control { min-height:40px; padding:8px 12px; }
@@ -36,7 +36,7 @@
 .filter-count { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
 .legend-panel { padding:8px 16px; border-top:1px solid var(--line); }
 .legend-items { display:flex; flex-wrap:wrap; gap:8px 20px; }
-.type-sample { width:24px; height:24px; flex:none; overflow:visible; }
+.type-sample { width:30px; height:30px; flex:none; overflow:visible; }
 #filter-summary { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-height:32px; font-size:13px; color:var(--muted); }
 .filter-chip { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:5px 10px; font:inherit; color:var(--ink); cursor:pointer; }
 #graph-feedback { min-height:24px; margin:8px 16px; color:var(--aqua); font-size:14px; }

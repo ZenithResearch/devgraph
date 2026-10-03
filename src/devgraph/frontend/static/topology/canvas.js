@@ -1,7 +1,20 @@
 /* Large maps share the SVG camera, registry, selection, and label policy. */
 (function(root) {
   'use strict';
-  const paths = new Map();
+  const paths = new Map(), sprites = new Map();
+  // Facets, lighting and bevels are rasterized once per kind. Every frame still
+  // costs one image draw per visible node, independent of the solid's face count.
+  function sprite(kind) {
+    const key=Object.hasOwn(DevgraphTopology.registry,kind)?kind:'other';
+    if(sprites.has(key))return sprites.get(key);
+    const model=DevgraphTopology.solid(kind),canvas=document.createElement('canvas');
+    canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');ctx.translate(128,128);ctx.scale(120,120);ctx.lineJoin='round';
+    for(const face of model.faces){const path=new Path2D(face.d);ctx.fillStyle=face.fill;ctx.fill(path);ctx.strokeStyle='rgba(233,246,255,.22)';ctx.lineWidth=.018;ctx.stroke(path);}
+    const outline=new Path2D(model.d),sheen=ctx.createLinearGradient(-.65,-1,.65,1);
+    sheen.addColorStop(0,'rgba(255,255,255,.32)');sheen.addColorStop(.48,'rgba(255,255,255,0)');sheen.addColorStop(1,'rgba(7,19,29,.24)');
+    ctx.fillStyle=sheen;ctx.fill(outline);ctx.strokeStyle='rgba(233,246,255,.5)';ctx.lineWidth=.025;ctx.stroke(outline);
+    sprites.set(key,canvas);paths.set(key,outline);return canvas;
+  }
   function draw(canvas, view, selectedKey, previewKey, adjacent, labelKeys, relationshipLabel, chooseLabels) {
     const ratio = Math.min(2, devicePixelRatio || 1), width = view.width, height = view.height;
     if (canvas.width !== Math.round(width*ratio) || canvas.height !== Math.round(height*ratio)) {
@@ -26,11 +39,10 @@
     }
     for(const node of view.nodes) {
       const p=positions.get(node.key),r=p.radius;if(p.x+r<0||p.x-r>width||p.y+r<0||p.y-r>height)continue;
-      const visual=DevgraphTopology.visual(node.kind),selected=node.key===selectedKey;
-      if(!paths.has(node.kind))paths.set(node.kind,new Path2D(DevgraphTopology.shape(node.kind,1)));
+      const selected=node.key===selectedKey,art=sprite(node.kind),key=Object.hasOwn(DevgraphTopology.registry,node.kind)?node.kind:'other';
       ctx.save();ctx.globalAlpha=adjacent.size&&!adjacent.has(node.key)?.32:1;ctx.translate(p.x,p.y);ctx.scale(r,r);
-      ctx.fillStyle=visual.color;ctx.strokeStyle=selected||node.key===previewKey?'#fff':'#17222b';ctx.lineWidth=(selected||node.key===previewKey?3:1.5)/r;
-      ctx.fill(paths.get(node.kind));ctx.stroke(paths.get(node.kind));
+      ctx.drawImage(art,-128/120,-128/120,256/120,256/120);
+      if(selected||node.key===previewKey){ctx.strokeStyle='#fff';ctx.lineWidth=3/r;ctx.stroke(paths.get(key));}
       if(selected){ctx.strokeStyle='#7cf7cf';ctx.lineWidth=1.5/r;ctx.beginPath();ctx.arc(0,0,1+6/r,0,Math.PI*2);ctx.stroke();}ctx.restore();
       occupied.push({x:p.x-r-2,y:p.y-r-2,width:(r+2)*2,height:(r+2)*2});
       if(view.labels!=='none'&&(labelKeys.has(node.key)||(view.labels==='all'&&candidates.length<160))) {
