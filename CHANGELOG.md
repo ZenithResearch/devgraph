@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Shared Rust workflow request parsing and cross-language vectors, preserving old signing bytes so Wallet and secS can admit the same explicit workflow operations.
+
 ## 0.1.0-beta.2 — 2026-09-15
 
 First public beta, published as a clean source snapshot under AGPL-3.0-only.
