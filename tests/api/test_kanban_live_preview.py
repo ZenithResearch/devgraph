@@ -48,6 +48,25 @@ def fixture():
             return httpx.Response(
                 200, json={"ready": True, "current_applied_version": state["version"]}
             )
+        if path == "/monitor/snapshot":
+            return httpx.Response(
+                200,
+                json={
+                    "graph_nodes": [
+                        {
+                            **row,
+                            "key": row["kind"] + ":" + row["id"],
+                            "category": "work",
+                            "archived": False,
+                        }
+                        for row in rows
+                    ],
+                    "graph_edges": [],
+                    "total_work": len(rows),
+                },
+            )
+        if path == "/initiative-observations" or "/relationships/" in path:
+            return httpx.Response(200, json={"items": []})
         if path == "/query/cypher":
             import json
 
@@ -167,3 +186,34 @@ def test_new_schema_is_never_misrepresented_as_unclassified():
         ).status_code
         == 503
     )
+
+
+def test_unified_monitor_uses_current_assets_authenticated_cache_and_same_origin_navigation():
+    client, calls, state = fixture()
+    assert client.get("/").url.path == "/monitor"
+    monitor = client.get("/monitor")
+    assert monitor.status_code == 200 and "Live local data" in monitor.text
+    assert "schedule(); refresh();" in monitor.text
+    assert "real-reader" not in monitor.text
+    assert "http://127.0.0.1:8080" not in client.get("/monitor/kanban/").text
+    assert 'content="local-session"' in client.get("/monitor/selection").text
+    assert "http://127.0.0.1:8080" not in client.get("/monitor/selection-assets/page/app.mjs").text
+    for path in ("/monitor/snapshot", "/monitor/topology/v1", "/initiative-observations"):
+        assert client.get(path).status_code == 401
+    assert not calls
+    assert (
+        client.post("/preview/session", headers={"Authorization": "Bearer " + TICKET}).status_code
+        == 204
+    )
+    assert client.get("/monitor/snapshot").json()["total_work"] == 113
+    topology = client.get("/monitor/topology/v1?work_kind=Task&node_limit=5").json()
+    assert topology["counts"]["matching_nodes"] == 110
+    assert len(topology["graph_nodes"]) == 5 and not topology["complete"]
+    assert sum(r.url.path == "/monitor/snapshot" for r in calls) == 1
+    assert client.get("/monitor/topology/v1?bad=filter").status_code == 400
+    assert client.get("/work/Issue/issue/relationships/children").status_code == 200
+    assert client.get("/initiative-observations").status_code == 200
+    assert client.get("/work/Task/t000/arbitrary").status_code == 404
+    state["valid"] = False
+    for path in ("/monitor/snapshot", "/monitor/topology/v1", "/initiative-observations"):
+        assert client.get(path).status_code == 401

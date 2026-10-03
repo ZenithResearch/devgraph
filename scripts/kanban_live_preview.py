@@ -1,4 +1,4 @@
-"""Read-only Kanban preview through the installed, authenticated Work API.
+"""Read-only UI preview through the installed, authenticated Work API.
 
 No database access, local Work writes, migrations, or signing routes. The legacy
 adapter is admitted only for schema 26, where workflow metadata does not exist.
@@ -23,6 +23,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from devgraph.api.topology import _ASSETS
+from devgraph.frontend import FRONTEND_HTML
+from devgraph.frontend.selection import _ASSETS as SELECTION_ASSETS
 from devgraph.frontend.selection import _HEADERS
 from devgraph.kanban import BoardChanged, BoardFilter, InvalidBoardFilter, build_board
 from devgraph.local_host import load_local_config, read_local_read_credential
@@ -30,6 +32,13 @@ from devgraph.model.base import WorkStatus
 from devgraph.model.repository import WORK_OBJECT_TYPES, MissingWorkObjectError
 from devgraph.model.validation import validate_work_object_id
 from devgraph.storage.base import EdgeRecord, NodeRecord, StorageUnavailable
+from devgraph.topology import (
+    SOURCE_EDGE_LIMIT,
+    SOURCE_NODE_LIMIT,
+    InvalidTopologyFilter,
+    TopologyFilter,
+    filter_projection,
+)
 from devgraph.workflow_contract import WORK_KINDS, catalog, default_workflow
 
 ORIGIN = "http://127.0.0.1:4193"
@@ -37,6 +46,32 @@ UPSTREAM = "http://127.0.0.1:8080"
 COOKIE = "devgraph_kanban_reader"
 ROOT = files("devgraph.frontend").joinpath("static")
 HOURS = 4 * 60 * 60
+
+
+def monitor_html():
+    # Adapt only the development shell to the same HttpOnly reader session used
+    # by Kanban. The fixed host still validates the real read credential.
+    replacements = {
+        "if (!tokenInput.value.trim()) { "
+        "document.getElementById('connection-settings').open = true; "
+        "text('status-line', 'Enter a read access key to connect.'); return; }": "",
+        "const credential = tokenInput.value.trim(); "
+        "if (!credential || graphView.preferenceKey) return;": (
+            "const credential = tokenInput.value.trim() || 'local-reader-session'; "
+            "if (graphView.preferenceKey) return;"
+        ),
+        "schedule(); if (tokenInput.value) refresh();": "schedule(); refresh();",
+        '<option value="10" selected>10 seconds</option>': '<option value="10">10 seconds</option>'
+        '<option value="60" selected>60 seconds</option>',
+        "}, 30000);": "}, 120000);",
+        "Live local state": "Live local data · development preview",
+    }
+    html = FRONTEND_HTML
+    for old, new in replacements.items():
+        if old not in html:
+            raise ValueError("The monitor development adapter needs updating")
+        html = html.replace(old, new)
+    return html
 
 
 class ReadProjection:
@@ -168,6 +203,7 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     session, used, started = secrets.token_hex(32), False, clock()
     cached, lock = {}, asyncio.Lock()
+    snapshot_cache, snapshot_lock = {}, asyncio.Lock()
 
     @app.middleware("http")
     async def boundary(request, call_next):
@@ -242,7 +278,77 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
                     cached.update(key=digest, time=clock(), value=value)
                 return cached["value"]
 
+    async def snapshot(request):
+        key = credential(request)
+        async with client(key) as api:
+            await upstream(api, "/work/Task?limit=1&include_archived=true")
+            digest = hashlib.sha256(key.encode()).hexdigest()
+            async with snapshot_lock:
+                if (
+                    snapshot_cache.get("key") != digest
+                    or clock() - snapshot_cache.get("time", -60) > 60
+                ):
+                    api.timeout = httpx.Timeout(120)
+                    value = await upstream(api, "/monitor/snapshot")
+                    if (
+                        len(value["graph_nodes"]) > SOURCE_NODE_LIMIT
+                        or len(value["graph_edges"]) > SOURCE_EDGE_LIMIT
+                    ):
+                        raise HTTPException(503, "The graph exceeds this preview's read budget")
+                    snapshot_cache.update(key=digest, time=clock(), value=value)
+                return snapshot_cache["value"]
+
     @app.get("/")
+    async def home():
+        return RedirectResponse("/monitor")
+
+    @app.get("/monitor")
+    @app.get("/monitor/")
+    async def monitor():
+        # The monitor's trusted, repo-owned shell contains inline scripts/styles.
+        headers = {
+            **_HEADERS,
+            "Content-Security-Policy": _HEADERS["Content-Security-Policy"].replace(
+                "script-src 'self'; style-src 'self';",
+                "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';",
+            ),
+        }
+        return Response(monitor_html(), media_type="text/html", headers=headers)
+
+    @app.get("/monitor/snapshot")
+    async def monitor_snapshot(request: Request):
+        return await snapshot(request)
+
+    @app.get("/monitor/topology/v1")
+    async def topology(request: Request):
+        try:
+            filters = TopologyFilter.parse(request.url.query)
+        except InvalidTopologyFilter:
+            raise HTTPException(400, "Invalid topology filter") from None
+        return filter_projection(await snapshot(request), filters)
+
+    @app.get("/monitor/selection")
+    @app.get("/monitor/selection/")
+    async def selection():
+        html = (
+            ROOT.joinpath("selection/page/index.html")
+            .read_text()
+            .replace(
+                "<head>", '<head><meta name="devgraph-selection-reader" content="local-session">'
+            )
+        )
+        return Response(html, media_type="text/html", headers=_HEADERS)
+
+    @app.get("/monitor/selection-assets/{name:path}")
+    async def selection_asset(name: str):
+        if name not in SELECTION_ASSETS:
+            raise HTTPException(404)
+        body = ROOT.joinpath("selection", name).read_text()
+        if name == "page/app.mjs":
+            body = body.replace("'http://127.0.0.1:8080/monitor'", "'/monitor'")
+            body = body.replace("cookieReader ? 30000 : 15000", "cookieReader ? 120000 : 15000")
+        return Response(body, media_type=SELECTION_ASSETS[name], headers=_HEADERS)
+
     @app.get("/monitor/kanban")
     async def redirect():
         return RedirectResponse("/monitor/kanban/")
@@ -263,9 +369,6 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
             "Older work appears in Backlog with “Stage not set”. No records are changed.</p>"
             '<p class="board-note">Columns summarize',
         )
-        # Other pages continue using the installed service and its existing auth.
-        for path in ("/monitor#topology", "/monitor/selection", "/monitor"):
-            html = html.replace(f'href="{path}"', f'href="{UPSTREAM}{path}"')
         return Response(html, media_type="text/html", headers=_HEADERS)
 
     @app.get("/monitor/{group}-assets/{name}")
@@ -340,9 +443,22 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
         if kind not in WORK_KINDS or not (
             not tail
             or tail == "supporting-material"
+            or tail in {
+                "relationships/children", "relationships/parent", "relationships/dependencies",
+                "relationships/dependents", "relationships/blockers", "relationships/blocked",
+            }
             or re.fullmatch(r"supporting-material/Artifact/[A-Za-z0-9_.:-]+/document", tail)
         ):
             raise HTTPException(404)
+        async with client(credential(request)) as api:
+            return await upstream(api, request.url.path + "?" + request.url.query)
+
+    @app.get("/initiative-observations")
+    @app.get("/initiative-observations/{item_id}")
+    @app.get("/arenas/{item_id}")
+    async def read_detail(request: Request, item_id: str | None = None):
+        if item_id is not None:
+            validate_work_object_id(item_id)
         async with client(credential(request)) as api:
             return await upstream(api, request.url.path + "?" + request.url.query)
 

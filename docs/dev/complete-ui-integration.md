@@ -25,11 +25,20 @@ runtime code cannot be folded into one public Devgraph PR.
 
 ## Source versus installed UI
 
-The read-only Kanban preview on port 4193 serves the new board while reading
-the installed service at port 8080. Its Overview, Topology, and Project selection
-links open that installed service, which may display a different release than
-the board. Updating the installed runtime is a separate release activation,
-including migration and matched-companion requirements.
+The read-only development preview on port 4193 serves the current Overview,
+Topology, Kanban, and Project selection UI from this checkout. Navigation stays
+on the preview origin. Authenticated API reads go to the installed service on
+port 8080; no production release activation or migration is performed.
+The preview supports the same temporary reader session across these pages and
+revalidates authority before returning cached snapshots. Topology filters use
+the current shared projection with explicit source budgets. Legacy snapshots
+retain their original coverage metadata; missing selection coverage still
+prevents a verified selection run.
+
+The unified-preview follow-up passed `pytest -q tests/api/test_kanban_live_preview.py`
+(4 tests), focused Ruff, and `git diff --check`. Browser verification on
+2026-10-03 showed the updated monitor connected to 405 real Work items within
+a 2,161-node graph, with 2,381 connections. This is read-only UI evidence.
 
 ## Validation
 
