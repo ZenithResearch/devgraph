@@ -11,7 +11,7 @@ function scene() {
     document,
     state: { snapshot: { graph_nodes: [] }, selectedGraphKey: null },
     graphView: { width: 800, height: 420, labels: 'none', nodes: [], edges: [] },
-    ensureGraphScene() {},
+    ensureGraphScene() {}, updateGraphPreview() {},
     text(id, value) { document.getElementById(id).textContent = value; },
     graphCoordinates(nodes) { return new Map(nodes.map(node => [node.key, { x: 100, y: 100, radius: 18 }])); },
     projectGraphPoint(point) { return point; },

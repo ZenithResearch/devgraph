@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { topologySource } from './monitor_test_helpers.mjs';
 
 const frontend = readFileSync(new URL('../../src/devgraph/frontend/app.py', import.meta.url), 'utf8');
 const names = [
@@ -47,7 +48,7 @@ function monitor() {
     state: { snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshQueued: false },
     detailState: { credential: 'synthetic-test-credential' },
     graphView: {
-      visibleCategories: new Set(categories), nodes: [], edges: [],
+      preferenceKey: 'fixture', filters: {}, filterSerial: 0, visibleCategories: new Set(categories), nodes: [], edges: [],
       nodePositions: new Map(), nodeVelocities: new Map(), pointers: new Map(), pinnedKey: null, fitted: false,
     },
     tokenInput: { value: 'synthetic-test-credential' },
@@ -55,13 +56,14 @@ function monitor() {
       if (!elements.has(id)) elements.set(id, { className: '', textContent: '' });
       return elements.get(id);
     } },
-    text() {}, relativeTime() { return 'now'; }, pauseGraphOrbit() {},
+    topologyPath: () => '/monitor/topology/v1', renderTopologyControls() {}, text() {}, relativeTime() { return 'now'; }, pauseGraphOrbit() {},
     renderPipeline() {}, renderBars() {}, renderActivity() {}, renderObservations() {},
     renderForceControls() {}, renderArenaFilter() {}, relaxGraph() {}, fitGraph() {},
     renderGraph() {}, renderGraphSelection() {}, renderGraphSearch() {}, loadSelectedDetail() {}, queueMicrotask,
   });
   c.relaxations = 0;
   c.relaxGraph = () => { c.relaxations += 1; };
+  vm.runInContext(topologySource, c); c.Topology = c.DevgraphTopology;
   vm.runInContext(source, c);
   return c;
 }
@@ -131,7 +133,7 @@ test('hidden selections and positions survive until the record leaves the snapsh
 test('all-hidden refresh keeps choices and restoring a category reveals fresh records', async () => {
   const c = monitor();
   let next = snapshot();
-  c.getJson = async path => path === '/monitor/snapshot' ? next : { items: [] };
+  c.getJson = async path => path === '/monitor/topology/v1' ? next : { items: [] };
   await c.refresh();
   c.graphView.visibleCategories.clear();
   c.updateGraphVisibility();

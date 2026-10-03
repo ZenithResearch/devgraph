@@ -114,12 +114,16 @@ def build_production_services() -> ApiServices:
         monitor_storage=storage,
     )
     monitor_view_read = None
+    monitor_topology_read = None
     if data_root is not None:
         try:
             monitor_view_read = load_local_secs_monitor_view_read_adapter(
                 data_root=data_root,
                 storage=storage,
                 audit_log=audit_log,
+            )
+            monitor_topology_read = load_local_secs_monitor_view_read_adapter(
+                data_root=data_root, storage=storage, audit_log=audit_log, version=2,
             )
         except LocalSecSMonitorViewReadError as error:
             if str(error) == OWNERSHIP_DISABLED_DIAGNOSTIC:
@@ -134,6 +138,7 @@ def build_production_services() -> ApiServices:
         migration_manifest=load_manifest(MANIFEST_PATH),
         migration_store=Neo4jMigrationStore(storage),
         monitor_view_read=monitor_view_read,
+        monitor_topology_read=monitor_topology_read,
         named_work=(
             LocalNamedWorkReceiver(data_root=data_root, storage=storage, audit_log=audit_log)
             if data_root is not None

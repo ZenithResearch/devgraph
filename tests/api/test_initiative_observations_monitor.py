@@ -173,15 +173,15 @@ def test_official_frontend_is_dependency_free_and_never_embeds_a_credential() ->
     assert monitor_alias.status_code == 200
     assert monitor_alias.text == response.text
     assert response.headers["content-type"].startswith("text/html")
-    assert "Graph operations monitor" in response.text
-    assert "Graph topology" in response.text
+    assert "Your work, connected" in response.text
+    assert "Work map" in response.text
     assert "renderGraph" in response.text
     assert "Orbit: off" in response.text
     assert 'id="reader-content"' in response.text
     assert "Description / plan" in response.text
     assert "Supporting material" in response.text
     assert 'id="graph-search"' in response.text
-    assert "Layout settings" in response.text
+    assert "Arrange nodes" in response.text
     assert "Node separation" in response.text
     assert "Reset force defaults" in response.text
     assert ".graph-node:focus-visible .graph-sphere" in response.text

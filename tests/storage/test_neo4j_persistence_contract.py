@@ -988,3 +988,19 @@ def test_repository_round_trip_over_simulated_neo4j_row() -> None:
         key: value
         for key, value in storage.get_node("Task", "task-1").properties.items()
     }
+
+
+def test_topology_materialization_retries_concurrent_change_and_has_finite_query_bounds():
+    node = _canonical_row()
+    old = [{"nodes": [], "edges": []}]
+    current = [{"nodes": [node], "edges": []}]
+    storage, calls = _storage_with_row_batches(old, current, current)
+    nodes, edges = storage.monitor_records()
+    assert nodes[0].id == "task-1" and not edges
+    assert len(calls) == 3
+    query, params = calls[0]
+    assert query.timeout == 5.0
+    assert params["node_limit"] == 10001 and params["edge_limit"] == 50001
+    unstable, _ = _storage_with_row_batches(old, current, old)
+    with pytest.raises(StorageUnavailable, match="changed during read"):
+        unstable.monitor_records()

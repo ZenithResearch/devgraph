@@ -55,8 +55,10 @@ def register_error_handlers(app: FastAPI) -> None:
     from devgraph.arenas import ArenaConflict
     from devgraph.auth.secs_work import SecSWorkDenied
     from devgraph.named_work import WorkRelationshipConflict
+    from devgraph.topology import InvalidTopologyFilter
 
     for exception, title, status in (
+        (InvalidTopologyFilter, "Invalid topology filters", 400),
         (SecSWorkDenied, "Named Work authority denied", 403),
         (WorkRelationshipConflict, "Work relationship conflict", 409),
         (ArenaConflict, "Arena membership or archival conflict", 409),

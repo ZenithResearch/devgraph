@@ -44,6 +44,7 @@ class ApiServices:
     migration_manifest: Manifest | None = None
     migration_store: MigrationStore | None = None
     monitor_view_read: SecSMonitorViewReadAdapter | None = None
+    monitor_topology_read: SecSMonitorViewReadAdapter | None = None
     named_work: NamedWorkReceiver | None = None
     retained_audit: RetainedAuditLog | None = None
     cypher_read: CypherReadService | None = None
@@ -88,6 +89,9 @@ def create_app(services: ApiServices, *, lifespan: Lifespan[FastAPI] | None = No
 
     register_error_handlers(app)
     register_routes(app, services)
+    from devgraph.api.topology import register_topology
+
+    register_topology(app, services)
     from devgraph.frontend.selection import register_selection
 
     register_selection(app)

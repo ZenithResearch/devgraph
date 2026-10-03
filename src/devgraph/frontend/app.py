@@ -316,54 +316,58 @@ FRONTEND_HTML = r'''<!doctype html>
       .graph-help { font-size: .7rem; }
     }
   </style>
+  <link rel="stylesheet" href="/monitor/topology-assets/style.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to graph monitor</a>
   <div class="shell">
-    <aside class="rail" aria-label="Dev Graph monitor navigation">
-      <div class="brand"><div class="brand-mark">DG</div><div><strong>Dev Graph</strong><span>Observer console</span></div></div>
+    <aside class="rail" aria-label="Observer navigation"><button type="button" class="graph-control" id="observer-toggle" aria-expanded="true" aria-controls="observer-content">Hide Observer</button><div id="observer-content">
+      <div class="brand"><div class="brand-mark">DG</div><div><strong>Dev Graph</strong><span>Observer</span></div></div>
       <nav><a href="#overview" aria-current="page">Overview</a><a href="#topology">Topology</a><a href="#pipeline">Initiative pipeline</a><a href="#activity">Graph activity</a><a href="#observations">Observations</a><a href="/monitor/selection">Project selection</a></nav>
-      <div class="rail-meta"><div>AUTHORITY<span>Scoped read credential</span></div><div>TRANSPORT<span>App-native projection</span></div><div>SCHEMA<span>initiative-observation.v0</span></div></div>
-    </aside>
+      <div class="rail-meta"><div>AUTHORITY<span>Read access credential</span></div><div>TRANSPORT<span>Local view</span></div><div>SCHEMA<span>initiative-observation.v0</span></div></div>
+    </div></aside>
     <main id="main">
       <header class="topbar" id="overview">
-        <div><div class="eyebrow">Live local state</div><h1>Graph operations monitor</h1><p class="subtitle">One read-only view across work objects, inferred initiative observations, and transactional mutation receipts.</p></div>
+        <div><div class="eyebrow">Live local state</div><h1>Your work, connected</h1><p class="subtitle">Explore your work, see how it connects, and read the details behind each item.</p></div>
         <div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Disconnected</span></div>
       </header>
       <form class="auth-strip" id="auth-form">
-        <label for="token">Scoped bearer credential</label><input id="token" name="token" type="password" autocomplete="off" placeholder="Paste a local devgraph.read credential">
+        <label for="token">Read access key</label><input id="token" name="token" type="password" autocomplete="off" placeholder="Paste a local devgraph.read credential">
         <label for="refresh-rate">Refresh rate</label><select id="refresh-rate"><option value="0">Manual</option><option value="10" selected>10 seconds</option><option value="30">30 seconds</option></select>
         <button class="button" type="submit">Connect</button>
       </form>
       <p class="status-line" id="status-line" role="status" aria-live="polite">Enter a scoped read credential to inspect the graph.</p>
       <section class="kpis" aria-label="Graph summary">
-        <article class="card kpi"><div class="kpi-label">Work objects</div><div class="kpi-value" id="total-work">—</div><div class="kpi-note">across the active work ontology</div></article>
-        <article class="card kpi"><div class="kpi-label">Active initiatives</div><div class="kpi-value" id="active-initiatives">—</div><div class="kpi-note">canonical, non-archived work</div></article>
-        <article class="card kpi"><div class="kpi-label">Inferred observations</div><div class="kpi-value" id="observation-count">—</div><div class="kpi-note">evidence-backed interpretations</div></article>
-        <article class="card kpi"><div class="kpi-label">Pending receipts</div><div class="kpi-value" id="pending-receipts">—</div><div class="kpi-note" id="receipt-note">local transactional outbox</div></article>
+        <article class="card kpi"><div class="kpi-label">Work objects</div><div class="kpi-value" id="total-work">—</div><div class="kpi-note">in your work graph</div></article>
+        <article class="card kpi"><div class="kpi-label">Active initiatives</div><div class="kpi-value" id="active-initiatives">—</div><div class="kpi-note">current larger efforts</div></article>
+        <article class="card kpi"><div class="kpi-label">Inferred observations</div><div class="kpi-value" id="observation-count">—</div><div class="kpi-note">interpretations supported by evidence</div></article>
+        <article class="card kpi"><div class="kpi-label">Records awaiting processing</div><div class="kpi-value" id="pending-receipts">—</div><div class="kpi-note" id="receipt-note">Changes recorded; processing pending</div></article>
       </section>
       <section class="card graph-card" id="topology">
         <div class="graph-toolbar">
-          <div class="graph-title-row"><div><h2>Graph topology</h2><span class="section-meta" id="graph-meta">not refreshed</span></div><button class="graph-control" id="graph-expand" type="button" aria-expanded="false" aria-controls="topology">Expand view</button></div>
+          <div class="graph-title-row"><div><h2>Work map</h2><span class="section-meta" id="graph-meta">not refreshed</span></div><button class="graph-control" id="graph-expand" type="button" aria-expanded="false" aria-controls="topology">Expand view</button></div>
           <div class="graph-primary">
-            <div class="graph-search"><label for="graph-search">Find work or a node</label><input type="search" id="graph-search" placeholder="Search titles or IDs" autocomplete="off" aria-controls="graph-search-results"><div id="graph-search-results" class="search-results" hidden></div></div>
-            <div class="graph-zoom" role="group" aria-label="Graph zoom"><button class="graph-control" id="graph-zoom-out" type="button" aria-label="Zoom out">−</button><input id="graph-zoom" type="range" min="25" max="400" value="100" step="1" aria-label="Graph zoom percentage"><output id="graph-zoom-value" for="graph-zoom">100%</output><button class="graph-control" id="graph-zoom-in" type="button" aria-label="Zoom in">+</button><button class="graph-control" id="graph-fit" type="button">Fit</button></div>
+            <div class="graph-search"><label for="graph-search">Find an item</label><input type="search" id="graph-search" placeholder="Search titles or IDs" autocomplete="off" aria-controls="graph-search-results"><div id="graph-search-results" class="search-results" hidden></div></div>
+            <div class="graph-zoom" role="group" aria-label="Graph zoom"><button class="graph-control" id="graph-zoom-out" type="button" aria-label="Zoom out">−</button><input id="graph-zoom" type="range" min="5" max="400" value="100" step="1" aria-label="Graph zoom percentage"><output id="graph-zoom-value" for="graph-zoom">100%</output><button class="graph-control" id="graph-zoom-in" type="button" aria-label="Zoom in">+</button><button class="graph-control" id="graph-fit" type="button">Fit view</button></div>
           </div>
-          <div class="graph-arena-row"><label class="graph-label-select" for="graph-arena">From Arena <select id="graph-arena" aria-controls="graph-svg" aria-describedby="graph-arena-note"><option value="">All nodes</option><option value="*">Any Arena</option></select></label><p class="graph-arena-note" id="graph-arena-note" role="status" aria-live="polite">Choose an Arena to follow its outgoing connections.</p></div>
-          <div class="graph-filter-row"><div class="graph-legend" role="group" aria-label="Visible node categories"><label class="legend-item"><input type="checkbox" data-graph-category="arena" aria-controls="graph-svg" checked><span>Arena <span id="category-arena-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="work" aria-controls="graph-svg" checked><span>Work <span id="category-work-count">0</span></span></label><label class="legend-item" title="Evidence-backed interpretations, initially inferred and unclaimed"><input type="checkbox" data-graph-category="observation" aria-controls="graph-svg" checked><span>Observation <span id="category-observation-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="receipt" aria-controls="graph-svg" checked><span>Receipt <span id="category-receipt-count">0</span></span></label></div><label class="graph-label-select">Labels <select id="graph-labels"><option value="selected">Selected neighborhood</option><option value="all">All labels</option><option value="none">No labels</option></select></label><button class="graph-control" id="graph-show-all" type="button" hidden>Exit neighborhood</button></div>
+          <div class="graph-actions"><button class="graph-control" id="graph-undo" type="button" disabled title="Restore the positions from before your last arrangement change">Undo positioning</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button><button class="graph-control" id="graph-clear-filters" type="button">Clear filters</button></div><div id="filter-summary"></div><details class="filter-panel" id="graph-filters"><summary>Filters</summary><div class="graph-arena-row"><label class="graph-label-select" for="graph-arena">From Arena <select id="graph-arena" aria-controls="graph-svg" aria-describedby="graph-arena-note"><option value="">All nodes</option><option value="*">Any Arena</option></select></label><p class="graph-arena-note" id="graph-arena-note" role="status" aria-live="polite">Choose an Arena to follow its outgoing connections.</p></div>
+          <div class="graph-filter-row"><div class="graph-legend" role="group" aria-label="Visible node categories"><label class="legend-item"><input type="checkbox" data-graph-category="arena" aria-controls="graph-svg" checked><span>Arena <span id="category-arena-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="work" aria-controls="graph-svg" checked><span>Work <span id="category-work-count">0</span></span></label><label class="legend-item" title="Evidence-backed interpretations, initially inferred and unclaimed"><input type="checkbox" data-graph-category="observation" aria-controls="graph-svg" checked><span>Observation <span id="category-observation-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="receipt" aria-controls="graph-svg" checked><span>Record <span id="category-receipt-count">0</span></span></label></div><label class="graph-label-select">Labels <select id="graph-labels"><option value="selected">Hovered or selected connections</option><option value="all">All labels</option><option value="none">No labels</option></select></label><button class="graph-control" id="graph-show-all" type="button" hidden>Exit connected view</button></div><div class="filter-grid" id="filter-grid"></div></details>
         </div>
-        <details class="graph-settings"><summary>Layout settings</summary><div class="graph-toolbar-actions"><button class="graph-control" id="graph-orbit" type="button" aria-pressed="false">Orbit: off</button><button class="graph-control" id="graph-settle" type="button">Settle graph</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button></div><div class="graph-force-panel"><div class="graph-force-copy"><strong>Graph forces</strong><span>Adjust spacing and the pull between connected nodes.</span><button class="graph-control" id="graph-force-reset" type="button">Reset force defaults</button></div><div class="graph-force-controls" id="graph-force-controls" aria-label="Graph force controls"></div></div></details>
+        <p id="graph-feedback" role="status" aria-live="polite"></p>
+        <details class="legend-panel" open><summary>Legend</summary><div class="legend-items" id="type-legend"></div><p class="reader-note">Arrows show the direction of a connection. Select an item to read its status.</p></details>
+        <details class="graph-settings"><summary>Arrange nodes</summary><div class="graph-toolbar-actions"><button class="graph-control" id="graph-orbit" type="button" aria-pressed="false">Orbit: off</button><button class="graph-control" id="graph-settle" type="button">Arrange nodes</button></div><div class="graph-force-panel"><div class="graph-force-copy"><strong>Graph forces</strong><span>Adjust spacing and the pull between connected nodes.</span><button class="graph-control" id="graph-force-reset" type="button">Reset force defaults</button></div><div class="graph-force-controls" id="graph-force-controls" aria-label="Graph force controls"></div></div></details>
         <div class="graph-layout">
-          <div class="graph-scroll"><svg class="graph-svg" id="graph-svg" viewBox="0 0 1080 420" tabindex="0" role="group" aria-label="Interactive Dev Graph topology" aria-describedby="graph-help"></svg></div>
-          <div class="reader-resize" id="reader-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Details width" aria-valuemin="280" aria-valuemax="600" aria-valuenow="360"></div>
+          <div class="graph-scroll"><canvas id="graph-canvas" hidden aria-hidden="true"></canvas><div id="graph-preview" aria-hidden="true"></div><div id="node-chooser" hidden></div><svg class="graph-svg" id="graph-svg" viewBox="0 0 1080 420" tabindex="0" role="group" aria-label="Interactive Dev Graph topology" aria-describedby="graph-help"></svg></div>
+          <div class="reader-resize" id="reader-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Details width" aria-valuemin="320" aria-valuemax="600" aria-valuenow="360"></div>
           <aside class="graph-details" id="graph-details"><div class="reader-header"><div class="reader-buttons"><button class="graph-control" id="reader-toggle" aria-expanded="true" aria-controls="reader-body">Hide details</button><button class="graph-control" id="reader-mode">Reading view</button></div><h3 id="reader-title">No node selected</h3><div class="graph-details-copy" id="reader-meta">Select a node or search to read its details.</div></div><div id="reader-body" class="reader-body"><p id="reader-status" role="status" aria-live="polite"></p><div id="reader-content"></div></div></aside>
         </div>
-        <p class="graph-help" id="graph-help">Click a node to read · Scroll/pinch to zoom · Shift-drag to pan · Drag to orbit or move a node · F to fit</p>
+        <details id="graph-result-list"><summary>Browse visible items</summary><div id="graph-result-items"></div><button class="graph-control" id="graph-results-more" hidden>Show more items</button></details>
+        <p class="graph-help" id="graph-help">Click a node to read · Scroll/pinch to zoom · Shift-drag to pan · Drag to orbit or move an item · F to fit · Browse visible items for keyboard selection</p>
         <div class="graph-resize" id="graph-resize" role="separator" tabindex="0" aria-label="Graph height" aria-orientation="horizontal" aria-valuemin="280" aria-valuemax="1200" aria-valuenow="420" aria-valuetext="420 pixels" aria-controls="graph-svg">Drag to resize · Arrow keys adjust height</div>
       </section>
       <section class="grid" id="pipeline">
         <article class="card section"><div class="section-head"><h2>Observation status</h2><span class="section-meta">inferred · claim actions unavailable</span></div><div class="pipeline" id="pipeline-stages"></div></article>
-        <article class="card section"><div class="section-head"><h2>Work distribution</h2><span class="section-meta">by canonical kind</span></div><div class="bars" id="work-bars"></div></article>
+        <article class="card section"><div class="section-head"><h2>Work distribution</h2><span class="section-meta">by work type</span></div><div class="bars" id="work-bars"></div></article>
       </section>
       <section class="grid">
         <article class="card section" id="activity"><div class="section-head"><h2>Recent graph activity</h2><span class="section-meta" id="generated-at">not refreshed</span></div><div class="activity" id="activity-list"><div class="empty">Connect to load safe graph activity.</div></div></article>
@@ -371,12 +375,16 @@ FRONTEND_HTML = r'''<!doctype html>
       </section>
     </main>
   </div>
+  <script src="/monitor/topology-assets/core.js"></script>
+  <script src="/monitor/topology-assets/proof.js"></script>
+  <script src="/monitor/topology-assets/canvas.js"></script>
   <script>
+    const Topology = DevgraphTopology;
     const state = { timer: null, snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshController: null, refreshQueued: false, pendingSnapshot: null, lastSuccess: null };
     const detailState = { node: null, data: null, error: null, loading: false, serial: 0, controller: null, promise: null, relations: new Map(), support: null, supportLoading: false, supportError: null, documents: new Map(), rendered: null, resourcesSerial: 0, credential: '' };
-    const graphView = { yaw: -.38, pitch: .22, zoom: 1, panX: 0, panY: 0, width: 1080, height: 420, fitted: false, expanded: false, pointers: new Map(), pinch: null, orbit: false, frame: null, lastFrame: 0, drag: null, nodes: [], edges: [], nodePositions: new Map(), nodeVelocities: new Map(), edgeStrengths: new Map(), repulsionStrength: 1.5, pinnedKey: null, visibleCategories: new Set(['arena', 'work', 'observation', 'receipt']), arenaKey: '', arenaNodes: [], neighborhood: null, labels: 'selected' };
+    const graphView = { yaw: -.38, pitch: .22, zoom: 1, panX: 0, panY: 0, width: 1080, height: 420, fitted: false, expanded: false, pointers: new Map(), pinch: null, orbit: false, frame: null, lastFrame: 0, drag: null, nodes: [], edges: [], nodePositions: new Map(), nodeVelocities: new Map(), edgeStrengths: new Map(), repulsionStrength: 1.5, pinnedKey: null, visibleCategories: new Set(['arena', 'work', 'observation', 'receipt']), arenaKey: '', arenaNodes: [], neighborhood: null, labels: 'selected', filters: Topology.filters(), hoveredKey: null, focusedKey: null, history: [], arrangement: null, layoutGeneration: 0, worker: null, index: null, renderFrame: null, preferenceKey: null, preferences: Topology.preferences(), filterSerial: 0 };
     const tokenInput = document.querySelector('#token');
-    tokenInput.value = sessionStorage.getItem('devgraph-monitor-token') || '';
+    try { tokenInput.value = sessionStorage.getItem('devgraph-monitor-token') || ''; } catch { tokenInput.value = ''; }
     const text = (id, value) => { const el = document.getElementById(id); if (el.textContent !== String(value)) el.textContent = String(value); };
     const headers = () => ({ Authorization: `Bearer ${tokenInput.value.trim()}` });
     const make = (tag, className, value) => { const node = document.createElement(tag); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; };
@@ -460,26 +468,18 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function baseGraphCoordinates(nodes) {
-      const lanes = new Map();
-      nodes.forEach(node => { const lane = graphLane(node.kind); if (!lanes.has(lane)) lanes.set(lane, []); lanes.get(lane).push(node); });
-      lanes.forEach(items => items.sort((a, b) => `${a.kind}:${a.id}`.localeCompare(`${b.kind}:${b.id}`)));
-      const coordinates = new Map();
-      lanes.forEach((items, lane) => {
-        items.forEach((node, index) => {
-          const span = Math.min(300, (items.length - 1) * 88); const y = items.length === 1 ? 0 : (-span / 2) + index * (span / (items.length - 1));
-          const categoryDepth = node.category === 'observation' ? 70 : node.category === 'receipt' ? -70 : 0;
-          coordinates.set(node.key, { x: (lane - 2) * 185, y, z: stableGraphDepth(node.key) + categoryDepth });
-        });
-      });
-      return coordinates;
+      return Topology.coordinates(nodes);
     }
 
     function syncGraphPhysics(nodes) {
-      const base = baseGraphCoordinates(nodes); let changed = false; const retained = new Set((state.snapshot?.graph_nodes || nodes).map(node => node.key));
-      nodes.forEach(node => { if (!graphView.nodePositions.has(node.key)) { graphView.nodePositions.set(node.key, { ...base.get(node.key) }); graphView.nodeVelocities.set(node.key, { x: 0, y: 0, z: 0 }); changed = true; } });
-      for (const key of graphView.nodePositions.keys()) if (!retained.has(key)) { graphView.nodePositions.delete(key); graphView.nodeVelocities.delete(key); changed = true; }
-      if (graphView.pinnedKey && !nodes.some(node => node.key === graphView.pinnedKey)) graphView.pinnedKey = null;
-      return changed;
+      const missing = nodes.filter(node => !graphView.nodePositions.has(node.key));
+      if (missing.length) { const base = baseGraphCoordinates(nodes); for (const node of missing) { graphView.nodePositions.set(node.key, {...base.get(node.key)}); graphView.nodeVelocities.set(node.key, {x:0,y:0,z:0}); } }
+      const full = state.snapshot && (state.snapshot.schema !== 'devgraph.topology.v1' || (state.snapshot.complete && !Topology.query(graphView.filters)));
+      if (full) { const retained = new Set(state.snapshot.graph_nodes.map(n=>n.key)); for (const key of graphView.nodePositions.keys()) if (!retained.has(key)) {graphView.nodePositions.delete(key);graphView.nodeVelocities.delete(key);} }
+      if (graphView.pinnedKey && !nodes.some(n=>n.key===graphView.pinnedKey)) graphView.pinnedKey=null;
+      // A filtered response does not prove that hidden nodes were deleted.
+      if (graphView.nodePositions.size > 10000) { const retained = new Set(nodes.map(n => n.key)); for (const key of graphView.nodePositions.keys()) if (!retained.has(key)) { graphView.nodePositions.delete(key); graphView.nodeVelocities.delete(key); } }
+      return missing.length > 0;
     }
 
     function filterGraph(nodes, edges, categories) {
@@ -523,18 +523,19 @@ FRONTEND_HTML = r'''<!doctype html>
 
     function setGraphArena(key) {
       graphView.arenaKey = key; graphView.neighborhood = null;
-      pauseGraphOrbit(); updateGraphVisibility(); fitGraph();
+      graphView.filters.arena = key; graphView.filters.anchor = ''; applyGraphFilters();
     }
 
     function graphCoordinates(nodes) {
-      syncGraphPhysics(nodes); return new Map(nodes.map(node => [node.key, graphView.nodePositions.get(node.key)]));
+      if (nodes.some(node => !graphView.nodePositions.has(node.key))) syncGraphPhysics(nodes);
+      return new Map(nodes.map(node => [node.key, graphView.nodePositions.get(node.key)]));
     }
 
     function projectGraphPoint(point) {
       const cy = Math.cos(graphView.yaw); const sy = Math.sin(graphView.yaw); const cp = Math.cos(graphView.pitch); const sp = Math.sin(graphView.pitch);
       const rotatedX = point.x * cy - point.z * sy; const yawDepth = point.x * sy + point.z * cy;
       const rotatedY = point.y * cp - yawDepth * sp; const depth = point.y * sp + yawDepth * cp;
-      const scale = (720 / (720 + depth)) * graphView.zoom * graphViewportScale();
+      const scale = (720 / (720 + Math.max(-300, Math.min(300, depth)))) * graphView.zoom * graphViewportScale();
       return { x: graphView.width / 2 + graphView.panX + rotatedX * scale, y: graphView.height / 2 + graphView.panY + rotatedY * scale, depth, scale, radius: Math.max(4, Math.min(64, 16 * scale)) };
     }
 
@@ -546,12 +547,12 @@ FRONTEND_HTML = r'''<!doctype html>
       const percent = Math.round(graphView.zoom * 100);
       document.getElementById('graph-zoom').value = String(percent);
       text('graph-zoom-value', `${percent}%`);
-      document.getElementById('graph-zoom-out').disabled = graphView.zoom <= .25;
+      document.getElementById('graph-zoom-out').disabled = graphView.zoom <= .05;
       document.getElementById('graph-zoom-in').disabled = graphView.zoom >= 4;
     }
 
     function setGraphZoom(value, anchor = { x: graphView.width / 2, y: graphView.height / 2 }) {
-      const zoom = Math.max(.25, Math.min(4, value)); if (!Number.isFinite(zoom)) return;
+      const zoom = Math.max(.05, Math.min(4, value)); if (!Number.isFinite(zoom)) return;
       const ratio = zoom / graphView.zoom; const x = anchor.x - graphView.width / 2; const y = anchor.y - graphView.height / 2;
       graphView.panX = x - (x - graphView.panX) * ratio; graphView.panY = y - (y - graphView.panY) * ratio;
       graphView.zoom = zoom; graphView.fitted = false; syncZoomControls(); renderGraph(graphView.nodes, graphView.edges);
@@ -563,7 +564,7 @@ FRONTEND_HTML = r'''<!doctype html>
       if (points.length) {
         const left = Math.min(...points.map(point => point.x - point.radius)); const right = Math.max(...points.map(point => point.x + point.radius));
         const top = Math.min(...points.map(point => point.y - point.radius)); const bottom = Math.max(...points.map(point => point.y + point.radius));
-        graphView.zoom = Math.max(.25, Math.min(4, (graphView.width - 80) / Math.max(1, right - left), (graphView.height - 80) / Math.max(1, bottom - top)));
+        graphView.zoom = Math.max(.05, Math.min(4, (graphView.width - 80) / Math.max(1, right - left), (graphView.height - 80) / Math.max(1, bottom - top)));
         graphView.panX = (graphView.width / 2 - (left + right) / 2) * graphView.zoom;
         graphView.panY = (graphView.height / 2 - (top + bottom) / 2) * graphView.zoom;
       }
@@ -617,38 +618,22 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function relaxGraph(iterations = 40, pinnedKey = graphView.pinnedKey) {
-      const nodes = graphView.nodes; const edges = graphView.edges; if (nodes.length < 2) return; const positions = graphCoordinates(nodes);
-      const passCount = Math.max(1, Math.min(iterations, Math.floor(40000 / Math.max(1, nodes.length * nodes.length))));
-      for (let iteration = 0; iteration < passCount; iteration += 1) {
-        const forces = new Map(nodes.map(node => [node.key, { x: 0, y: 0, z: 0 }]));
-        edges.forEach(edge => {
-          const source = positions.get(edge.source); const target = positions.get(edge.target); if (!source || !target) return;
-          const dx = target.x - source.x; const dy = target.y - source.y; const dz = target.z - source.z; const distance = Math.max(1, Math.hypot(dx, dy, dz)); const magnitude = (distance - 155) * .0035 * graphEdgeStrength(edge.relationship);
-          const force = { x: dx / distance * magnitude, y: dy / distance * magnitude, z: dz / distance * magnitude }; const sourceForce = forces.get(edge.source); const targetForce = forces.get(edge.target);
-          sourceForce.x += force.x; sourceForce.y += force.y; sourceForce.z += force.z; targetForce.x -= force.x; targetForce.y -= force.y; targetForce.z -= force.z;
-        });
-        for (let left = 0; left < nodes.length; left += 1) for (let right = left + 1; right < nodes.length; right += 1) {
-          const first = positions.get(nodes[left].key); const second = positions.get(nodes[right].key); const dx = second.x - first.x; const dy = second.y - first.y; const dz = second.z - first.z; const distance = Math.max(18, Math.hypot(dx, dy, dz));
-          const longRange = 4200 * graphView.repulsionStrength / (distance * distance); const collision = Math.max(0, 115 - distance) * .045 * graphView.repulsionStrength; const magnitude = longRange + collision; const force = { x: dx / distance * magnitude, y: dy / distance * magnitude, z: dz / distance * magnitude };
-          const firstForce = forces.get(nodes[left].key); const secondForce = forces.get(nodes[right].key); firstForce.x -= force.x; firstForce.y -= force.y; firstForce.z -= force.z; secondForce.x += force.x; secondForce.y += force.y; secondForce.z += force.z;
-          const firstProjected = projectGraphPoint(first); const secondProjected = projectGraphPoint(second); let projectedX = secondProjected.x - firstProjected.x; let projectedY = secondProjected.y - firstProjected.y; let projectedDistance = Math.hypot(projectedX, projectedY);
-          if (projectedDistance < 72) { if (projectedDistance < 1) { projectedX = left % 2 ? -1 : 1; projectedY = right % 2 ? 1 : -1; projectedDistance = Math.hypot(projectedX, projectedY); } const screenMagnitude = (72 - projectedDistance) * .075 * graphView.repulsionStrength; const screenForce = graphScreenVector(projectedX / projectedDistance * screenMagnitude, projectedY / projectedDistance * screenMagnitude, (firstProjected.scale + secondProjected.scale) / 2); firstForce.x -= screenForce.x; firstForce.y -= screenForce.y; firstForce.z -= screenForce.z; secondForce.x += screenForce.x; secondForce.y += screenForce.y; secondForce.z += screenForce.z; }
-        }
-        nodes.forEach(node => {
-          const position = positions.get(node.key); if (node.key === pinnedKey) { graphView.nodeVelocities.set(node.key, { x: 0, y: 0, z: 0 }); return; }
-          const force = forces.get(node.key); force.x -= position.x * .00065; force.y -= position.y * .00065; force.z -= position.z * .00045;
-          const prior = graphView.nodeVelocities.get(node.key) || { x: 0, y: 0, z: 0 }; const velocity = { x: (prior.x + force.x) * .76, y: (prior.y + force.y) * .76, z: (prior.z + force.z) * .76 }; const speed = Math.max(1, Math.hypot(velocity.x, velocity.y, velocity.z)); const limit = Math.min(1, 9 / speed); velocity.x *= limit; velocity.y *= limit; velocity.z *= limit;
-          const next = { x: Math.max(-470, Math.min(470, position.x + velocity.x)), y: Math.max(-175, Math.min(175, position.y + velocity.y)), z: Math.max(-280, Math.min(280, position.z + velocity.z)) }; positions.set(node.key, next); graphView.nodePositions.set(node.key, next); graphView.nodeVelocities.set(node.key, velocity);
-        });
-      }
+      if (graphView.nodes.length < 2 || graphView.drag) return;
+      invalidateLayout(); const generation = graphView.layoutGeneration;
+      try {
+        const worker = new Worker('/monitor/topology-assets/worker.js'); graphView.worker = worker;
+        worker.onmessage = ({data}) => { if (data.generation !== graphView.layoutGeneration) return; for (const [key,p] of data.positions) if (graphView.nodePositions.has(key)) graphView.nodePositions.set(key,p); worker.terminate(); graphView.worker = null; if (graphView.fitted) fitGraph(); else requestGraphRender(); };
+        worker.onerror = () => { worker.terminate(); graphView.worker = null; announceGraph('Automatic arrangement is unavailable. You can still move items.'); };
+        worker.postMessage({generation, nodes: graphView.nodes.map(n=>({key:n.key})), edges:graphView.edges, positions:[...graphCoordinates(graphView.nodes)], options:{iterations,separation:graphView.repulsionStrength,pinned:pinnedKey,strengths:Object.fromEntries(graphView.edgeStrengths)}});
+      } catch { announceGraph('Automatic arrangement is unavailable. You can still move items.'); }
     }
 
     function settleGraph() {
-      graphView.pinnedKey = null; relaxGraph(90, null); renderGraph(graphView.nodes, graphView.edges);
+      beginArrangement('Arrange nodes'); graphView.pinnedKey = null; finishArrangement(); relaxGraph(60, null); announceGraph('Arranging items. Undo positioning restores the previous layout.'); renderGraph(graphView.nodes, graphView.edges);
     }
 
     function resetForceStrengths() {
-      graphView.repulsionStrength = 1.5; new Set(graphView.edges.map(edge => edge.relationship)).forEach(relationship => graphView.edgeStrengths.set(relationship, 1)); renderForceControls(graphView.edges); settleGraph();
+      beginArrangement('Reset spacing'); graphView.repulsionStrength = 1.5; new Set(graphView.edges.map(edge => edge.relationship)).forEach(relationship => graphView.edgeStrengths.set(relationship, 1)); renderForceControls(graphView.edges); settleGraph();
     }
 
     function drawGraphTooltip(layer, node, position, edges) {
@@ -660,7 +645,7 @@ FRONTEND_HTML = r'''<!doctype html>
       group.append(svgMake('rect', { class: 'graph-tooltip-panel', x, y, width, height, rx: 9 }));
       const title = svgMake('text', { class: 'graph-tooltip-title', x: x + 12, y: y + 21 }); title.textContent = node.title.length > 38 ? `${node.title.slice(0, 37)}…` : node.title;
       const meta = svgMake('text', { class: 'graph-tooltip-meta', x: x + 12, y: y + 39 }); meta.textContent = `${node.kind} · ${node.status}${node.archived ? ' · archived' : ''}`;
-      const copy = svgMake('text', { class: 'graph-tooltip-copy', x: x + 12, y: y + 57 }); copy.textContent = `${connected} stored relationship${connected === 1 ? '' : 's'} · drag to pull graph · click to inspect`;
+      const copy = svgMake('text', { class: 'graph-tooltip-copy', x: x + 12, y: y + 57 }); copy.textContent = `${connected} connection${connected === 1 ? '' : 's'} · drag to pull graph · click to inspect`;
       group.append(title, meta, copy); layer.append(group);
     }
 
@@ -866,7 +851,7 @@ FRONTEND_HTML = r'''<!doctype html>
       const latest = (state.snapshot?.graph_nodes || []).find(item => item.key === node?.key);
       if (latest) detailState.node = { ...node, ...latest };
       text('reader-title', detailState.data?.title || node?.title || 'No node selected');
-      text('reader-meta', node ? `${node.kind} · ${detailState.data?.status || node.status} · ${node.id}` : 'Select a node or search to read its details.');
+      text('reader-meta', node ? `${Topology.visual(node.kind).label} · ${detailState.data?.status || node.status} · ${node.id}` : 'Select a node or search to read its details.');
       text('reader-status', detailState.loading ? 'Loading details…' : detailState.error ? `${detailState.error}${detailState.data ? ' Showing the last loaded details.' : ''}` : '');
       const content = make('div');
       if (!node) { content.append(make('p', 'reader-note', 'Find an item to read its description, related work, and supporting material.')); reconcileChildren(document.getElementById('reader-content'), content); return; }
@@ -874,11 +859,11 @@ FRONTEND_HTML = r'''<!doctype html>
       const visible = graphView.nodes.some(item => item.key === node.key);
       const outsideArena = latest && graphView.arenaKey && !graphView.arenaNodes.some(item => item.key === node.key);
       actions.append(readerButton(outsideArena ? 'Show in all nodes' : visible ? 'Focus in graph' : 'Reveal in graph', 'focus'));
-      if (!outsideArena) actions.append(readerButton('Show neighborhood', 'neighborhood'));
+      if (!outsideArena) actions.append(readerButton('Show connected items', 'neighborhood'));
       if (latest?.category === 'arena') actions.append(readerButton('Filter from this Arena', 'arena-filter'));
       if (readPath(node)) actions.append(readerButton('Refresh details', 'refresh-detail'));
       content.append(actions);
-      if (!latest) content.append(make('p', 'reader-note', 'This item is outside the current graph snapshot. Its available details are shown below.'));
+      if (!latest) content.append(make('p', 'reader-note', state.snapshot?.schema === 'devgraph.topology.v1' && Topology.query(graphView.filters) ? 'Hidden by your filters. Its available details are shown below.' : 'This item is outside the current graph snapshot. Its available details are shown below.'));
       else if (!visible) content.append(make('p', 'reader-note', outsideArena ? 'This item is outside the selected Arena reachability filter.' : 'This item is hidden by the graph filters.'));
       const data = detailState.data;
       if (node.category === 'work' && data) {
@@ -949,7 +934,7 @@ FRONTEND_HTML = r'''<!doctype html>
         for (const url of data.evidence_urls || []) { const row = make('p'); appendSource(row, url, url); evidence.append(row); }
         content.append(evidence);
       } else if (node.category === 'receipt') {
-        const section = readerSection('Receipt summary', 'receipt'); section.append(make('p', 'reader-description', 'A receipt records a committed graph mutation. Pending means the local outbox has not advanced; it does not mean the mutation is uncommitted.')); content.append(section);
+        const section = readerSection('Mutation record', 'receipt'); section.append(make('p', 'reader-description', 'An unsigned record of a committed change. Pending means outbox processing has not advanced; the change is already recorded.')); content.append(section);
       }
       const connections = readerSection('Connections in this snapshot', 'connections');
       const allEdges = (state.snapshot?.graph_edges || []).filter(edge => edge.source === node.key || edge.target === node.key);
@@ -992,20 +977,20 @@ FRONTEND_HTML = r'''<!doctype html>
 
     function updateGraphVisibility() {
       const allNodes = state.snapshot?.graph_nodes || [], allEdges = state.snapshot?.graph_edges || [];
-      const scoped = filterGraphByArena(allNodes, allEdges, graphView.arenaKey); graphView.arenaNodes = scoped.nodes;
-      renderArenaFilter(allNodes);
+      const scoped = state.snapshot?.schema === 'devgraph.topology.v1' ? {nodes:allNodes,edges:allEdges} : filterGraphByArena(allNodes, allEdges, graphView.arenaKey); graphView.arenaNodes = scoped.nodes;
+      renderArenaFilter(state.snapshot?.arenas || allNodes);
       let { nodes, edges } = filterGraph(scoped.nodes, scoped.edges, graphView.visibleCategories);
-      if (graphView.neighborhood) {
+      if (graphView.neighborhood && state.snapshot?.schema !== 'devgraph.topology.v1') {
         const keys = neighborhoodKeys(allNodes, allEdges, graphView.neighborhood);
         nodes = nodes.filter(node => keys.has(node.key)); const shown = new Set(nodes.map(node => node.key)); edges = edges.filter(edge => shown.has(edge.source) && shown.has(edge.target));
       }
       graphView.nodes = nodes; graphView.edges = edges;
       const changed = syncGraphPhysics(nodes); renderForceControls(scoped.edges);
-      if (changed) relaxGraph(90, null);
+      if (changed && graphView.nodePositions.size === nodes.length && !graphView.initialArranged) { graphView.initialArranged = true; graphView.fitted = true; relaxGraph(40, null); }
       if (graphView.fitted) fitGraph(); else renderGraph(nodes, edges);
-      for (const category of ['arena', 'work', 'observation', 'receipt']) text(`category-${category}-count`, scoped.nodes.filter(node => node.category === category).length);
+      for (const category of ['arena', 'work', 'observation', 'receipt']) text(`category-${category}-count`, state.snapshot?.facets?.category?.[category] ?? scoped.nodes.filter(node => node.category === category).length);
       document.getElementById('graph-show-all').hidden = !graphView.neighborhood;
-      renderGraphSelection(); renderGraphSearch();
+      renderGraphSelection(); renderGraphSearch(); renderTopologyControls();
     }
 
     function renderForceControls(edges) {
@@ -1016,12 +1001,14 @@ FRONTEND_HTML = r'''<!doctype html>
         let row = rows.get(name);
         if (!row) {
           row = make('label', 'graph-force-control'); row.dataset.force = name;
-          const label = make('span', '', name === 'separation' ? 'Node separation' : relationshipLabel(name)); label.title = name;
+          const label = make('span', '', name === 'separation' ? 'Space between nodes' : relationshipLabel(name)); label.title = name;
           const input = document.createElement('input'); input.type = 'range'; input.min = name === 'separation' ? '.5' : '0'; input.max = name === 'separation' ? '3' : '2.5'; input.step = '.25';
           input.setAttribute('aria-label', name === 'separation' ? 'Node separation strength' : `${name} attraction strength`);
           const output = document.createElement('output');
+          input.addEventListener('change', () => finishArrangement());
+          input.addEventListener('pointercancel', cancelArrangement);
           input.addEventListener('input', () => {
-            const value = Number(input.value); if (name === 'separation') graphView.repulsionStrength = value; else graphView.edgeStrengths.set(name, value);
+            if (!graphView.arrangement) beginArrangement('Adjust spacing'); const value = Number(input.value); if (name === 'separation') graphView.repulsionStrength = value; else graphView.edgeStrengths.set(name, value);
             output.textContent = `${value.toFixed(2)}×`; graphView.pinnedKey = null; relaxGraph(55, null); renderGraph(graphView.nodes, graphView.edges);
           });
           row.append(label, input, output); root.append(row);
@@ -1033,12 +1020,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function nodeShape(kind, radius) {
-      const r = radius;
-      if (kind === 'Project') return `M ${-r} ${-r} H ${r} V ${r} H ${-r} Z`;
-      if (kind === 'Issue') return `M 0 ${-r * 1.25} L ${r * 1.15} 0 L 0 ${r * 1.25} L ${-r * 1.15} 0 Z`;
-      if (kind === 'Task') return `M ${-r} 0 L ${-r / 2} ${-r} H ${r / 2} L ${r} 0 L ${r / 2} ${r} H ${-r / 2} Z`;
-      if (kind === 'Proposal') return `M 0 ${-r * 1.2} L ${r * 1.1} ${r} H ${-r * 1.1} Z`;
-      return `M ${-r} 0 A ${r} ${r} 0 1 0 ${r} 0 A ${r} ${r} 0 1 0 ${-r} 0`;
+      return Topology.shape(kind, radius);
     }
 
     function setSvg(element, attributes) {
@@ -1059,11 +1041,23 @@ FRONTEND_HTML = r'''<!doctype html>
       const svg = document.getElementById('graph-svg'); ensureGraphScene(svg);
       setSvg(svg, { viewBox: `0 0 ${graphView.width} ${graphView.height}` }); setSvg(document.getElementById('scene-hit'), { width: graphView.width, height: graphView.height });
       graphView.nodes = nodes; graphView.edges = edges;
-      text('graph-meta', state.snapshot ? `${nodes.length} of ${state.snapshot.graph_nodes.length} nodes · ${edges.length} connections in view` : 'Connect to load your graph');
-      const empty = document.getElementById('scene-empty'); empty.textContent = nodes.length ? '' : !state.snapshot ? 'Connect to load the graph.' : graphView.arenaKey ? 'No reachable nodes match these filters.' : state.snapshot.graph_nodes.length ? 'No nodes match these filters.' : 'No graph nodes yet.';
+      text('graph-meta', state.snapshot ? `${state.snapshot.complete === false ? 'Partial map · ' : ''}${nodes.length} of ${state.snapshot.counts?.matching_nodes ?? state.snapshot.graph_nodes.length} matching items · ${edges.length} connections` : 'Connect to load your graph');
+      const empty = document.getElementById('scene-empty'); empty.textContent = nodes.length ? '' : !state.snapshot ? 'Connect to load the graph.' : graphView.arenaKey ? 'No reachable nodes match these filters.' : (state.snapshot.counts?.available_nodes ?? state.snapshot.graph_nodes.length) ? 'No items match these filters.' : 'No work has been recorded yet.';
       const positions = new Map([...graphCoordinates(nodes)].map(([key, point]) => [key, projectGraphPoint(point)]));
-      const adjacent = neighborhoodKeys(nodes, edges, state.selectedGraphKey);
+      if (graphView.indexNodes !== nodes || graphView.indexEdges !== edges) { graphView.index = Topology.index(nodes, edges); graphView.indexNodes = nodes; graphView.indexEdges = edges; }
+      const previewKey = graphView.hoveredKey || graphView.focusedKey || state.selectedGraphKey;
+      const adjacent = new Set(previewKey && graphView.index.byKey.has(previewKey) ? [previewKey, ...(graphView.index.adjacent.get(previewKey) || [])] : []);
+      const labelKeys = new Set(previewKey ? [previewKey, ...[...adjacent].filter(key => key !== previewKey).slice(0, 12)] : []);
+      graphView.projected = positions;
       const edgeLayer = document.getElementById('scene-edges'), nodeLayer = document.getElementById('scene-nodes'), labelLayer = document.getElementById('scene-labels');
+      const canvas = document.getElementById('graph-canvas'); graphView.canvasMode = nodes.length >= 200;
+      canvas.hidden = !graphView.canvasMode;
+      if (graphView.canvasMode) {
+        if (nodeLayer.contains(document.activeElement)) svg.focus();
+        nodeLayer.replaceChildren(); edgeLayer.replaceChildren(); labelLayer.replaceChildren();
+        const labels = DevgraphTopologyCanvas.draw(canvas, graphView, state.selectedGraphKey, previewKey, adjacent, labelKeys, relationshipLabel, chooseGraphLabels);
+        updateGraphPreview(previewKey, adjacent, labels); return;
+      }
       const existingNodes = new Map([...nodeLayer.children].map(el => [el.dataset.nodeKey, el]));
       const existingEdges = new Map([...edgeLayer.children].map(el => [el.dataset.edgeKey, el]));
       const edgeKeys = new Set(), candidates = [], occupied = [];
@@ -1074,14 +1068,15 @@ FRONTEND_HTML = r'''<!doctype html>
           group.append(svgMake('title'), svgMake('circle', { class: 'graph-node-hit', cx: 0, cy: 0 }), svgMake('path', { class: 'graph-sphere' }), svgMake('circle', { class: 'graph-selection-ring', cx: 0, cy: 0 }));
           nodeLayer.append(group);
         }
-        const selected = node.key === state.selectedGraphKey, nearby = adjacent.has(node.key), count = edges.filter(edge => edge.source === node.key || edge.target === node.key).length;
-        setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}`, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.32' : '1', 'aria-pressed': selected, 'aria-label': `${node.kind}: ${node.title}, ${node.status}, ${count} visible connections. Press Enter to read; arrow keys move the node.` });
-        group.querySelector('title').textContent = `${node.kind}: ${node.title} · ${node.status}`;
-        setSvg(group.querySelector('.graph-node-hit'), { r: Math.max(16, r + 5) });
-        setSvg(group.querySelector('.graph-sphere'), { d: nodeShape(node.kind, r), fill: `url(#sphere-${node.category})` });
-        setSvg(group.querySelector('.graph-selection-ring'), { r: r + 6, visibility: selected ? 'visible' : 'hidden' });
+        const selected = node.key === state.selectedGraphKey, nearby = adjacent.has(node.key), count = graphView.index.degree.get(node.key) || 0;
+        setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}${node.key === previewKey ? ' preview' : ''}`, tabindex: node.key === (graphView.index.byKey.has(state.selectedGraphKey) ? state.selectedGraphKey : nodes[0]?.key) ? 0 : -1, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.32' : '1', 'aria-pressed': selected, 'aria-label': `${Topology.visual(node.kind).label}: ${node.title}, ${node.status}, ${count} visible connections. Press Enter to read; arrow keys move the node.` });
+        group._parts ||= {title:group.querySelector('title'),hit:group.querySelector('.graph-node-hit'),shape:group.querySelector('.graph-sphere'),ring:group.querySelector('.graph-selection-ring')};
+        const titleText = `${Topology.visual(node.kind).label}: ${node.title} · ${node.status}`; if (group._parts.title.textContent !== titleText) group._parts.title.textContent = titleText;
+        setSvg(group._parts.hit, { r: Math.max(14, r + 5) });
+        setSvg(group._parts.shape, { d: nodeShape(node.kind, r), fill: Topology.visual(node.kind).color });
+        setSvg(group._parts.ring, { r: r + 6, visibility: selected ? 'visible' : 'hidden' });
         occupied.push({ x: position.x - r - 2, y: position.y - r - 2, width: (r + 2) * 2, height: (r + 2) * 2 });
-        if (graphView.labels !== 'none' && (selected || nearby || graphView.labels === 'all')) {
+        if (graphView.labels !== 'none' && (labelKeys.has(node.key) || (graphView.labels === 'all' && candidates.length < 160))) {
           const title = node.title.length > 36 ? `${node.title.slice(0, 35)}…` : node.title, width = title.length * 7.5 + 8;
           const candidate = { key: `node:${node.key}`, text: title, className: 'graph-node-label', width, height: 19, priority: selected ? 0 : 1 };
           candidates.push({ ...candidate, x: position.x + r + 9, y: position.y - 9 }, { ...candidate, x: position.x - width - r - 9, y: position.y - 9 }, { ...candidate, x: position.x - width / 2, y: position.y - r - 26 }, { ...candidate, x: position.x - width / 2, y: position.y + r + 9 });
@@ -1094,9 +1089,9 @@ FRONTEND_HTML = r'''<!doctype html>
         let path = existingEdges.get(key); if (!path) { path = svgMake('path', { class: 'graph-edge', 'data-edge-key': key }); edgeLayer.append(path); }
         const dx = target.x - source.x, dy = target.y - source.y, distance = Math.max(1, Math.hypot(dx, dy)), ux = dx / distance, uy = dy / distance;
         const sx = source.x + ux * source.radius, sy = source.y + uy * source.radius, tx = target.x - ux * (target.radius + 3), ty = target.y - uy * (target.radius + 3);
-        const connected = edge.source === state.selectedGraphKey || edge.target === state.selectedGraphKey;
+        const connected = edge.source === previewKey || edge.target === previewKey;
         setSvg(path, { d: `M ${sx} ${sy} L ${tx} ${ty}`, 'stroke-width': connected ? 2 : 1, stroke: connected ? '#9dc9b7' : '#527568', opacity: adjacent.size && !connected ? .14 : .8 });
-        if (graphView.labels === 'all' || (graphView.labels === 'selected' && connected)) {
+        if (candidates.length < 220 && (graphView.labels === 'all' || (graphView.labels === 'selected' && connected))) {
           const label = relationshipLabel(edge.relationship), width = label.length * 6.8 + 8;
           candidates.push({ key: `edge:${key}`, text: label, className: 'graph-edge-label', x: (sx + tx) / 2 - width / 2, y: (sy + ty) / 2 - 23, width, height: 18, priority: 2 });
         }
@@ -1106,27 +1101,28 @@ FRONTEND_HTML = r'''<!doctype html>
       const nextLabels = svgMake('g');
       for (const label of labels) { const el = svgMake('text', { class: label.className, x: label.x + 4, y: label.y + 14, 'text-anchor': 'start', 'data-ui-key': label.key }); el.textContent = label.text; nextLabels.append(el); }
       reconcileChildren(labelLayer, nextLabels);
+      updateGraphPreview(previewKey, adjacent, labels);
     }
 
     function renderGraphSearch() {
       const input = document.getElementById('graph-search'), root = document.getElementById('graph-search-results'), query = input.value.trim().toLowerCase();
       root.hidden = !query; if (!query) return;
-      const scoped = filterGraphByArena(state.snapshot?.graph_nodes || [], state.snapshot?.graph_edges || [], graphView.arenaKey);
+      const scoped = state.snapshot?.schema === 'devgraph.topology.v1' ? {nodes:state.snapshot.graph_nodes} : filterGraphByArena(state.snapshot?.graph_nodes || [], state.snapshot?.graph_edges || [], graphView.arenaKey);
       const nodes = scoped.nodes.filter(node => `${node.title} ${node.id}`.toLowerCase().includes(query));
       const desired = make('div'); desired.append(make('p', 'reader-note', `${nodes.length} matches ${graphView.arenaKey ? 'reachable from the Arena filter' : 'in the loaded graph'}`));
-      for (const node of nodes.slice(0, 30)) { const button = make('button', 'search-result', node.title); button.dataset.nodeKey = node.key; button.dataset.uiKey = node.key; button.append(make('small', '', `${node.kind} · ${node.status}${graphView.visibleCategories.has(node.category) ? '' : ' · hidden category'}`)); desired.append(button); }
+      for (const node of nodes.slice(0, 30)) { const button = make('button', 'search-result', node.title); button.dataset.nodeKey = node.key; button.dataset.uiKey = node.key; button.append(make('small', '', `${Topology.visual(node.kind).label} · ${node.status}${graphView.visibleCategories.has(node.category) ? '' : ' · hidden category'}`)); desired.append(button); }
       if (nodes.length > 30) desired.append(make('p', 'reader-note', 'Showing 30 results. Refine your search for more.'));
       reconcileChildren(root, desired);
     }
 
     function focusSelectedNode(neighborhood = false) {
+      const node = detailState.node; if (!node) return;
+      const visible = graphView.nodes.some(item => item.key === node.key);
+      if (!visible) { graphView.filters = Topology.filters(); graphView.visibleCategories = new Set(Topology.categories); graphView.arenaKey = ''; announceGraph('Filters cleared to reveal this item.'); }
+      graphView.filters.anchor = neighborhood ? node.key : ''; graphView.neighborhood = neighborhood ? node.key : null;
+      if (!visible || neighborhood || state.snapshot?.applied_filters?.anchor) { applyGraphFilters(); return; }
       document.getElementById('topology').classList.remove('reading-view'); text('reader-mode', 'Reading view');
-      const node = detailState.node; if (!node || !(state.snapshot?.graph_nodes || []).some(item => item.key === node.key)) return;
-      if (graphView.arenaKey && !graphView.arenaNodes.some(item => item.key === node.key)) graphView.arenaKey = '';
-      graphView.neighborhood = neighborhood ? node.key : null; graphView.visibleCategories.add(node.category);
-      document.querySelector(`[data-graph-category="${node.category}"]`).checked = true; updateGraphVisibility();
-      if (neighborhood) fitGraph();
-      else { setGraphZoom(Math.max(1.2, graphView.zoom)); const point = projectGraphPoint(graphView.nodePositions.get(node.key)); graphView.panX += graphView.width / 2 - point.x; graphView.panY += graphView.height / 2 - point.y; renderGraph(graphView.nodes, graphView.edges); }
+      setGraphZoom(Math.max(1.2, graphView.zoom)); const point = projectGraphPoint(graphView.nodePositions.get(node.key)); graphView.panX += graphView.width/2-point.x; graphView.panY += graphView.height/2-point.y; renderGraph(graphView.nodes,graphView.edges);
     }
 
     function pauseGraphOrbit() {
@@ -1145,13 +1141,13 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function resetGraphView() {
-      pauseGraphOrbit(); graphView.yaw = -.38; graphView.pitch = .22; graphView.zoom = 1; graphView.panX = 0; graphView.panY = 0; graphView.fitted = false; syncZoomControls(); graphView.pinnedKey = null; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); syncGraphPhysics(graphView.nodes); relaxGraph(90, null); renderGraph(graphView.nodes, graphView.edges);
+      beginArrangement('Reset layout', true); pauseGraphOrbit(); graphView.yaw = -.38; graphView.pitch = .22; graphView.zoom = 1; graphView.panX = 0; graphView.panY = 0; graphView.fitted = false; syncZoomControls(); graphView.pinnedKey = null; for (const node of graphView.nodes) { graphView.nodePositions.delete(node.key); graphView.nodeVelocities.delete(node.key); } syncGraphPhysics(graphView.nodes); finishArrangement(); relaxGraph(40, null); fitGraph(); announceGraph('Layout reset. Undo positioning is available.');
     }
 
     function render(snapshot, observations) {
       state.snapshot = snapshot;
       text('total-work', snapshot.total_work); text('active-initiatives', snapshot.active_initiatives); text('observation-count', snapshot.observation_count); text('pending-receipts', snapshot.pending_receipts);
-      text('receipt-note', `${snapshot.receipt_count} receipts in the local outbox`); const age = relativeTime(snapshot.generated_at); text('generated-at', age === 'now' ? 'updated just now' : `updated ${age} ago`);
+      text('receipt-note', `${snapshot.receipt_count} records in the local outbox`); const age = relativeTime(snapshot.generated_at); text('generated-at', age === 'now' ? 'updated just now' : `updated ${age} ago`);
       updateGraphVisibility(); renderPipeline(snapshot.observation_by_status); renderBars(snapshot.work_by_kind); renderActivity(snapshot.recent_activity); renderObservations(observations);
       document.getElementById('connection-dot').className = `dot ${snapshot.storage.ready ? 'ready' : 'error'}`;
       text('connection-label', snapshot.storage.ready ? 'Graph ready' : 'Graph degraded');
@@ -1163,7 +1159,7 @@ FRONTEND_HTML = r'''<!doctype html>
       state.refreshController?.abort(); state.refreshController = null;
       detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null;
       resetDetailState(); state.snapshot = null; state.observations = []; state.selectedGraphKey = null; graphView.neighborhood = null; graphView.arenaKey = '';
-      graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
+      invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
       ['total-work', 'active-initiatives', 'observation-count', 'pending-receipts'].forEach(id => text(id, '—'));
       renderActivity([]); renderObservations([]); renderPipeline({}); renderBars({});
     }
@@ -1181,18 +1177,20 @@ FRONTEND_HTML = r'''<!doctype html>
 
     async function refresh() {
       synchronizeCredential();
+      if (!graphView.preferenceKey) await prepareGraphPreferences();
       if (!tokenInput.value.trim()) { text('status-line', 'Enter a scoped read credential to inspect the graph.'); return; }
       if (state.refreshPromise) { state.refreshQueued = true; return state.refreshPromise; }
-      const epoch = state.authEpoch, controller = new AbortController(); state.refreshController = controller;
+      const epoch = state.authEpoch, filterSerial = graphView.filterSerial, controller = new AbortController(); state.refreshController = controller;
       if (!state.snapshot) text('status-line', 'Loading graph…');
       const request = (async () => {
         try {
-          const [snapshot, observations] = await Promise.all([getJson('/monitor/snapshot', { signal: controller.signal }), getJson('/initiative-observations?descending=true&limit=100', { signal: controller.signal })]);
-          if (epoch !== state.authEpoch) return;
+          const [snapshot, observations] = await Promise.all([getJson(topologyPath(), { signal: controller.signal }), getJson('/initiative-observations?descending=true&limit=100', { signal: controller.signal })]);
+          if (epoch !== state.authEpoch || filterSerial !== graphView.filterSerial) return;
           applySnapshot(snapshot, observations.items);
+          if (state.filterFeedback) { state.filterFeedback = false; announceGraph(snapshot.scope_error ? 'The saved scope is unavailable. Choose another Arena or clear filters.' : `${snapshot.counts.matching_nodes} matching items. ${state.preferenceSaveFailed ? 'Filters could not be saved on this device.' : 'Filters saved on this device.'}`); }
         } catch (error) {
           controller.abort();
-          if (epoch !== state.authEpoch) return;
+          if (epoch !== state.authEpoch || filterSerial !== graphView.filterSerial) return;
           state.refreshQueued = false; state.pendingSnapshot = null;
           document.getElementById('connection-dot').className = 'dot error';
           text('connection-label', error.status === 401 || error.status === 403 ? 'Access denied' : 'Connection interrupted');
@@ -1206,6 +1204,169 @@ FRONTEND_HTML = r'''<!doctype html>
 
     function graphDragMoved(drag, x, y) {
       return Math.hypot(x - drag.startX, y - drag.startY) >= 5;
+    }
+
+    function announceGraph(message) {
+      text('graph-feedback', message);
+    }
+
+    function invalidateLayout() {
+      graphView.layoutGeneration += 1; graphView.worker?.terminate(); graphView.worker = null;
+    }
+
+    function requestGraphRender() {
+      if (graphView.renderFrame) return;
+      graphView.renderFrame = requestAnimationFrame(() => { graphView.renderFrame = null; renderGraph(graphView.nodes,graphView.edges); });
+    }
+
+    function beginArrangement(label, camera = false) {
+      invalidateLayout(); pauseGraphOrbit(); if (!graphView.arrangement) graphView.arrangement = {...Topology.capture(graphView),label,restoreCamera:camera};
+    }
+
+    function finishArrangement() {
+      if (!graphView.arrangement) return;
+      graphView.history.push(graphView.arrangement); graphView.history = graphView.history.slice(-20); graphView.arrangement = null; syncUndoControl();
+    }
+
+    function cancelArrangement() {
+      if (!graphView.arrangement) return; invalidateLayout(); Topology.restore(graphView, graphView.arrangement, {camera:graphView.arrangement.restoreCamera}); graphView.arrangement = null;
+      renderForceControls(graphView.edges); syncZoomControls(); requestGraphRender(); announceGraph('Positioning cancelled. Previous positions restored.');
+    }
+
+    function syncUndoControl() {
+      const button = document.getElementById('graph-undo'); button.disabled = !graphView.history.length;
+      button.title = graphView.history.length ? `Undo: ${graphView.history.at(-1).label}` : 'No positioning changes to undo';
+    }
+
+    function undoPositioning() {
+      const entry = graphView.history.pop(); if (!entry) return; invalidateLayout(); pauseGraphOrbit();
+      const unfiltered = state.snapshot?.complete && !Topology.query(graphView.filters);
+      const available = unfiltered ? new Set(graphView.nodes.map(n=>n.key)) : null;
+      Topology.restore(graphView,entry,{camera:entry.restoreCamera,available}); graphView.arrangement = null;
+      renderForceControls(graphView.edges); syncZoomControls(); syncUndoControl(); renderGraph(graphView.nodes,graphView.edges);
+      announceGraph(available && entry.positions.some(([key])=>!available.has(key)) ? 'Restored positions for the items still available.' : 'Positions restored.');
+    }
+
+    function topologyPath() {
+      const query = Topology.query(graphView.filters); return '/monitor/topology/v1' + (query ? `?${query}` : '');
+    }
+
+    async function prepareGraphPreferences() {
+      const credential = tokenInput.value.trim(); if (!credential || graphView.preferenceKey) return;
+      const epoch = state.authEpoch;
+      const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(credential)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+      if (epoch !== state.authEpoch) return;
+      graphView.preferenceKey = `devgraph.topology.preferences.v1:${location.origin}:${hash}`;
+      let raw = null; try { raw = JSON.parse(localStorage.getItem(graphView.preferenceKey)); } catch { announceGraph('Saved view preferences are unavailable. Using the default view.'); }
+      graphView.preferences = Topology.preferences(raw); graphView.filters = graphView.preferences.filters;
+      if (raw && (raw.version !== 1 || JSON.stringify(raw.filters) !== JSON.stringify(graphView.filters))) announceGraph('Saved filters were updated to supported values. Review the active filters.');
+      graphView.visibleCategories = new Set(graphView.filters.category ?? Topology.categories); graphView.arenaKey = graphView.filters.arena; graphView.neighborhood = graphView.filters.anchor || null; graphView.labels = graphView.preferences.labels;
+      document.getElementById('graph-labels').value = graphView.labels;
+      setObserverCollapsed(graphView.preferences.observerCollapsed, false);
+      document.getElementById('graph-details').classList.toggle('collapsed',graphView.preferences.readerCollapsed);
+      document.getElementById('reader-toggle').setAttribute('aria-expanded',String(!graphView.preferences.readerCollapsed)); text('reader-toggle',graphView.preferences.readerCollapsed?'Show details':'Hide details');
+      if (graphView.preferences.readerWidth) document.getElementById('topology').style.setProperty('--reader-width',`${graphView.preferences.readerWidth}px`);
+      renderTopologyControls();
+    }
+
+    function saveGraphPreferences() {
+      if (!graphView.preferenceKey) return;
+      const p = {...graphView.preferences,version:1,filters:graphView.filters,labels:graphView.labels,readerCollapsed:document.getElementById('graph-details').classList.contains('collapsed')};
+      graphView.preferences = p; try { localStorage.setItem(graphView.preferenceKey,JSON.stringify(p)); state.preferenceSaveFailed = false; } catch { state.preferenceSaveFailed = true; announceGraph('View changed, but could not be saved on this device.'); }
+    }
+
+    function applyGraphFilters() {
+      invalidateLayout(); pauseGraphOrbit(); graphView.filterSerial += 1; state.filterFeedback = true; state.pendingSnapshot = null;
+      graphView.filters = Topology.filters(graphView.filters); graphView.visibleCategories = new Set(graphView.filters.category ?? Topology.categories); graphView.arenaKey = graphView.filters.arena; graphView.neighborhood = graphView.filters.anchor || null;
+      saveGraphPreferences(); renderTopologyControls(); announceGraph('Applying filters…');
+      if (state.refreshPromise) { state.refreshQueued = true; state.refreshController?.abort(); } else refresh();
+    }
+
+    function setObserverCollapsed(collapsed, persist = true) {
+      const rail = document.querySelector('.rail'), button = document.getElementById('observer-toggle'), content = document.getElementById('observer-content');
+      if (collapsed && content.contains(document.activeElement)) button.focus();
+      document.querySelector('.shell').classList.toggle('observer-collapsed',collapsed); content.hidden = collapsed;
+      button.setAttribute('aria-expanded',String(!collapsed)); button.textContent = collapsed ? 'Show Observer' : 'Hide Observer';
+      graphView.preferences.observerCollapsed = collapsed; if (persist) { saveGraphPreferences(); announceGraph(collapsed?'Observer hidden. More room for your map.':'Observer shown.'); }
+    }
+
+    function typeSample(kind) {
+      const v=Topology.visual(kind),svg=svgMake('svg',{viewBox:'-18 -18 36 36',class:'type-sample','aria-hidden':'true'}); svg.append(svgMake('path',{d:Topology.shape(kind,12),fill:v.color,stroke:'currentColor','stroke-width':.5})); return svg;
+    }
+
+    function renderTopologyControls() {
+      const snapshot=state.snapshot,facets=snapshot?.facets||{};
+      document.querySelectorAll('[data-graph-category]').forEach(el=> {el.checked=graphView.visibleCategories.has(el.dataset.graphCategory); if(el.dataset.graphCategory==='work')el.indeterminate=el.checked&&graphView.filters.work_kind!==null&&graphView.filters.work_kind.length!==Topology.kinds.length;});
+      for(const facet of ['work_kind','work_status','observation_status','record_status']) {
+        const root=document.getElementById(`facet-${facet}`); if(!root)continue;
+        const selected=graphView.filters[facet];
+        for(const input of root.querySelectorAll('input')) {input.checked=selected===null||selected.includes(input.value);input.disabled=facet==='work_kind'&&!graphView.visibleCategories.has('work');const count=root.querySelector(`[data-count="${input.value}"]`);if(count)count.textContent=String(facets[facet]?.[input.value]??0);}
+      }
+      const archive=document.getElementById('filter-archived'); if(archive)archive.value=graphView.filters.archived;
+      const query=document.getElementById('filter-query'); if(query&&document.activeElement!==query)query.value=graphView.filters.q;
+      const relationships=document.getElementById('filter-relationships');
+      if(relationships){const chosen=graphView.filters.relationship,options=snapshot?.relationship_types||[];const signature=JSON.stringify([options,chosen]);if(relationships.dataset.signature!==signature){relationships.dataset.signature=signature;relationships.replaceChildren();for(const value of options){const label=make('label'),input=make('input');input.type='checkbox';input.value=value;input.checked=chosen===null||chosen.includes(value);input.addEventListener('change',()=>{graphView.filters.relationship=[...relationships.querySelectorAll('input:checked')].map(x=>x.value);applyGraphFilters();});label.append(input,make('span','',relationshipLabel(value)));relationships.append(label);}}}
+      const summary=document.getElementById('filter-summary');if(summary){summary.replaceChildren();const f=graphView.filters;for(const key of Object.keys(f)){const value=f[key];if(value===null||value===''||(key==='archived'&&value==='include'))continue;const labels={category:'Types',work_kind:'Work types',work_status:'Work status',observation_status:'Observation status',record_status:'Record status',relationship:'Connections',arena:'Arena',anchor:'Connected view',q:'Search',archived:'Archived'};const label=Array.isArray(value)?value.length?value.map(x=>x==='receipt'?'Record':x).join(', '):'None':value;const chip=make('button','filter-chip',`${labels[key]}: ${label} ×`);chip.type='button';chip.setAttribute('aria-label',`Clear ${labels[key]} filter`);chip.addEventListener('click',()=>{graphView.filters[key]=Topology.filters()[key];applyGraphFilters();});summary.append(chip);}if(!summary.children.length)summary.append(make('span','','All item types · no filters'));}
+      if(snapshot?.scope_error)text('graph-meta','Saved scope unavailable. Choose another Arena or clear filters.');
+      syncUndoControl(); renderVisibleItems();
+    }
+
+    function renderVisibleItems() {
+      const details=document.getElementById('graph-result-list');if(!details?.open)return;
+      const root=document.getElementById('graph-result-items'),limit=graphView.resultLimit||50,desired=make('div');
+      for(const node of graphView.nodes.slice(0,limit)){const button=make('button');button.type='button';button.dataset.uiKey=node.key;button.dataset.nodeKey=node.key;button.append(typeSample(node.kind),make('span','',`${node.title} · ${Topology.visual(node.kind).label}`));desired.append(button);}
+      reconcileChildren(root,desired);
+      document.getElementById('graph-results-more').hidden=graphView.nodes.length<=limit;
+    }
+
+    function updateGraphPreview(key, adjacent, labels) {
+      const node=graphView.index?.byKey.get(key),target=document.getElementById('graph-preview');if(!target)return;
+      if(!node){target.textContent='';return;}
+      const total=node.connection_count??Math.max(0,adjacent.size-1);const shown=labels.filter(label=>label.key.startsWith('node:')&&label.key!==`node:${key}`).length;
+      const qualified=state.snapshot?.complete===false&&node.connection_count===undefined?'loaded connections':'connected items';
+      target.textContent=`${node.title} · ${Topology.visual(node.kind).label} · ${node.status} — ${shown} of ${total} ${qualified} labelled. Open details for the list.`;
+    }
+
+    function pickGraphNodes(clientX, clientY) {
+      if (!graphView.projected) return [];
+      const point=graphClientPoint(clientX,clientY),matches=[];
+      for(const [key,p]of graphView.projected){const distance=Math.hypot(point.x-p.x,point.y-p.y);if(distance<=Math.max(14,p.radius+5))matches.push({key,distance});}
+      return matches.sort((a,b)=>a.distance-b.distance||a.key.localeCompare(b.key));
+    }
+
+    function showNodeChooser(matches, clientX, clientY) {
+      const panel=document.getElementById('node-chooser'),bounds=document.querySelector('.graph-scroll').getBoundingClientRect();panel.replaceChildren();
+      panel.append(make('strong','','Choose an item'));
+      for(const match of matches.slice(0,20)){const node=graphView.index.byKey.get(match.key);if(!node)continue;const button=make('button','graph-control',`${node.title} · ${Topology.visual(node.kind).label}`);button.addEventListener('click',()=>{panel.hidden=true;selectGraphNode(node);document.getElementById('reader-toggle').focus();});panel.append(button);}
+      if(matches.length>20)panel.append(make('p','','Zoom in or use Browse visible items for more.'));
+      const close=make('button','graph-control','Close');close.addEventListener('click',()=>{panel.hidden=true;graphSvg.focus();});panel.append(close);panel.hidden=false;
+      panel.style.left=`${Math.max(0,Math.min(bounds.width-260,clientX-bounds.left))}px`;panel.style.top=`${Math.max(0,Math.min(bounds.height-280,clientY-bounds.top))}px`;panel.querySelector('button')?.focus();
+    }
+
+    function initializeTopologyControls() {
+      const legend=document.getElementById('type-legend');for(const kind of ['Arena',...Topology.kinds,'InitiativeObservation','EventReceipt']){const item=make('div','legend-sample');item.title=Topology.visual(kind).description;item.append(typeSample(kind),make('span','',Topology.visual(kind).label));legend.append(item);}
+      const grid=document.getElementById('filter-grid');
+      const facets=[['work_kind','Work types',Topology.kinds],['work_status','Work status',['draft','review','accepted','archived','unknown']],['observation_status','Observation status',['unclaimed','claimed','amended','rejected','unknown']],['record_status','Record status',['pending','dispatched_dry_run','retry_scheduled','failed','unknown']]];
+      for(const [key,title,values]of facets){const field=make('fieldset');field.id=`facet-${key}`;field.append(make('legend','',title));for(const value of values){const label=make('label'),input=make('input');input.type='checkbox';input.value=value;input.checked=true;input.addEventListener('change',()=>{graphView.filters[key]=[...field.querySelectorAll('input:checked')].map(x=>x.value);applyGraphFilters();});label.append(input);if(key==='work_kind')label.append(typeSample(value));label.append(make('span','',value==='dispatched_dry_run'?'Processed locally (dry run)':value.replaceAll('_',' ')));const count=make('span','filter-count','0');count.dataset.count=value;label.append(count);field.append(label);}const all=make('button','graph-control','All'),none=make('button','graph-control','None');all.type=none.type='button';all.addEventListener('click',()=>{graphView.filters[key]=null;applyGraphFilters();});none.addEventListener('click',()=>{graphView.filters[key]=[];applyGraphFilters();});field.append(all,none);grid.append(field);}
+      const options=make('fieldset');options.append(make('legend','','More filters'));const archive=make('select');archive.id='filter-archived';archive.setAttribute('aria-label','Archived items');for(const [value,label]of [['include','Include archived'],['exclude','Hide archived'],['only','Only archived']]){const option=make('option','',label);option.value=value;archive.append(option);}archive.addEventListener('change',()=>{graphView.filters.archived=archive.value;applyGraphFilters();});
+      const query=make('input');query.type='search';query.id='filter-query';query.placeholder='Filter titles or IDs';query.setAttribute('aria-label','Filter titles or IDs');let searchTimer;query.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{graphView.filters.q=query.value;applyGraphFilters();},200);});options.append(archive,query);grid.append(options);
+      const rel=make('fieldset');rel.append(make('legend','','Connection types'));const rels=make('div');rels.id='filter-relationships';rel.append(rels);grid.append(rel);
+      document.getElementById('observer-toggle').addEventListener('click',()=>setObserverCollapsed(!graphView.preferences.observerCollapsed));
+      document.getElementById('graph-undo').addEventListener('click',undoPositioning);
+      document.getElementById('graph-clear-filters').addEventListener('click',()=>{graphView.filters=Topology.filters();applyGraphFilters();});
+      document.getElementById('graph-result-list').addEventListener('toggle',renderVisibleItems);
+      document.getElementById('graph-result-items').addEventListener('click',event=>{const key=event.target.closest('[data-node-key]')?.dataset.nodeKey;const node=graphView.index?.byKey.get(key);if(node){selectGraphNode(node);graphSvg.focus();announceGraph(`${node.title} selected. Arrow keys move this item; details are open.`);}});
+      document.getElementById('graph-results-more').addEventListener('click',()=>{graphView.resultLimit=(graphView.resultLimit||50)+50;renderVisibleItems();});
+      document.getElementById('reader-toggle').addEventListener('click',saveGraphPreferences);
+      document.getElementById('reader-resize').addEventListener('pointerup',()=>{graphView.preferences.readerWidth=Number(document.getElementById('reader-resize').getAttribute('aria-valuenow'));saveGraphPreferences();});
+      graphSvg.addEventListener('pointermove',event=>{if(graphView.drag||graphView.pointers.size)return;const key=graphView.canvasMode?(pickGraphNodes(event.clientX,event.clientY)[0]?.key||null):(event.target.closest('.graph-node')?.dataset.nodeKey||null);graphSvg.style.cursor=key?'pointer':'';if(key===graphView.hoveredKey)return;graphView.hoveredKey=key;requestGraphRender();});
+      graphSvg.addEventListener('pointerleave',()=>{graphView.hoveredKey=null;requestGraphRender();});
+      graphSvg.addEventListener('focusin',event=>{graphView.focusedKey=event.target.closest('.graph-node')?.dataset.nodeKey||null;requestGraphRender();});
+      graphSvg.addEventListener('focusout',()=>{graphView.focusedKey=null;requestGraphRender();});
+      graphSvg.addEventListener('keyup',event=>{if(event.key.startsWith('Arrow'))finishArrangement();});
+      document.addEventListener('keydown',event=>{if(event.key==='Escape'&&graphView.arrangement){event.preventDefault();cancelArrangement();graphView.drag=null;graphView.pointers.clear();graphSvg.classList.remove('dragging','node-dragging');}if((event.ctrlKey||event.metaKey)&&event.key==='z'&&graphSvg.contains(document.activeElement)){event.preventDefault();undoPositioning();}});
+      document.addEventListener('visibilitychange',()=>{if(document.hidden){invalidateLayout();pauseGraphOrbit();}});
+      renderTopologyControls();
     }
 
     function schedule() {
@@ -1223,10 +1384,12 @@ FRONTEND_HTML = r'''<!doctype html>
     graphSvg.addEventListener('pointerdown', event => {
       if (event.button !== 0 || graphView.pointers.size >= 2) return;
       graphView.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); graphSvg.setPointerCapture(event.pointerId);
-      const nodeTarget = event.target.closest('.graph-node'); pauseGraphOrbit(); event.preventDefault();
-      if (graphView.pointers.size === 2) { graphView.pinch = pinchPosition(); graphView.drag = null; graphSvg.classList.remove('dragging', 'node-dragging'); return; }
+      const candidates = pickGraphNodes(event.clientX,event.clientY);
+      const nodeTarget = candidates.length ? {dataset:{nodeKey:candidates[0].key}} : event.target.closest('.graph-node'); pauseGraphOrbit(); event.preventDefault();
+      if (graphView.pointers.size === 2) { cancelArrangement(); graphView.pinch = pinchPosition(); graphView.drag = null; graphSvg.classList.remove('dragging', 'node-dragging'); return; }
       const mode = event.shiftKey ? 'pan' : nodeTarget ? 'node' : 'scene';
-      graphView.drag = { mode, key: nodeTarget?.dataset.nodeKey || null, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false, pointerId: event.pointerId };
+      if (mode === 'node') beginArrangement('Move item');
+      graphView.drag = { mode, key: nodeTarget?.dataset.nodeKey || null, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, candidates, moved: false, pointerId: event.pointerId };
       graphSvg.classList.add(mode === 'node' ? 'node-dragging' : 'dragging');
     });
     graphSvg.addEventListener('pointermove', event => {
@@ -1243,17 +1406,17 @@ FRONTEND_HTML = r'''<!doctype html>
       graphView.drag.moved = true;
       const deltaX = event.clientX - graphView.drag.x; const deltaY = event.clientY - graphView.drag.y;
       graphView.fitted = false;
-      if (graphView.drag.mode === 'node') { const point = graphCoordinates(graphView.nodes).get(graphView.drag.key); const delta = graphClientDelta(deltaX, deltaY); graphView.pinnedKey = graphView.drag.key; if (point) { moveGraphNode(graphView.drag.key, delta.x, delta.y, projectGraphPoint(point).scale); relaxGraph(3, graphView.drag.key); } }
+      if (graphView.drag.mode === 'node') { const point = graphCoordinates(graphView.nodes).get(graphView.drag.key); const delta = graphClientDelta(deltaX, deltaY); graphView.pinnedKey = graphView.drag.key; if (point) { moveGraphNode(graphView.drag.key, delta.x, delta.y, projectGraphPoint(point).scale); } }
       else if (graphView.drag.mode === 'pan') { const delta = graphClientDelta(deltaX, deltaY); graphView.panX += delta.x; graphView.panY += delta.y; }
       else { graphView.yaw += deltaX * .008; graphView.pitch = Math.max(-1.15, Math.min(1.15, graphView.pitch + deltaY * .006)); }
-      graphView.drag.x = event.clientX; graphView.drag.y = event.clientY; renderGraph(graphView.nodes, graphView.edges);
+      graphView.drag.x = event.clientX; graphView.drag.y = event.clientY; requestGraphRender();
     });
     const endGraphDrag = event => {
       if (!graphView.pointers.has(event.pointerId) && graphView.drag?.pointerId !== event.pointerId) return;
       graphView.pointers.delete(event.pointerId); if (graphView.pinch) graphView.pinch = null;
       if (graphSvg.hasPointerCapture(event.pointerId)) graphSvg.releasePointerCapture(event.pointerId);
       if (!graphView.drag || graphView.drag.pointerId !== event.pointerId) { flushPendingSnapshot(); return; } const completed = graphView.drag; graphView.drag = null; graphSvg.classList.remove('dragging', 'node-dragging'); if (graphSvg.hasPointerCapture(event.pointerId)) graphSvg.releasePointerCapture(event.pointerId);
-      if (completed.mode === 'node' && event.type === 'pointerup') { if (completed.moved) relaxGraph(30, completed.key); selectGraphNode(graphView.nodes.find(node => node.key === completed.key)); }
+      if (completed.mode === 'node') { if (event.type !== 'pointerup') cancelArrangement(); else { if (completed.moved) { finishArrangement(); announceGraph('Item moved. Undo positioning is available.'); } else graphView.arrangement = null; if (!completed.moved && completed.candidates.length > 1) showNodeChooser(completed.candidates,event.clientX,event.clientY); else selectGraphNode(graphView.nodes.find(node => node.key === completed.key)); } }
       flushPendingSnapshot();
     };
     graphSvg.addEventListener('pointerup', endGraphDrag); graphSvg.addEventListener('pointercancel', endGraphDrag); graphSvg.addEventListener('lostpointercapture', endGraphDrag);
@@ -1265,12 +1428,12 @@ FRONTEND_HTML = r'''<!doctype html>
     }, { passive: false });
     graphSvg.addEventListener('keydown', event => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      const group = event.target.closest('.graph-node');
+      const group = event.target.closest('.graph-node') || (graphView.canvasMode && state.selectedGraphKey ? {dataset:{nodeKey:state.selectedGraphKey}} : null);
       if (group) {
         const node = graphView.nodes.find(item => item.key === group.dataset.nodeKey);
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectGraphNode(node); return; }
         const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-        if (node && arrows[event.key]) { event.preventDefault(); pauseGraphOrbit(); const distance = event.shiftKey ? 24 : 8; const delta = graphClientDelta(arrows[event.key][0] * distance, arrows[event.key][1] * distance); graphView.pinnedKey = node.key; moveGraphNode(node.key, delta.x, delta.y, projectGraphPoint(graphView.nodePositions.get(node.key)).scale); relaxGraph(24, node.key); selectGraphNode(node); return; }
+        if (node && arrows[event.key]) { event.preventDefault(); pauseGraphOrbit(); if (!graphView.arrangement) beginArrangement('Move item with keyboard'); const distance = event.shiftKey ? 24 : 8; const delta = graphClientDelta(arrows[event.key][0] * distance, arrows[event.key][1] * distance); graphView.pinnedKey = node.key; moveGraphNode(node.key, delta.x, delta.y, projectGraphPoint(graphView.nodePositions.get(node.key)).scale); selectGraphNode(node); return; }
       }
       if (event.key === '+' || event.key === '=') { event.preventDefault(); setGraphZoom(graphView.zoom * 1.2); }
       else if (event.key === '-') { event.preventDefault(); setGraphZoom(graphView.zoom / 1.2); }
@@ -1286,7 +1449,7 @@ FRONTEND_HTML = r'''<!doctype html>
     document.querySelectorAll('[data-graph-category]').forEach(input => {
       input.addEventListener('change', () => {
         if (input.checked) graphView.visibleCategories.add(input.dataset.graphCategory); else graphView.visibleCategories.delete(input.dataset.graphCategory);
-        pauseGraphOrbit(); updateGraphVisibility();
+        graphView.filters.category = [...graphView.visibleCategories]; applyGraphFilters();
       });
     });
     document.getElementById('graph-expand').addEventListener('click', toggleGraphExpanded);
@@ -1308,8 +1471,8 @@ FRONTEND_HTML = r'''<!doctype html>
     document.getElementById('graph-search').addEventListener('input', renderGraphSearch);
     document.getElementById('graph-search').addEventListener('keydown', event => { if (event.key === 'ArrowDown') { event.preventDefault(); document.querySelector('.search-result')?.focus(); } if (event.key === 'Escape') document.getElementById('graph-search-results').hidden = true; });
     document.getElementById('graph-search-results').addEventListener('click', event => { const button = event.target.closest('[data-node-key]'); if (!button) return; selectGraphNode(state.snapshot.graph_nodes.find(node => node.key === button.dataset.nodeKey)); document.getElementById('graph-search-results').hidden = true; document.getElementById('graph-search').value = ''; document.getElementById('reader-toggle').focus(); });
-    document.getElementById('graph-labels').addEventListener('change', event => { graphView.labels = event.target.value; renderGraph(graphView.nodes, graphView.edges); });
-    document.getElementById('graph-show-all').addEventListener('click', () => { graphView.neighborhood = null; updateGraphVisibility(); });
+    document.getElementById('graph-labels').addEventListener('change', event => { graphView.labels = event.target.value; saveGraphPreferences(); renderGraph(graphView.nodes, graphView.edges); });
+    document.getElementById('graph-show-all').addEventListener('click', () => { graphView.neighborhood = null; graphView.filters.anchor = ''; applyGraphFilters(); });
     document.getElementById('reader-content').addEventListener('toggle', event => { if (event.target.matches('details[data-relationship]') && event.target.open) loadRelationship(event.target.dataset.relationship); }, true);
     document.getElementById('reader-content').addEventListener('click', event => {
       const button = event.target.closest('[data-action]'); if (!button) return;
@@ -1327,21 +1490,22 @@ FRONTEND_HTML = r'''<!doctype html>
     document.getElementById('reader-toggle').addEventListener('click', () => { const collapsed = document.getElementById('graph-details').classList.toggle('collapsed'); if (collapsed) { document.getElementById('topology').classList.remove('reading-view'); text('reader-mode', 'Reading view'); } document.getElementById('reader-toggle').setAttribute('aria-expanded', String(!collapsed)); text('reader-toggle', collapsed ? 'Show details' : 'Hide details'); });
     document.getElementById('reader-mode').addEventListener('click', () => { const reading = document.getElementById('topology').classList.toggle('reading-view'); document.getElementById('graph-details').classList.remove('collapsed'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'true'); text('reader-toggle', 'Hide details'); text('reader-mode', reading ? 'Back to graph' : 'Reading view'); });
     const readerResize = document.getElementById('reader-resize'); let readerDrag = null;
-    const setReaderWidth = width => { const value = Math.max(280, Math.min(600, width)); document.getElementById('topology').style.setProperty('--reader-width', `${value}px`); readerResize.setAttribute('aria-valuenow', String(value)); };
+    const setReaderWidth = width => { const value = Math.max(320, Math.min(600, width)); document.getElementById('topology').style.setProperty('--reader-width', `${value}px`); readerResize.setAttribute('aria-valuenow', String(value)); };
     readerResize.addEventListener('pointerdown', event => { if (event.button !== 0) return; event.preventDefault(); readerDrag = { id: event.pointerId, x: event.clientX, width: Number(readerResize.getAttribute('aria-valuenow')) }; readerResize.setPointerCapture(event.pointerId); });
     readerResize.addEventListener('pointermove', event => { if (readerDrag?.id === event.pointerId) setReaderWidth(readerDrag.width + readerDrag.x - event.clientX); });
     const endReaderResize = event => { if (readerDrag?.id !== event.pointerId) return; readerDrag = null; if (readerResize.hasPointerCapture(event.pointerId)) readerResize.releasePointerCapture(event.pointerId); };
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(name => readerResize.addEventListener(name, endReaderResize));
-    readerResize.addEventListener('keydown', event => { const width = Number(readerResize.getAttribute('aria-valuenow')); const next = { ArrowLeft: width + 20, ArrowRight: width - 20, Home: 280, End: 600 }[event.key]; if (next !== undefined) { event.preventDefault(); setReaderWidth(next); } });
+    readerResize.addEventListener('keydown', event => { const width = Number(readerResize.getAttribute('aria-valuenow')); const next = { ArrowLeft: width + 20, ArrowRight: width - 20, Home: 280, End: 600 }[event.key]; if (next !== undefined) { event.preventDefault(); setReaderWidth(next); graphView.preferences.readerWidth=next; saveGraphPreferences(); } });
     document.addEventListener('pointerdown', event => { if (event.target.matches('input[type="range"], [role="separator"]')) state.controlDragging = true; });
     ['pointerup', 'pointercancel'].forEach(name => document.addEventListener(name, () => { state.controlDragging = false; flushPendingSnapshot(); }));
     document.getElementById('graph-details').classList.add('collapsed'); text('reader-toggle', 'Show details'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'false');
+    initializeTopologyControls();
     new ResizeObserver(resizeGraphViewport).observe(graphSvg); resizeGraphViewport(); syncZoomControls();
     document.getElementById('graph-reset').addEventListener('click', resetGraphView);
     document.getElementById('graph-settle').addEventListener('click', settleGraph); document.getElementById('graph-force-reset').addEventListener('click', resetForceStrengths);
     const orbitButton = document.getElementById('graph-orbit'); orbitButton.addEventListener('click', toggleGraphOrbit);
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { orbitButton.disabled = true; orbitButton.textContent = 'Orbit: reduced motion'; orbitButton.title = 'Continuous orbit follows your reduced-motion preference'; }
-    document.getElementById('auth-form').addEventListener('submit', event => { event.preventDefault(); sessionStorage.setItem('devgraph-monitor-token', tokenInput.value.trim()); schedule(); refresh(); });
+    document.getElementById('auth-form').addEventListener('submit', event => { event.preventDefault(); try { sessionStorage.setItem('devgraph-monitor-token', tokenInput.value.trim()); } catch { announceGraph('Access works for this page; tab storage is unavailable.'); } schedule(); refresh(); });
     document.getElementById('refresh-rate').addEventListener('change', schedule);
     schedule(); if (tokenInput.value) refresh();
   </script>

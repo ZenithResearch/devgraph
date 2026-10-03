@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
+export const topologySource = readFileSync(new URL('../../src/devgraph/frontend/static/topology/core.js', import.meta.url), 'utf8');
 export const frontend = readFileSync(new URL('../../src/devgraph/frontend/app.py', import.meta.url), 'utf8');
 
 // Run the shipped functions, rather than a second implementation of their behavior.
@@ -16,7 +17,9 @@ export function functionsSource(names) {
 }
 
 export function contextWithFunctions(names, globals) {
-  const context = vm.createContext(globals);
+  const context = vm.createContext({ URLSearchParams, TextEncoder, ...globals });
+  vm.runInContext(topologySource, context);
+  context.Topology = context.DevgraphTopology;
   vm.runInContext(functionsSource(names), context);
   return context;
 }

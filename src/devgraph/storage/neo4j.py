@@ -42,7 +42,7 @@ from devgraph.storage.supporting_material import (
 )
 
 try:  # Optional dependency: required only for canonical Neo4j runtime/smoke tests.
-    from neo4j import GraphDatabase
+    from neo4j import GraphDatabase, Query
     from neo4j.exceptions import Neo4jError, ServiceUnavailable
 except Exception:  # pragma: no cover - exercised by environments without neo4j installed.
     GraphDatabase = None  # type: ignore[assignment]
@@ -782,6 +782,41 @@ class Neo4jGraphStorage:
         if len(rows) > len(keys):
             raise StorageUnavailable("ambiguous supporting identity")
         return list(found.values())
+
+    def monitor_records(self):
+        """One bounded statement materializes nodes and edges for all view facets."""
+        from devgraph.topology import PUBLIC_LABELS, SOURCE_EDGE_LIMIT, SOURCE_NODE_LIMIT
+
+        query = Query(
+            "CALL () { MATCH (n) WHERE size(labels(n)) = 1 AND labels(n)[0] IN $labels "
+            "WITH n ORDER BY labels(n)[0], n.id LIMIT $node_limit "
+            "RETURN collect({labels: labels(n), id: n.id, archived: n.archived, "
+            "properties: properties(n)}) AS nodes } "
+            "CALL () { MATCH (s)-[e]->(t) "
+            "WHERE size(labels(s)) = 1 AND size(labels(t)) = 1 "
+            "AND labels(s)[0] IN $labels AND labels(t)[0] IN $labels "
+            "WITH s, e, t ORDER BY labels(s)[0], s.id, type(e), labels(t)[0], t.id "
+            "LIMIT $edge_limit RETURN collect({from_labels: labels(s), from_id: s.id, "
+            "relationship: type(e), to_labels: labels(t), to_id: t.id, properties: {}}) "
+            "AS edges } RETURN nodes, edges", timeout=5.0,
+        )
+        parameters = dict(labels=list(PUBLIC_LABELS), node_limit=SOURCE_NODE_LIMIT + 1,
+                          edge_limit=SOURCE_EDGE_LIMIT + 1)
+        # Neo4j read-committed isolation is not a snapshot. Require two equal
+        # bounded materializations; one retry handles a concurrent graph change.
+        previous = self._run_graph(query, **parameters)
+        for _ in range(2):
+            rows = self._run_graph(query, **parameters)
+            if rows == previous:
+                break
+            previous = rows
+        else:
+            raise StorageUnavailable("topology changed during read; retry")
+        if len(rows) != 1:
+            raise StorageUnavailable("topology snapshot unavailable")
+        nodes = [self._node_from_row(row, row["labels"][0]) for row in rows[0]["nodes"]]
+        edges = [self._edge_from_row(row) for row in rows[0]["edges"]]
+        return nodes, edges
 
     def list_edges(
         self, relationship: str | None = None, *, limit: int | None = None

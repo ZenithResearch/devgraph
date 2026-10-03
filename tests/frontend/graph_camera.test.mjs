@@ -32,6 +32,7 @@ function camera(width = 1080, height = 420) {
       });
       return elements.get(id);
     } },
+    announceGraph() {}, renderTopologyControls() {}, beginArrangement() {}, finishArrangement() {}, cancelArrangement() {}, requestGraphRender() {}, pickGraphNodes: () => [],
     text() {}, renderGraph() {}, renderGraphSelection() {}, renderGraphSearch() {}, renderArenaFilter() {},
     graphCoordinates(nodes) { return new Map(nodes.map(node => [node.key, node.point])); },
   });
@@ -53,7 +54,7 @@ test('zoom keeps the graph point under an off-center cursor fixed, including at 
     const after = c.projectGraphPoint(point);
     near(after.x, anchor.x, 'cursor x');
     near(after.y, anchor.y, 'cursor y');
-    assert.ok(c.graphView.zoom >= .25 && c.graphView.zoom <= 4);
+    assert.ok(c.graphView.zoom >= .05 && c.graphView.zoom <= 4);
   }
 });
 
@@ -260,14 +261,14 @@ test('a node click, including small hand jitter, selects without moving neighbor
   }
 });
 
-test('a deliberate node drag moves the node and relaxes connected work only after the threshold', () => {
+test('a deliberate node drag moves only the selected node after the threshold without running physics', () => {
   const g = gestures();
   g.send('pointerdown', 1, 10, 10, 'test-node');
   g.send('pointermove', 1, 12, 11);
   assert.equal(g.c.relaxations.length, 0);
   assert.equal(g.c.movements.length, 0);
   g.send('pointermove', 1, 40, 20);
-  assert.ok(g.c.relaxations.length > 0);
+  assert.equal(g.c.relaxations.length, 0, 'pointer movement must never dispatch layout work');
   assert.ok(g.c.movements.length > 0);
   g.send('pointerup', 1, 40, 20, 'test-node');
   assert.equal(g.c.graphView.drag, null);
