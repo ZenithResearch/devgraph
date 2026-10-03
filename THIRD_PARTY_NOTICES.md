@@ -46,3 +46,8 @@ Devgraph’s license. Neither agent package includes Hermes or Codex itself.
 
 The project-selection page uses the repository’s dependency-free JavaScript
 modules. It does not require or redistribute the separate preview browser SDK.
+
+The frontend packages Zenith UI's `public/tokens.css` as `zenith-tokens.css`.
+Its exact source revision and SHA-256 are recorded in `docs/dev/zenith-tokens.json`;
+`scripts/sync_zenith_tokens.py` verifies the imported bytes. The import includes
+token definitions only, with no Zenith React components or font files.

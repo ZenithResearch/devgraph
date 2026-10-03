@@ -229,3 +229,69 @@ Results: 2,153 Python tests passed, five existing opt-in tests skipped, 111 exis
 Starlette warnings; 137 frontend tests passed. No operator input was required.
 Browser checks used synthetic data. The installed runtime and live graph were
 not changed; the release qualification limits above still apply.
+
+## Zenith themes and design roundtable — 2026-10-02
+
+All three themes from Zenith UI are packaged locally: Dark, Light, and Aqua.
+The complete `public/tokens.css` file is copied byte-for-byte from source revision
+`46c7fbf09de23a54ac04ede705e8a98623056dc3`. The revision, hash, and theme inventory
+are recorded in `zenith-tokens.json`. No React runtime, font files, CDN, or sibling
+checkout is required to use the monitor. Verify or update the pin with:
+
+```sh
+python3 scripts/sync_zenith_tokens.py
+python3 scripts/sync_zenith_tokens.py --source /absolute/path/to/zenith-ui
+python3 scripts/sync_zenith_tokens.py --source /absolute/path/to/zenith-ui --update
+```
+
+The default verification script also checks the pinned bytes. Changes must be
+committed upstream before the importer will accept them. Review upstream theme
+additions against the chooser and shared-controller tests when updating.
+
+The requested roundtable used three agent review perspectives, including an
+atomic-design review inspired by Brad Frost; it was not a personal consultation
+with him. The integrated decisions were:
+
+| Perspective | Decision |
+| --- | --- |
+| Atomic design | One pinned token source and one adapter/controller serve the monitor and Project selection. Filled actions use matched fill/content roles; links use readable text roles. Devgraph's panel radius is namespaced so it does not overwrite Zenith's `--radius`. |
+| UX design | The labelled native selector remains available with Observer collapsed and inside fullscreen. System is a preference resolving to Light/Dark. Validate and restore the origin-wide preference before paint, synchronize tabs, and retain an in-memory choice if storage is unavailable. |
+| Art direction | Preserve the Platonic forms, facet lighting, object hues, and 1.618 composition. Use strong contextual focus/warning colors on pale backgrounds, opaque backing for Aqua overlays, and theme-aware node outlines, edges, and labels. |
+
+The shared theme is applied to the root element, including reading modals and
+fullscreen surfaces. CSS roles repaint SVG, while computed graph colors are read
+once per theme change and passed to Canvas. Material sprites remain cached by
+kind; theme changes do not move nodes, rerun layout, fetch graph data, or rebuild
+reader/selection forms. No font or layout redesign was introduced.
+
+Browser checks used the synthetic local demo in the in-app browser. Dark, Light,
+and Aqua were inspected on the graph and Project selection; Light and Aqua reader
+modals were inspected, including a reader inside the fullscreen surface. The
+saved choice survived reload and navigation, and changing it in Project selection
+updated the open monitor tab. An edited example estimate and its open inspector
+survived a theme change. Restoring the estimate and running selection produced
+three selected items and net utility 9. No browser script errors were observed.
+
+At 390px, both pages measured a 390px document width. The monitor picker remained
+available with Observer collapsed; fullscreen controls wrapped within that width.
+Viewport overrides were reset. A separate temporary renderer fixture exercised
+250 and 1,500 synthetic nodes, with all three palettes at 1,500. This checks color
+painting, not layout quality or a new performance benchmark. Unit tests also
+cover palette updates without new sprites or changed positions, OS preference
+changes, invalid/denied storage, cross-tab updates, and control synchronization.
+
+Final validation commands (all exit 0):
+
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv uv sync --locked`
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv bash docs/dev/verification.md`
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv uv run ruff check src tests scripts integrations`
+- `node --test tests/frontend/*.test.mjs`
+- `python3 scripts/sync_zenith_tokens.py --source /Volumes/home/bananawalnut/repos/zenith-ui`
+- `git diff --check`
+
+Results: 2,153 Python tests passed, five existing opt-in tests skipped, 111 existing
+Starlette warnings; 148 frontend tests passed. No operator input was required.
+The first verification attempt found one long line in the new sync script; it
+was corrected and the full verification rerun passed. The installed runtime and
+live graph were not changed. Physical smaller-Mac, Safari, assistive-technology,
+and long-session qualification remain outside this check.

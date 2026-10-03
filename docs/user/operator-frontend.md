@@ -69,6 +69,12 @@ authority remain unchanged.
 
 ### View controls
 
+Use **Theme** in the page header to choose Zenith UI's **Light**, **Dark**, or
+**Aqua** appearance. **System** follows your device's light/dark setting. The
+choice is remembered in this browser and shared with Project selection. A
+second selector stays available when the graph canvas is fullscreen. Changing
+appearance preserves your graph filters, positions, selection, and local inputs.
+
 Use **Filters** for object categories, individual Work types, category-specific
 statuses, archived items, text and connection types. The legend explains each
 shape. All filters are available through the API and survive a page reload.

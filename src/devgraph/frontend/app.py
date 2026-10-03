@@ -7,23 +7,11 @@ FRONTEND_HTML = r'''<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dev Graph Monitor</title>
+  <script src="/monitor/topology-assets/theme.js"></script>
+  <link rel="stylesheet" href="/monitor/topology-assets/zenith-tokens.css">
   <style>
     :root {
-      color-scheme: dark;
-      --ink: #eef6f2;
-      --muted: #8ea39a;
-      --faint: #95aaa0;
-      --canvas: #07110d;
-      --panel: #0b1712;
-      --panel-strong: #102019;
-      --line: #20352c;
-      --line-soft: #162820;
-      --aqua: #7cf7cf;
-      --aqua-soft: rgba(124, 247, 207, .12);
-      --amber: #f6c86f;
-      --coral: #ff9675;
-      --violet: #b9a4ff;
-      --radius: 14px;
+      --dg-panel-radius: 14px;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -32,7 +20,7 @@ FRONTEND_HTML = r'''<!doctype html>
       margin: 0;
       min-height: 100vh;
       background:
-        radial-gradient(circle at 76% 0%, rgba(34, 105, 79, .16), transparent 28rem),
+        radial-gradient(circle at 76% 0%, var(--color-brand-subtle), transparent 28rem),
         var(--canvas);
       color: var(--ink);
       font-family: var(--sans);
@@ -40,17 +28,17 @@ FRONTEND_HTML = r'''<!doctype html>
     button, input, select { font: inherit; }
     button, a, input, select { outline-offset: 3px; }
     :focus-visible { outline: 2px solid var(--aqua); }
-    .skip-link { position: fixed; left: 1rem; top: -4rem; z-index: 9; background: var(--aqua); color: #07110d; padding: .65rem 1rem; }
+    .skip-link { position: fixed; left: 1rem; top: -4rem; z-index: 9; background: var(--color-primary); color: var(--color-primary-content); padding: .65rem 1rem; }
     .skip-link:focus { top: 1rem; }
     .shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
-    .rail { border-right: 1px solid var(--line-soft); padding: 1.6rem 1.25rem; display: flex; flex-direction: column; gap: 2rem; background: rgba(5, 14, 10, .72); }
+    .rail { border-right: 1px solid var(--line-soft); padding: 1.6rem 1.25rem; display: flex; flex-direction: column; gap: 2rem; background: var(--color-nav); }
     .brand { display: flex; align-items: center; gap: .75rem; }
     .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--aqua); color: var(--aqua); font-family: var(--mono); font-size: .75rem; }
     .brand strong { display: block; font-size: .92rem; letter-spacing: .02em; }
     .brand span { color: var(--muted); font: .68rem var(--mono); text-transform: uppercase; letter-spacing: .12em; }
     .rail nav { display: grid; gap: .25rem; }
     .rail nav a { color: var(--muted); text-decoration: none; padding: .65rem .75rem; border-radius: 8px; font-size: .84rem; }
-    .rail nav a[aria-current="page"] { color: var(--ink); background: var(--aqua-soft); border: 1px solid rgba(124, 247, 207, .15); }
+    .rail nav a[aria-current="page"] { color: var(--ink); background: var(--aqua-soft); border: 1px solid var(--color-brand-border); }
     .rail-meta { margin-top: auto; display: grid; gap: .75rem; color: var(--muted); font: .68rem/1.55 var(--mono); }
     .rail-meta span { color: var(--ink); display: block; }
     main { min-width: 0; padding: 1.65rem clamp(1rem, 3vw, 3rem) 3rem; }
@@ -59,19 +47,19 @@ FRONTEND_HTML = r'''<!doctype html>
     h1 { margin: .35rem 0 .3rem; font-size: clamp(1.55rem, 3vw, 2.45rem); font-weight: 560; letter-spacing: -.04em; }
     .subtitle { margin: 0; color: var(--muted); max-width: 48rem; font-size: .9rem; line-height: 1.6; }
     .connection { display: flex; align-items: center; gap: .5rem; min-width: max-content; padding-top: .25rem; color: var(--muted); font: .7rem var(--mono); }
-    .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--faint); box-shadow: 0 0 0 4px rgba(82, 98, 92, .12); }
-    .dot.ready { background: var(--aqua); box-shadow: 0 0 0 4px var(--aqua-soft); }
-    .dot.error { background: var(--coral); box-shadow: 0 0 0 4px rgba(255, 150, 117, .12); }
-    .auth-strip { display: grid; grid-template-columns: 1fr auto auto; gap: .6rem; margin-bottom: 1rem; padding: .75rem; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(11, 23, 18, .74); }
+    .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--faint); box-shadow: 0 0 0 4px var(--color-symbol-soft); }
+    .dot.ready { background: var(--color-success); box-shadow: 0 0 0 4px var(--color-success-subtle); }
+    .dot.error { background: var(--coral); box-shadow: 0 0 0 4px var(--color-error-subtle); }
+    .auth-strip { display: grid; grid-template-columns: 1fr auto auto; gap: .6rem; margin-bottom: 1rem; padding: .75rem; border: 1px solid var(--line); border-radius: var(--dg-panel-radius); background: var(--panel); }
     .auth-strip label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-    .auth-strip input, .auth-strip select { min-width: 0; background: #07110d; color: var(--ink); border: 1px solid var(--line); border-radius: 9px; padding: .68rem .75rem; font: .74rem var(--mono); }
-    .button { border: 1px solid var(--aqua); border-radius: 9px; padding: .65rem 1rem; color: #06110c; background: var(--aqua); cursor: pointer; font-weight: 650; }
+    .auth-strip input, .auth-strip select { min-width: 0; background: var(--canvas); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; padding: .68rem .75rem; font: .74rem var(--mono); }
+    .button { border: 1px solid var(--color-primary-border); border-radius: 9px; padding: .65rem 1rem; color: var(--color-primary-content); background: var(--color-primary); cursor: pointer; font-weight: 650; }
     .button.secondary { color: var(--muted); background: transparent; border-color: var(--line); }
     .status-line { min-height: 1.3rem; color: var(--muted); font: .7rem var(--mono); margin: 0 0 1rem; }
     .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-bottom: .75rem; }
-    .card { border: 1px solid var(--line); background: linear-gradient(145deg, rgba(16, 32, 25, .93), rgba(8, 19, 14, .93)); border-radius: var(--radius); }
+    .card { border: 1px solid var(--line); background: var(--panel); border-radius: var(--dg-panel-radius); }
     .kpi { min-height: 122px; padding: 1rem; position: relative; overflow: hidden; }
-    .kpi::after { content: ""; position: absolute; right: -24px; bottom: -36px; width: 92px; height: 92px; border: 1px solid rgba(124, 247, 207, .09); transform: rotate(28deg); }
+    .kpi::after { content: ""; position: absolute; right: -24px; bottom: -36px; width: 92px; height: 92px; border: 1px solid var(--color-brand-border); transform: rotate(28deg); }
     .kpi-label { color: var(--muted); font: .67rem var(--mono); text-transform: uppercase; letter-spacing: .09em; }
     .kpi-value { margin-top: .65rem; font: 2rem var(--mono); letter-spacing: -.07em; }
     .kpi-note { margin-top: .5rem; color: var(--faint); font: .68rem var(--mono); }
@@ -81,7 +69,7 @@ FRONTEND_HTML = r'''<!doctype html>
     h2 { margin: 0; font-size: .9rem; font-weight: 600; letter-spacing: -.01em; }
     .section-meta { color: var(--faint); font: .64rem var(--mono); }
     .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: .45rem; }
-    .stage { padding: .85rem .7rem; border: 1px solid var(--line-soft); border-radius: 10px; background: rgba(5, 14, 10, .55); }
+    .stage { padding: .85rem .7rem; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--canvas); }
     .stage strong { display: block; font: 1.15rem var(--mono); margin-bottom: .35rem; }
     .stage span { color: var(--muted); font-size: .68rem; }
     .stage:nth-child(1) strong { color: var(--amber); }
@@ -114,7 +102,7 @@ FRONTEND_HTML = r'''<!doctype html>
     .graph-card { margin: .75rem 0; padding: 1.05rem; }
     .graph-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; }
     .graph-toolbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: .55rem; flex-wrap: wrap; }
-    .graph-control { padding: .42rem .65rem; border: 1px solid var(--line); border-radius: 8px; background: rgba(7, 17, 13, .82); color: var(--muted); cursor: pointer; font: .62rem var(--mono); }
+    .graph-control { padding: .42rem .65rem; border: 1px solid var(--line); border-radius: 8px; background: var(--canvas); color: var(--muted); cursor: pointer; font: .62rem var(--mono); }
     .graph-control:hover, .graph-control[aria-pressed="true"] { color: var(--ink); border-color: var(--aqua); background: var(--aqua-soft); }
     .graph-control:disabled { opacity: .4; cursor: default; }
     .graph-zoom { display: flex; align-items: center; gap: .4rem; }
@@ -126,7 +114,7 @@ FRONTEND_HTML = r'''<!doctype html>
     .legend-item input[data-graph-category="observation"] { accent-color: var(--amber); }
     .legend-item input[data-graph-category="receipt"] { accent-color: var(--violet); }
     .legend-item input:not(:checked) + span { color: var(--faint); }
-    .graph-force-panel { display: grid; grid-template-columns: minmax(180px, .65fr) minmax(0, 1.35fr); gap: 1rem; align-items: start; margin: -.1rem 0 .9rem; padding: .75rem; border: 1px solid var(--line-soft); border-radius: 10px; background: rgba(7, 17, 13, .54); }
+    .graph-force-panel { display: grid; grid-template-columns: minmax(180px, .65fr) minmax(0, 1.35fr); gap: 1rem; align-items: start; margin: -.1rem 0 .9rem; padding: .75rem; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--canvas); }
     .graph-force-copy strong { display: block; color: var(--ink); font-size: .72rem; }
     .graph-force-copy span { display: block; margin-top: .3rem; color: var(--faint); font: .6rem/1.45 var(--mono); }
     .graph-force-copy .graph-control { margin-top: .65rem; }
@@ -137,19 +125,19 @@ FRONTEND_HTML = r'''<!doctype html>
     .graph-force-control output { color: var(--aqua); text-align: right; }
     .graph-force-empty { color: var(--faint); font: .6rem var(--mono); }
     .graph-layout { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: .75rem; min-height: 0; }
-    .graph-scroll { min-width: 0; height: var(--graph-height, 420px); overflow: hidden; border: 1px solid var(--line-soft); border-radius: 11px; background: radial-gradient(circle at 50% 42%, rgba(124, 247, 207, .08), transparent 22rem), linear-gradient(rgba(124, 247, 207, .018) 1px, transparent 1px), linear-gradient(90deg, rgba(124, 247, 207, .018) 1px, transparent 1px), rgba(5, 14, 10, .68); background-size: auto, 32px 32px, 32px 32px, auto; }
+    .graph-scroll { min-width: 0; height: var(--graph-height, 420px); overflow: hidden; border: 1px solid var(--line-soft); border-radius: 11px; background: radial-gradient(circle at 50% 42%, var(--color-brand-subtle), transparent 22rem), linear-gradient(var(--graph-grid) 1px, transparent 1px), linear-gradient(90deg, var(--graph-grid) 1px, transparent 1px), var(--canvas); background-size: auto, 32px 32px, 32px 32px, auto; }
     .graph-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
     .graph-help { margin: .65rem 0 0; color: var(--muted); font: .61rem/1.6 var(--mono); }
-    .graph-resize { display: flex; align-items: center; justify-content: center; gap: .6rem; width: 100%; min-height: 30px; margin-top: .6rem; border: 1px solid var(--line-soft); border-radius: 7px; color: var(--muted); background: rgba(7, 17, 13, .65); font: .6rem var(--mono); cursor: ns-resize; touch-action: none; user-select: none; }
+    .graph-resize { display: flex; align-items: center; justify-content: center; gap: .6rem; width: 100%; min-height: 30px; margin-top: .6rem; border: 1px solid var(--line-soft); border-radius: 7px; color: var(--muted); background: var(--canvas); font: .6rem var(--mono); cursor: ns-resize; touch-action: none; user-select: none; }
     .graph-resize::before { content: ""; width: 28px; height: 5px; border-top: 1px solid var(--muted); border-bottom: 1px solid var(--muted); }
     .graph-resize:hover { color: var(--ink); border-color: var(--aqua); }
     .graph-scene-hit { fill: transparent; cursor: grab; }
     .graph-svg.dragging .graph-scene-hit { cursor: grabbing; }
-    .graph-edge { fill: none; stroke: #527568; marker-end: url(#graph-arrow); }
-    .graph-edge-label { fill: var(--faint); font: 9px var(--mono); letter-spacing: .04em; text-anchor: middle; paint-order: stroke; stroke: #07110d; stroke-width: 5px; stroke-linejoin: round; }
-    .graph-node { --graph-plasma: #7cf7cf; cursor: grab; }
-    .graph-node.observation { --graph-plasma: #f6c86f; }
-    .graph-node.receipt { --graph-plasma: #b9a4ff; }
+    .graph-edge { fill: none; stroke: var(--edge-color, var(--graph-edge)); marker-end: url(#graph-arrow); }
+    .graph-edge-label { fill: var(--faint); font: 9px var(--mono); letter-spacing: .04em; text-anchor: middle; paint-order: stroke; stroke: var(--canvas); stroke-width: 5px; stroke-linejoin: round; }
+    .graph-node { --graph-plasma: var(--graph-selection); cursor: grab; }
+    .graph-node.observation { --graph-plasma: var(--graph-selection); }
+    .graph-node.receipt { --graph-plasma: var(--graph-selection); }
     .graph-node:focus { outline: none; }
     .graph-svg.node-dragging .graph-node { cursor: grabbing; }
     .graph-shadow { fill: rgba(0, 0, 0, .34); filter: blur(2px); pointer-events: none; }
@@ -162,22 +150,22 @@ FRONTEND_HTML = r'''<!doctype html>
     .graph-plasma-halo { fill: none; stroke: var(--graph-plasma); stroke-width: 2.2; stroke-dasharray: 1 4 8 5; opacity: .26; filter: blur(1px) drop-shadow(0 0 3px var(--graph-plasma)); pointer-events: none; animation: graph-plasma-flow 5.5s linear infinite; }
     .graph-selection-ring { fill: none; stroke: var(--graph-plasma); stroke-width: .65; stroke-dasharray: .8 5.2; opacity: .42; filter: drop-shadow(0 0 2px var(--graph-plasma)); pointer-events: none; animation: graph-plasma-flow 7s linear infinite reverse; }
     @keyframes graph-plasma-flow { to { stroke-dashoffset: -36; } }
-    .graph-node-kind { fill: var(--muted); font: 7.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; paint-order: stroke; stroke: #07110d; stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+    .graph-node-kind { fill: var(--muted); font: 7.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; paint-order: stroke; stroke: var(--canvas); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
     .graph-depth-hint { fill: var(--faint); font: 8px var(--mono); letter-spacing: .05em; pointer-events: none; }
     .graph-tooltip { pointer-events: none; }
-    .graph-tooltip-panel { fill: rgba(7, 17, 13, .97); stroke: #4a7565; stroke-width: 1; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .38)); }
+    .graph-tooltip-panel { fill: var(--canvas); stroke: var(--line); stroke-width: 1; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .38)); }
     .graph-tooltip-title { fill: var(--ink); font: 600 12px var(--sans); }
     .graph-tooltip-meta { fill: var(--aqua); font: 8px var(--mono); letter-spacing: .055em; text-transform: uppercase; }
     .graph-tooltip-copy { fill: var(--muted); font: 8px var(--mono); }
-    .graph-details { min-width: 0; padding: .9rem; border: 1px solid var(--line-soft); border-radius: 11px; background: rgba(7, 17, 13, .72); }
+    .graph-details { min-width: 0; padding: .9rem; border: 1px solid var(--line-soft); border-radius: 11px; background: var(--panel); }
     .graph-details-kicker { color: var(--aqua); font: .6rem var(--mono); text-transform: uppercase; letter-spacing: .1em; }
     .graph-details h3 { margin: .5rem 0 .35rem; font-size: .88rem; line-height: 1.35; overflow-wrap: anywhere; }
     .graph-details-copy { color: var(--muted); font: .68rem/1.55 var(--mono); overflow-wrap: anywhere; }
     .graph-progress { margin-top: .9rem; padding-top: .75rem; border-top: 1px solid var(--line-soft); }
     .graph-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; color: var(--muted); font: .61rem var(--mono); }
     .graph-progress-head strong { color: var(--ink); font-size: .78rem; }
-    .graph-progress-track { height: 8px; margin-top: .55rem; overflow: hidden; border: 1px solid rgba(124, 247, 207, .16); border-radius: 999px; background: var(--line-soft); }
-    .graph-progress-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3cae8a, var(--aqua)); box-shadow: 0 0 9px rgba(124, 247, 207, .28); transition: width .25s ease; }
+    .graph-progress-track { height: 8px; margin-top: .55rem; overflow: hidden; border: 1px solid var(--color-brand-border); border-radius: 999px; background: var(--line-soft); }
+    .graph-progress-fill { height: 100%; border-radius: inherit; background: var(--color-success); box-shadow: 0 0 9px var(--color-success-subtle); transition: width .25s ease; }
     .graph-progress-meta { margin-top: .45rem; color: var(--muted); font: .6rem/1.55 var(--mono); }
     .graph-connections { display: grid; gap: .5rem; margin-top: .85rem; }
     .graph-connection { padding-top: .5rem; border-top: 1px solid var(--line-soft); color: var(--muted); font: .61rem/1.45 var(--mono); overflow-wrap: anywhere; }
@@ -227,7 +215,7 @@ FRONTEND_HTML = r'''<!doctype html>
     .graph-search { position: relative; flex: 1 1 230px; min-width: 0; }
     .graph-search label { display: block; color: var(--muted); font-size: .75rem; margin-bottom: .25rem; }
     .graph-search input { width: 100%; min-width: 0; background: var(--canvas); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: .6rem .7rem; font-size: .9rem; }
-    .search-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 60; background: var(--panel-strong); padding: .5rem; border: 1px solid var(--line); border-radius: 8px; max-height: 300px; overflow: auto; box-shadow: 0 10px 24px #0008; }
+    .search-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 60; background: var(--panel-strong); padding: .5rem; border: 1px solid var(--line); border-radius: 8px; max-height: 300px; overflow: auto; box-shadow: var(--shadow-elevated); }
     .search-result { display: block; text-align: left; width: 100%; border: 0; border-radius: 6px; background: transparent; color: var(--ink); padding: .6rem; cursor: pointer; font-size: .9rem; }
     .search-result:hover, .search-result:focus-visible { background: var(--aqua-soft); }
     .search-result small { display: block; color: var(--muted); margin-top: .25rem; }
@@ -260,8 +248,8 @@ FRONTEND_HTML = r'''<!doctype html>
     .document-content { white-space: pre-wrap; overflow-wrap: anywhere; font: .9rem/1.65 var(--sans); }
     .reader-resize { cursor: ew-resize; border-radius: 5px; touch-action: none; background: var(--line-soft); }
     .reader-resize:hover, .reader-resize:focus-visible { background: var(--aqua); }
-    .graph-node.selected .graph-sphere { stroke: #fff; stroke-width: 3; filter: drop-shadow(0 0 6px var(--aqua)); }
-    .graph-node:focus-visible .graph-sphere { stroke: #fff; stroke-width: 3; }
+    .graph-node.selected .graph-sphere { stroke: var(--graph-outline); stroke-width: 3; filter: drop-shadow(0 0 6px var(--aqua)); }
+    .graph-node:focus-visible .graph-sphere { stroke: var(--graph-outline); stroke-width: 3; }
     .graph-node-kind { font: 10px var(--mono); fill: var(--ink); }
     .graph-edge-label { font: 12px var(--sans); fill: var(--muted); }
     .graph-node-label { font: 600 13px var(--sans); fill: var(--ink); paint-order: stroke; stroke: var(--canvas); stroke-width: 5px; pointer-events: none; }
@@ -296,6 +284,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
   </style>
   <link rel="stylesheet" href="/monitor/topology-assets/style.css">
+  <link rel="stylesheet" href="/monitor/topology-assets/theme.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to graph monitor</a>
@@ -308,7 +297,7 @@ FRONTEND_HTML = r'''<!doctype html>
     <main id="main">
       <header class="topbar" id="overview">
         <div><div class="eyebrow">Live local state</div><h1>Your work, connected</h1><p class="subtitle">Explore your work, see how it connects, and read the details behind each item.</p></div>
-        <div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Disconnected</span></div>
+        <div class="topbar-preferences"><label class="theme-picker"><span>Theme</span><select data-theme-picker aria-label="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="aqua">Aqua</option></select></label><div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Disconnected</span></div></div><span class="theme-status" data-theme-status role="status" aria-live="polite"></span>
       </header>
       <details class="connection-settings" id="connection-settings" open><summary id="connection-summary">Connect to your graph</summary>
       <form class="auth-strip" id="auth-form">
@@ -333,7 +322,7 @@ FRONTEND_HTML = r'''<!doctype html>
           <div class="graph-filter-row"><div class="graph-legend" role="group" aria-label="Visible node categories"><label class="legend-item"><input type="checkbox" data-graph-category="arena" aria-controls="graph-svg" checked><span>Arena <span id="category-arena-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="work" aria-controls="graph-svg" checked><span>Work <span id="category-work-count">0</span></span></label><label class="legend-item" title="Evidence-backed interpretations, initially inferred and unclaimed"><input type="checkbox" data-graph-category="observation" aria-controls="graph-svg" checked><span>Observation <span id="category-observation-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="receipt" aria-controls="graph-svg" checked><span>Record <span id="category-receipt-count">0</span></span></label></div><label class="graph-label-select">Labels <select id="graph-labels"><option value="selected">Hovered or selected connections</option><option value="all">All labels</option><option value="none">No labels</option></select></label><button class="graph-control" id="graph-show-all" type="button" hidden>Exit connected view</button></div><div class="filter-grid" id="filter-grid"></div></div></details>
         </div>
         <section class="graph-surface" id="graph-surface" aria-label="Graph canvas">
-          <header class="surface-header"><div><h3>Graph canvas</h3><span class="section-meta" id="graph-meta">not refreshed</span></div><button class="graph-control" id="graph-expand" type="button" aria-expanded="false" aria-controls="graph-surface">Full screen</button></header>
+          <header class="surface-header"><div><h3>Graph canvas</h3><span class="section-meta" id="graph-meta">not refreshed</span></div><div class="surface-header-actions"><label class="theme-picker surface-theme"><span>Theme</span><select data-theme-picker aria-label="Canvas theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="aqua">Aqua</option></select></label><button class="graph-control" id="graph-expand" type="button" aria-expanded="false" aria-controls="graph-surface">Full screen</button></div><span class="theme-status" data-theme-status role="status" aria-live="polite"></span></header>
           <div class="surface-controls">
             <div class="graph-zoom" role="group" aria-label="Graph zoom"><button class="graph-control" id="graph-zoom-out" type="button" aria-label="Zoom out">−</button><input id="graph-zoom" type="range" min="5" max="400" value="100" step="1" aria-label="Graph zoom percentage"><output id="graph-zoom-value" for="graph-zoom">100%</output><button class="graph-control" id="graph-zoom-in" type="button" aria-label="Zoom in">+</button><button class="graph-control" id="graph-fit" type="button">Fit view</button></div>
             <div class="graph-actions"><button class="graph-control" id="graph-undo" type="button" disabled title="Restore the positions from before your last arrangement change">Undo positioning</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button></div>
@@ -1057,7 +1046,7 @@ FRONTEND_HTML = r'''<!doctype html>
       const sheen = svgMake('linearGradient', { id: 'graph-solid-sheen', gradientUnits: 'userSpaceOnUse', x1: '-.65', y1: '-1', x2: '.65', y2: '1' });
       sheen.append(svgMake('stop', { offset: '0%', 'stop-color': '#fff', 'stop-opacity': '.32' }), svgMake('stop', { offset: '48%', 'stop-color': '#fff', 'stop-opacity': '0' }), svgMake('stop', { offset: '100%', 'stop-color': '#07131d', 'stop-opacity': '.24' })); defs.append(sheen);
       for (const kind of [...Object.keys(Topology.registry), 'other']) defs.append(solidArtwork(kind));
-      const marker = svgMake('marker', { id: 'graph-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }); marker.append(svgMake('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#8aa99a' })); defs.append(marker);
+      const marker = svgMake('marker', { id: 'graph-arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: 'auto-start-reverse' }); marker.append(svgMake('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: 'var(--graph-edge)' })); defs.append(marker);
       svg.append(defs, svgMake('rect', { id: 'scene-hit', class: 'graph-scene-hit', x: 0, y: 0 }), svgMake('g', { id: 'scene-edges' }), svgMake('g', { id: 'scene-nodes' }), svgMake('g', { id: 'scene-labels', 'pointer-events': 'none' }), svgMake('text', { id: 'scene-empty', x: '50%', y: '50%', 'text-anchor': 'middle', class: 'graph-node-kind' }));
     }
 
@@ -1115,7 +1104,7 @@ FRONTEND_HTML = r'''<!doctype html>
         const dx = target.x - source.x, dy = target.y - source.y, distance = Math.max(1, Math.hypot(dx, dy)), ux = dx / distance, uy = dy / distance;
         const sx = source.x + ux * source.radius, sy = source.y + uy * source.radius, tx = target.x - ux * (target.radius + 3), ty = target.y - uy * (target.radius + 3);
         const connected = edge.source === previewKey || edge.target === previewKey;
-        setSvg(path, { d: `M ${sx} ${sy} L ${tx} ${ty}`, 'stroke-width': connected ? 2 : 1, stroke: connected ? '#9dc9b7' : '#527568', opacity: adjacent.size && !connected ? .14 : .8 });
+        setSvg(path, { d: `M ${sx} ${sy} L ${tx} ${ty}`, 'stroke-width': connected ? 2 : 1, style: `--edge-color:${connected ? 'var(--graph-edge-active)' : 'var(--graph-edge)'}`, opacity: adjacent.size && !connected ? .14 : .8 });
         if (candidates.length < 220 && (graphView.labels === 'all' || (graphView.labels === 'selected' && connected))) {
           const label = relationshipLabel(edge.relationship), width = label.length * 6.8 + 8;
           candidates.push({ key: `edge:${key}`, text: label, className: 'graph-edge-label', x: (sx + tx) / 2 - width / 2, y: (sy + ty) / 2 - 23, width, height: 18, priority: 2 });
@@ -1321,7 +1310,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function typeSample(kind) {
-      const svg=svgMake('svg',{viewBox:'-1.2 -1.2 2.4 2.4',class:'type-sample','aria-hidden':'true'}); svg.append(svgMake('use',{href:`#graph-solid-${Object.hasOwn(Topology.registry,kind)?kind:'other'}`})); return svg;
+      const svg=svgMake('svg',{viewBox:'-1.2 -1.2 2.4 2.4',class:'type-sample','aria-hidden':'true'}); svg.append(svgMake('use',{href:`#graph-solid-${Object.hasOwn(Topology.registry,kind)?kind:'other'}`}),svgMake('path',{d:Topology.solid(kind).d,fill:'none',stroke:'var(--graph-node-border)','stroke-width':'.06'})); return svg;
     }
 
     function renderTopologyControls() {
@@ -1587,6 +1576,17 @@ FRONTEND_HTML = r'''<!doctype html>
     ['pointerup', 'pointercancel'].forEach(name => document.addEventListener(name, () => { state.controlDragging = false; flushPendingSnapshot(); }));
     document.getElementById('graph-details').classList.add('collapsed'); text('reader-toggle', 'Open reader'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'false');
     ensureGraphScene(graphSvg); initializeTopologyControls();
+    function repaintGraphTheme() {
+      // Resolve roles once per theme change, never per node or animation frame.
+      const css = getComputedStyle(document.documentElement), color = name => css.getPropertyValue(name).trim();
+      graphView.paint = {edge:color('--graph-edge'), edgeActive:color('--graph-edge-active'),
+        labelBackground:color('--canvas'), labelText:color('--ink'), outline:color('--graph-outline'),
+        selection:color('--graph-selection'), nodeBorder:color('--graph-node-border')};
+      renderGraph(graphView.nodes, graphView.edges);
+    }
+    window.addEventListener('devgraph:themechange', repaintGraphTheme);
+    repaintGraphTheme();
+
     new ResizeObserver(syncReaderPresentation).observe(document.getElementById('graph-surface'));
     new ResizeObserver(resizeGraphViewport).observe(graphSvg); resizeGraphViewport(); syncZoomControls();
     document.getElementById('graph-reset').addEventListener('click', resetGraphView);
