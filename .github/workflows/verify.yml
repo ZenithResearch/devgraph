@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: "24"
       - name: Frontend tests
-        run: node --test tests/frontend/*.test.mjs
+        run: node --test tests/frontend/*.test.mjs tests/frontend_kanban.mjs
       - name: Repository verification
         run: bash docs/dev/verification.md
       - name: Lint

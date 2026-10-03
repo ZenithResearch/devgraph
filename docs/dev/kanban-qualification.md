@@ -1,7 +1,8 @@
 # Kanban candidate qualification
 
-This is follow-up work to the topology/theme UI PR (#8), on
-`codex/kanban-workflows`. The source candidate implements the board, workflow
+This work is integrated with the shared protocol and topology/theme UI on
+`codex/devgraph-complete`; [integration evidence](complete-ui-integration.md)
+records the original PR heads. The source candidate implements the board, workflow
 engine, migration 27, ontology v0.7.0, and named signed mutations. It is **not
 qualified for installed Chrome editing** until the final gate below passes.
 
@@ -66,7 +67,9 @@ native host, secS and receiver. Verify:
 - Parent approvals stay independent; stale evidence cannot clear a gate.
 
 The current machine's canonical port is occupied by the live local service; the
-new board preview runs on an independent in-memory fixture port. No production
+synthetic board preview runs on an independent in-memory fixture port. The
+separate live-data preview uses authenticated reads from the installed API,
+without database access or migrations. No production
 identity, grants, native installation or data were changed for qualification.
 A fixture bridge or successful WASM test must never be reported as this gate.
 Until the installed test passes, keep the PR a draft and the browser-editing

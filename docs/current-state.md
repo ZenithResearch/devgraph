@@ -3,6 +3,21 @@
 This page records the combined official-frontend and private macOS deployment
 baseline. Repository behavior and live machine state remain separate evidence.
 
+## Integrated UI and workflow candidate
+
+The combined source includes the canvas topology renderer, Platonic node shapes,
+fullscreen graph surface, shared reading modal, granular persisted filters,
+collapsible Observer panel, Zenith themes, and a separate Kanban board. The
+shared Rust protocol, its CI matrix, Python workflow engine, forward migration
+27, and ontology v0.7.0 are integrated together. Existing records retain absent
+workflow stages; lifecycle and workflow completion remain distinct.
+
+See [integration evidence](dev/complete-ui-integration.md) for the included PRs
+and [Kanban qualification](dev/kanban-qualification.md) for the remaining
+installed Chrome/Wallet/native-host gate. Source integration does not update
+an already installed local runtime. The live read-only board preview reads
+that runtime's API and deliberately leaves it running its installed release.
+
 ## Arena runtime
 
 The source implements Arena as a separate type with signed create, patch,
@@ -44,7 +59,7 @@ and identity/grant activation need their own machine evidence.
 
 | Surface | Current evidence |
 |---|---|
-| Ontology | `ontology/`, immutable releases `v0.1.0` through `v0.6.0`, and `scripts/build_ontology_bundle.py --check` |
+| Ontology | `ontology/`, immutable releases `v0.1.0` through `v0.7.0`, and `scripts/build_ontology_bundle.py --check` |
 | Storage | `src/devgraph/storage/`; parity, persistence-contract, migration-store, and opt-in Neo4j tests |
 | Domain model | `src/devgraph/model/`, `src/devgraph/relationships.py`, and `src/devgraph/services/priority.py` |
 | Authorization | `src/devgraph/auth/` and `tests/auth/` |

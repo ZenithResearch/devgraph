@@ -18,6 +18,15 @@ previous Arena explicitly. Omitting that optional field preserves old Work bytes
 These request domains do not change any Wallet presentation signature domain.
 A request and its resource set describe intended work; they grant no authority.
 
+The integrated candidate also admits `workflow.assign`, `workflow.review`, and
+`workflow.transition`, with the closed payloads and supporting-record resources
+defined in `workflow.rs`. Project parents remain Initiatives; Issues may belong
+to Initiatives or Projects, and Tasks to Initiatives, Projects, or Issues.
+Historical Work/Arena requests retain their exact canonical bytes and digests.
+The additive workflow corpus lives in `tests/fixtures/workflow-v1/`; Python and
+Rust consume the same valid and invalid cases. Matched Wallet/secS/native-host
+versions and explicit grants are still required to use these operations.
+
 Rust rejects non-integer number spellings, lexical negative zero, duplicate and
 unknown fields, unsafe integers, excessive nesting, oversized inputs and invalid
 resource references. The adversarial corpus records the existing Python behavior
@@ -36,7 +45,7 @@ feature-independent canonical encoder. Both authored implementations were by
 Gabriel Atkinson. This publication is rooted in public Devgraph history and
 imports no private Git ancestry.
 
-The exported fixtures contain 15 Work requests, 25 adversarial cases, eight
+The original export's fixtures contain 15 Work requests, 25 adversarial cases, eight
 Arena/parent-change requests and 19 Arena denials. They use synthetic example
 records, not live credentials or identity material. Work/Arena request copies
 are checked against the existing public Python receiver fixtures. The export
