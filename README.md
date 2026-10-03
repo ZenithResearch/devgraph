@@ -47,8 +47,9 @@ with Ctrl-C.
 
 Select a node to open its details. **Description / plan** contains authored
 text; **Load supporting material** resolves attached documents, links,
-requirements, and criteria. Use **Fit**, zoom, **Expand view**, and the resize
-handles to make room. The category checkboxes hide or show node classes.
+requirements, and criteria. The separate **Graph canvas** panel has zoom,
+**Fit view**, and **Full screen** controls. Press Escape or **Exit full screen**
+to return to the page. The category checkboxes hide or show node classes.
 **From Arena** follows outgoing connections, so it may include dependencies
 belonging to another Arena; it does not move work between Arenas.
 

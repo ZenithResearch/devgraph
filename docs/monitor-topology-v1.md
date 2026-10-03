@@ -127,6 +127,17 @@ lighting, instead of drawing every facet on every frame. Solid orientation is
 fixed for recognition while the map camera orbits. All silhouettes fit inside
 the existing picking radius; hover and selection retain their white outline.
 
+The graph lives in a separate `graph-surface` panel with its own fullscreen
+controller (`surface.js`). Its zoom, fit, positioning, legend, arrangement,
+accessible item list and details controls travel with the canvas. Page filters
+remain outside it. **Full screen** uses the native browser API when available,
+with a viewport-filling fallback for embedded browsers. Escape or **Exit full
+screen** restores the panel, background focusability, focus and page scroll.
+The same SVG/canvas elements are moved, never cloned, so graph positions,
+selection, filters and undo history survive. Resize observation adapts the
+camera; an explicitly fitted view refits to the available space. The existing
+1.618:1 graph/details split and responsive stacking also apply in fullscreen.
+
 Automatic layout uses a spatial-grid worker, bounded neighbors/iterations and
 a generation token. Filters, undo, gestures and credential changes invalidate
 stale results. Pointer movement never runs layout. Redraws are coalesced to

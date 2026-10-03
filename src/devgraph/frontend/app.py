@@ -143,13 +143,6 @@ FRONTEND_HTML = r'''<!doctype html>
     .graph-resize { display: flex; align-items: center; justify-content: center; gap: .6rem; width: 100%; min-height: 30px; margin-top: .6rem; border: 1px solid var(--line-soft); border-radius: 7px; color: var(--muted); background: rgba(7, 17, 13, .65); font: .6rem var(--mono); cursor: ns-resize; touch-action: none; user-select: none; }
     .graph-resize::before { content: ""; width: 28px; height: 5px; border-top: 1px solid var(--muted); border-bottom: 1px solid var(--muted); }
     .graph-resize:hover { color: var(--ink); border-color: var(--aqua); }
-    body.graph-expanded { overflow: hidden; }
-    .graph-card.expanded { position: fixed; inset: 1rem; z-index: 50; margin: 0; display: flex; flex-direction: column; background: var(--panel); overflow: auto; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .7); }
-    .graph-card.expanded .graph-layout { flex: 1; min-height: 180px; }
-    .graph-card.expanded .graph-scroll { height: 100%; min-height: 180px; }
-    .graph-card.expanded .graph-details { overflow: auto; }
-    .graph-card.expanded .graph-force-panel { max-height: 150px; overflow: auto; flex-shrink: 0; }
-    .graph-card.expanded .graph-resize { display: none; }
     .graph-scene-hit { fill: transparent; cursor: grab; }
     .graph-svg.dragging .graph-scene-hit { cursor: grabbing; }
     .graph-edge { fill: none; stroke: #527568; marker-end: url(#graph-arrow); }
@@ -194,8 +187,6 @@ FRONTEND_HTML = r'''<!doctype html>
       .kpis { grid-template-columns: repeat(2, 1fr); }
       .graph-layout { grid-template-columns: 1fr; }
       .graph-force-panel { grid-template-columns: 1fr; }
-      .graph-card.expanded .graph-layout { grid-template-rows: minmax(180px, 1fr) auto; }
-      .graph-card.expanded .graph-details { max-height: 140px; }
     }
     @media (max-width: 690px) {
       main { padding: 1rem; }
@@ -269,12 +260,6 @@ FRONTEND_HTML = r'''<!doctype html>
     .document-content { white-space: pre-wrap; overflow-wrap: anywhere; font: .9rem/1.65 var(--sans); }
     .reader-resize { cursor: ew-resize; border-radius: 5px; touch-action: none; background: var(--line-soft); }
     .reader-resize:hover, .reader-resize:focus-visible { background: var(--aqua); }
-    .graph-card.expanded { overflow: hidden; }
-    .graph-card.expanded .graph-toolbar { flex-shrink: 0; }
-    .graph-card.expanded .graph-layout { min-height: 180px; }
-    .graph-card.expanded .graph-details { height: 100%; overflow: hidden; }
-    .graph-card.expanded .graph-force-panel { max-height: none; overflow: visible; }
-    .graph-card.expanded .graph-settings[open] { max-height: 40vh; overflow: auto; }
     .graph-node.selected .graph-sphere { stroke: #fff; stroke-width: 3; filter: drop-shadow(0 0 6px var(--aqua)); }
     .graph-node:focus-visible .graph-sphere { stroke: #fff; stroke-width: 3; }
     .graph-node-kind { font: 10px var(--mono); fill: var(--ink); }
@@ -291,22 +276,16 @@ FRONTEND_HTML = r'''<!doctype html>
     .reading-view .graph-scroll, .reading-view .reader-resize, .reading-view .graph-toolbar, .reading-view .graph-settings, .reading-view .graph-help, .reading-view .graph-resize { display: none; }
     .reading-view .graph-layout { display: block !important; min-height: 0; }
     .reading-view .graph-details { height: min(75vh, 900px); max-height: none; }
-    .reading-view.expanded .graph-details { height: 100%; }
     @media (max-width: 1100px) { .shell { grid-template-columns: 1fr; } .rail { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: .75rem; padding: .75rem 1rem; border-bottom: 1px solid var(--line); } .rail nav { display: flex; flex-wrap: wrap; } .rail-meta { display: none; } }
     @media (max-width: 980px) {
       .graph-layout { grid-template-columns: 1fr; gap: .65rem; }
       .reader-resize { display: none; }
       .graph-details { height: 340px; max-height: 45vh; }
-      .graph-card.expanded .graph-layout { grid-template-rows: minmax(180px, 1fr) auto; }
-      .graph-card.expanded .graph-details { height: 240px; max-height: 35vh; }
-      .graph-card.expanded .graph-details.collapsed { height: auto; }
-      .graph-card.reading-view .graph-details { height: 72vh; max-height: none; }
-      .graph-card.reading-view.expanded .graph-details { height: 100%; }
+      .graph-surface.reading-view .graph-details { height: 72vh; max-height: none; }
       .graph-primary { align-items: flex-end; }
     }
     @media (max-width: 480px) {
       .graph-card { padding: .65rem; }
-      .graph-card.expanded { inset: .5rem; }
       .graph-primary { gap: .4rem; }
       .graph-search { flex-basis: 100%; }
       .graph-title-row h2 { font-size: 1rem; }
@@ -345,25 +324,31 @@ FRONTEND_HTML = r'''<!doctype html>
       </section>
       <section class="card graph-card" id="topology">
         <div class="graph-toolbar">
-          <div class="graph-title-row"><div><h2>Work map</h2><span class="section-meta" id="graph-meta">not refreshed</span></div><button class="graph-control" id="graph-expand" type="button" aria-expanded="false" aria-controls="topology">Expand view</button></div>
+          <div class="graph-title-row"><div><h2>Work map</h2></div></div>
           <div class="graph-primary">
             <div class="graph-search"><label for="graph-search">Find an item</label><input type="search" id="graph-search" placeholder="Search titles or IDs" autocomplete="off" aria-controls="graph-search-results"><div id="graph-search-results" class="search-results" hidden></div></div>
-            <div class="graph-zoom" role="group" aria-label="Graph zoom"><button class="graph-control" id="graph-zoom-out" type="button" aria-label="Zoom out">−</button><input id="graph-zoom" type="range" min="5" max="400" value="100" step="1" aria-label="Graph zoom percentage"><output id="graph-zoom-value" for="graph-zoom">100%</output><button class="graph-control" id="graph-zoom-in" type="button" aria-label="Zoom in">+</button><button class="graph-control" id="graph-fit" type="button">Fit view</button></div>
           </div>
-          <div class="graph-actions"><button class="graph-control" id="graph-undo" type="button" disabled title="Restore the positions from before your last arrangement change">Undo positioning</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button><button class="graph-control" id="graph-clear-filters" type="button">Clear filters</button></div><div id="filter-summary"></div><details class="filter-panel" id="graph-filters"><summary>Filters</summary><div class="graph-arena-row"><label class="graph-label-select" for="graph-arena">From Arena <select id="graph-arena" aria-controls="graph-svg" aria-describedby="graph-arena-note"><option value="">All nodes</option><option value="*">Any Arena</option></select></label><p class="graph-arena-note" id="graph-arena-note" role="status" aria-live="polite">Choose an Arena to follow its outgoing connections.</p></div>
+          <div class="graph-actions"><button class="graph-control" id="graph-clear-filters" type="button">Clear filters</button></div><div id="filter-summary"></div><details class="filter-panel" id="graph-filters"><summary>Filters</summary><div class="graph-arena-row"><label class="graph-label-select" for="graph-arena">From Arena <select id="graph-arena" aria-controls="graph-svg" aria-describedby="graph-arena-note"><option value="">All nodes</option><option value="*">Any Arena</option></select></label><p class="graph-arena-note" id="graph-arena-note" role="status" aria-live="polite">Choose an Arena to follow its outgoing connections.</p></div>
           <div class="graph-filter-row"><div class="graph-legend" role="group" aria-label="Visible node categories"><label class="legend-item"><input type="checkbox" data-graph-category="arena" aria-controls="graph-svg" checked><span>Arena <span id="category-arena-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="work" aria-controls="graph-svg" checked><span>Work <span id="category-work-count">0</span></span></label><label class="legend-item" title="Evidence-backed interpretations, initially inferred and unclaimed"><input type="checkbox" data-graph-category="observation" aria-controls="graph-svg" checked><span>Observation <span id="category-observation-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="receipt" aria-controls="graph-svg" checked><span>Record <span id="category-receipt-count">0</span></span></label></div><label class="graph-label-select">Labels <select id="graph-labels"><option value="selected">Hovered or selected connections</option><option value="all">All labels</option><option value="none">No labels</option></select></label><button class="graph-control" id="graph-show-all" type="button" hidden>Exit connected view</button></div><div class="filter-grid" id="filter-grid"></div></details>
         </div>
-        <p id="graph-feedback" role="status" aria-live="polite"></p>
-        <details class="legend-panel" open><summary>Legend</summary><div class="legend-items" id="type-legend"></div><p class="reader-note">Arrows show the direction of a connection. Select an item to read its status.</p></details>
-        <details class="graph-settings"><summary>Arrange nodes</summary><div class="graph-toolbar-actions"><button class="graph-control" id="graph-orbit" type="button" aria-pressed="false">Orbit: off</button><button class="graph-control" id="graph-settle" type="button">Arrange nodes</button></div><div class="graph-force-panel"><div class="graph-force-copy"><strong>Graph forces</strong><span>Adjust spacing and the pull between connected nodes.</span><button class="graph-control" id="graph-force-reset" type="button">Reset force defaults</button></div><div class="graph-force-controls" id="graph-force-controls" aria-label="Graph force controls"></div></div></details>
-        <div class="graph-layout">
-          <div class="graph-scroll"><canvas id="graph-canvas" hidden aria-hidden="true"></canvas><div id="graph-preview" aria-hidden="true"></div><div id="node-chooser" hidden></div><svg class="graph-svg" id="graph-svg" viewBox="0 0 1080 420" tabindex="0" role="group" aria-label="Interactive Dev Graph topology" aria-describedby="graph-help"></svg></div>
-          <div class="reader-resize" id="reader-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Details width" aria-valuemin="320" aria-valuemax="600" aria-valuenow="360"></div>
-          <aside class="graph-details" id="graph-details"><div class="reader-header"><div class="reader-buttons"><button class="graph-control" id="reader-toggle" aria-expanded="true" aria-controls="reader-body">Hide details</button><button class="graph-control" id="reader-mode">Reading view</button></div><h3 id="reader-title">No node selected</h3><div class="graph-details-copy" id="reader-meta">Select a node or search to read its details.</div></div><div id="reader-body" class="reader-body"><p id="reader-status" role="status" aria-live="polite"></p><div id="reader-content"></div></div></aside>
-        </div>
-        <details id="graph-result-list"><summary>Browse visible items</summary><div id="graph-result-items"></div><button class="graph-control" id="graph-results-more" hidden>Show more items</button></details>
-        <p class="graph-help" id="graph-help">Click a node to read · Scroll/pinch to zoom · Shift-drag to pan · Drag to orbit or move an item · F to fit · Browse visible items for keyboard selection</p>
-        <div class="graph-resize" id="graph-resize" role="separator" tabindex="0" aria-label="Graph height" aria-orientation="horizontal" aria-valuemin="280" aria-valuemax="1200" aria-valuenow="420" aria-valuetext="420 pixels" aria-controls="graph-svg">Drag to resize · Arrow keys adjust height</div>
+        <section class="graph-surface" id="graph-surface" aria-label="Graph canvas">
+          <header class="surface-header"><div><h3>Graph canvas</h3><span class="section-meta" id="graph-meta">not refreshed</span></div><button class="graph-control" id="graph-expand" type="button" aria-expanded="false" aria-controls="graph-surface">Full screen</button></header>
+          <div class="surface-controls">
+            <div class="graph-zoom" role="group" aria-label="Graph zoom"><button class="graph-control" id="graph-zoom-out" type="button" aria-label="Zoom out">−</button><input id="graph-zoom" type="range" min="5" max="400" value="100" step="1" aria-label="Graph zoom percentage"><output id="graph-zoom-value" for="graph-zoom">100%</output><button class="graph-control" id="graph-zoom-in" type="button" aria-label="Zoom in">+</button><button class="graph-control" id="graph-fit" type="button">Fit view</button></div>
+            <div class="graph-actions"><button class="graph-control" id="graph-undo" type="button" disabled title="Restore the positions from before your last arrangement change">Undo positioning</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button></div>
+            <details class="legend-panel surface-options"><summary>Legend</summary><div class="surface-popover"><div class="legend-items" id="type-legend"></div><p class="reader-note">Arrows show the direction of a connection. Select an item to read its status.</p></div></details>
+            <details class="graph-settings surface-options"><summary>Arrange nodes</summary><div class="surface-popover"><div class="graph-toolbar-actions"><button class="graph-control" id="graph-orbit" type="button" aria-pressed="false">Orbit: off</button><button class="graph-control" id="graph-settle" type="button">Arrange nodes</button></div><div class="graph-force-panel"><div class="graph-force-copy"><strong>Graph forces</strong><span>Adjust spacing and the pull between connected nodes.</span><button class="graph-control" id="graph-force-reset" type="button">Reset force defaults</button></div><div class="graph-force-controls" id="graph-force-controls" aria-label="Graph force controls"></div></div></div></details>
+          </div>
+          <p id="graph-feedback" role="status" aria-live="polite"></p>
+          <div class="graph-layout">
+            <div class="graph-scroll"><canvas id="graph-canvas" hidden aria-hidden="true"></canvas><div id="graph-preview" aria-hidden="true"></div><div id="node-chooser" hidden></div><svg class="graph-svg" id="graph-svg" viewBox="0 0 1080 420" tabindex="0" role="group" aria-label="Interactive Dev Graph topology" aria-describedby="graph-help"></svg></div>
+            <div class="reader-resize" id="reader-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Details width" aria-valuemin="320" aria-valuemax="600" aria-valuenow="360"></div>
+            <aside class="graph-details" id="graph-details"><div class="reader-header"><div class="reader-buttons"><button class="graph-control" id="reader-toggle" aria-expanded="true" aria-controls="reader-body">Hide details</button><button class="graph-control" id="reader-mode">Reading view</button></div><h3 id="reader-title">No node selected</h3><div class="graph-details-copy" id="reader-meta">Select a node or search to read its details.</div></div><div id="reader-body" class="reader-body"><p id="reader-status" role="status" aria-live="polite"></p><div id="reader-content"></div></div></aside>
+          </div>
+          <details id="graph-result-list"><summary>Browse visible items</summary><div id="graph-result-items"></div><button class="graph-control" id="graph-results-more" hidden>Show more items</button></details>
+          <p class="graph-help" id="graph-help">Click a node to read · Scroll/pinch to zoom · Shift-drag to pan · Drag to orbit or move an item · F to fit · Browse visible items for keyboard selection</p>
+          <div class="graph-resize" id="graph-resize" role="separator" tabindex="0" aria-label="Graph height" aria-orientation="horizontal" aria-valuemin="280" aria-valuemax="1200" aria-valuenow="420" aria-valuetext="420 pixels" aria-controls="graph-svg">Drag to resize · Arrow keys adjust height</div>
+        </section>
       </section>
       <section class="grid" id="pipeline">
         <article class="card section"><div class="section-head"><h2>Observation status</h2><span class="section-meta">inferred · claim actions unavailable</span></div><div class="pipeline" id="pipeline-stages"></div></article>
@@ -378,6 +363,7 @@ FRONTEND_HTML = r'''<!doctype html>
   <script src="/monitor/topology-assets/core.js"></script>
   <script src="/monitor/topology-assets/proof.js"></script>
   <script src="/monitor/topology-assets/canvas.js"></script>
+  <script src="/monitor/topology-assets/surface.js"></script>
   <script>
     const Topology = DevgraphTopology;
     const state = { timer: null, snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshController: null, refreshQueued: false, pendingSnapshot: null, lastSuccess: null };
@@ -582,18 +568,12 @@ FRONTEND_HTML = r'''<!doctype html>
 
     function setGraphHeight(value) {
       const height = Math.round(Math.max(280, Math.min(1200, value)));
-      document.getElementById('topology').style.setProperty('--graph-height', `${height}px`);
+      document.getElementById('graph-surface').style.setProperty('--graph-height', `${height}px`);
       const handle = document.getElementById('graph-resize'); handle.setAttribute('aria-valuenow', String(height)); handle.setAttribute('aria-valuetext', `${height} pixels`);
     }
 
     function toggleGraphExpanded() {
-      const card = document.getElementById('topology'); const button = document.getElementById('graph-expand');
-      graphView.expanded = !graphView.expanded; card.classList.toggle('expanded', graphView.expanded); document.body.classList.toggle('graph-expanded', graphView.expanded);
-      button.setAttribute('aria-expanded', String(graphView.expanded)); button.textContent = graphView.expanded ? 'Restore view' : 'Expand view';
-      // Prevent keyboard focus from moving behind the expanded graph.
-      [...document.querySelector('main').children].filter(element => element !== card).forEach(element => { element.inert = graphView.expanded; });
-      document.querySelector('.rail').inert = graphView.expanded;
-      if (!graphView.expanded) button.focus();
+      return graphSurface.toggle();
     }
 
     function graphScreenVector(deltaX, deltaY, scale) {
@@ -1129,7 +1109,7 @@ FRONTEND_HTML = r'''<!doctype html>
       if (!visible) { graphView.filters = Topology.filters(); graphView.visibleCategories = new Set(Topology.categories); graphView.arenaKey = ''; announceGraph('Filters cleared to reveal this item.'); }
       graphView.filters.anchor = neighborhood ? node.key : ''; graphView.neighborhood = neighborhood ? node.key : null;
       if (!visible || neighborhood || state.snapshot?.applied_filters?.anchor) { applyGraphFilters(); return; }
-      document.getElementById('topology').classList.remove('reading-view'); text('reader-mode', 'Reading view');
+      document.getElementById('graph-surface').classList.remove('reading-view'); text('reader-mode', 'Reading view');
       setGraphZoom(Math.max(1.2, graphView.zoom)); const point = projectGraphPoint(graphView.nodePositions.get(node.key)); graphView.panX += graphView.width/2-point.x; graphView.panY += graphView.height/2-point.y; renderGraph(graphView.nodes,graphView.edges);
     }
 
@@ -1273,7 +1253,7 @@ FRONTEND_HTML = r'''<!doctype html>
       setObserverCollapsed(graphView.preferences.observerCollapsed, false);
       document.getElementById('graph-details').classList.toggle('collapsed',graphView.preferences.readerCollapsed);
       document.getElementById('reader-toggle').setAttribute('aria-expanded',String(!graphView.preferences.readerCollapsed)); text('reader-toggle',graphView.preferences.readerCollapsed?'Show details':'Hide details');
-      if (graphView.preferences.readerWidth) document.getElementById('topology').style.setProperty('--reader-width',`${graphView.preferences.readerWidth}px`);
+      if (graphView.preferences.readerWidth) document.getElementById('graph-surface').style.setProperty('--reader-width',`${graphView.preferences.readerWidth}px`);
       renderTopologyControls();
     }
 
@@ -1460,8 +1440,11 @@ FRONTEND_HTML = r'''<!doctype html>
         graphView.filters.category = [...graphView.visibleCategories]; applyGraphFilters();
       });
     });
+    const graphSurface = DevgraphGraphSurface.create({
+      element: document.getElementById('graph-surface'), button: document.getElementById('graph-expand'),
+      onChange(expanded) { graphView.expanded = expanded; window.requestAnimationFrame(resizeGraphViewport); }, announce: announceGraph,
+    });
     document.getElementById('graph-expand').addEventListener('click', toggleGraphExpanded);
-    document.addEventListener('keydown', event => { if (event.key === 'Escape' && graphView.expanded) { event.preventDefault(); toggleGraphExpanded(); } });
     const graphResize = document.getElementById('graph-resize'); let resizeDrag = null;
     graphResize.addEventListener('pointerdown', event => {
       if (event.button !== 0 || resizeDrag) return; event.preventDefault();
@@ -1495,10 +1478,10 @@ FRONTEND_HTML = r'''<!doctype html>
       else if (action === 'support' || action === 'support-more') loadSupporting(action === 'support-more');
       else if (action === 'document') loadDocument(id);
     });
-    document.getElementById('reader-toggle').addEventListener('click', () => { const collapsed = document.getElementById('graph-details').classList.toggle('collapsed'); if (collapsed) { document.getElementById('topology').classList.remove('reading-view'); text('reader-mode', 'Reading view'); } document.getElementById('reader-toggle').setAttribute('aria-expanded', String(!collapsed)); text('reader-toggle', collapsed ? 'Show details' : 'Hide details'); });
-    document.getElementById('reader-mode').addEventListener('click', () => { const reading = document.getElementById('topology').classList.toggle('reading-view'); document.getElementById('graph-details').classList.remove('collapsed'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'true'); text('reader-toggle', 'Hide details'); text('reader-mode', reading ? 'Back to graph' : 'Reading view'); });
+    document.getElementById('reader-toggle').addEventListener('click', () => { const collapsed = document.getElementById('graph-details').classList.toggle('collapsed'); if (collapsed) { document.getElementById('graph-surface').classList.remove('reading-view'); text('reader-mode', 'Reading view'); } document.getElementById('reader-toggle').setAttribute('aria-expanded', String(!collapsed)); text('reader-toggle', collapsed ? 'Show details' : 'Hide details'); });
+    document.getElementById('reader-mode').addEventListener('click', () => { const reading = document.getElementById('graph-surface').classList.toggle('reading-view'); document.getElementById('graph-details').classList.remove('collapsed'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'true'); text('reader-toggle', 'Hide details'); text('reader-mode', reading ? 'Back to graph' : 'Reading view'); });
     const readerResize = document.getElementById('reader-resize'); let readerDrag = null;
-    const setReaderWidth = width => { const value = Math.max(320, Math.min(600, width)); document.getElementById('topology').style.setProperty('--reader-width', `${value}px`); readerResize.setAttribute('aria-valuenow', String(value)); };
+    const setReaderWidth = width => { const value = Math.max(320, Math.min(600, width)); document.getElementById('graph-surface').style.setProperty('--reader-width', `${value}px`); readerResize.setAttribute('aria-valuenow', String(value)); };
     readerResize.addEventListener('pointerdown', event => { if (event.button !== 0) return; event.preventDefault(); readerDrag = { id: event.pointerId, x: event.clientX, width: Number(readerResize.getAttribute('aria-valuenow')) }; readerResize.setPointerCapture(event.pointerId); });
     readerResize.addEventListener('pointermove', event => { if (readerDrag?.id === event.pointerId) setReaderWidth(readerDrag.width + readerDrag.x - event.clientX); });
     const endReaderResize = event => { if (readerDrag?.id !== event.pointerId) return; readerDrag = null; if (readerResize.hasPointerCapture(event.pointerId)) readerResize.releasePointerCapture(event.pointerId); };

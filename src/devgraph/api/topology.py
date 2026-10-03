@@ -22,6 +22,7 @@ from devgraph.topology import ENUMS, PATH
 _ASSETS = {
     "core.js": "text/javascript",
     "canvas.js": "text/javascript",
+    "surface.js": "text/javascript",
     "worker.js": "text/javascript",
     "style.css": "text/css",
     "proof.js": "text/javascript",

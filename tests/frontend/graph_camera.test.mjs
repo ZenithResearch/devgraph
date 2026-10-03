@@ -184,7 +184,7 @@ test('resizing updates both visible height and accessible value without changing
   Object.assign(c.graphView, { zoom: 1.8, panX: 94, panY: -11 });
   for (const [requested, expected] of [[20, 280], [573.8, 574], [5000, 1200]]) {
     c.setGraphHeight(requested);
-    assert.equal(c.document.getElementById('topology').properties['--graph-height'], `${expected}px`);
+    assert.equal(c.document.getElementById('graph-surface').properties['--graph-height'], `${expected}px`);
     assert.equal(c.document.getElementById('graph-resize').attributes['aria-valuenow'], String(expected));
     assert.equal(c.document.getElementById('graph-resize').attributes['aria-valuetext'], `${expected} pixels`);
     near(c.graphView.zoom, 1.8, 'zoom survives height changes');

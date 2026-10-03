@@ -136,3 +136,23 @@ again passed 2,153 Python tests (five opt-in skips), generated-artifact checks a
 lint. `uv sync --locked`, the separate `ruff check src tests scripts integrations`,
 and `git diff --check` also exited 0. Commands use the same `UV_CACHE_DIR` shown
 above; the standalone JavaScript command remains `node --test tests/frontend/*.test.mjs`.
+
+## Independent canvas panel and fullscreen
+
+The canvas now owns a separate panel and a packaged `surface.js` controller.
+The old whole-card expansion is removed. Native fullscreen and Escape back to
+the page were verified in the in-app browser with synthetic demo data. The
+canvas fills the screen with its own controls and item counts. Unit tests cover
+native fullscreen exit events, denied API fallback, pending-entry cancellation,
+keyboard focus containment, and restoration of the original DOM node, scroll,
+focus, and pre-existing inert states. The responsive 1.618:1 details layout is
+retained; the filters and overview remain outside the fullscreen surface.
+
+`UV_CACHE_DIR=/private/tmp/devgraph-ui-uv uv sync --locked`,
+`UV_CACHE_DIR=/private/tmp/devgraph-ui-uv bash docs/dev/verification.md`,
+`UV_CACHE_DIR=/private/tmp/devgraph-ui-uv uv run ruff check src tests scripts integrations`,
+`node --test tests/frontend/*.test.mjs`, and `git diff --check` exited 0.
+The verification script ran 2,153 passing Python tests with the same five opt-in
+skips and 111 existing warnings; all 127 frontend tests passed. The new asset's
+allowlisted route is included in the packaged-asset API test. No installed
+runtime or live graph was changed.
