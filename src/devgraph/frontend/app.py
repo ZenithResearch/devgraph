@@ -302,25 +302,26 @@ FRONTEND_HTML = r'''<!doctype html>
   <div class="shell">
     <aside class="rail" aria-label="Observer navigation"><button type="button" class="graph-control" id="observer-toggle" aria-expanded="true" aria-controls="observer-content">Hide Observer</button><div id="observer-content">
       <div class="brand"><div class="brand-mark">DG</div><div><strong>Dev Graph</strong><span>Observer</span></div></div>
-      <nav><a href="#overview" aria-current="page">Overview</a><a href="#topology">Topology</a><a href="#pipeline">Initiative pipeline</a><a href="#activity">Graph activity</a><a href="#observations">Observations</a><a href="/monitor/selection">Project selection</a></nav>
-      <div class="rail-meta"><div>AUTHORITY<span>Read access credential</span></div><div>TRANSPORT<span>Local view</span></div><div>SCHEMA<span>initiative-observation.v0</span></div></div>
+      <nav><a href="#overview" aria-current="page">Overview</a><a href="#topology">Topology</a><a href="#pipeline">Observation status</a><a href="#activity">Graph activity</a><a href="#observations">Observations</a><a href="/monitor/selection">Project selection</a></nav>
+      <p class="rail-meta">Local graph · View only</p>
     </div></aside>
     <main id="main">
       <header class="topbar" id="overview">
         <div><div class="eyebrow">Live local state</div><h1>Your work, connected</h1><p class="subtitle">Explore your work, see how it connects, and read the details behind each item.</p></div>
         <div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Disconnected</span></div>
       </header>
+      <details class="connection-settings" id="connection-settings" open><summary id="connection-summary">Connect to your graph</summary>
       <form class="auth-strip" id="auth-form">
         <label for="token">Read access key</label><input id="token" name="token" type="password" autocomplete="off" placeholder="Paste a local devgraph.read credential">
         <label for="refresh-rate">Refresh rate</label><select id="refresh-rate"><option value="0">Manual</option><option value="10" selected>10 seconds</option><option value="30">30 seconds</option></select>
         <button class="button" type="submit">Connect</button>
-      </form>
+      </form></details>
       <p class="status-line" id="status-line" role="status" aria-live="polite">Enter a scoped read credential to inspect the graph.</p>
       <section class="kpis" aria-label="Graph summary">
-        <article class="card kpi"><div class="kpi-label">Work objects</div><div class="kpi-value" id="total-work">—</div><div class="kpi-note">in your work graph</div></article>
+        <article class="card kpi"><div class="kpi-label">Work items</div><div class="kpi-value" id="total-work">—</div><div class="kpi-note">in your work graph</div></article>
         <article class="card kpi"><div class="kpi-label">Active initiatives</div><div class="kpi-value" id="active-initiatives">—</div><div class="kpi-note">current larger efforts</div></article>
-        <article class="card kpi"><div class="kpi-label">Inferred observations</div><div class="kpi-value" id="observation-count">—</div><div class="kpi-note">interpretations supported by evidence</div></article>
-        <article class="card kpi"><div class="kpi-label">Records awaiting processing</div><div class="kpi-value" id="pending-receipts">—</div><div class="kpi-note" id="receipt-note">Changes recorded; processing pending</div></article>
+        <article class="card kpi"><div class="kpi-label">Observations</div><div class="kpi-value" id="observation-count">—</div><div class="kpi-note">interpretations supported by evidence</div></article>
+        <article class="card kpi"><div class="kpi-label">Pending records</div><div class="kpi-value" id="pending-receipts">—</div><div class="kpi-note" id="receipt-note">Changes recorded; processing pending</div></article>
       </section>
       <section class="card graph-card" id="topology">
         <div class="graph-toolbar">
@@ -328,8 +329,8 @@ FRONTEND_HTML = r'''<!doctype html>
           <div class="graph-primary">
             <div class="graph-search"><label for="graph-search">Find an item</label><input type="search" id="graph-search" placeholder="Search titles or IDs" autocomplete="off" aria-controls="graph-search-results"><div id="graph-search-results" class="search-results" hidden></div></div>
           </div>
-          <div class="graph-actions"><button class="graph-control" id="graph-clear-filters" type="button">Clear filters</button></div><div id="filter-summary"></div><details class="filter-panel" id="graph-filters"><summary>Filters</summary><div class="graph-arena-row"><label class="graph-label-select" for="graph-arena">From Arena <select id="graph-arena" aria-controls="graph-svg" aria-describedby="graph-arena-note"><option value="">All nodes</option><option value="*">Any Arena</option></select></label><p class="graph-arena-note" id="graph-arena-note" role="status" aria-live="polite">Choose an Arena to follow its outgoing connections.</p></div>
-          <div class="graph-filter-row"><div class="graph-legend" role="group" aria-label="Visible node categories"><label class="legend-item"><input type="checkbox" data-graph-category="arena" aria-controls="graph-svg" checked><span>Arena <span id="category-arena-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="work" aria-controls="graph-svg" checked><span>Work <span id="category-work-count">0</span></span></label><label class="legend-item" title="Evidence-backed interpretations, initially inferred and unclaimed"><input type="checkbox" data-graph-category="observation" aria-controls="graph-svg" checked><span>Observation <span id="category-observation-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="receipt" aria-controls="graph-svg" checked><span>Record <span id="category-receipt-count">0</span></span></label></div><label class="graph-label-select">Labels <select id="graph-labels"><option value="selected">Hovered or selected connections</option><option value="all">All labels</option><option value="none">No labels</option></select></label><button class="graph-control" id="graph-show-all" type="button" hidden>Exit connected view</button></div><div class="filter-grid" id="filter-grid"></div></details>
+          <div class="graph-actions"><button class="graph-control" id="graph-clear-filters" type="button">Clear filters</button></div><div id="filter-summary"></div><details class="filter-panel" id="graph-filters"><summary>Filters</summary><div class="filter-content"><div class="graph-arena-row"><label class="graph-label-select" for="graph-arena">From Arena <select id="graph-arena" aria-controls="graph-svg" aria-describedby="graph-arena-note"><option value="">All nodes</option><option value="*">Any Arena</option></select></label><p class="graph-arena-note" id="graph-arena-note" role="status" aria-live="polite">Choose an Arena to follow its outgoing connections.</p></div>
+          <div class="graph-filter-row"><div class="graph-legend" role="group" aria-label="Visible node categories"><label class="legend-item"><input type="checkbox" data-graph-category="arena" aria-controls="graph-svg" checked><span>Arena <span id="category-arena-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="work" aria-controls="graph-svg" checked><span>Work <span id="category-work-count">0</span></span></label><label class="legend-item" title="Evidence-backed interpretations, initially inferred and unclaimed"><input type="checkbox" data-graph-category="observation" aria-controls="graph-svg" checked><span>Observation <span id="category-observation-count">0</span></span></label><label class="legend-item"><input type="checkbox" data-graph-category="receipt" aria-controls="graph-svg" checked><span>Record <span id="category-receipt-count">0</span></span></label></div><label class="graph-label-select">Labels <select id="graph-labels"><option value="selected">Hovered or selected connections</option><option value="all">All labels</option><option value="none">No labels</option></select></label><button class="graph-control" id="graph-show-all" type="button" hidden>Exit connected view</button></div><div class="filter-grid" id="filter-grid"></div></div></details>
         </div>
         <section class="graph-surface" id="graph-surface" aria-label="Graph canvas">
           <header class="surface-header"><div><h3>Graph canvas</h3><span class="section-meta" id="graph-meta">not refreshed</span></div><button class="graph-control" id="graph-expand" type="button" aria-expanded="false" aria-controls="graph-surface">Full screen</button></header>
@@ -343,7 +344,7 @@ FRONTEND_HTML = r'''<!doctype html>
           <div class="graph-layout">
             <div class="graph-scroll"><canvas id="graph-canvas" hidden aria-hidden="true"></canvas><div id="graph-preview" aria-hidden="true"></div><div id="node-chooser" hidden></div><svg class="graph-svg" id="graph-svg" viewBox="0 0 1080 420" tabindex="0" role="group" aria-label="Interactive Dev Graph topology" aria-describedby="graph-help"></svg></div>
             <div class="reader-resize" id="reader-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Details width" aria-valuemin="320" aria-valuemax="600" aria-valuenow="360"></div>
-            <aside class="graph-details" id="graph-details"><div class="reader-header"><div class="reader-buttons"><button class="graph-control" id="reader-toggle" aria-expanded="true" aria-controls="reader-body">Hide details</button><button class="graph-control" id="reader-mode">Reading view</button></div><h3 id="reader-title">No node selected</h3><div class="graph-details-copy" id="reader-meta">Select a node or search to read its details.</div></div><div id="reader-body" class="reader-body"><p id="reader-status" role="status" aria-live="polite"></p><div id="reader-content"></div></div></aside>
+            <aside class="graph-details" id="graph-details" aria-label="Item reader"><div class="reader-header"><div class="reader-buttons"><button class="graph-control" id="reader-toggle" aria-expanded="true" aria-controls="reader-body">Close reader</button><button class="graph-control" id="reader-mode">Expand reader</button></div><p class="reader-eyebrow">Reader</p><h3 id="reader-title" tabindex="-1">Choose an item</h3><div class="graph-details-copy" id="reader-meta">Select a node or search to read its details.</div></div><div id="reader-body" class="reader-body"><p id="reader-status" role="status" aria-live="polite"></p><div id="reader-content"></div></div></aside>
           </div>
           <details id="graph-result-list"><summary>Browse visible items</summary><div id="graph-result-items"></div><button class="graph-control" id="graph-results-more" hidden>Show more items</button></details>
           <p class="graph-help" id="graph-help">Click a node to read · Scroll/pinch to zoom · Shift-drag to pan · Drag to orbit or move an item · F to fit · Browse visible items for keyboard selection</p>
@@ -653,19 +654,47 @@ FRONTEND_HTML = r'''<!doctype html>
       detailState.relations.clear(); detailState.documents.clear();
     }
 
-    function selectGraphNode(node, focus = false) {
+    function selectGraphNode(node, focus = false, openReader = true) {
       if (!node) return;
       pauseGraphOrbit();
       if (detailState.node?.key !== node.key) {
-        resetDetailState(); detailState.node = node;
+        resetDetailState(); detailState.node = node; text('graph-feedback', '');
         document.getElementById('reader-body').scrollTop = 0;
       }
       state.selectedGraphKey = node.key;
-      const panel = document.getElementById('graph-details'); panel.classList.remove('collapsed');
-      document.getElementById('reader-toggle').setAttribute('aria-expanded', 'true'); text('reader-toggle', 'Hide details');
+      if (openReader) setReaderCollapsed(false);
       renderGraph(graphView.nodes, graphView.edges); renderGraphSelection();
+      if (openReader && !document.getElementById('graph-surface').classList.contains('is-fullscreen')) document.getElementById('graph-details').scrollIntoView({block:'nearest', behavior:'instant'});
       loadSelectedDetail();
-      if (focus) document.querySelector(`[data-node-key="${CSS.escape(node.key)}"]`)?.focus();
+      if (openReader && document.querySelector('.graph-scroll').inert) document.getElementById('reader-title').focus({preventScroll:true});
+      else if (focus) document.querySelector(`[data-node-key="${CSS.escape(node.key)}"]`)?.focus();
+    }
+
+    function syncReaderPresentation() {
+      const surface = document.getElementById('graph-surface'), panel = document.getElementById('graph-details'), map = document.querySelector('.graph-scroll');
+      const overlay = surface.querySelector('.graph-layout').clientWidth <= 820 && !panel.classList.contains('collapsed') && !surface.classList.contains('reading-view');
+      map.inert = overlay;
+      if (overlay && map.contains(document.activeElement)) document.getElementById('reader-title').focus({preventScroll: true});
+    }
+
+    function setReaderCollapsed(collapsed, persist = true) {
+      const panel = document.getElementById('graph-details'), changed = panel.classList.contains('collapsed') !== collapsed;
+      const restoreFocus = collapsed && panel.contains(document.activeElement);
+      panel.classList.toggle('collapsed', collapsed);
+      if (collapsed) { document.getElementById('graph-surface').classList.remove('reading-view'); text('reader-mode', 'Expand reader'); }
+      document.getElementById('reader-toggle').setAttribute('aria-expanded', String(!collapsed)); text('reader-toggle', collapsed ? 'Open reader' : 'Close reader');
+      syncReaderPresentation();
+      if (restoreFocus) document.getElementById('graph-svg').focus({preventScroll: true});
+      if (persist && changed) saveGraphPreferences();
+    }
+
+    function setReaderMode(reading) {
+      const surface = document.getElementById('graph-surface');
+      surface.classList.toggle('reading-view', reading); setReaderCollapsed(false); text('reader-mode', reading ? 'Back to map' : 'Expand reader');
+      window.requestAnimationFrame(() => {
+        if (!surface.classList.contains('is-fullscreen')) surface.scrollIntoView({block: 'start', behavior: 'instant'});
+        (reading ? document.getElementById('reader-title') : document.getElementById('reader-mode')).focus({preventScroll: true});
+      });
     }
 
     async function loadSelectedDetail() {
@@ -792,6 +821,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function reconcileChildren(parent, desired) {
+      const focused = parent.contains(document.activeElement) ? document.activeElement : null;
       const wanted = [...desired.childNodes]; const keyed = new Map([...parent.children].filter(el => el.dataset.uiKey).map(el => [el.dataset.uiKey, el]));
       const retained = new Set();
       wanted.forEach((next, index) => {
@@ -811,10 +841,11 @@ FRONTEND_HTML = r'''<!doctype html>
         retained.add(current);
       });
       for (const current of [...parent.childNodes]) if (!retained.has(current)) current.remove();
+      if (focused && parent.contains(focused) && document.activeElement !== focused) focused.focus({preventScroll:true});
     }
 
     function readerButton(label, action, extra = {}) {
-      const button = make('button', 'graph-control', label); button.type = 'button'; Object.assign(button.dataset, { action, ...extra }); return button;
+      const button = make('button', 'graph-control', label); button.type = 'button'; Object.assign(button.dataset, { action, ...extra, uiKey: [action, extra.relationship, extra.id].filter(Boolean).join(':') }); return button;
     }
 
     function readerSection(title, key) {
@@ -830,12 +861,12 @@ FRONTEND_HTML = r'''<!doctype html>
       const node = detailState.node;
       const latest = (state.snapshot?.graph_nodes || []).find(item => item.key === node?.key);
       if (latest) detailState.node = { ...node, ...latest };
-      text('reader-title', detailState.data?.title || node?.title || 'No node selected');
-      text('reader-meta', node ? `${Topology.visual(node.kind).label} · ${detailState.data?.status || node.status} · ${node.id}` : 'Select a node or search to read its details.');
+      text('reader-title', detailState.data?.title || node?.title || 'Choose an item');
+      text('reader-meta', node ? `${Topology.visual(node.kind).label} · ${detailState.data?.status || node.status}` : 'Select an item on the map to start reading.');
       text('reader-status', detailState.loading ? 'Loading details…' : detailState.error ? `${detailState.error}${detailState.data ? ' Showing the last loaded details.' : ''}` : '');
       const content = make('div');
       if (!node) { content.append(make('p', 'reader-note', 'Find an item to read its description, related work, and supporting material.')); reconcileChildren(document.getElementById('reader-content'), content); return; }
-      const actions = make('div', 'reader-actions'); actions.dataset.uiKey = 'actions';
+      const actions = make('details', 'reader-actions'); actions.dataset.uiKey = 'actions'; actions.append(make('summary', '', 'Reader actions'));
       const visible = graphView.nodes.some(item => item.key === node.key);
       const outsideArena = latest && graphView.arenaKey && !graphView.arenaNodes.some(item => item.key === node.key);
       actions.append(readerButton(outsideArena ? 'Show in all nodes' : visible ? 'Focus in graph' : 'Reveal in graph', 'focus'));
@@ -848,9 +879,9 @@ FRONTEND_HTML = r'''<!doctype html>
       const data = detailState.data;
       if (node.category === 'work' && data) {
         const description = readerSection('Description / plan', 'description');
-        description.append(make('div', 'reader-note', `Priority ${data.priority} · Version ${data.version}`), make('div', data.description ? 'reader-description' : 'reader-note', data.description || 'No description has been written for this item.'));
+        description.append(make('div', data.description ? 'reader-description' : 'reader-note', data.description || 'No description has been written for this item.'));
         content.append(description);
-        if (latest?.progress) { const p = latest.progress; const section = readerSection('Progress', 'progress'); section.append(make('p', 'reader-note', `${p.percent}% · ${p.completed} of ${p.total} terminal work items (accepted or archived)`)); content.append(section); }
+        if (latest?.progress) { const p = latest.progress; const section = readerSection('Progress', 'progress'); section.append(make('p', 'reader-note', `${p.percent}% complete · ${p.completed} of ${p.total} final work items accepted or archived`)); content.append(section); }
         const relationships = [['parent', 'Parent'], ['children', 'Child work'], ['dependencies', 'Depends on'], ['dependents', 'Needed by'], ...(node.kind === 'Task' ? [['blockers', 'Blocked by'], ['blocked', 'Blocks']] : [])];
         const section = readerSection('Related work', 'relationships');
         for (const [rel, label] of relationships) {
@@ -868,7 +899,7 @@ FRONTEND_HTML = r'''<!doctype html>
         const support = readerSection('Supporting material', 'support');
         const refs = [...(data.artifact_ids || []).map(id => `Artifact: ${id}`), ...(data.external_link_ids || []).map(id => `Link: ${id}`)];
         if (!detailState.support) {
-          support.append(make('p', 'reader-note', refs.length ? `${refs.length} declared references. Load to resolve them and any attached requirements or criteria.` : 'No declared document/link references. Load to check attached material and requirements.'));
+          support.append(make('p', 'reader-note', refs.length ? `${refs.length} declared references. Load to resolve them and any attached requirements or criteria.` : 'Check for linked documents, requirements, and other supporting material.'));
           refs.forEach(ref => support.append(make('p', 'reader-note', ref)));
         }
         for (const item of detailState.support?.items || []) {
@@ -916,7 +947,7 @@ FRONTEND_HTML = r'''<!doctype html>
       } else if (node.category === 'receipt') {
         const section = readerSection('Mutation record', 'receipt'); section.append(make('p', 'reader-description', 'An unsigned record of a committed change. Pending means outbox processing has not advanced; the change is already recorded.')); content.append(section);
       }
-      const connections = readerSection('Connections in this snapshot', 'connections');
+      const connections = readerSection('Connections', 'connections');
       const allEdges = (state.snapshot?.graph_edges || []).filter(edge => edge.source === node.key || edge.target === node.key);
       const visibleEdges = graphView.edges.filter(edge => edge.source === node.key || edge.target === node.key);
       connections.append(make('p', 'reader-note', `${visibleEdges.length} visible · ${allEdges.length} in this snapshot`));
@@ -926,7 +957,10 @@ FRONTEND_HTML = r'''<!doctype html>
         const other = (state.snapshot?.graph_nodes || []).find(item => item.key === key);
         const link = make('button', 'reader-link', `${outbound ? '→' : '←'} ${relationshipLabel(edge.relationship)} · ${other?.title || key}`); Object.assign(link.dataset, { action: 'snapshot-node', key, uiKey: `${edge.source}:${edge.relationship}:${edge.target}` }); connections.append(link);
       }
-      content.append(connections); reconcileChildren(document.getElementById('reader-content'), content);
+      content.append(connections);
+      const record = make('details', 'reader-record'); record.dataset.uiKey = 'record'; record.append(make('summary', '', 'Record information'), make('p', 'reader-note', `ID: ${node.id}`));
+      if (data?.version !== undefined) record.append(make('p', 'reader-note', `${data.priority !== undefined ? `Priority ${data.priority} · ` : ''}Version ${data.version}`));
+      content.append(record); reconcileChildren(document.getElementById('reader-content'), content);
     }
 
     function documentStateMessage(doc) {
@@ -1105,11 +1139,12 @@ FRONTEND_HTML = r'''<!doctype html>
 
     function focusSelectedNode(neighborhood = false) {
       const node = detailState.node; if (!node) return;
+      setReaderCollapsed(true);
       const visible = graphView.nodes.some(item => item.key === node.key);
       if (!visible) { graphView.filters = Topology.filters(); graphView.visibleCategories = new Set(Topology.categories); graphView.arenaKey = ''; announceGraph('Filters cleared to reveal this item.'); }
       graphView.filters.anchor = neighborhood ? node.key : ''; graphView.neighborhood = neighborhood ? node.key : null;
       if (!visible || neighborhood || state.snapshot?.applied_filters?.anchor) { applyGraphFilters(); return; }
-      document.getElementById('graph-surface').classList.remove('reading-view'); text('reader-mode', 'Reading view');
+      document.getElementById('graph-surface').classList.remove('reading-view'); text('reader-mode', 'Expand reader');
       setGraphZoom(Math.max(1.2, graphView.zoom)); const point = projectGraphPoint(graphView.nodePositions.get(node.key)); graphView.panX += graphView.width/2-point.x; graphView.panY += graphView.height/2-point.y; renderGraph(graphView.nodes,graphView.edges);
     }
 
@@ -1138,14 +1173,17 @@ FRONTEND_HTML = r'''<!doctype html>
       text('receipt-note', `${snapshot.receipt_count} records in the local outbox`); const age = relativeTime(snapshot.generated_at); text('generated-at', age === 'now' ? 'updated just now' : `updated ${age} ago`);
       updateGraphVisibility(); renderPipeline(snapshot.observation_by_status); renderBars(snapshot.work_by_kind); renderActivity(snapshot.recent_activity); renderObservations(observations);
       document.getElementById('connection-dot').className = `dot ${snapshot.storage.ready ? 'ready' : 'error'}`;
-      text('connection-label', snapshot.storage.ready ? 'Graph ready' : 'Graph degraded');
-      text('status-line', `${snapshot.storage.detail} · Updated ${new Date(snapshot.generated_at).toLocaleTimeString()} · Read-only`);
+      text('connection-label', snapshot.storage.ready ? 'Graph ready' : 'Some data unavailable');
+      const connection = document.getElementById('connection-settings');
+      if (!state.connected) { const restoreFocus = connection.contains(document.activeElement); connection.open = false; state.connected = true; if (restoreFocus) document.getElementById('connection-summary').focus({preventScroll:true}); }
+      text('connection-summary', 'Connection settings');
+      text('status-line', `Connected · Updated ${new Date(snapshot.generated_at).toLocaleTimeString()} · Read-only`);
     }
 
     function synchronizeCredential() {
       const credential = tokenInput.value.trim(); if (credential === detailState.credential) return;
       state.refreshController?.abort(); state.refreshController = null;
-      detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null;
+      detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null; state.connected = false;
       resetDetailState(); state.snapshot = null; state.observations = []; state.selectedGraphKey = null; graphView.neighborhood = null; graphView.arenaKey = '';
       invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
       ['total-work', 'active-initiatives', 'observation-count', 'pending-receipts'].forEach(id => text(id, '—'));
@@ -1166,7 +1204,7 @@ FRONTEND_HTML = r'''<!doctype html>
     async function refresh() {
       synchronizeCredential();
       if (!graphView.preferenceKey) await prepareGraphPreferences();
-      if (!tokenInput.value.trim()) { text('status-line', 'Enter a scoped read credential to inspect the graph.'); return; }
+      if (!tokenInput.value.trim()) { document.getElementById('connection-settings').open = true; text('status-line', 'Enter a read access key to connect.'); return; }
       if (state.refreshPromise) { state.refreshQueued = true; return state.refreshPromise; }
       const epoch = state.authEpoch, filterSerial = graphView.filterSerial, controller = new AbortController(); state.refreshController = controller;
       if (!state.snapshot) text('status-line', 'Loading graph…');
@@ -1181,6 +1219,8 @@ FRONTEND_HTML = r'''<!doctype html>
           if (epoch !== state.authEpoch || filterSerial !== graphView.filterSerial) return;
           state.refreshQueued = false; state.pendingSnapshot = null;
           document.getElementById('connection-dot').className = 'dot error';
+          if (!state.snapshot || error.status === 401 || error.status === 403) document.getElementById('connection-settings').open = true;
+          state.connected = false;
           text('connection-label', error.status === 401 || error.status === 403 ? 'Access denied' : 'Connection interrupted');
           text('status-line', `${state.snapshot ? `Showing saved snapshot from ${new Date(state.lastSuccess).toLocaleTimeString()}. ` : ''}${error.status === 401 || error.status === 403 ? 'Reconnect with a valid read credential.' : 'Refresh failed. Retrying on the next update.'}`);
         } finally {
@@ -1251,8 +1291,7 @@ FRONTEND_HTML = r'''<!doctype html>
       graphView.visibleCategories = new Set(graphView.filters.category ?? Topology.categories); graphView.arenaKey = graphView.filters.arena; graphView.neighborhood = graphView.filters.anchor || null; graphView.labels = graphView.preferences.labels;
       document.getElementById('graph-labels').value = graphView.labels;
       setObserverCollapsed(graphView.preferences.observerCollapsed, false);
-      document.getElementById('graph-details').classList.toggle('collapsed',graphView.preferences.readerCollapsed);
-      document.getElementById('reader-toggle').setAttribute('aria-expanded',String(!graphView.preferences.readerCollapsed)); text('reader-toggle',graphView.preferences.readerCollapsed?'Show details':'Hide details');
+      setReaderCollapsed(graphView.preferences.readerCollapsed, false);
       if (graphView.preferences.readerWidth) document.getElementById('graph-surface').style.setProperty('--reader-width',`${graphView.preferences.readerWidth}px`);
       renderTopologyControls();
     }
@@ -1325,13 +1364,19 @@ FRONTEND_HTML = r'''<!doctype html>
     function showNodeChooser(matches, clientX, clientY) {
       const panel=document.getElementById('node-chooser'),bounds=document.querySelector('.graph-scroll').getBoundingClientRect();panel.replaceChildren();
       panel.append(make('strong','','Choose an item'));
-      for(const match of matches.slice(0,20)){const node=graphView.index.byKey.get(match.key);if(!node)continue;const button=make('button','graph-control',`${node.title} · ${Topology.visual(node.kind).label}`);button.addEventListener('click',()=>{panel.hidden=true;selectGraphNode(node);document.getElementById('reader-toggle').focus();});panel.append(button);}
+      for(const match of matches.slice(0,20)){const node=graphView.index.byKey.get(match.key);if(!node)continue;const button=make('button','graph-control',`${node.title} · ${Topology.visual(node.kind).label}`);button.addEventListener('click',()=>{panel.hidden=true;selectGraphNode(node);document.getElementById('reader-title').focus();});panel.append(button);}
       if(matches.length>20)panel.append(make('p','','Zoom in or use Browse visible items for more.'));
       const close=make('button','graph-control','Close');close.addEventListener('click',()=>{panel.hidden=true;graphSvg.focus();});panel.append(close);panel.hidden=false;
       panel.style.left=`${Math.max(0,Math.min(bounds.width-260,clientX-bounds.left))}px`;panel.style.top=`${Math.max(0,Math.min(bounds.height-280,clientY-bounds.top))}px`;panel.querySelector('button')?.focus();
     }
 
     function initializeTopologyControls() {
+      const popovers = [...document.querySelectorAll('#graph-filters, .surface-options')];
+      for (const panel of popovers) panel.addEventListener('toggle', () => { if (panel.open) for (const other of popovers) if (other !== panel) other.open = false; });
+      document.addEventListener('pointerdown', event => { for (const panel of popovers) if (panel.open && !panel.contains(event.target)) panel.open = false; });
+      document.addEventListener('keydown', event => { if (event.key === 'Escape') for (const panel of popovers) if (panel.open) { panel.open = false; panel.querySelector('summary').focus(); } });
+      const updateNavigation = () => { const current = window.location.hash || '#overview'; for (const link of document.querySelectorAll('.rail nav a')) { if (link.getAttribute('href') === current) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current'); } };
+      window.addEventListener('hashchange', updateNavigation); updateNavigation();
       const legend=document.getElementById('type-legend');for(const kind of ['Arena',...Topology.kinds,'InitiativeObservation','EventReceipt']){const item=make('div','legend-sample');item.title=Topology.visual(kind).description;item.append(typeSample(kind),make('span','',Topology.visual(kind).label));legend.append(item);}
       const grid=document.getElementById('filter-grid');
       const facets=[['work_kind','Work types',Topology.kinds],['work_status','Work status',['draft','review','accepted','archived','unknown']],['observation_status','Observation status',['unclaimed','claimed','amended','rejected','unknown']],['record_status','Record status',['pending','dispatched_dry_run','retry_scheduled','failed','unknown']]];
@@ -1343,9 +1388,8 @@ FRONTEND_HTML = r'''<!doctype html>
       document.getElementById('graph-undo').addEventListener('click',undoPositioning);
       document.getElementById('graph-clear-filters').addEventListener('click',()=>{graphView.filters=Topology.filters();applyGraphFilters();});
       document.getElementById('graph-result-list').addEventListener('toggle',renderVisibleItems);
-      document.getElementById('graph-result-items').addEventListener('click',event=>{const key=event.target.closest('[data-node-key]')?.dataset.nodeKey;const node=graphView.index?.byKey.get(key);if(node){selectGraphNode(node);graphSvg.focus();announceGraph(`${node.title} selected. Arrow keys move this item; details are open.`);}});
+      document.getElementById('graph-result-items').addEventListener('click',event=>{const key=event.target.closest('[data-node-key]')?.dataset.nodeKey;const node=graphView.index?.byKey.get(key);if(node){selectGraphNode(node);document.getElementById('reader-title').focus();announceGraph(`${node.title} selected. Reader opened.`);}});
       document.getElementById('graph-results-more').addEventListener('click',()=>{graphView.resultLimit=(graphView.resultLimit||50)+50;renderVisibleItems();});
-      document.getElementById('reader-toggle').addEventListener('click',saveGraphPreferences);
       document.getElementById('reader-resize').addEventListener('pointerup',()=>{graphView.preferences.readerWidth=Number(document.getElementById('reader-resize').getAttribute('aria-valuenow'));saveGraphPreferences();});
       graphSvg.addEventListener('pointermove',event=>{if(graphView.drag||graphView.pointers.size)return;const key=graphView.canvasMode?(pickGraphNodes(event.clientX,event.clientY)[0]?.key||null):(event.target.closest('.graph-node')?.dataset.nodeKey||null);graphSvg.style.cursor=key?'pointer':'';if(key===graphView.hoveredKey)return;graphView.hoveredKey=key;requestGraphRender();});
       graphSvg.addEventListener('pointerleave',()=>{graphView.hoveredKey=null;requestGraphRender();});
@@ -1421,7 +1465,7 @@ FRONTEND_HTML = r'''<!doctype html>
         const node = graphView.nodes.find(item => item.key === group.dataset.nodeKey);
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectGraphNode(node); return; }
         const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-        if (node && arrows[event.key]) { event.preventDefault(); pauseGraphOrbit(); if (!graphView.arrangement) beginArrangement('Move item with keyboard'); const distance = event.shiftKey ? 24 : 8; const delta = graphClientDelta(arrows[event.key][0] * distance, arrows[event.key][1] * distance); graphView.pinnedKey = node.key; moveGraphNode(node.key, delta.x, delta.y, projectGraphPoint(graphView.nodePositions.get(node.key)).scale); selectGraphNode(node); return; }
+        if (node && arrows[event.key]) { event.preventDefault(); pauseGraphOrbit(); if (!graphView.arrangement) beginArrangement('Move item with keyboard'); const distance = event.shiftKey ? 24 : 8; const delta = graphClientDelta(arrows[event.key][0] * distance, arrows[event.key][1] * distance); graphView.pinnedKey = node.key; moveGraphNode(node.key, delta.x, delta.y, projectGraphPoint(graphView.nodePositions.get(node.key)).scale); selectGraphNode(node, false, false); return; }
       }
       if (event.key === '+' || event.key === '=') { event.preventDefault(); setGraphZoom(graphView.zoom * 1.2); }
       else if (event.key === '-') { event.preventDefault(); setGraphZoom(graphView.zoom / 1.2); }
@@ -1461,7 +1505,7 @@ FRONTEND_HTML = r'''<!doctype html>
     });
     document.getElementById('graph-search').addEventListener('input', renderGraphSearch);
     document.getElementById('graph-search').addEventListener('keydown', event => { if (event.key === 'ArrowDown') { event.preventDefault(); document.querySelector('.search-result')?.focus(); } if (event.key === 'Escape') document.getElementById('graph-search-results').hidden = true; });
-    document.getElementById('graph-search-results').addEventListener('click', event => { const button = event.target.closest('[data-node-key]'); if (!button) return; selectGraphNode(state.snapshot.graph_nodes.find(node => node.key === button.dataset.nodeKey)); document.getElementById('graph-search-results').hidden = true; document.getElementById('graph-search').value = ''; document.getElementById('reader-toggle').focus(); });
+    document.getElementById('graph-search-results').addEventListener('click', event => { const button = event.target.closest('[data-node-key]'); if (!button) return; selectGraphNode(state.snapshot.graph_nodes.find(node => node.key === button.dataset.nodeKey)); document.getElementById('graph-search-results').hidden = true; document.getElementById('graph-search').value = ''; document.getElementById('reader-title').focus(); });
     document.getElementById('graph-labels').addEventListener('change', event => { graphView.labels = event.target.value; saveGraphPreferences(); renderGraph(graphView.nodes, graphView.edges); });
     document.getElementById('graph-show-all').addEventListener('click', () => { graphView.neighborhood = null; graphView.filters.anchor = ''; applyGraphFilters(); });
     document.getElementById('reader-content').addEventListener('toggle', event => { if (event.target.matches('details[data-relationship]') && event.target.open) loadRelationship(event.target.dataset.relationship); }, true);
@@ -1471,26 +1515,27 @@ FRONTEND_HTML = r'''<!doctype html>
       if (action === 'focus' || action === 'neighborhood') focusSelectedNode(action === 'neighborhood');
       else if (action === 'arena-filter' && detailState.node?.category === 'arena') setGraphArena(detailState.node.key);
       else if (action === 'refresh-detail') loadSelectedDetail();
-      else if (action === 'related') { const work = detailState.relations.get(relationship)?.items.find(item => item.id === id && item.kind === kind); if (work) selectGraphNode(workNode(work)); }
-      else if (action === 'snapshot-node') selectGraphNode(state.snapshot.graph_nodes.find(node => node.key === key));
+      else if (action === 'related') { const work = detailState.relations.get(relationship)?.items.find(item => item.id === id && item.kind === kind); if (work) { selectGraphNode(workNode(work)); document.getElementById('reader-title').focus({preventScroll:true}); } }
+      else if (action === 'snapshot-node') { selectGraphNode(state.snapshot.graph_nodes.find(node => node.key === key)); document.getElementById('reader-title').focus({preventScroll:true}); }
       else if (action === 'relationship-more') loadRelationship(relationship, true);
       else if (action === 'relationship-retry') { detailState.relations.delete(relationship); loadRelationship(relationship); }
       else if (action === 'support' || action === 'support-more') loadSupporting(action === 'support-more');
       else if (action === 'document') loadDocument(id);
     });
-    document.getElementById('reader-toggle').addEventListener('click', () => { const collapsed = document.getElementById('graph-details').classList.toggle('collapsed'); if (collapsed) { document.getElementById('graph-surface').classList.remove('reading-view'); text('reader-mode', 'Reading view'); } document.getElementById('reader-toggle').setAttribute('aria-expanded', String(!collapsed)); text('reader-toggle', collapsed ? 'Show details' : 'Hide details'); });
-    document.getElementById('reader-mode').addEventListener('click', () => { const reading = document.getElementById('graph-surface').classList.toggle('reading-view'); document.getElementById('graph-details').classList.remove('collapsed'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'true'); text('reader-toggle', 'Hide details'); text('reader-mode', reading ? 'Back to graph' : 'Reading view'); });
+    document.getElementById('reader-toggle').addEventListener('click', () => setReaderCollapsed(!document.getElementById('graph-details').classList.contains('collapsed')));
+    document.getElementById('reader-mode').addEventListener('click', () => setReaderMode(!document.getElementById('graph-surface').classList.contains('reading-view')));
     const readerResize = document.getElementById('reader-resize'); let readerDrag = null;
     const setReaderWidth = width => { const value = Math.max(320, Math.min(600, width)); document.getElementById('graph-surface').style.setProperty('--reader-width', `${value}px`); readerResize.setAttribute('aria-valuenow', String(value)); };
     readerResize.addEventListener('pointerdown', event => { if (event.button !== 0) return; event.preventDefault(); readerDrag = { id: event.pointerId, x: event.clientX, width: Number(readerResize.getAttribute('aria-valuenow')) }; readerResize.setPointerCapture(event.pointerId); });
     readerResize.addEventListener('pointermove', event => { if (readerDrag?.id === event.pointerId) setReaderWidth(readerDrag.width + readerDrag.x - event.clientX); });
     const endReaderResize = event => { if (readerDrag?.id !== event.pointerId) return; readerDrag = null; if (readerResize.hasPointerCapture(event.pointerId)) readerResize.releasePointerCapture(event.pointerId); };
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(name => readerResize.addEventListener(name, endReaderResize));
-    readerResize.addEventListener('keydown', event => { const width = Number(readerResize.getAttribute('aria-valuenow')); const next = { ArrowLeft: width + 20, ArrowRight: width - 20, Home: 280, End: 600 }[event.key]; if (next !== undefined) { event.preventDefault(); setReaderWidth(next); graphView.preferences.readerWidth=next; saveGraphPreferences(); } });
+    readerResize.addEventListener('keydown', event => { const width = Number(readerResize.getAttribute('aria-valuenow')); const next = { ArrowLeft: width + 20, ArrowRight: width - 20, Home: 320, End: 600 }[event.key]; if (next !== undefined) { event.preventDefault(); setReaderWidth(next); graphView.preferences.readerWidth=next; saveGraphPreferences(); } });
     document.addEventListener('pointerdown', event => { if (event.target.matches('input[type="range"], [role="separator"]')) state.controlDragging = true; });
     ['pointerup', 'pointercancel'].forEach(name => document.addEventListener(name, () => { state.controlDragging = false; flushPendingSnapshot(); }));
-    document.getElementById('graph-details').classList.add('collapsed'); text('reader-toggle', 'Show details'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'false');
+    document.getElementById('graph-details').classList.add('collapsed'); text('reader-toggle', 'Open reader'); document.getElementById('reader-toggle').setAttribute('aria-expanded', 'false');
     ensureGraphScene(graphSvg); initializeTopologyControls();
+    new ResizeObserver(syncReaderPresentation).observe(document.getElementById('graph-surface'));
     new ResizeObserver(resizeGraphViewport).observe(graphSvg); resizeGraphViewport(); syncZoomControls();
     document.getElementById('graph-reset').addEventListener('click', resetGraphView);
     document.getElementById('graph-settle').addEventListener('click', settleGraph); document.getElementById('graph-force-reset').addEventListener('click', resetForceStrengths);

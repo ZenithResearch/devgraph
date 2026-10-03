@@ -82,10 +82,28 @@ def _seed_synthetic_demo(
     """Populate obvious synthetic records for local visual verification."""
 
     initiative = Initiative(
-        id="demo-federated-discovery", title="Federated discovery layer"
+        id="demo-federated-discovery",
+        title="Federated discovery layer",
+        description=(
+            "Demo brief\n\nBring related work and supporting evidence into one local graph. "
+            "People should be able to follow an initiative from its purpose to the projects "
+            "and concrete issues that deliver it.\n\nSuccess means someone opening this graph "
+            "can understand what is happening, who depends on it, and where to read more."
+        ),
     )
     project = Project(
-        id="demo-initiative-contract", title="Initiative observation contract"
+        id="demo-initiative-contract",
+        title="Initiative observation contract",
+        description=(
+            "Demo project plan\n\nMake observations easy to understand and trace back to their "
+            "supporting evidence. Keep a clear distinction between a proposed interpretation "
+            "and work that someone has chosen to pursue.\n\nFirst, define the information an "
+            "observation needs: the problem, the desired outcome, and links to evidence. "
+            "Then connect observations to the projects and issues they inform.\n\nReview "
+            "the reader with a long description, related work, and supporting material. "
+            "The title and navigation should stay visible while the document scrolls.\n\n"
+            "This is synthetic preview content. It does not describe or modify live work."
+        ),
     )
     issue = Issue(id="demo-monitor-ui", title="Build graph operations monitor")
     for work in (initiative, project, issue):
@@ -102,9 +120,7 @@ def _seed_synthetic_demo(
             title="Local ambient evidence fabric",
             problem="Agents lose the context surrounding work between sessions.",
             desired_state="A local-first evidence timeline that agents can inspect safely.",
-            evidence_urls=(
-                "https://github.com/dragthelake/ambient-context",
-            ),
+            evidence_urls=("https://github.com/dragthelake/ambient-context",),
             confidence=0.88,
             observed_by="devgraph-demo-scout",
         )

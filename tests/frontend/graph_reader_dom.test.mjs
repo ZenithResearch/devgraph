@@ -117,3 +117,19 @@ test('linked document previews render text safely and unresolved references rema
   assert.match(support.textContent, /could not be fully resolved/);
   assert.match(support.textContent, /not an empty document/);
 });
+
+
+test('loading supporting material retains the focused action as new cards appear', () => {
+  const c = readerTree();
+  c.renderGraphSelection();
+  const support = c.document.getElementById('reader-content').children.find(node => node.dataset.uiKey === 'support');
+  const button = support.children.find(node => node.dataset.action === 'support');
+  button.focus();
+  const insert = support.insertBefore.bind(support);
+  support.insertBefore = (node, next) => { if (node === button) c.document.activeElement = null; return insert(node, next); };
+  c.detailState.support = { items: [{kind: 'Artifact', id: 'plan', resolution: 'missing', metadata: {title: 'Plan'}}] };
+  c.renderGraphSelection();
+  assert.equal(support.children.find(node => node.dataset.action === 'support'), button);
+  assert.equal(c.document.activeElement, button);
+  assert.equal(button.textContent, 'Refresh material');
+});

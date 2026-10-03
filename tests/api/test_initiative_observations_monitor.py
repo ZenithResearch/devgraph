@@ -185,7 +185,7 @@ def test_official_frontend_is_dependency_free_and_never_embeds_a_credential() ->
     assert "Node separation" in response.text
     assert "Reset force defaults" in response.text
     assert ".graph-node:focus-visible .graph-sphere" in response.text
-    assert "terminal work items (accepted or archived)" in response.text
+    assert "final work items accepted or archived" in response.text
     assert "edgeStrengths: new Map()" in response.text
     assert "repulsionStrength: 1.5" in response.text
     assert "sessionStorage" in response.text

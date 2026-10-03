@@ -156,3 +156,44 @@ The verification script ran 2,153 passing Python tests with the same five opt-in
 skips and 111 existing warnings; all 127 frontend tests passed. The new asset's
 allowlisted route is included in the packaged-asset API test. No installed
 runtime or live graph was changed.
+
+## UI walkthrough and reader refinement — 2026-10-02
+
+The local synthetic monitor was exercised in the Codex in-app browser at
+1280px desktop, 760px tablet, and 390px phone viewport widths. Viewport overrides
+were reset after testing. The demo now has explicitly synthetic multiline work
+plans, so reading can be assessed with realistic text length.
+
+| Area | Browser evidence |
+| --- | --- |
+| Connection | Invalid demo key shows Access denied and clears private content; reconnect restores the graph and collapses settings. |
+| Navigation and overview | Compact cards and search controls bring the canvas closer to the top; section links update the selected navigation item; desktop rail remains visible while scrolling. |
+| Filters | Project subtype exclusion updates the graph; exclusion survives reload; archived-only produces a clear empty state; Clear filters restores all four demo items. |
+| Canvas controls | Legend and arrangement menus open one at a time; Escape dismisses them; arrangement enables Undo; a keyboard move leaves the reader closed and Undo reports Positions restored. |
+| Reader selection | Search, graph keyboard selection, visible-item browsing, related work, and connection links open the intended item. Work and Observation sections render their respective content. |
+| Reading | Desktop shows the map and reader together with a default 1.618:1 split. Expand reader and Back to map keep navigation visible. The description scrolls within the reader beneath its fixed header. |
+| Reader loading | Child work loads correctly. Supporting material keeps the action focused as cards appear. Unsupported material remains explicitly unresolved. Existing automated document tests cover safe text rendering, stale content, and late responses. |
+| Persistence | Observer visibility, reader collapse, and subtype filters were checked across reload. |
+| Responsive layout | At 760px and 390px the reader covers the map; the underlying map becomes inert while covered. At 390px the document and viewport widths both measured 390px. Selecting an item scrolls the complete pane into view. |
+| Fullscreen | The selected reader remains beside the map; Escape restores the canvas to the page and focus to the fullscreen button. |
+| Project selection | The monitor network loads; Load example and Run selection complete with three selected items and net utility 9. This only changes local planning state in the isolated test tab. |
+
+The walkthrough fixes excess vertical spacing, prematurely stacked reader panes,
+offscreen reading navigation, lost focus during reader reconciliation, stale
+navigation highlighting, and menus overlapping one another. IDs and record
+metadata now sit in a disclosure below the prose. Actions are collapsed by
+default. Platonic-solid styling and the independent fullscreen canvas remain.
+
+Final validation commands (all exit 0):
+
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv uv sync --locked`
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv bash docs/dev/verification.md`
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv uv run ruff check src tests scripts integrations`
+- `node --test tests/frontend/*.test.mjs`
+- `git diff --check`
+
+Results: 2,153 Python tests passed, five existing opt-in tests skipped, 111 existing
+Starlette warnings; 131 frontend tests passed. No operator input was required.
+Browser checks used synthetic data, not live Work or document files. Physical
+small-Mac performance, Safari, assistive technology, and long-session qualification
+remain the release limits listed above.
