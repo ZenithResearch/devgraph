@@ -92,6 +92,9 @@ def create_app(services: ApiServices, *, lifespan: Lifespan[FastAPI] | None = No
     from devgraph.api.topology import register_topology
 
     register_topology(app, services)
+    from devgraph.api.kanban import register_kanban
+
+    register_kanban(app, services)
     from devgraph.frontend.selection import register_selection
 
     register_selection(app)

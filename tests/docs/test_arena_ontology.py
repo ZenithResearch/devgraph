@@ -26,7 +26,7 @@ def test_arena_vocabulary_and_profile_agree_without_broadening_work_kinds() -> N
     assert "subClassOf" not in arena
     edge = by_id["zn:CONTAINS_WORK"]
     assert (edge["domain"], edge["range"]) == ("zn:Arena", "zn:Todo")
-    assert PROFILE["ontology_version"] == publication["version"] == "0.6.0"
+    assert PROFILE["ontology_version"] == publication["version"] == "0.7.0"
     assert PROFILE["runtime_binding"] is True
     assert PROFILE["arena"]["subclass_of_todo"] is False
     assert PROFILE["arena"]["nested_arenas"] is False
@@ -82,7 +82,7 @@ def test_ontology_extension_preserves_existing_operations_and_constraints() -> N
     old_root = ONTOLOGY / "releases/v0.4.0"
     previous = json.loads((old_root / "operations.json").read_text())
     current = json.loads((ONTOLOGY / "operations.json").read_text())
-    assert current.pop("ontology_version") == "0.6.0"
+    assert current.pop("ontology_version") == "0.7.0"
     assert previous.pop("ontology_version") == "0.4.0"
     old_operations = previous.pop("operations")
     operations = current.pop("operations")
@@ -90,6 +90,8 @@ def test_ontology_extension_preserves_existing_operations_and_constraints() -> N
     assert operations[:len(old_operations)] == old_operations
     assert {item["name"] for item in operations[len(old_operations):]} == {
         f"devgraph.arena.{op}.v1" for op in ("create", "patch", "archive", "member.set")
+    } | {f"devgraph.work.workflow.{op}.v1" for op in ("assign", "review", "transition")} | {
+        "kanban", "workflows", "work_workflow"
     }
     assert (ONTOLOGY / "neo4j/constraints.cypher").read_bytes().startswith(
         (old_root / "constraints.cypher").read_bytes()

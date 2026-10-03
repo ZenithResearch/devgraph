@@ -304,3 +304,22 @@ def test_emergency_revoke_survives_lost_identity_and_producer(installation, monk
     assert result["producer_revoked"] is (lost != "producer")
     assert not (installation.receiver / "receiver.json").exists()
     assert not result["ready"]
+
+
+@pytest.mark.parametrize("arenas", [False, True])
+def test_workflow_grants_are_explicit_and_all_new_resources_are_bound(arenas):
+    old = grants._policy(PUBLIC, 1, 99, 999, include_arenas=arenas)
+    assert not grants._has_workflows(old)
+    new = grants._policy(PUBLIC, 1, 99, 999, include_arenas=arenas, include_workflows=True)
+    assert grants._validate_policy(new, PUBLIC) == (99, 999, 1)
+    resources = {
+        r["resource"] for r in new["rules"] if r["operation"] == "devgraph.work.workflow.review.v1"
+    }
+    assert resources == {
+        k + "/" for k in (*grants.KINDS, "Decision", "ReviewPacket", "Handoff", "ExternalLink")
+    }
+    assert all(rule in new["rules"] for rule in old["rules"])
+    broken = copy.deepcopy(new)
+    broken["rules"].pop()
+    with pytest.raises(grants.WorkGrantError):
+        grants._validate_policy(broken, PUBLIC)

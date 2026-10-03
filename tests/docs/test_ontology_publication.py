@@ -60,14 +60,11 @@ def test_operation_catalog_keeps_semantics_separate_from_secs_opcodes() -> None:
         "id": "urn:zenith:devgraph:operation:devgraph.issue.create.v1",
         "mutation": True,
         "required_scopes": ["devgraph.write"],
-        "request_schema_id": (
-            "urn:zenith:devgraph:schema:devgraph-issue-create-request:v1"
-        ),
+        "request_schema_id": ("urn:zenith:devgraph:schema:devgraph-issue-create-request:v1"),
         "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1",
     }
     assert all(
-        selector not in exact_operation
-        for selector in ("opcode", "transport", "route", "handler")
+        selector not in exact_operation for selector in ("opcode", "transport", "route", "handler")
     )
 
 
@@ -100,7 +97,15 @@ def test_discovery_pins_manifest_and_release_digest() -> None:
     assert discovery["current"]["version"] == manifest["version"]
     assert discovery["current"]["bundle_digest"] == manifest["bundle_digest"]
     assert discovery["current"]["manifest_sha256"] == hashlib.sha256(manifest_payload).hexdigest()
-    assert discovery["supported_versions"] == ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"]
+    assert discovery["supported_versions"] == [
+        "0.1.0",
+        "0.2.0",
+        "0.3.0",
+        "0.4.0",
+        "0.5.0",
+        "0.6.0",
+        "0.7.0",
+    ]
 
 
 def test_historical_release_manifests_and_payloads_remain_byte_pinned() -> None:
@@ -143,9 +148,11 @@ def test_current_repository_contract_pins_current_ontology_version() -> None:
     publication = read_json(ONTOLOGY / "publication.json")
     release = ONTOLOGY / "releases" / publication["release"]
 
-    assert read_json(ONTOLOGY / "repository-contract.json")[
-        "ontology_version"
-    ] == publication["version"]
-    assert read_json(release / "repository-contract.json")[
-        "ontology_version"
-    ] == publication["version"]
+    assert (
+        read_json(ONTOLOGY / "repository-contract.json")["ontology_version"]
+        == publication["version"]
+    )
+    assert (
+        read_json(release / "repository-contract.json")["ontology_version"]
+        == publication["version"]
+    )

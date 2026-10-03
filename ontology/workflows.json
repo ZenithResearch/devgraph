@@ -1,0 +1,267 @@
+{
+  "schema": "devgraph.workflows.v1",
+  "columns": {
+    "backlog": "Backlog",
+    "planning": "Planning",
+    "plan_approval": "Plan approval",
+    "ready": "Ready",
+    "in_progress": "In progress",
+    "review": "Review",
+    "done": "Done",
+    "waiting": "Waiting"
+  },
+  "defaults": {
+    "Proposal": "vibe-ceo.v1",
+    "Initiative": "vibe-ceo.v1",
+    "Project": "vibe-ceo.v1",
+    "Issue": "execution.v1",
+    "Task": "execution.v1"
+  },
+  "workflows": {
+    "vibe-ceo.v1": {
+      "stages": [
+        {
+          "id": "backlog",
+          "label": "Backlog",
+          "column": "backlog",
+          "entry_reviews": [],
+          "requires_completion": false
+        },
+        {
+          "id": "planning",
+          "label": "Requirements, context and plan",
+          "column": "planning",
+          "entry_reviews": [],
+          "requires_completion": false
+        },
+        {
+          "id": "developer_plan_approval",
+          "label": "Developer plan approval",
+          "column": "plan_approval",
+          "entry_reviews": [
+            "requirements"
+          ],
+          "requires_completion": false
+        },
+        {
+          "id": "ceo_plan_approval",
+          "label": "CEO plan approval",
+          "column": "plan_approval",
+          "entry_reviews": [
+            "developer_plan"
+          ],
+          "requires_completion": false
+        },
+        {
+          "id": "ready",
+          "label": "Approved plan, ready for execution",
+          "column": "ready",
+          "entry_reviews": [
+            "ceo_plan"
+          ],
+          "requires_completion": false
+        },
+        {
+          "id": "in_progress",
+          "label": "Coordinating execution",
+          "column": "in_progress",
+          "entry_reviews": [],
+          "requires_completion": false
+        },
+        {
+          "id": "ceo_delivery_approval",
+          "label": "CEO delivery approval",
+          "column": "review",
+          "entry_reviews": [],
+          "requires_completion": true
+        },
+        {
+          "id": "technical_review",
+          "label": "Technical review",
+          "column": "review",
+          "entry_reviews": [
+            "ceo_delivery"
+          ],
+          "requires_completion": false
+        },
+        {
+          "id": "handoff_verification",
+          "label": "Handoff verification",
+          "column": "review",
+          "entry_reviews": [
+            "technical"
+          ],
+          "requires_completion": true
+        },
+        {
+          "id": "done",
+          "label": "Done",
+          "column": "done",
+          "entry_reviews": [
+            "technical",
+            "handoff"
+          ],
+          "requires_completion": true
+        },
+        {
+          "id": "blocked_waiting_input",
+          "label": "Blocked, waiting for input",
+          "column": "waiting",
+          "entry_reviews": [],
+          "requires_completion": false
+        }
+      ],
+      "forward": {
+        "backlog": "planning",
+        "planning": "developer_plan_approval",
+        "developer_plan_approval": "ceo_plan_approval",
+        "ceo_plan_approval": "ready",
+        "ready": "in_progress",
+        "in_progress": "ceo_delivery_approval",
+        "ceo_delivery_approval": "technical_review",
+        "technical_review": "handoff_verification",
+        "handoff_verification": "done"
+      },
+      "returns": {
+        "in_progress": "planning",
+        "developer_plan_approval": "planning",
+        "ceo_plan_approval": "planning",
+        "ceo_delivery_approval": "in_progress",
+        "technical_review": "in_progress",
+        "handoff_verification": "in_progress"
+      }
+    },
+    "execution.v1": {
+      "stages": [
+        {
+          "id": "backlog",
+          "label": "Backlog",
+          "column": "backlog",
+          "entry_reviews": [],
+          "requires_completion": false
+        },
+        {
+          "id": "intake",
+          "label": "Intake",
+          "column": "planning",
+          "entry_reviews": [],
+          "requires_completion": false
+        },
+        {
+          "id": "requirements_normalized",
+          "label": "Requirements normalized",
+          "column": "planning",
+          "entry_reviews": [
+            "requirements"
+          ],
+          "requires_completion": false
+        },
+        {
+          "id": "baseline_captured",
+          "label": "Baseline captured",
+          "column": "ready",
+          "entry_reviews": [
+            "baseline"
+          ],
+          "requires_completion": false
+        },
+        {
+          "id": "implementing_commit",
+          "label": "Implementing commit",
+          "column": "in_progress",
+          "entry_reviews": [],
+          "requires_completion": false
+        },
+        {
+          "id": "commit_ready_for_review",
+          "label": "Commit ready for review",
+          "column": "review",
+          "entry_reviews": [
+            "commit"
+          ],
+          "requires_completion": false
+        },
+        {
+          "id": "layer_review",
+          "label": "Layer review",
+          "column": "review",
+          "entry_reviews": [],
+          "requires_completion": false
+        },
+        {
+          "id": "reconciling_ledger",
+          "label": "Reconciling ledger",
+          "column": "review",
+          "entry_reviews": [
+            "technical"
+          ],
+          "requires_completion": false
+        },
+        {
+          "id": "delivery_packet_ready",
+          "label": "Delivery packet ready",
+          "column": "review",
+          "entry_reviews": [],
+          "requires_completion": true
+        },
+        {
+          "id": "done",
+          "label": "Done",
+          "column": "done",
+          "entry_reviews": [
+            "technical",
+            "handoff"
+          ],
+          "requires_completion": true
+        },
+        {
+          "id": "blocked_waiting_input",
+          "label": "Blocked, waiting for input",
+          "column": "waiting",
+          "entry_reviews": [],
+          "requires_completion": false
+        }
+      ],
+      "forward": {
+        "backlog": "intake",
+        "intake": "requirements_normalized",
+        "requirements_normalized": "baseline_captured",
+        "baseline_captured": "implementing_commit",
+        "implementing_commit": "commit_ready_for_review",
+        "commit_ready_for_review": "layer_review",
+        "layer_review": "reconciling_ledger",
+        "reconciling_ledger": "delivery_packet_ready",
+        "delivery_packet_ready": "done"
+      },
+      "returns": {
+        "implementing_commit": "intake",
+        "commit_ready_for_review": "implementing_commit",
+        "layer_review": "implementing_commit",
+        "reconciling_ledger": "implementing_commit",
+        "delivery_packet_ready": "implementing_commit"
+      }
+    }
+  },
+  "review_layers": [
+    "product",
+    "architecture",
+    "implementation",
+    "e2e",
+    "design",
+    "ux"
+  ],
+  "permitted_parents": {
+    "Project": [
+      "Initiative"
+    ],
+    "Issue": [
+      "Initiative",
+      "Project"
+    ],
+    "Task": [
+      "Initiative",
+      "Project",
+      "Issue"
+    ]
+  }
+}

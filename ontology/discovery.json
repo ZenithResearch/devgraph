@@ -1,21 +1,21 @@
 {
   "canonical_authority": {
     "name": "Devgraph",
-    "release_tag": "ontology-v0.6.0",
+    "release_tag": "ontology-v0.7.0",
     "repository": "https://github.com/ZenithResearch/devgraph",
     "source_path": "ontology/"
   },
   "compatibility_policy": "Consumers pin version and bundle_digest; additive changes require a new versioned release.",
   "current": {
-    "bundle_digest": "11d670a57b2052b4de00509559d081b524bf953c6da2544a25f33976857f8f4f",
-    "context_url": "https://zenith-research.ca/ontology/v0.6.0/context.jsonld",
-    "manifest_sha256": "24c7f491bd009036032255436fa6cc5a2b9fd36e4d041ba55b58feaa5e8e2b4b",
-    "manifest_url": "https://zenith-research.ca/ontology/v0.6.0/manifest.json",
-    "ontology_url": "https://zenith-research.ca/ontology/v0.6.0/ontology.jsonld",
-    "operations_url": "https://zenith-research.ca/ontology/v0.6.0/operations.json",
-    "release": "v0.6.0",
-    "repository_contract_url": "https://zenith-research.ca/ontology/v0.6.0/repository-contract.json",
-    "version": "0.6.0"
+    "bundle_digest": "818f708fa1f8f7ef41f6e0ca6ab4d2d682e40a7917487bcc02145d2cdfe8e995",
+    "context_url": "https://zenith-research.ca/ontology/v0.7.0/context.jsonld",
+    "manifest_sha256": "fbf0cfbdfaf4f02895e5a9a3166eb1399196ee7378d891cb06fc10e96c666c46",
+    "manifest_url": "https://zenith-research.ca/ontology/v0.7.0/manifest.json",
+    "ontology_url": "https://zenith-research.ca/ontology/v0.7.0/ontology.jsonld",
+    "operations_url": "https://zenith-research.ca/ontology/v0.7.0/operations.json",
+    "release": "v0.7.0",
+    "repository_contract_url": "https://zenith-research.ca/ontology/v0.7.0/repository-contract.json",
+    "version": "0.7.0"
   },
   "ontology_id": "https://zenith-research.ca/ontology",
   "schema_version": 1,
@@ -25,6 +25,7 @@
     "0.3.0",
     "0.4.0",
     "0.5.0",
-    "0.6.0"
+    "0.6.0",
+    "0.7.0"
   ]
 }

@@ -50,6 +50,21 @@ SCOPES = {
     "blocker.add": ("Task",),
     "blocker.remove": ("Task",),
 }
+WORKFLOW_SCOPES = {
+    "workflow.assign": KINDS,
+    "workflow.transition": KINDS,
+    "workflow.review": (*KINDS, "Decision", "ReviewPacket", "Handoff", "ExternalLink"),
+}
+
+
+def _has_arenas(policy):
+    return any(r["operation"].startswith("devgraph.arena.") for r in policy["rules"])
+
+
+def _has_workflows(policy):
+    return any(r["operation"].startswith("devgraph.work.workflow.") for r in policy["rules"])
+
+
 ARENA_SCOPES = {
     "create": ("Arena",),
     "patch": ("Arena",),
@@ -160,8 +175,12 @@ def _operator_lock():
             os.close(fd)
 
 
-def _policy(public, version, start, end, *, revoked=False, include_arenas=False):
+def _policy(
+    public, version, start, end, *, revoked=False, include_arenas=False, include_workflows=False
+):
     scopes = [(f"devgraph.work.{operation}.v1", kinds) for operation, kinds in SCOPES.items()]
+    if include_workflows:
+        scopes.extend((f"devgraph.work.{op}.v1", kinds) for op, kinds in WORKFLOW_SCOPES.items())
     if include_arenas:
         scopes.extend((f"devgraph.arena.{op}.v1", kinds) for op, kinds in ARENA_SCOPES.items())
         scopes.append(("devgraph.work.parent.set.v1", ("Arena",)))
@@ -218,7 +237,8 @@ def _validate_policy(policy, public=None):
                 start,
                 end,
                 revoked=first["status"] == "revoked",
-                include_arenas=len(rules) == 48,
+                include_arenas=_has_arenas(policy),
+                include_workflows=_has_workflows(policy),
             )
             for rule in expected["rules"]:
                 rule["actor_id"] = actor
@@ -229,7 +249,8 @@ def _validate_policy(policy, public=None):
                 start,
                 end,
                 revoked=first["status"] == "revoked",
-                include_arenas=len(rules) == 48,
+                include_arenas=_has_arenas(policy),
+                include_workflows=_has_workflows(policy),
             )
         if type(policy["schema_version"]) is not int or _json(policy) != _json(expected):
             raise ValueError()
@@ -419,12 +440,10 @@ def grant_status():
         return {
             "ready": ready,
             "state": "active" if ready else "inactive_or_mismatched",
-            "operations_authorized": (15 if len(producer["policy"]["rules"]) == 48 else 11)
+            "operations_authorized": len({r["operation"] for r in producer["policy"]["rules"]})
             if ready
             else 0,
-            "arena_operations_authorized": 4
-            if ready and len(producer["policy"]["rules"]) == 48
-            else 0,
+            "arena_operations_authorized": 4 if ready and _has_arenas(producer["policy"]) else 0,
             "receiver_matches": matches,
             "signer_matches": actor_matches,
             "key_current": producer["key_current"],
@@ -439,7 +458,15 @@ def grant_status():
         return {"ready": False, "state": "unavailable_or_unsafe", "operations_authorized": 0}
 
 
-def _plan(ttl_hours, *, renew=False, rotate=False, revoke=False, include_arenas=None):
+def _plan(
+    ttl_hours,
+    *,
+    renew=False,
+    rotate=False,
+    revoke=False,
+    include_arenas=None,
+    include_workflows=None,
+):
     if type(ttl_hours) is not int or not 1 <= ttl_hours <= 8760:
         raise WorkGrantError("grant lifetime must be 1 through 8760 hours")
     public = _signer()
@@ -454,7 +481,11 @@ def _plan(ttl_hours, *, renew=False, rotate=False, revoke=False, include_arenas=
     now = int(time.time())
     version = previous["policy_version"] + 1 if exists else 1
     if include_arenas is None:
-        include_arenas = exists and len(previous["policy"]["rules"]) == 48
+        include_arenas = exists and _has_arenas(previous["policy"])
+    if include_workflows is None:
+        include_workflows = exists and _has_workflows(previous["policy"])
+    if type(include_workflows) is not bool:
+        raise WorkGrantError("Workflow grant selection must be a boolean")
     if type(include_arenas) is not bool:
         raise WorkGrantError("Arena grant selection must be a boolean")
     policy = _policy(
@@ -464,6 +495,7 @@ def _plan(ttl_hours, *, renew=False, rotate=False, revoke=False, include_arenas=
         now + ttl_hours * 3600,
         revoked=revoke,
         include_arenas=include_arenas,
+        include_workflows=include_workflows,
     )
     return {
         "schema": PLAN_SCHEMA,
@@ -478,8 +510,10 @@ def _plan(ttl_hours, *, renew=False, rotate=False, revoke=False, include_arenas=
     }
 
 
-def plan_grant(ttl_hours=720, *, renew=False, include_arenas=None):
-    return _plan(ttl_hours, renew=renew, include_arenas=include_arenas)
+def plan_grant(ttl_hours=720, *, renew=False, include_arenas=None, include_workflows=None):
+    return _plan(
+        ttl_hours, renew=renew, include_arenas=include_arenas, include_workflows=include_workflows
+    )
 
 
 def write_plan(plan: dict, path: Path):
@@ -634,7 +668,7 @@ def apply_grant(plan_file: Path):
         ) from None
 
 
-def _renew(ttl_hours, *, rotate=False, revoke=False, include_arenas=None):
+def _renew(ttl_hours, *, rotate=False, revoke=False, include_arenas=None, include_workflows=None):
     try:
         with _operator_lock():
             return _apply(
@@ -644,6 +678,7 @@ def _renew(ttl_hours, *, rotate=False, revoke=False, include_arenas=None):
                     rotate=rotate,
                     revoke=revoke,
                     include_arenas=include_arenas,
+                    include_workflows=include_workflows,
                 )
             )
     except (
@@ -658,8 +693,8 @@ def _renew(ttl_hours, *, rotate=False, revoke=False, include_arenas=None):
         ) from None
 
 
-def renew_grant(ttl_hours=720, *, include_arenas=None):
-    return _renew(ttl_hours, include_arenas=include_arenas)
+def renew_grant(ttl_hours=720, *, include_arenas=None, include_workflows=None):
+    return _renew(ttl_hours, include_arenas=include_arenas, include_workflows=include_workflows)
 
 
 def rotate_verifier(ttl_hours=720):

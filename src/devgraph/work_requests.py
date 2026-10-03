@@ -29,6 +29,13 @@ from devgraph.auth.secs_issue_create import (
     _strict_json_object,
 )
 from devgraph.model.validation import validate_version, validate_work_object_id
+from devgraph.workflow_contract import (
+    PARENTS,
+    RECORD_KINDS,
+    WorkflowAssign,
+    WorkflowReview,
+    WorkflowTransition,
+)
 
 WORK_REQUEST_SCHEMA = "devgraph.work-request.v1"
 WORK_REQUEST_DOMAIN = b"devgraph.work-request.v1\x00"
@@ -44,6 +51,9 @@ WORK_OPERATIONS = (
     "dependency.remove",
     "blocker.add",
     "blocker.remove",
+    "workflow.assign",
+    "workflow.review",
+    "workflow.transition",
 )
 WorkOperation = Literal[
     "create",
@@ -57,6 +67,9 @@ WorkOperation = Literal[
     "dependency.remove",
     "blocker.add",
     "blocker.remove",
+    "workflow.assign",
+    "workflow.review",
+    "workflow.transition",
 ]
 
 
@@ -124,8 +137,11 @@ _PAYLOAD_TYPES = {
     "dependency.remove": _EdgeChange,
     "blocker.add": _EdgeChange,
     "blocker.remove": _EdgeChange,
+    "workflow.assign": WorkflowAssign,
+    "workflow.review": WorkflowReview,
+    "workflow.transition": WorkflowTransition,
 }
-_PARENT_KIND = {"Project": "Initiative", "Issue": "Project", "Task": "Issue"}
+_PARENT_KIND = PARENTS
 
 
 @dataclass(frozen=True, repr=False)
@@ -176,7 +192,7 @@ class WorkRequest:
                     raise ValueError("invalid parent change")
                 for reference in (payload["previous_parent"], payload["parent"]):
                     if reference is not None:
-                        if reference["kind"] != expected_kind:
+                        if reference["kind"] not in expected_kind:
                             raise ValueError("invalid parent kind")
                         resources.add(f"{reference['kind']}/{reference['id']}")
                 arena = payload.get("previous_arena")
@@ -194,6 +210,11 @@ class WorkRequest:
                 ):
                     raise ValueError("blocker kinds")
                 resources.add(resource)
+            if envelope.operation == "workflow.review":
+                resources.add(f"{RECORD_KINDS[payload['phase']]}/{payload['record_id']}")
+                for evidence in payload["evidence"]:
+                    if evidence["url"]:
+                        resources.add(f"ExternalLink/{evidence['id']}")
             materialized = envelope.model_dump(mode="json", by_alias=True)
             materialized["payload"] = payload
             canonical = _canonical_json(materialized)

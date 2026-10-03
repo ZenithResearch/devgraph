@@ -157,6 +157,22 @@ def build_monitor_snapshot(storage: GraphStorage) -> dict[str, Any]:
             # Decimal strings preserve canonical i64 versions in JavaScript clients.
             version = node.properties.get("version")
             work_node["version"] = str(version) if type(version) is int and version > 0 else None
+            from devgraph.workflow_contract import STAGES, decode_state
+
+            raw_workflow = node.properties.get("workflow_json")
+            if raw_workflow:
+                workflow = decode_state(raw_workflow)
+                stage = next(
+                    row for row in STAGES[workflow.workflow_id] if row[0] == workflow.stage
+                )
+                work_node["workflow"] = {
+                    "id": workflow.workflow_id,
+                    "stage": workflow.stage,
+                    "label": stage[1],
+                    "column": stage[2],
+                }
+            else:
+                work_node["workflow"] = None
             graph_nodes.append(work_node)
 
     observations = [
@@ -249,10 +265,13 @@ def build_monitor_snapshot(storage: GraphStorage) -> dict[str, Any]:
             continue
         if dependent in work_keys and prerequisite not in work_keys:
             # Report the affected visible Work without disclosing a hidden endpoint.
-            unresolved.append({
-                "work_key": dependent, "relationship": edge.relationship,
-                "reason": "prerequisite is not available as canonical Work",
-            })
+            unresolved.append(
+                {
+                    "work_key": dependent,
+                    "relationship": edge.relationship,
+                    "reason": "prerequisite is not available as canonical Work",
+                }
+            )
     unresolved.sort(key=lambda item: (item["work_key"], item["relationship"]))
     nodes_by_key = {item["key"]: item for item in graph_nodes}
     child_keys_by_parent: dict[str, list[str]] = {}

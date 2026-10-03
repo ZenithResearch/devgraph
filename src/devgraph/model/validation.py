@@ -98,14 +98,21 @@ def validate_canonical_work_object_properties(
     if not isinstance(properties, dict):
         raise ValueError("invalid_work_object_properties")
     property_names = set(properties)
+    optional = {"workflow_json"}
     valid_property_names = (
         CANONICAL_MODEL_PROPERTIES.issubset(property_names)
         if allow_unknown
-        else property_names == set(CANONICAL_MODEL_PROPERTIES)
+        else CANONICAL_MODEL_PROPERTIES.issubset(property_names)
+        and property_names <= CANONICAL_MODEL_PROPERTIES | optional
     )
     if not valid_property_names:
         raise ValueError("invalid_work_object_properties")
     canonical = {key: properties[key] for key in CANONICAL_MODEL_PROPERTIES}
+    if "workflow_json" in properties:
+        from devgraph.workflow_contract import decode_state
+
+        decode_state(properties["workflow_json"])
+        canonical["workflow_json"] = properties["workflow_json"]
     if canonical.get("kind") != label:
         raise ValueError("invalid_work_object_kind")
     if not isinstance(canonical.get("title"), str) or not isinstance(

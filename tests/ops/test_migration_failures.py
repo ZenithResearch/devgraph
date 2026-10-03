@@ -206,7 +206,7 @@ def test_cli_reports_stable_safe_reason_without_configuration() -> None:
         "applied": [],
         "current_applied_version": 0,
         "manifest_schema_version": 1,
-        "maximum_schema_version": 26,
+        "maximum_schema_version": 27,
         "minimum_schema_version": 1,
         "ready": False,
         "reason": "operator_hold_storage_unavailable",
@@ -323,7 +323,7 @@ def test_status_rejects_extra_above_manifest_journal_version() -> None:
     store = MemoryMigrationStore()
     manifest = load_manifest(ROOT / "migrations/manifest.json")
     assert apply_migrations(manifest, store, attempt_id="first").ready is True
-    store.journal[27] = replace(store.journal[26], version=27)
+    store.journal[28] = replace(store.journal[27], version=28)
     assert migration_status(manifest, store).reason == "operator_hold_journal_version_out_of_range"
 
 

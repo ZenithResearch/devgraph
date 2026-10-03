@@ -99,7 +99,7 @@ dependency-aware scenario. Its inputs and saved drafts are local to the browser
 tab; exports are local files. It does not update canonical Work or promise a
 schedule or hard-budget solution. See [project selection](docs/user/project-selection.md).
 
-Ontology bundles through `v0.6.0` are packaged with the application.
+Ontology bundles through `v0.7.0` are packaged with the application.
 `devgraph ontology` identifies the canonical release. `Entity`, `Person`,
 `Agent`, and `Organization` are directory vocabulary with no admitted runtime
 CRUD; `Actor` remains a compatibility alias.
@@ -180,3 +180,10 @@ Devgraph's code, ontology, and bundled skills/plugins are licensed under
 **AGPL-3.0-only**. See [LICENSE](LICENSE) for the terms and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party material.
 Separately installed dependencies and native companions retain their own terms.
+
+## Work board
+
+The separate [Kanban page](docs/user/kanban.md) shows all five Work types, saved
+filters, optional child scopes and guarded workflow stages. It is readable in all
+supported browsers. Signed Chrome moves require matched companion candidates and
+separate installed-native qualification; no bearer credential grants write access.

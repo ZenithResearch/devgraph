@@ -4,6 +4,8 @@
 
 ### Added
 
+- Kanban reading page, versioned Vibe CEO/execution workflows, signed approval and transition operations, bounded board API, flexible parentage and ontology v0.7.0. Legacy work remains unclassified. Installed Chrome signing still requires isolated qualification.
+
 - Shared Rust workflow request parsing and cross-language vectors, preserving old signing bytes so Wallet and secS can admit the same explicit workflow operations.
 
 ## 0.1.0-beta.2 — 2026-09-15
