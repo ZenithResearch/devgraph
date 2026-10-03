@@ -84,3 +84,34 @@ in `src/devgraph/workflow_contract.py` and frozen public request vectors. New
 review/link records need their own resource grants, in addition to the work item.
 `devgraph auth work plan --renew --include-workflows` creates a reviewable grant
 plan; ordinary renewal preserves the existing scope and never adds workflows.
+
+## Read your existing local graph in the preview
+
+The developer helper `scripts/kanban_live_preview.py` serves the new board at
+`http://127.0.0.1:4193/monitor/kanban/` while reading the installed service at
+`http://127.0.0.1:8080` through its authenticated Work and bounded relationship
+APIs. Your existing local read key works on this preview. It exposes no Work
+mutations and does not access the database or run migrations.
+
+For a schema-26 host, all records remain unclassified and display “Stage not
+set”; accepted or archived lifecycle values do not imply workflow completion.
+The helper reads at most 10,000 Work records and 10,000 edges per relationship
+type, caches its read projection for one minute, and revalidates read authority
+on every request. The displayed update time is the projection's actual read
+time. Card rendering remains bounded to 30 per column initially.
+
+Start it from the development checkout with an owner-private, regular file
+containing a random 64-hex connection ticket, referenced by
+`DEVGRAPH_KANBAN_SESSION_FILE`:
+
+```sh
+uv run uvicorn scripts.kanban_live_preview:from_environment --factory \
+  --host 127.0.0.1 --port 4193 --no-access-log
+```
+
+Open the page and enter your local read key. An operator can alternatively open
+`/monitor/kanban/#reader_session=TICKET` once within ten minutes of startup to
+establish a four-hour HttpOnly local session. This keeps the real credential
+native; the ticket is removed from the URL immediately. An expired session can
+reconnect with the existing read key. The helper rejects a newer host schema
+instead of hiding its workflow data; upgrade to the native board API then.
