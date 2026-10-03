@@ -12,8 +12,10 @@ test('Arena details use their independent read route', () => {
 });
 
 function reader() {
-  const document = textDocument();
+  const document = textDocument(); document.querySelector = () => ({inert:false});
   document.getElementById('graph-details').classList = { remove() {} };
+  document.getElementById('graph-details').scrollIntoView = () => {};
+  document.getElementById('graph-surface').classList = { contains() { return false; } };
   const openRelationships = [];
   document.getElementById('reader-content').querySelectorAll = () => openRelationships.map(relationship => ({ dataset: { relationship } }));
   const requests = [];
@@ -30,7 +32,7 @@ function reader() {
       supportLoading: false, supportError: null, documents: new Map(), rendered: null,
     },
     graphView: { nodes: [first, second], edges: [] },
-    document, pauseGraphOrbit() {}, renderGraph() {}, renderGraphSelection() {},
+    document, setReaderCollapsed() {}, pauseGraphOrbit() {}, renderGraph() {}, renderGraphSelection() {},
     text(id, value) { document.getElementById(id).textContent = value; },
     make(tag, className, textContent) { return { tag, className, textContent }; },
   });

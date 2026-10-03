@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from devgraph.events.outbox import EVENT_RECEIPT_LABEL
 from devgraph.model.base import TERMINAL_STATUSES, WorkStatus, utc_now
 from devgraph.model.initiative_observations import (
     INITIATIVE_OBSERVATION_LABEL,
@@ -99,6 +98,7 @@ def build_monitor_snapshot(storage: GraphStorage) -> dict[str, Any]:
     """Build a safe aggregate without credential or raw payload material."""
 
     from devgraph.arenas import ArenaRepository
+    from devgraph.events.outbox import EVENT_RECEIPT_LABEL
 
     read_started_at = utc_now().isoformat()
     work_by_kind: Counter[str] = Counter()

@@ -510,6 +510,16 @@ class AuthorizedWorkGraph:
     ) -> InitiativeObservation:
         return self.authorize_write(credential).create_initiative_observation(observation)
 
+    def monitor_topology(self, credential: str | None, query: str) -> dict[str, Any]:
+        from devgraph.topology import TopologyFilter, build_topology
+
+        context = self._authorize(credential, CATEGORY_READ)
+        if self._monitor_storage is None:
+            raise ValueError("monitor storage is not configured")
+        result = build_topology(self._monitor_storage, TopologyFilter.parse(query))
+        self._audit(context, CATEGORY_READ, "monitor_topology")
+        return result
+
     def monitor_snapshot(self, credential: str | None) -> dict[str, Any]:
         context = self._authorize(credential, CATEGORY_READ)
         if self._monitor_storage is None:

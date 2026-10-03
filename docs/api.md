@@ -56,6 +56,7 @@ Idempotency-Key: <caller-generated non-empty value>
 | GET | `/ready` | none | readiness body; 200 ready or 503 not ready |
 | GET | `/` | none | official frontend HTML |
 | GET | `/monitor` | none | alias of `/` |
+| GET | `/monitor/topology/v1` | `devgraph.read` bearer or separate `devgraph.monitor.view.read.v2` PoP | [filtered topology, counts and limits](monitor-topology-v1.md) |
 | GET | `/monitor/snapshot` | `devgraph.read` bearer or exact `devgraph.monitor.view.read.v1` PoP | safe aggregate and topology |
 | GET | `/work/{kind}` | `devgraph.read` | work list |
 | GET | `/work/{kind}/{id}` | `devgraph.read` | one work object |

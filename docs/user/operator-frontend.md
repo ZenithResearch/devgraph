@@ -10,7 +10,7 @@ external client copy.
 The frontend shell is served at `GET /`. `GET /monitor` remains a compatibility
 alias so existing bookmarks continue to work. The shell contains no embedded
 graph data or credential. After an operator supplies a `devgraph.read`
-credential, the browser calls the same scoped `/monitor/snapshot` and
+credential, the browser calls the same scoped `/monitor/topology/v1` and
 `/initiative-observations` API routes available to other authorized clients.
 
 Credentials are held only in the current tab's `sessionStorage`. Closing the
@@ -22,19 +22,15 @@ Castalia authentication design. Production integration must replace it with a
 wallet/secS Magik signing flow; root keys and `.castaway` contents must never be
 loaded into this page.
 
-The API now also contains a separate exact PoP receiver for
-`devgraph.monitor.view.read.v1`, documented in
-[monitor proof of possession](../monitor-proof-of-possession.md). This receiver
-slice does not yet change the frontend: it does not mint an ephemeral page key,
-request Wallet approval, sign refreshes, remove the bearer field, or replace
-the separate observation-list request. The snapshot already contains the
-topology, observation nodes, and Project/Issue progress needed for the graph
-inspector, so those frontend changes are a bounded next slice rather than a
-generic read authorization expansion.
+The existing exact signed v1 snapshot receiver remains available. The new
+filtered topology route also supports an independently provisioned signed v2
+profile, with a packaged ephemeral page-proof producer. Native Wallet sign-in
+is not activated by this change. See [filtered topology](../monitor-topology-v1.md)
+for the query contract, signed profile, limits, and compatibility details.
 
 ## Current capabilities
 
-The frontend presents safe work, initiative-observation, and receipt summaries;
+The frontend presents safe work, initiative-observation, and Record summaries;
 recent graph activity; and an interactive 3D topology of monitor-visible stored
 relationships. Operators can orbit the scene, drag nodes, settle or reset the
 layout, tune node separation, and tune attraction independently for each
@@ -60,15 +56,42 @@ for missing graph links.
 Category and neighborhood filters apply after reachability. Hiding an Arena or
 intermediate Work node therefore does not hide its otherwise reachable records.
 Search and category counts use the selected Arena scope. Selecting a new Arena
-exits neighborhood mode and fits the resulting graph; automatic refresh retains
+exits connected-items mode; automatic refresh retains
 the Arena choice. Details remain readable when their node is filtered out, with
 an explicit **Show in all nodes** action to clear an incompatible Arena filter.
 
 If the selected Arena disappears from the loaded snapshot, the filter remains
 selected and shows an explanation instead of silently broadening the view.
-Changing credentials clears the selection. This filter uses only the existing
-monitor projection; it cannot follow paths through object types absent from
-that projection. It changes no stored relationships, authorization or API shape.
+Changing credentials clears the inspected item and loads preferences scoped to
+that read context. Reachability uses only the safe monitor projection; it cannot
+follow paths through object types absent from it. Stored relationships and
+authority remain unchanged.
+
+### View controls
+
+Use **Theme** in the page header to choose Zenith UI's **Light**, **Dark**, or
+**Aqua** appearance. **System** follows your device's light/dark setting. The
+choice is remembered in this browser and shared with Project selection. A
+second selector stays available when the graph canvas is fullscreen. Changing
+appearance preserves your graph filters, positions, selection, and local inputs.
+
+Use **Filters** for object categories, individual Work types, category-specific
+statuses, archived items, text and connection types. The legend explains each
+shape. All filters are available through the API and survive a page reload.
+**Clear filters** restores the full supported view. **Hide Observer** reclaims
+space without changing the graph. Details stack on narrow windows; wide views
+start with a golden-ratio graph/details split and support reader resizing.
+
+Hover an item for its type, status and connected labels. Click to read details;
+use **Browse visible items** or search when the map is dense. Overlapping
+picking targets open a chooser. Move items with drag or arrow keys, then use
+**Undo positioning** to revert. Escape cancels a move. **Reset layout** is also
+undoable; **Fit view** only changes framing. Feedback confirms local actions
+and distinguishes failed saves or reads from successful ones.
+
+Large maps use a canvas renderer and worker layout. No items are silently
+sampled away: result limits are disclosed as a partial map. A connection failure
+keeps the last successful view and labels it as saved data.
 
 When an operator highlights a `Project` or `Issue`, the node inspector renders
 its `devgraph.work-progress.v0` progress projection. This is a local,

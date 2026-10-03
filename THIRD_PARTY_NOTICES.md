@@ -55,3 +55,10 @@ transitive dependencies from the registry under the versions/checksums in
 `Cargo.lock`; their respective notices remain authoritative. This repository does
 not vendor those dependencies. The Devgraph crate itself follows the repository's
 AGPL-3.0-only license and does not change the licenses of separate native companions.
+
+## Zenith UI tokens
+
+The frontend packages Zenith UI's `public/tokens.css` as `zenith-tokens.css`.
+Its exact source revision and SHA-256 are recorded in `docs/dev/zenith-tokens.json`;
+`scripts/sync_zenith_tokens.py` verifies the imported bytes. The import includes
+token definitions only, with no Zenith React components or font files.

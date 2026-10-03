@@ -11,7 +11,7 @@ function scene() {
     document,
     state: { snapshot: { graph_nodes: [] }, selectedGraphKey: null },
     graphView: { width: 800, height: 420, labels: 'none', nodes: [], edges: [] },
-    ensureGraphScene() {},
+    ensureGraphScene() {}, updateGraphPreview() {},
     text(id, value) { document.getElementById(id).textContent = value; },
     graphCoordinates(nodes) { return new Map(nodes.map(node => [node.key, { x: 100, y: 100, radius: 18 }])); },
     projectGraphPoint(point) { return point; },
@@ -43,9 +43,12 @@ test('unchanged SVG nodes retain identity and focus across projection updates', 
   c.state.snapshot.graph_nodes = [node];
   c.renderGraph([node], []);
   const element = c.document.getElementById('scene-nodes').children[0];
+  const solid = element.querySelector('.graph-solid');
+  assert.equal(solid.getAttribute('href'), '#graph-solid-Task');
   element.focus();
   c.renderGraph([{ ...node, title: 'Revised title', status: 'review' }], []);
   assert.equal(c.document.getElementById('scene-nodes').children[0], element);
+  assert.equal(element.querySelector('.graph-solid'), solid);
   assert.equal(c.document.activeElement, element);
   assert.match(element.getAttribute('aria-label'), /Revised title, review/);
 });

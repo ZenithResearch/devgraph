@@ -344,6 +344,21 @@ class MemoryGraphStorage:
                 if (node := self._nodes.get(key)) is not None
             ]
 
+    def monitor_records(self):
+        """Capture the public topology under the same lock as Work mutations."""
+        from devgraph.topology import PUBLIC_LABELS, SOURCE_EDGE_LIMIT, SOURCE_NODE_LIMIT
+
+        with self._transaction_lock:
+            nodes = [n for n in self._nodes.values() if n.label in PUBLIC_LABELS]
+            nodes.sort(key=lambda n: (n.label, n.id))
+            nodes = deepcopy(nodes[:SOURCE_NODE_LIMIT + 1])
+            keys = {(n.label, n.id) for n in nodes}
+            edges = [e for e in self._edges if (e.from_label, e.from_id) in keys
+                     and (e.to_label, e.to_id) in keys]
+            edges.sort(key=lambda e: (e.from_label, e.from_id, e.relationship,
+                                      e.to_label, e.to_id))
+            return nodes, deepcopy(edges[:SOURCE_EDGE_LIMIT + 1])
+
     def list_edges(
         self, relationship: str | None = None, *, limit: int | None = None
     ) -> list[EdgeRecord]:
