@@ -197,3 +197,35 @@ Starlette warnings; 131 frontend tests passed. No operator input was required.
 Browser checks used synthetic data, not live Work or document files. Physical
 small-Mac performance, Safari, assistive technology, and long-session qualification
 remain the release limits listed above.
+
+## Right-click reading modal — 2026-10-02
+
+Right-clicking a topology node, its label, or an item in search/browse results
+opens the existing reader in a native dialog. The reader retains its detail,
+related-work, and supporting-material controls. Closing it restores the inline
+reader's previous presentation and focus without changing the map layout.
+Empty canvas retains the browser context menu. ContextMenu and Shift+F10 provide
+keyboard entry; Escape, Close reader, and a click beginning on the backdrop
+dismiss the dialog. Escape closes the reader independently of canvas fullscreen.
+
+The synthetic demo was checked in the in-app browser: Project and Issue reading,
+ContextMenu entry, focus wrapping, close/focus restoration, native fullscreen,
+and a 390px responsive layout with no document overflow. Viewport overrides
+were reset after checking. Shift+F10 dispatch, all eight node types, canvas hit
+detection, label targeting, and late native close events are covered by unit
+tests. The large-node canvas fixture was not rerun for this interaction change.
+The desktop screenshot is saved in the workspace at
+`research/devgraph-node-reading-modal.png` (outside this repository worktree).
+
+Final validation commands (all exit 0):
+
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv uv sync --locked`
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv bash docs/dev/verification.md`
+- `UV_CACHE_DIR=/private/tmp/devgraph-ui-uv uv run ruff check src tests scripts integrations`
+- `node --test tests/frontend/*.test.mjs`
+- `git diff --check`
+
+Results: 2,153 Python tests passed, five existing opt-in tests skipped, 111 existing
+Starlette warnings; 137 frontend tests passed. No operator input was required.
+Browser checks used synthetic data. The installed runtime and live graph were
+not changed; the release qualification limits above still apply.

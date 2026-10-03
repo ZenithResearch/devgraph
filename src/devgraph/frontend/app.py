@@ -346,8 +346,9 @@ FRONTEND_HTML = r'''<!doctype html>
             <div class="reader-resize" id="reader-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Details width" aria-valuemin="320" aria-valuemax="600" aria-valuenow="360"></div>
             <aside class="graph-details" id="graph-details" aria-label="Item reader"><div class="reader-header"><div class="reader-buttons"><button class="graph-control" id="reader-toggle" aria-expanded="true" aria-controls="reader-body">Close reader</button><button class="graph-control" id="reader-mode">Expand reader</button></div><p class="reader-eyebrow">Reader</p><h3 id="reader-title" tabindex="-1">Choose an item</h3><div class="graph-details-copy" id="reader-meta">Select a node or search to read its details.</div></div><div id="reader-body" class="reader-body"><p id="reader-status" role="status" aria-live="polite"></p><div id="reader-content"></div></div></aside>
           </div>
+          <dialog id="reader-dialog" class="reader-dialog" aria-labelledby="reader-title"></dialog>
           <details id="graph-result-list"><summary>Browse visible items</summary><div id="graph-result-items"></div><button class="graph-control" id="graph-results-more" hidden>Show more items</button></details>
-          <p class="graph-help" id="graph-help">Click a node to read · Scroll/pinch to zoom · Shift-drag to pan · Drag to orbit or move an item · F to fit · Browse visible items for keyboard selection</p>
+          <p class="graph-help" id="graph-help">Click a node to read · Right-click for a reading modal · Scroll/pinch to zoom · Shift-drag to pan · Drag to orbit or move an item · F to fit · Browse visible items for keyboard selection</p>
           <div class="graph-resize" id="graph-resize" role="separator" tabindex="0" aria-label="Graph height" aria-orientation="horizontal" aria-valuemin="280" aria-valuemax="1200" aria-valuenow="420" aria-valuetext="420 pixels" aria-controls="graph-svg">Drag to resize · Arrow keys adjust height</div>
         </section>
       </section>
@@ -365,6 +366,7 @@ FRONTEND_HTML = r'''<!doctype html>
   <script src="/monitor/topology-assets/proof.js"></script>
   <script src="/monitor/topology-assets/canvas.js"></script>
   <script src="/monitor/topology-assets/surface.js"></script>
+  <script src="/monitor/topology-assets/reader.js"></script>
   <script>
     const Topology = DevgraphTopology;
     const state = { timer: null, snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshController: null, refreshQueued: false, pendingSnapshot: null, lastSuccess: null };
@@ -662,9 +664,10 @@ FRONTEND_HTML = r'''<!doctype html>
         document.getElementById('reader-body').scrollTop = 0;
       }
       state.selectedGraphKey = node.key;
-      if (openReader) setReaderCollapsed(false);
+      const modalOpen = document.getElementById('reader-dialog').open;
+      if (openReader && !modalOpen) setReaderCollapsed(false);
       renderGraph(graphView.nodes, graphView.edges); renderGraphSelection();
-      if (openReader && !document.getElementById('graph-surface').classList.contains('is-fullscreen')) document.getElementById('graph-details').scrollIntoView({block:'nearest', behavior:'instant'});
+      if (openReader && !modalOpen && !document.getElementById('graph-surface').classList.contains('is-fullscreen')) document.getElementById('graph-details').scrollIntoView({block:'nearest', behavior:'instant'});
       loadSelectedDetail();
       if (openReader && document.querySelector('.graph-scroll').inert) document.getElementById('reader-title').focus({preventScroll:true});
       else if (focus) document.querySelector(`[data-node-key="${CSS.escape(node.key)}"]`)?.focus();
@@ -672,7 +675,7 @@ FRONTEND_HTML = r'''<!doctype html>
 
     function syncReaderPresentation() {
       const surface = document.getElementById('graph-surface'), panel = document.getElementById('graph-details'), map = document.querySelector('.graph-scroll');
-      const overlay = surface.querySelector('.graph-layout').clientWidth <= 820 && !panel.classList.contains('collapsed') && !surface.classList.contains('reading-view');
+      const overlay = !document.getElementById('reader-dialog').open && surface.querySelector('.graph-layout').clientWidth <= 820 && !panel.classList.contains('collapsed') && !surface.classList.contains('reading-view');
       map.inert = overlay;
       if (overlay && map.contains(document.activeElement)) document.getElementById('reader-title').focus({preventScroll: true});
     }
@@ -1090,7 +1093,7 @@ FRONTEND_HTML = r'''<!doctype html>
           nodeLayer.append(group);
         }
         const selected = node.key === state.selectedGraphKey, nearby = adjacent.has(node.key), count = graphView.index.degree.get(node.key) || 0;
-        setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}${node.key === previewKey ? ' preview' : ''}`, tabindex: node.key === (graphView.index.byKey.has(state.selectedGraphKey) ? state.selectedGraphKey : nodes[0]?.key) ? 0 : -1, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.32' : '1', 'aria-pressed': selected, 'aria-label': `${Topology.visual(node.kind).label}: ${node.title}, ${node.status}, ${count} visible connections. Press Enter to read; arrow keys move the node.` });
+        setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}${node.key === previewKey ? ' preview' : ''}`, tabindex: node.key === (graphView.index.byKey.has(state.selectedGraphKey) ? state.selectedGraphKey : nodes[0]?.key) ? 0 : -1, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.32' : '1', 'aria-pressed': selected, 'aria-label': `${Topology.visual(node.kind).label}: ${node.title}, ${node.status}, ${count} visible connections. Press Enter to read; Shift+F10 opens the reading modal; arrow keys move the node.` });
         group._parts ||= {title:group.querySelector('title'),hit:group.querySelector('.graph-node-hit'),solid:group.querySelector('.graph-solid'),shape:group.querySelector('.graph-sphere'),ring:group.querySelector('.graph-selection-ring')};
         const titleText = `${Topology.visual(node.kind).label}: ${node.title} · ${node.status}`; if (group._parts.title.textContent !== titleText) group._parts.title.textContent = titleText;
         setSvg(group._parts.hit, { r: Math.max(14, r + 5) });
@@ -1139,7 +1142,7 @@ FRONTEND_HTML = r'''<!doctype html>
 
     function focusSelectedNode(neighborhood = false) {
       const node = detailState.node; if (!node) return;
-      setReaderCollapsed(true);
+      readerModal.close(); setReaderCollapsed(true);
       const visible = graphView.nodes.some(item => item.key === node.key);
       if (!visible) { graphView.filters = Topology.filters(); graphView.visibleCategories = new Set(Topology.categories); graphView.arenaKey = ''; announceGraph('Filters cleared to reveal this item.'); }
       graphView.filters.anchor = neighborhood ? node.key : ''; graphView.neighborhood = neighborhood ? node.key : null;
@@ -1347,6 +1350,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function updateGraphPreview(key, adjacent, labels) {
+      graphView.drawnLabels = labels;
       const node=graphView.index?.byKey.get(key),target=document.getElementById('graph-preview');if(!target)return;
       if(!node){target.textContent='';return;}
       const total=node.connection_count??Math.max(0,adjacent.size-1);const shown=labels.filter(label=>label.key.startsWith('node:')&&label.key!==`node:${key}`).length;
@@ -1359,6 +1363,47 @@ FRONTEND_HTML = r'''<!doctype html>
       const point=graphClientPoint(clientX,clientY),matches=[];
       for(const [key,p]of graphView.projected){const distance=Math.hypot(point.x-p.x,point.y-p.y);if(distance<=Math.max(14,p.radius+5))matches.push({key,distance});}
       return matches.sort((a,b)=>a.distance-b.distance||a.key.localeCompare(b.key));
+    }
+
+    function graphContextNode(event) {
+      const item = event.target.closest('[data-node-key]');
+      let key = item?.dataset.nodeKey;
+      if (!key && graphSvg.contains(event.target)) {
+        key = pickGraphNodes(event.clientX, event.clientY)[0]?.key;
+        if (!key) {
+          const point = graphClientPoint(event.clientX, event.clientY);
+          const label = (graphView.drawnLabels || []).find(label => label.key.startsWith('node:') && point.x >= label.x && point.x <= label.x + label.width && point.y >= label.y && point.y <= label.y + label.height);
+          key = label?.key.slice(5);
+        }
+      }
+      return graphView.index?.byKey.get(key) || state.snapshot?.graph_nodes.find(node => node.key === key);
+    }
+
+    function openNodeReaderModal(node, trigger) {
+      if (!node) return;
+      if (graphView.arrangement) cancelArrangement();
+      const pointers = [...graphView.pointers.keys()]; graphView.pointers.clear(); graphView.drag = null; graphView.pinch = null;
+      graphSvg.classList.remove('dragging', 'node-dragging');
+      for (const id of pointers) if (graphSvg.hasPointerCapture(id)) graphSvg.releasePointerCapture(id);
+      document.getElementById('node-chooser').hidden = true;
+      document.getElementById('graph-search-results').hidden = true;
+      selectGraphNode(node, false, false);
+      readerModal.open(trigger || graphSvg);
+      syncReaderPresentation();
+    }
+
+    function openNodeContextMenu(event) {
+      const node = graphContextNode(event); if (!node) return;
+      event.preventDefault();
+      openNodeReaderModal(node, event.target.closest('.graph-node, [data-node-key]') || graphSvg);
+    }
+
+    function openNodeKeyboardMenu(event) {
+      if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+      const key = event.target.closest('[data-node-key]')?.dataset.nodeKey || (event.target === graphSvg ? state.selectedGraphKey : null);
+      const node = graphView.index?.byKey.get(key) || state.snapshot?.graph_nodes.find(node => node.key === key);
+      if (!node) return;
+      event.preventDefault(); event.stopPropagation(); openNodeReaderModal(node, event.target);
     }
 
     function showNodeChooser(matches, clientX, clientY) {
@@ -1414,7 +1459,7 @@ FRONTEND_HTML = r'''<!doctype html>
       return { distance: Math.max(1, Math.hypot(first.x - second.x, first.y - second.y)), midpoint: graphClientPoint((first.x + second.x) / 2, (first.y + second.y) / 2) };
     };
     graphSvg.addEventListener('pointerdown', event => {
-      if (event.button !== 0 || graphView.pointers.size >= 2) return;
+      if (event.button !== 0 || event.ctrlKey || graphView.pointers.size >= 2) return;
       graphView.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); graphSvg.setPointerCapture(event.pointerId);
       const candidates = pickGraphNodes(event.clientX,event.clientY);
       const nodeTarget = candidates.length ? {dataset:{nodeKey:candidates[0].key}} : event.target.closest('.graph-node'); pauseGraphOrbit(); event.preventDefault();
@@ -1484,9 +1529,16 @@ FRONTEND_HTML = r'''<!doctype html>
         graphView.filters.category = [...graphView.visibleCategories]; applyGraphFilters();
       });
     });
+    const readerModal = DevgraphReaderModal.create({
+      dialog: document.getElementById('reader-dialog'), panel: document.getElementById('graph-details'),
+      closeButton: document.getElementById('reader-toggle'), modeButton: document.getElementById('reader-mode'),
+      title: document.getElementById('reader-title'), fallbackFocus: graphSvg, onRestore: syncReaderPresentation,
+    });
+    document.addEventListener('contextmenu', openNodeContextMenu);
+    document.addEventListener('keydown', openNodeKeyboardMenu);
     const graphSurface = DevgraphGraphSurface.create({
       element: document.getElementById('graph-surface'), button: document.getElementById('graph-expand'),
-      onChange(expanded) { graphView.expanded = expanded; window.requestAnimationFrame(resizeGraphViewport); }, announce: announceGraph,
+      onChange(expanded) { if (!expanded) readerModal.close(); graphView.expanded = expanded; window.requestAnimationFrame(resizeGraphViewport); }, announce: announceGraph,
     });
     document.getElementById('graph-expand').addEventListener('click', toggleGraphExpanded);
     const graphResize = document.getElementById('graph-resize'); let resizeDrag = null;
@@ -1522,7 +1574,7 @@ FRONTEND_HTML = r'''<!doctype html>
       else if (action === 'support' || action === 'support-more') loadSupporting(action === 'support-more');
       else if (action === 'document') loadDocument(id);
     });
-    document.getElementById('reader-toggle').addEventListener('click', () => setReaderCollapsed(!document.getElementById('graph-details').classList.contains('collapsed')));
+    document.getElementById('reader-toggle').addEventListener('click', () => readerModal.active ? readerModal.close() : setReaderCollapsed(!document.getElementById('graph-details').classList.contains('collapsed')));
     document.getElementById('reader-mode').addEventListener('click', () => setReaderMode(!document.getElementById('graph-surface').classList.contains('reading-view')));
     const readerResize = document.getElementById('reader-resize'); let readerDrag = null;
     const setReaderWidth = width => { const value = Math.max(320, Math.min(600, width)); document.getElementById('graph-surface').style.setProperty('--reader-width', `${value}px`); readerResize.setAttribute('aria-valuenow', String(value)); };

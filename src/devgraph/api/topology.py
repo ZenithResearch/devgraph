@@ -23,6 +23,7 @@ _ASSETS = {
     "core.js": "text/javascript",
     "canvas.js": "text/javascript",
     "surface.js": "text/javascript",
+    "reader.js": "text/javascript",
     "worker.js": "text/javascript",
     "style.css": "text/css",
     "proof.js": "text/javascript",

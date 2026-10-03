@@ -355,7 +355,15 @@ def test_shared_ui_query_fixtures_and_openapi_filter_discovery():
 
 def test_packaged_topology_assets_are_allowlisted_and_contain_no_graph_data():
     api = client()
-    for name in ("core.js", "canvas.js", "surface.js", "worker.js", "style.css", "proof.js"):
+    for name in (
+        "core.js",
+        "canvas.js",
+        "surface.js",
+        "reader.js",
+        "worker.js",
+        "style.css",
+        "proof.js",
+    ):
         response = api.get("/monitor/topology-assets/" + name)
         assert response.status_code == 200
         assert FAKE_CREDENTIAL not in response.text
