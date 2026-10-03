@@ -21,14 +21,14 @@ EXPECTED = [
     *EXPECTED_DDL,
     "canonical_work_object_persistence_v1",
     "event_receipt_idempotency_claim_digest",
-    "work_mutation_guard_id", "arena_id",
+    "work_mutation_guard_id", "arena_id", "workflow_metadata_v1",
 ]
 
 
 def test_manifest_pins_schema_payloads_transactional_v23_and_claim_constraint_v24() -> None:
     manifest = load_manifest(ROOT / "migrations/manifest.json")
     assert manifest.schema_version == 1
-    assert [item.version for item in manifest.migrations] == list(range(1, 27))
+    assert [item.version for item in manifest.migrations] == list(range(1, 28))
     assert [item.name for item in manifest.migrations] == EXPECTED
     assert [item.kind for item in manifest.migrations[:22]] == ["schema_ddl"] * 22
     assert manifest.migrations[22].kind == "transactional_data"
@@ -36,7 +36,7 @@ def test_manifest_pins_schema_payloads_transactional_v23_and_claim_constraint_v2
     for item in manifest.migrations:
         payload = (ROOT / item.payload_path).read_bytes()
         assert hashlib.sha256(payload).hexdigest() == item.checksum
-    for item in (*manifest.migrations[:22], *manifest.migrations[23:]):
+    for item in (m for m in manifest.migrations if m.kind == "schema_ddl"):
         assert item.payload.decode().count(";") == 1
         assert "IF NOT EXISTS" in item.payload.decode()
     transactional = manifest.migrations[22]

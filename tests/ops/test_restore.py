@@ -114,9 +114,9 @@ def metadata(*, created_hour: int = 20) -> BackupMetadata:
         restore_size_bytes=1000,
         neo4j_edition="community",
         neo4j_version="5.26.28",
-        migration_current_version=26,
+        migration_current_version=27,
         migration_minimum_version=1,
-        migration_maximum_version=26,
+        migration_maximum_version=27,
         backend_id=BACKEND_ID,
         backend_version="1",
         consistency_mode="offline_consistent",
@@ -140,7 +140,7 @@ def plan(root: Path, *, target_value=None, capability_value=None):
         target_value or target(),
         capability_value or capability(),
         supported_migration_minimum=1,
-        supported_migration_maximum=26,
+        supported_migration_maximum=27,
     )
 
 

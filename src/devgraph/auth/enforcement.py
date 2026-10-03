@@ -520,6 +520,26 @@ class AuthorizedWorkGraph:
         self._audit(context, CATEGORY_READ, "monitor_topology")
         return result
 
+    def kanban(self, credential: str | None, query: str) -> dict:
+        from devgraph.kanban import BoardFilter, build_board
+
+        context = self._authorize(credential, CATEGORY_READ)
+        result = build_board(self._monitor_storage, BoardFilter.parse(query))
+        self._audit(context, CATEGORY_READ, "kanban")
+        return result
+
+    def workflows(self, credential: str | None, *, kind=None, work_id=None) -> dict:
+        from devgraph.model.repository import WorkObjectRepository
+        from devgraph.policy.redaction import redact_mapping
+        from devgraph.workflow_contract import catalog
+        from devgraph.workflows import Workflows
+
+        context = self._authorize(credential, CATEGORY_READ)
+        result = catalog() if kind is None else Workflows(self._monitor_storage).detail(
+            WorkObjectRepository(self._monitor_storage).get_by_id(kind, work_id))
+        self._audit(context, CATEGORY_READ, "workflows")
+        return redact_mapping(result)
+
     def monitor_snapshot(self, credential: str | None) -> dict[str, Any]:
         context = self._authorize(credential, CATEGORY_READ)
         if self._monitor_storage is None:

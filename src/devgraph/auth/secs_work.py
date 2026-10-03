@@ -287,9 +287,10 @@ class SecSWorkAdapter:
                     idempotency_key_digest_sha256=verified.idempotency_digest,
                     summary=verified.safe_summary,
                     mutation=lambda _: (
-                        self.arena_mutations
-                        if isinstance(request, ArenaRequest) else self.mutations
-                    ).execute(request),
+                        self.arena_mutations.execute(request)
+                        if isinstance(request, ArenaRequest) else
+                        self.mutations.execute(request, actor_id=verified.principal.actor_id)
+                    ),
                     on_result=audit_result,
                 )
         return work, receipt, work is None

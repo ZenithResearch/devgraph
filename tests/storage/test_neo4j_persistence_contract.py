@@ -909,6 +909,9 @@ class TransactionalMigrationStorage:
             self.writes.append(("backfill", (parameters["node_id"], parameters["archived"])))
             return [{"changed": 1}]
         if "CREATE (journal:DevgraphMigration" in query:
+            assert parameters["version"] == parameters["data"]["version"]
+            assert parameters["prior_count"] == parameters["version"] - 1
+            assert "prior.version < $version" in query
             if self.journal_applied == 1:
                 self.writes.append(("journal", parameters["data"]))
             return [{"applied": self.journal_applied}]
@@ -1004,3 +1007,31 @@ def test_topology_materialization_retries_concurrent_change_and_has_finite_query
     unstable, _ = _storage_with_row_batches(old, current, old)
     with pytest.raises(StorageUnavailable, match="changed during read"):
         unstable.monitor_records()
+
+
+@pytest.mark.parametrize("metadata", [None,
+    '{"schema_version":1,"workflow_id":"execution.v1","stage":"backlog"}'])
+def test_v27_admits_metadata_without_backfilling_any_work(metadata):
+    row = _legacy_task_row(status="draft")
+    row["properties"]["archived"] = False
+    row["properties"].pop("workflow_json", None)
+    if metadata is not None:
+        row["properties"]["workflow_json"] = metadata
+    storage = TransactionalMigrationStorage([row])
+    migration = load_manifest(ROOT / "migrations/manifest.json").migrations[26]
+    store = Neo4jMigrationStore(cast(Neo4jGraphStorage, storage))
+    assert store.apply_transactional_data(migration, "attempt-v27", "2026-10-03T00:00:00+00:00")
+    assert len(storage.writes) == 1 and storage.writes[0][0] == "journal"
+    assert storage.writes[0][1]["version"] == 27
+    assert row["properties"].get("workflow_json") == metadata
+
+
+def test_v27_rejects_malformed_workflow_without_any_writes():
+    row = _legacy_task_row(status="draft")
+    row["properties"].update(archived=False, workflow_json='{"stage":"invented"}')
+    storage = TransactionalMigrationStorage([row])
+    migration = load_manifest(ROOT / "migrations/manifest.json").migrations[26]
+    with pytest.raises(StorageUnavailable):
+        Neo4jMigrationStore(cast(Neo4jGraphStorage, storage)).apply_transactional_data(
+            migration, "attempt-v27", "2026-10-03T00:00:00+00:00")
+    assert storage.writes == []

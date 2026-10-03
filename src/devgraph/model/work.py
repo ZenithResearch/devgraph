@@ -7,7 +7,14 @@ from devgraph.model.base import WorkObject, WorkStatus
 
 @dataclass(frozen=True)
 class Todo(WorkObject):
-    pass
+    workflow_json: str | None = "new"
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.workflow_json == "new":
+            from devgraph.workflow_contract import initial_state
+
+            object.__setattr__(self, "workflow_json", initial_state(self.kind))
 
 
 @dataclass(frozen=True)

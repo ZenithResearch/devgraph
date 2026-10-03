@@ -140,7 +140,7 @@ def test_packaged_ontology_releases_match_every_canonical_release() -> None:
 
 
 def test_ontology_snapshot_defaults_to_the_latest_packaged_release() -> None:
-    assert ontology_snapshot()["version"] == "0.6.0"
+    assert ontology_snapshot()["version"] == "0.7.0"
 
 
 def test_cli_packaged_arena_contract_and_legacy_actor_remain_available() -> None:

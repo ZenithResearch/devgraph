@@ -6,6 +6,8 @@
 //! let request = WorkRequest { value: serde_json::Value::Null,
 //!     canonical: vec![], operation: String::new(), resources: vec![] };
 //! ```
+mod workflow;
+
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use serde_json::{Map, Value};
@@ -326,9 +328,9 @@ impl WorkRequest {
                     exact(&payload, &["previous_parent", "parent"])?;
                 }
                 let expected_kind = match label.as_str() {
-                    "Project" => "Initiative",
-                    "Issue" => "Project",
-                    "Task" => "Issue",
+                    "Project" => &["Initiative"][..],
+                    "Issue" => &["Initiative", "Project"][..],
+                    "Task" => &["Initiative", "Project", "Issue"][..],
                     _ => return Err("invalid_work_request"),
                 };
                 if payload["previous_parent"].is_null() && payload["parent"].is_null() {
@@ -338,7 +340,7 @@ impl WorkRequest {
                     let parent = &payload[key];
                     if !parent.is_null() {
                         let resource = reference(parent)?;
-                        if text(parent, "kind")? != expected_kind {
+                        if !expected_kind.contains(&text(parent, "kind")?) {
                             return Err("invalid_work_request");
                         }
                         resources.insert(resource);
@@ -356,6 +358,9 @@ impl WorkRequest {
                     return Err("invalid_work_request");
                 }
                 resources.insert(resource);
+            }
+            "workflow.assign" | "workflow.review" | "workflow.transition" => {
+                payload = workflow::normalize(&op, payload, &mut resources)?;
             }
             _ => return Err("invalid_work_request"),
         }

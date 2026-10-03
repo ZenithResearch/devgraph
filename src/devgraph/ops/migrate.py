@@ -177,10 +177,10 @@ def load_manifest(path: Path, *, payload_override: Mapping[int, Path] | None = N
             ) != expected_definition:
                 raise ManifestError("payload_definition_mismatch")
         elif (
-            expected_version != 23
-            or name != "canonical_work_object_persistence_v1"
+            (expected_version, name) not in {(23, "canonical_work_object_persistence_v1"),
+                                             (27, "workflow_metadata_v1")}
             or statement.count(";") != 1
-            or "canonical_work_object_persistence_v1" not in statement
+            or name not in statement
         ):
             raise ManifestError("unsupported_transactional_migration")
         migrations.append(
@@ -201,7 +201,8 @@ def load_manifest(path: Path, *, payload_override: Mapping[int, Path] | None = N
     if (
         len(kinds) < 23
         or kinds[:23] != ["schema_ddl"] * 22 + ["transactional_data"]
-        or any(kind != "schema_ddl" for kind in kinds[23:])
+        or any(kind != ("transactional_data" if i == 27 else "schema_ddl")
+               for i, kind in enumerate(kinds[23:], 24))
     ):
         raise ManifestError("invalid_migration_kind_order")
     referenced = {Path(item.payload_path).name for item in migrations}

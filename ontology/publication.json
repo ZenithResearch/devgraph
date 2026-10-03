@@ -1,24 +1,25 @@
 {
   "schema_version": 1,
   "ontology_id": "https://zenith-research.ca/ontology",
-  "version": "0.6.0",
-  "release": "v0.6.0",
-  "published_at": "2026-09-14T04:52:18Z",
-  "canonical_base_url": "https://zenith-research.ca/ontology/v0.6.0",
+  "version": "0.7.0",
+  "release": "v0.7.0",
+  "published_at": "2026-10-03T20:00:00Z",
+  "canonical_base_url": "https://zenith-research.ca/ontology/v0.7.0",
   "supported_versions": [
     "0.1.0",
     "0.2.0",
     "0.3.0",
     "0.4.0",
     "0.5.0",
-    "0.6.0"
+    "0.6.0",
+    "0.7.0"
   ],
   "discovery_url": "https://zenith-research.ca/.well-known/zenith-ontology",
   "authority": {
     "name": "Devgraph",
     "repository": "https://github.com/ZenithResearch/devgraph",
     "source_path": "ontology/",
-    "release_tag": "ontology-v0.6.0"
+    "release_tag": "ontology-v0.7.0"
   },
   "compatibility": {
     "mode": "additive",
@@ -27,7 +28,7 @@
   },
   "files": [
     {
-      "source": "ontology/release-notes/v0.6.0.md",
+      "source": "ontology/release-notes/v0.7.0.md",
       "target": "README.md",
       "media_type": "text/markdown"
     },
@@ -82,7 +83,7 @@
       "media_type": "text/markdown"
     },
     {
-      "source": "ontology/compatibility/v0.6.0.md",
+      "source": "ontology/compatibility/v0.7.0.md",
       "target": "compatibility.md",
       "media_type": "text/markdown"
     },
@@ -105,6 +106,16 @@
       "source": "ontology/arena-runtime.md",
       "target": "arena-runtime.md",
       "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/workflows.md",
+      "target": "workflows.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/workflows.json",
+      "target": "workflows.json",
+      "media_type": "application/json"
     }
   ]
 }

@@ -302,3 +302,37 @@ def test_proof_expiring_while_waiting_for_database_lock_has_no_effects():
             request_json=request(), projection_json=proof(request()), idempotency_key=KEY
         )
     assert storage.query() == []
+
+
+def test_signed_workflow_commit_retry_and_version_conflict():
+    client, services, _ = client_and_services()
+    assert post(client, request(kind="Task")).status_code == 201
+    raw = request(
+        "workflow.transition",
+        "Task",
+        version=1,
+        payload={"stage": "intake", "reason": "Start the work"},
+    )
+    first = post(client, raw, key=KEY + "workflow")
+    assert first.status_code == 200, first.text
+    assert first.json()["work"]["version"] == 2
+    duplicate = post(client, raw, key=KEY + "workflow")
+    assert duplicate.json()["receipt"]["duplicate"] is True
+    assert duplicate.json()["receipt"]["receipt_id"] == first.json()["receipt"]["receipt_id"]
+    stale = post(client, raw, key=KEY + "different")
+    assert stale.status_code == 412
+    from devgraph.workflow_contract import decode_state
+
+    state = services.storage.get_node("Task", "test-one").properties["workflow_json"]
+    assert decode_state(state).stage == "intake"
+    # Read credentials cannot substitute for a secS projection.
+    from tests.api.test_app_scaffold import FAKE_CREDENTIAL
+
+    assert (
+        client.post(
+            "/work-operations/v1",
+            content=raw,
+            headers={"Authorization": "Bearer " + FAKE_CREDENTIAL},
+        ).status_code
+        == 403
+    )

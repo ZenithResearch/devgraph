@@ -32,11 +32,12 @@ class NamedWorkMutations:
         self.repository = WorkObjectRepository(storage)
         self.lifecycle = ProposalLifecycle(storage)
 
-    def execute(self, request: WorkRequest):
+    def execute(self, request: WorkRequest, *, actor_id: str = ""):
+
         # Reparse immutable bytes; caller-supplied derived fields never select execution.
         request = WorkRequest.from_json(request.canonical)
         with self.storage.work_mutation_transaction():
-            return self._execute(request)
+            return self._execute(request, actor_id=actor_id)
 
     def _current(self, kind, work_id, version):
         current = self.repository.get_by_id(kind, work_id)
@@ -57,7 +58,7 @@ class NamedWorkMutations:
     def _bump(self, work):
         return self.repository.update(work, expected_version=work.version)
 
-    def _execute(self, request):
+    def _execute(self, request, *, actor_id=""):
         operation, payload = request.operation, request.payload
         if operation == "create":
             values = dict(payload)
@@ -68,6 +69,10 @@ class NamedWorkMutations:
         if operation == "archive":
             return self.repository.archive(subject.kind, subject.id)
         self._active(subject)
+        if operation.startswith("workflow."):
+            from devgraph.workflows import Workflows
+
+            return Workflows(self.storage, actor_id=actor_id).execute(subject, operation, payload)
         if operation == "patch":
             return self.repository.update_content(
                 subject.kind,

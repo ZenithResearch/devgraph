@@ -21,7 +21,10 @@ def parse(raw):
     return parser.from_json(raw.encode())
 
 
-@pytest.mark.parametrize("case", load("requests.json") + load("arena-v1/requests.json"))
+@pytest.mark.parametrize(
+    "case",
+    load("requests.json") + load("arena-v1/requests.json") + load("workflow-v1/requests.json"),
+)
 def test_shared_request_bytes_domains_and_resources(case):
     request = parse(case["raw"])
     assert request.canonical.decode() == case["canonical"]
@@ -43,7 +46,9 @@ def test_shared_adversarial_decisions(case):
     assert list(request.resources) == case["resources"]
 
 
-@pytest.mark.parametrize("case", load("arena-v1/invalid-requests.json"))
+@pytest.mark.parametrize(
+    "case", load("arena-v1/invalid-requests.json") + load("workflow-v1/invalid-requests.json")
+)
 def test_shared_arena_denials(case):
     with pytest.raises((InvalidArenaRequest, InvalidWorkRequest)):
         parse(case["raw"])

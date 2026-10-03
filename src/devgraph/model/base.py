@@ -55,6 +55,7 @@ class WorkObject:
     artifact_ids: tuple[str, ...] = ()
     external_link_ids: tuple[str, ...] = ()
     priority: int = 0
+    workflow_json: str | None = None
 
     def __post_init__(self) -> None:
         validate_work_object_id(self.id)
@@ -71,7 +72,7 @@ class WorkObject:
         return type(self).__name__
 
     def to_node_properties(self) -> dict[str, Any]:
-        return {
+        properties = {
             "title": self.title,
             "description": self.description,
             "status": self.status.value,
@@ -83,6 +84,10 @@ class WorkObject:
             "external_link_ids": list(self.external_link_ids),
             "priority": self.priority,
         }
+
+        if self.workflow_json is not None:
+            properties["workflow_json"] = self.workflow_json
+        return properties
 
     def with_status(self: WorkObjectT, status: WorkStatus) -> WorkObjectT:
         return replace(

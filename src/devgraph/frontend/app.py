@@ -291,7 +291,7 @@ FRONTEND_HTML = r'''<!doctype html>
   <div class="shell">
     <aside class="rail" aria-label="Observer navigation"><button type="button" class="graph-control" id="observer-toggle" aria-expanded="true" aria-controls="observer-content">Hide Observer</button><div id="observer-content">
       <div class="brand"><div class="brand-mark">DG</div><div><strong>Dev Graph</strong><span>Observer</span></div></div>
-      <nav><a href="#overview" aria-current="page">Overview</a><a href="#topology">Topology</a><a href="#pipeline">Observation status</a><a href="#activity">Graph activity</a><a href="#observations">Observations</a><a href="/monitor/selection">Project selection</a></nav>
+      <nav><a href="#overview" aria-current="page">Overview</a><a href="#topology">Topology</a><a href="#pipeline">Observation status</a><a href="#activity">Graph activity</a><a href="#observations">Observations</a><a href="/monitor/kanban/">Work board</a><a href="/monitor/selection">Project selection</a></nav>
       <p class="rail-meta">Local graph · View only</p>
     </div></aside>
     <main id="main">
@@ -873,7 +873,8 @@ FRONTEND_HTML = r'''<!doctype html>
         const description = readerSection('Description / plan', 'description');
         description.append(make('div', data.description ? 'reader-description' : 'reader-note', data.description || 'No description has been written for this item.'));
         content.append(description);
-        if (latest?.progress) { const p = latest.progress; const section = readerSection('Progress', 'progress'); section.append(make('p', 'reader-note', `${p.percent}% complete · ${p.completed} of ${p.total} final work items accepted or archived`)); content.append(section); }
+        const workflowSection = readerSection('Workflow', 'workflow'); workflowSection.append(make('p', 'reader-note', latest?.workflow ? `${latest.workflow.label} · ${latest.workflow.id}` : 'Stage not set · shown in Backlog on the work board')); content.append(workflowSection);
+        if (latest?.progress) { const p = latest.progress; const section = readerSection('Lifecycle summary', 'progress'); section.append(make('p', 'reader-note', `${p.percent}% complete · ${p.completed} of ${p.total} final work items accepted or archived`)); content.append(section); }
         const relationships = [['parent', 'Parent'], ['children', 'Child work'], ['dependencies', 'Depends on'], ['dependents', 'Needed by'], ...(node.kind === 'Task' ? [['blockers', 'Blocked by'], ['blocked', 'Blocks']] : [])];
         const section = readerSection('Related work', 'relationships');
         for (const [rel, label] of relationships) {

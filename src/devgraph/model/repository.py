@@ -402,6 +402,7 @@ class WorkObjectRepository:
                 artifact_ids=tuple(properties["artifact_ids"]),
                 external_link_ids=tuple(properties["external_link_ids"]),
                 priority=properties["priority"],
+                workflow_json=properties.get("workflow_json"),
             )
         except WorkObjectRepositoryError:
             raise

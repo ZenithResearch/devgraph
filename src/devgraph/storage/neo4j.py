@@ -1019,7 +1019,7 @@ class Neo4jGraphStorage:
             if canonical_payload and validate_canonical:
                 properties = {
                     key: raw_properties[key]
-                    for key in CANONICAL_MODEL_PROPERTIES
+                    for key in CANONICAL_MODEL_PROPERTIES | {"workflow_json"}
                     if key in raw_properties
                 }
                 properties = validate_canonical_work_object_properties(
@@ -1267,8 +1267,8 @@ class Neo4jMigrationStore:
         from dataclasses import asdict
 
         if (
-            getattr(migration, "version", None) != 23
-            or getattr(migration, "name", None) != "canonical_work_object_persistence_v1"
+            (getattr(migration, "version", None), getattr(migration, "name", None))
+            not in {(23, "canonical_work_object_persistence_v1"), (27, "workflow_metadata_v1")}
             or getattr(migration, "kind", None) != "transactional_data"
         ):
             raise StorageUnavailable("unsupported transactional migration")
@@ -1311,6 +1311,8 @@ class Neo4jMigrationStore:
                         validated_id = validate_work_object_id(node_id)
                         if not isinstance(archived, bool):
                             raise ValueError("archived")
+                        if archived_missing and migration.version == 27:
+                            raise StorageUnavailable("canonical persistence preflight failed")
                         if archived_missing:
                             backfills.append((label, validated_id, archived))
                 for label, node_id, archived in backfills:
@@ -1327,14 +1329,17 @@ class Neo4jMigrationStore:
                     "MATCH (owner:DevgraphMigration {version: 0, owner_attempt_id: $attempt}) "
                     "WHERE owner.state = 'owned' AND owner.runner_schema_version = 1 "
                     "MATCH (prior:DevgraphMigration) "
-                    "WHERE prior.version >= 1 AND prior.version <= 22 AND prior.state = 'applied' "
+                    "WHERE prior.version >= 1 AND prior.version < $version "
+                    "AND prior.state = 'applied' "
                     "WITH owner, count(prior) AS prior_count "
-                    "WHERE prior_count = 22 AND NOT EXISTS { "
-                    "MATCH (:DevgraphMigration {version: 23}) } "
-                    "CREATE (journal:DevgraphMigration {version: 23}) SET journal = $data "
+                    "WHERE prior_count = $prior_count AND NOT EXISTS { "
+                    "MATCH (:DevgraphMigration {version: $version}) } "
+                    "CREATE (journal:DevgraphMigration {version: $version}) SET journal = $data "
                     "RETURN count(journal) AS applied",
                     attempt=attempt_id,
                     data=asdict(journal),
+                    version=migration.version,
+                    prior_count=migration.version - 1,
                 )
                 if len(rows) != 1 or rows[0].get("applied") != 1:
                     raise StorageUnavailable("canonical persistence journal marker failed")

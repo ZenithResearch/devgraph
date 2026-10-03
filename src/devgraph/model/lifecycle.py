@@ -200,6 +200,7 @@ class ProposalLifecycle:
                 artifact_ids=tuple(properties["artifact_ids"]),
                 external_link_ids=tuple(properties["external_link_ids"]),
                 priority=properties["priority"],
+                workflow_json=properties.get("workflow_json"),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ProposalLifecycleError(

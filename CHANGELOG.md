@@ -6,6 +6,10 @@
 
 - Publish the shared Rust Work/Arena request protocol and cross-language synthetic fixtures — native and WASM consumers can pin public source without importing private history or losing Arena resource bindings.
 
+- Kanban reading page, versioned Vibe CEO/execution workflows, signed approval and transition operations, bounded board API, flexible parentage and ontology v0.7.0. Legacy work remains unclassified. Installed Chrome signing still requires isolated qualification.
+
+- Shared Rust workflow request parsing and cross-language vectors, preserving old signing bytes so Wallet and secS can admit the same explicit workflow operations.
+
 ## 0.1.0-beta.2 — 2026-09-15
 
 First public beta, published as a clean source snapshot under AGPL-3.0-only.

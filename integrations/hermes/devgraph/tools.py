@@ -21,6 +21,7 @@ WORK_KINDS = ("Proposal", "Initiative", "Project", "Issue", "Task")
 WORK_OPERATIONS = (
     "create", "patch", "status", "archive", "accept", "convert", "parent.set",
     "dependency.add", "dependency.remove", "blocker.add", "blocker.remove",
+    "workflow.assign", "workflow.review", "workflow.transition",
 )
 ARENA_OPERATIONS = ("create", "patch", "archive", "member.set")
 RELATIONSHIPS = ("children", "parent", "dependencies", "dependents", "blockers", "blocked")
