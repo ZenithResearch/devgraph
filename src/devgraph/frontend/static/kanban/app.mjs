@@ -21,7 +21,7 @@ const result=await get('/monitor/kanban/v1?'+filterQuery);if(generation!==serial
 for(const column of result.columns){const wanted=keep.get(column.id)||column.items.length;while(column.items.length<wanted&&column.next_cursor){const next=await get('/monitor/kanban/v1?'+query(prefs,{column:column.id,after:column.next_cursor,revision:result.revision,limit:Math.min(100,wanted-column.items.length)}));if(generation!==serial)return;const page=next.columns.find(c=>c.id===column.id);column.items=appendPage(column.items,page.items);column.next_cursor=page.next_cursor;}}
 lastQuery=filterQuery;board=result;render();announce(`${result.total} ${result.total===1?'item':'items'} · Updated ${new Date().toLocaleTimeString()} · ${wallet.connection?'Signed moves connected':'Reading mode'}`);}catch(error){if(generation===serial)announce(error.message);}}
 function render(){
- const boardNode=$('board'),scroll=boardNode.scrollLeft,focused=document.activeElement?.closest('[data-key]')?.dataset.key,focusedAction=document.activeElement?.dataset.action;
+ const boardNode=$('board'),scroll=boardNode.scrollLeft,focused=document.activeElement?.closest('[data-key]')?.dataset.key,focusedAction=document.activeElement?.dataset.action,focusedMore=document.activeElement?.classList.contains('load-more')?document.activeElement.closest('.column')?.dataset.column:null;
  options($('scope'),[['','All work'],...board.scopes.map(x=>[x.key,`${x.kind} · ${x.title}`])],prefs.scope);
  if(prefs.scope&&!board.scopes.some(x=>x.key===prefs.scope)){$('scope').append(new Option(prefs.scope,prefs.scope));$('scope').value=prefs.scope;}
  $('board-title').textContent=prefs.scope?board.scopes.find(x=>x.key===prefs.scope)?.title||prefs.scope:'All work';$('count').textContent=`${board.total} ${board.total===1?'item':'items'}`;
@@ -29,12 +29,13 @@ function render(){
  $('filter-count').textContent=Object.keys(DEFAULTS).filter(k=>prefs[k]!==DEFAULTS[k]).length||'';
  const columns=board.columns.filter(c=>!prefs.column||c.id===prefs.column);
  boardNode.replaceChildren(...columns.map(column=>{
-  const section=el('section',undefined,'column');section.dataset.column=column.id;section.setAttribute('aria-label',catalog.columns[column.id]);const header=el('header');header.append(el('h3',catalog.columns[column.id]),el('span',String(column.count),'count'));section.append(header);
+  const section=el('section',undefined,'column');section.dataset.column=column.id;section.tabIndex=-1;section.setAttribute('aria-label',catalog.columns[column.id]);const header=el('header');header.append(el('h3',catalog.columns[column.id]),el('span',String(column.count),'count'));section.append(header);
   const cards=el('div',undefined,'cards');cards.append(...column.items.map(card));section.append(cards);
   if(!column.count)section.append(el('p','No items here.','empty'));
   if(column.next_cursor)section.append(button(`Load more (${column.count-column.items.length} remaining)`,()=>more(column.id),'load-more'));
   section.addEventListener('dragover',event=>{if(wallet.connection){event.preventDefault();section.classList.add('drop-target');}});section.addEventListener('dragleave',()=>section.classList.remove('drop-target'));section.addEventListener('drop',event=>{event.preventDefault();section.classList.remove('drop-target');const key=event.dataTransfer.getData('application/x-devgraph-work');const item=board.columns.flatMap(x=>x.items).find(x=>x.key===key);if(item)openMove(item,column.id);});return section;
  }));boardNode.scrollLeft=scroll;mobile();
+ if(focusedMore){const section=[...boardNode.children].find(x=>x.dataset.column===focusedMore);(section?.querySelector('.load-more')||section)?.focus({preventScroll:true});}
  if(focused){const target=[...boardNode.querySelectorAll('[data-key]')].find(x=>x.dataset.key===focused);(focusedAction?target?.querySelector(`[data-action="${focusedAction}"]`):target)?.focus({preventScroll:true});}
 }
 function card(item){const node=el('article',undefined,'card');node.tabIndex=0;node.dataset.key=item.key;node.setAttribute('aria-label',`${item.kind}: ${item.title}. ${item.stage_label}`);node.draggable=!!wallet.connection&&item.lifecycle!=='archived'&&!pending;

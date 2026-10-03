@@ -71,3 +71,21 @@ identity, grants, native installation or data were changed for qualification.
 A fixture bridge or successful WASM test must never be reported as this gate.
 Until the installed test passes, keep the PR a draft and the browser-editing
 release claim unqualified. Read-only preview is independently usable.
+
+## Recorded source checks
+
+The public implementation at `30d0464` passed `bash docs/dev/verification.md`
+(exit 0: 2,310 passed, 5 skipped) and `ruff check src tests scripts integrations`.
+Shared Rust native/all-feature and WASM checks passed. Wallet's complete npm test
+suite, TypeScript checks and Rust workspace suite passed at `d6f2b55`; secS workspace
+test/build passed at `306f713`. The matching private SDK passed its Rust/native
+suite, WASM build, JavaScript tests, TypeScript checks and integrated Python
+verification (2,267 passed, 5 skipped). Disposable socket tests require loopback
+permission. Opt-in live database tests were not run.
+
+Manual in-app-browser checks confirmed direct-child vs descendant scope, persisted
+filters, all four themes, 390px column selection, right-click reading, supporting
+material and focus restoration. A 1,500-item disposable board rendered 30 initial
+cards and 60 after one incremental load, retaining the complete 1,500 count.
+Pagination focus was subsequently corrected and rechecked. These checks are UI
+and source-contract evidence, not the installed Chrome signing gate above.
