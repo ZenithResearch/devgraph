@@ -103,8 +103,12 @@ start with a golden-ratio graph/details split and support reader resizing.
 
 Hover an item for its type, status and connected labels. Click to read details
 beside the graph; narrow screens stack the reader below the interactive canvas.
-Right-click, Shift+F10, or **Open modal** opens the overlay reader and restores
-focus when closed. Reading never switches the graph to a replacement page.
+On narrow screens, **Expand reader** fills the canvas area with the current
+reader. **Back to graph** or Escape returns to the map, preserving its selection,
+positions and camera, and the reader's scroll position. Closing the reader also
+restores the map. Widening the canvas returns to the desktop split automatically.
+Right-click or Shift+F10 opens the overlay reader at any width; **Open modal** is
+also available in the wide sidebar. Closing the modal restores focus.
 Related work in the reader and the Work board also provide access to Issues
 and Tasks, including records hidden by current graph filters. For keyboard selection,
 use **Browse visible items** or search when the map is dense. Overlapping

@@ -209,6 +209,18 @@ button:disabled { opacity:.5; cursor:default; }
  .graph-surface .graph-details:not(.collapsed) { background:linear-gradient(var(--panel),var(--panel)),var(--canvas); }
 }
 
+/* An explicit reading mode uses the compact canvas area without rebuilding it. */
+.graph-surface.reading-view .graph-scroll,
+.graph-surface.reading-view .reader-resize,
+.graph-surface.reading-view .surface-controls,
+.graph-surface.reading-view #graph-result-list,
+.graph-surface.reading-view .graph-help,
+.graph-surface.reading-view .graph-resize { display:none; }
+.graph-surface.reading-view .graph-layout { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
+.graph-surface.reading-view .graph-layout > .graph-details:not(.collapsed) { height:clamp(360px,78dvh,900px); max-height:none; }
+.graph-surface.reading-view .reader-body { width:100%; max-width:72ch; margin:0 auto; }
+.graph-surface.is-fullscreen.reading-view .graph-layout > .graph-details:not(.collapsed) { height:100%; min-height:0; }
+
 .arena-region path { fill:var(--aqua); stroke:var(--aqua); stroke-width:1; vector-effect:non-scaling-stroke; }
 .arena-region .arena-volume-back { fill-opacity:.025; stroke:none; }
 .arena-region .arena-volume-side { fill-opacity:.065; stroke:none; }

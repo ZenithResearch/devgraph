@@ -667,16 +667,22 @@ FRONTEND_HTML = r'''<!doctype html>
 
     function syncReaderPresentation() {
       const surface = document.getElementById('graph-surface'), map = document.querySelector('.graph-scroll');
-      // The regular reader never covers or disables the graph, even on narrow screens.
-      map.inert = false;
-      surface.classList.remove('reading-view');
+      const panel = document.getElementById('graph-details'), mode = document.getElementById('reader-mode');
+      const narrow = surface.querySelector('.graph-layout').clientWidth <= 820;
+      const expanded = narrow && !panel.classList.contains('collapsed') && surface.classList.contains('reading-view');
+      surface.classList.toggle('reading-view', expanded);
+      map.inert = expanded;
+      mode.textContent = narrow ? expanded ? 'Back to graph' : 'Expand reader' : 'Open modal';
+      if (narrow) { mode.setAttribute('aria-expanded', String(expanded)); mode.setAttribute('aria-controls', 'reader-body'); }
+      else { mode.removeAttribute('aria-expanded'); mode.removeAttribute('aria-controls'); }
+      if (expanded && map.contains(document.activeElement)) document.getElementById('reader-title').focus({preventScroll:true});
     }
 
     function setReaderCollapsed(collapsed, persist = true) {
       const panel = document.getElementById('graph-details'), changed = panel.classList.contains('collapsed') !== collapsed;
       const restoreFocus = collapsed && panel.contains(document.activeElement);
       panel.classList.toggle('collapsed', collapsed);
-      if (collapsed) { document.getElementById('graph-surface').classList.remove('reading-view'); text('reader-mode', 'Open modal'); }
+      if (collapsed) document.getElementById('graph-surface').classList.remove('reading-view');
       document.getElementById('reader-toggle').setAttribute('aria-expanded', String(!collapsed)); text('reader-toggle', collapsed ? 'Open reader' : 'Close reader');
       syncReaderPresentation();
       if (restoreFocus) document.getElementById('graph-svg').focus({preventScroll: true});
@@ -684,7 +690,17 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function setReaderMode() {
-      if (detailState.node) openNodeReaderModal(detailState.node, document.getElementById('reader-mode'));
+      if (!detailState.node) return;
+      const surface = document.getElementById('graph-surface');
+      if (surface.querySelector('.graph-layout').clientWidth > 820) { openNodeReaderModal(detailState.node, document.getElementById('reader-mode')); return; }
+      const expanded = !surface.classList.contains('reading-view');
+      surface.classList.toggle('reading-view', expanded); syncReaderPresentation();
+      document.getElementById(expanded ? 'reader-title' : 'graph-svg').focus({preventScroll:true});
+      if (!surface.classList.contains('is-fullscreen')) surface.scrollIntoView({block:'start',behavior:'instant'});
+    }
+
+    function handleReaderKeydown(event) {
+      if (event.key === 'Escape' && !readerModal.active && document.getElementById('graph-surface').classList.contains('reading-view')) { event.preventDefault(); event.stopPropagation(); setReaderMode(); }
     }
 
     async function loadSelectedDetail() {
@@ -1224,7 +1240,6 @@ FRONTEND_HTML = r'''<!doctype html>
       if (!visible) { graphView.filters = Topology.overviewFilters(); graphView.visibleCategories = new Set(Topology.categories); graphView.arenaKey = ''; announceGraph('Filters cleared to reveal this item.'); }
       graphView.filters.anchor = neighborhood ? node.key : ''; graphView.neighborhood = neighborhood ? node.key : null;
       if (!visible || neighborhood || state.snapshot?.applied_filters?.anchor) { applyGraphFilters(); return; }
-      document.getElementById('graph-surface').classList.remove('reading-view'); text('reader-mode', 'Open modal');
       setGraphZoom(Math.max(1.2, graphView.zoom)); const point = projectGraphPoint(graphView.nodePositions.get(node.key)); graphView.panX += graphView.width/2-point.x; graphView.panY += graphView.height/2-point.y; renderGraph(graphView.nodes,graphView.edges);
     }
 
@@ -1656,6 +1671,7 @@ FRONTEND_HTML = r'''<!doctype html>
     });
     document.getElementById('reader-toggle').addEventListener('click', () => readerModal.active ? readerModal.close() : setReaderCollapsed(!document.getElementById('graph-details').classList.contains('collapsed')));
     document.getElementById('reader-mode').addEventListener('click', setReaderMode);
+    document.getElementById('graph-details').addEventListener('keydown', handleReaderKeydown);
     const readerResize = document.getElementById('reader-resize'); let readerDrag = null;
     const setReaderWidth = width => { const value = Math.max(320, Math.min(600, width)); document.getElementById('graph-surface').style.setProperty('--reader-width', `${value}px`); readerResize.setAttribute('aria-valuenow', String(value)); };
     readerResize.addEventListener('pointerdown', event => { if (event.button !== 0) return; event.preventDefault(); readerDrag = { id: event.pointerId, x: event.clientX, width: Number(readerResize.getAttribute('aria-valuenow')) }; readerResize.setPointerCapture(event.pointerId); });
