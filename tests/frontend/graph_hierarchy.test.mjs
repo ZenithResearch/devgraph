@@ -151,3 +151,23 @@ test('descendant traversal terminates on cycles and ignores missing expansion ro
   assert.equal(view.families.get(f.p.key).size,3);
   assert.equal(T.attentionRoot(f.task.key,'missing',view),f.p.key);
 });
+
+test('250 and 1500 revealed children preserve all overview anchors and their local depth bands',()=>{
+  for(const size of [250,1500]){
+    const f=fixture(),all=[...f.nodes],edges=[...f.edges];
+    for(let i=0;i<size;i++){
+      const child=node('Task',`child-${i}`);all.push(child);edges.push(edge(i%2?f.p:f.r,child));
+    }
+    const overview=T.hierarchy(f.nodes,f.edges),anchors=new Map(overview.positions);
+    anchors.set(f.p.key,{x:500,y:210,z:350});
+    anchors.set(f.r.key,{x:-750,y:-100,z:500});
+    const start=performance.now(),full=T.hierarchy(all,edges),revealed=T.anchorHierarchy(full,anchors);
+    for(const [key,p] of anchors)assert.deepEqual({...revealed.positions.get(key)},{...p});
+    for(const link of edges.filter(e=>e.target.startsWith('Task:'))){
+      const p=revealed.positions.get(link.source),child=revealed.positions.get(link.target);
+      assert.ok(child.y>p.y&&child.z>p.z,'children remain behind and below their own anchored parent');
+    }
+    assert.equal(revealed.positions.size,all.length-2);
+    assert.ok(performance.now()-start<2000,'reveal remains bounded without running global physics');
+  }
+});

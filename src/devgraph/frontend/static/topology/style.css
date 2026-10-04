@@ -87,6 +87,10 @@ button:disabled { opacity:.5; cursor:default; }
 .surface-controls .graph-zoom { flex-wrap:wrap; }
 .surface-controls .graph-zoom input { width:72px; }
 .surface-controls .graph-actions { gap:8px; }
+/* Keep the toolbar and fullscreen viewport still as child work is revealed. */
+#graph-collapse-children { white-space:nowrap; }
+.surface-header > div:first-child { flex:1; min-width:0; }
+#graph-meta { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .surface-options { position:static; margin:0; padding:0; border:0; }
 .surface-options > summary { display:flex; align-items:center; min-height:40px; padding:0 10px; border:1px solid var(--line); border-radius:8px; cursor:pointer; font:inherit; color:var(--muted); }
 .surface-options > summary::after { content:'⌄'; margin-left:8px; }
@@ -98,7 +102,7 @@ button:disabled { opacity:.5; cursor:default; }
 .graph-surface .graph-details.collapsed { position:absolute; right:8px; top:8px; z-index:4; }
 .graph-surface .graph-details.collapsed .reader-header { padding:0; background:transparent; }
 .graph-surface .graph-svg { min-height:0; }
-.graph-surface #graph-feedback { margin:0; }
+.graph-surface #graph-feedback { display:block; min-height:1.5em; margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .graph-surface #graph-result-list { margin:0; }
 .graph-surface .graph-help,.graph-surface .graph-resize { margin:0; }
 .graph-surface .graph-scroll { min-height:280px; }

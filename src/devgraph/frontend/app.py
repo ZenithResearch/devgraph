@@ -321,7 +321,7 @@ FRONTEND_HTML = r'''<!doctype html>
           <header class="surface-header"><div><h3>Graph canvas</h3><span class="section-meta" id="graph-meta">not refreshed</span></div><div class="surface-header-actions"><label class="theme-picker surface-theme"><span>Theme</span><select data-theme-picker aria-label="Canvas theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="aqua">Aqua</option></select></label><button class="graph-control" id="graph-expand" type="button" aria-expanded="false" aria-controls="graph-surface">Full screen</button></div><span class="theme-status" data-theme-status role="status" aria-live="polite"></span></header>
           <div class="surface-controls">
             <div class="graph-zoom" role="group" aria-label="Graph zoom"><button class="graph-control" id="graph-zoom-out" type="button" aria-label="Zoom out">−</button><input id="graph-zoom" type="range" min="5" max="400" value="100" step="1" aria-label="Graph zoom percentage"><output id="graph-zoom-value" for="graph-zoom">100%</output><button class="graph-control" id="graph-zoom-in" type="button" aria-label="Zoom in">+</button><button class="graph-control" id="graph-fit" type="button">Fit view</button></div>
-            <div class="graph-actions"><button class="graph-control" id="graph-undo" type="button" disabled title="Restore the positions from before your last arrangement change">Undo positioning</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button><button class="graph-control" id="graph-collapse-children" type="button" hidden>Collapse child work</button></div>
+            <div class="graph-actions"><button class="graph-control" id="graph-undo" type="button" disabled title="Restore the positions from before your last arrangement change">Undo positioning</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button><button class="graph-control" id="graph-collapse-children" type="button" disabled>Collapse child work</button></div>
             <details class="legend-panel surface-options"><summary>Legend</summary><div class="surface-popover"><div class="legend-items" id="type-legend"></div><p class="reader-note">Arena regions keep related work together. Parents sit above and in front of their children. Hold Command (⌘) and drag to explore the depth. Proposals, Initiatives, Projects, and top-level Issues and Tasks appear here. Hover or focus an Initiative or Project to reveal all matching child work.</p></div></details>
             <details class="graph-settings surface-options"><summary>Arrange nodes</summary><div class="surface-popover"><div class="graph-toolbar-actions"><button class="graph-control" id="graph-orbit" type="button" aria-pressed="false">Orbit: off</button><button class="graph-control" id="graph-settle" type="button">Arrange nodes</button></div><div class="graph-force-panel"><div class="graph-force-copy"><strong>Graph forces</strong><span>3D physics keeps siblings together, preserves depth, and separates Arena neighborhoods.</span><button class="graph-control" id="graph-force-reset" type="button">Reset force defaults</button></div><div class="graph-force-controls" id="graph-force-controls" aria-label="Graph force controls"></div></div></div></details>
           </div>
@@ -1021,25 +1021,13 @@ FRONTEND_HTML = r'''<!doctype html>
       const sourceChanged = graphView.sourceMembership && sourceMembership !== graphView.sourceMembership;
       const revealSignature = [...projection.families.keys()].sort().join('|');
       const revealChanged = revealSignature !== (graphView.revealSignature || '');
-      if (sourceChanged) graphView.basePositions = null;
-      if (revealSignature) {
-        if (revealChanged || sourceChanged) {
-          invalidateLayout();
-          if (!graphView.revealSignature && !sourceChanged) graphView.basePositions = new Map([...graphView.nodePositions].map(([key,p])=>[key,{...p}]));
-        }
-        // Keep the active parent anchored, including after an ordinary refresh.
-        const anchorKey = [...projection.families.keys()].find(key=>graphView.nodePositions.has(key));
-        const before = graphView.nodePositions.get(anchorKey), after = graphView.layoutPlan.positions.get(anchorKey);
-        const delta = before && after ? {x:before.x-after.x,y:before.y-after.y,z:before.z-after.z} : {x:0,y:0,z:0};
-        for (const [key,p] of graphView.layoutPlan.positions) {
-          const aligned={x:p.x+delta.x,y:p.y+delta.y,z:p.z+delta.z}; graphView.layoutPlan.positions.set(key,aligned);
-          if (revealChanged || sourceChanged) graphView.nodePositions.set(key,{...aligned});
-        }
-        for (const group of graphView.layoutPlan.groups) { group.x+=delta.x; group.y+=delta.y; group.z+=delta.z; }
-      } else if (revealChanged) {
-        invalidateLayout();
-        for (const node of nodes) graphView.nodePositions.set(node.key,{...(graphView.basePositions?.get(node.key) || graphView.layoutPlan.positions.get(node.key))});
-        graphView.basePositions = null;
+      if (revealSignature || revealChanged) {
+        if (revealChanged || sourceChanged) invalidateLayout();
+        const anchors = new Map(graphView.nodes.filter(node=>graphView.nodePositions.has(node.key)).map(node=>[node.key,graphView.nodePositions.get(node.key)]));
+        graphView.layoutPlan = Topology.anchorHierarchy(graphView.layoutPlan, anchors);
+        // Copy only the new branch placement; existing anchors are unchanged.
+        // Hidden cached children are placed again so they follow a moved parent.
+        for (const node of nodes) if (!anchors.has(node.key)) graphView.nodePositions.set(node.key,{...graphView.layoutPlan.positions.get(node.key)});
       } else if (!revealOnly && graphView.membership && membership !== graphView.membership && graphView.membershipFilter === graphView.filterSerial && !graphView.drag) {
         for (const node of nodes) graphView.nodePositions.delete(node.key); graphView.initialArranged = false;
       }
@@ -1051,7 +1039,7 @@ FRONTEND_HTML = r'''<!doctype html>
       if (graphView.fitted && !revealOnly && !revealSignature) fitGraph(); else renderGraph(nodes, edges);
 
       document.getElementById('graph-show-all').hidden = !graphView.neighborhood;
-      document.getElementById('graph-collapse-children').hidden = !revealSignature;
+      document.getElementById('graph-collapse-children').disabled = !revealSignature;
       renderGraphSelection(); renderGraphSearch(); renderTopologyControls();
     }
 
@@ -1280,7 +1268,7 @@ FRONTEND_HTML = r'''<!doctype html>
       state.refreshController?.abort(); state.refreshController = null;
       detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null; state.connected = false;
       resetDetailState(); state.snapshot = null; state.observations = []; state.selectedGraphKey = null; graphView.neighborhood = null; graphView.arenaKey = '';
-      invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.hoverRoot=graphView.focusRoot=graphView.selectedRoot=null; graphView.basePositions=null; graphView.revealSignature=''; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
+      invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.hoverRoot=graphView.focusRoot=graphView.selectedRoot=null; graphView.revealSignature=''; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
       ['total-work', 'active-initiatives', 'observation-count', 'pending-receipts'].forEach(id => text(id, '—'));
       renderActivity([]); renderObservations([]); renderPipeline({}); renderBars({});
     }
@@ -1399,7 +1387,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function applyGraphFilters() {
-      graphView.hoverRoot = graphView.focusRoot = graphView.selectedRoot = null; graphView.basePositions = null; graphView.revealSignature = '';
+      graphView.hoverRoot = graphView.focusRoot = graphView.selectedRoot = null; graphView.revealSignature = '';
       invalidateLayout(); pauseGraphOrbit(); graphView.filterSerial += 1; state.filterFeedback = true; state.pendingSnapshot = null;
       graphView.filters = Topology.overviewFilters(graphView.filters); graphView.visibleCategories = new Set(graphView.filters.category ?? Topology.categories); graphView.arenaKey = graphView.filters.arena; graphView.neighborhood = graphView.filters.anchor || null;
       saveGraphPreferences(); renderTopologyControls(); announceGraph('Applying filters…');

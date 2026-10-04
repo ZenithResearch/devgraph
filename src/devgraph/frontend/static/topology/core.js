@@ -197,6 +197,26 @@
     return {positions,groups,parents,arenaOf};
   }
   function coordinates(nodes, edges=[]) { return hierarchy(nodes,edges).positions; }
+  // Revealing a branch must not repack the map around one active root. Keep
+  // every visible item fixed and attach new descendants to their nearest
+  // visible ancestor, including when several families are open at once.
+  function anchorHierarchy(plan, anchors) {
+    const offsets=new Map(), positions=new Map();
+    for(const [key,p] of plan.positions){
+      const anchor=anchors.get(key);
+      if(anchor)offsets.set(key,{x:anchor.x-p.x,y:anchor.y-p.y,z:anchor.z-p.z});
+    }
+    for(const [key,p] of plan.positions){
+      const trail=[],visited=new Set();let ancestor=key;
+      while(ancestor&&!offsets.has(ancestor)&&!visited.has(ancestor)){
+        visited.add(ancestor);trail.push(ancestor);ancestor=plan.parents.get(ancestor);
+      }
+      const delta=offsets.get(ancestor)||{x:0,y:0,z:0};
+      for(const entry of trail)offsets.set(entry,delta);
+      positions.set(key,anchors.has(key)?{...anchors.get(key)}:{x:p.x+delta.x,y:p.y+delta.y,z:p.z+delta.z});
+    }
+    return {...plan,positions};
+  }
   function regions(groups, positions) {
     return (groups||[]).map(group=>{
       const points=group.keys.map(key=>positions.get(key)).filter(Boolean);
@@ -281,5 +301,5 @@
     view.pinnedKey=entry.pinned;view.repulsionStrength=entry.separation;view.edgeStrengths=new Map(entry.strengths);
     if(camera)Object.assign(view,entry.camera);
   }
-  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,primaryKinds,overviewKinds,overviewFilters,overviewProjection,attentionRoot,defaultCamera,hierarchy,regions,regionCorners,depthOrder,coordinates,layout,filters,query,preferences,capture,restore};
+  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,primaryKinds,overviewKinds,overviewFilters,overviewProjection,attentionRoot,defaultCamera,hierarchy,anchorHierarchy,regions,regionCorners,depthOrder,coordinates,layout,filters,query,preferences,capture,restore};
 })(globalThis);

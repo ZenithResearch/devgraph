@@ -192,8 +192,53 @@ test('refresh classifies changed parentage without restoring a stale collapsed l
   const c=monitor(); c.state.snapshot=snapshot(); c.updateGraphVisibility();
   c.setGraphAttention('hoveredKey','work-a');
   c.state.snapshot=snapshot(nodes,[]); c.updateGraphVisibility();
-  assert.equal(c.graphView.basePositions,null,'changed parentage invalidates the old overview cache');
   c.setGraphAttention('hoveredKey',null);
   assert.deepEqual(Array.from(c.graphView.nodes,n=>n.key),['work-a','work-b'],'newly standalone Issue remains visible after collapse');
   for(const node of c.graphView.nodes) assert.deepEqual({...c.graphView.nodePositions.get(node.key)},{...c.graphView.layoutPlan.positions.get(node.key)});
+});
+
+test('revealing, switching, refreshing, and collapsing families keeps every existing node and the camera still',()=>{
+  const c=monitor();
+  const work=(kind,id)=>({key:`${kind}:${id}`,id,kind,category:kind==='Arena'?'arena':'work'});
+  const a=work('Arena','a'),b=work('Arena','b'),i=work('Initiative','i'),p=work('Project','p'),q=work('Project','q');
+  const issue=work('Issue','child'),task=work('Task','nested'),other=work('Task','other'),standalone=work('Issue','standalone');
+  const link=(source,target,relationship='HAS_CHILD')=>({source:source.key,target:target.key,relationship});
+  c.state.snapshot=snapshot([a,b,i,p,q,issue,task,other,standalone],[link(a,i,'CONTAINS_WORK'),link(b,q,'CONTAINS_WORK'),link(i,p),link(p,issue),link(issue,task),link(q,other)]);
+  c.updateGraphVisibility();
+  const camera={panX:73,panY:-48,zoom:1.7,yaw:-.32,pitch:.24,cameraDistance:5000,fitted:true};
+  Object.assign(c.graphView,camera);
+  const original=new Map([...c.graphView.nodePositions].map(([k,p])=>[k,{...p}]));
+  c.fitGraph=()=>assert.fail('attention must not refit');
+  c.relaxGraph=()=>assert.fail('attention must not run global physics');
+  const still=action=>{
+    const before=new Map(c.graphView.nodes.map(n=>[n.key,{...c.graphView.nodePositions.get(n.key)}]));
+    action();
+    for(const n of c.graphView.nodes)if(before.has(n.key))assert.deepEqual({...c.graphView.nodePositions.get(n.key)},before.get(n.key),`${n.key} must not move`);
+    for(const [k,v] of Object.entries(camera))assert.equal(c.graphView[k],v,`camera ${k} must not move`);
+  };
+  for(let cycle=0;cycle<3;cycle++){
+    still(()=>c.setGraphAttention('hoveredKey',i.key));
+    assert.ok(c.graphView.nodes.some(n=>n.key===task.key),'all descendants are still revealed');
+    still(()=>c.setGraphAttention('focusedKey',q.key));
+    assert.ok(c.graphView.nodes.some(n=>n.key===other.key),'two independently anchored families can be open');
+    still(()=>c.setGraphAttention('hoveredKey',q.key));
+    still(()=>c.updateGraphVisibility());
+    still(()=>c.setGraphAttention('hoveredKey',null));
+    still(()=>c.setGraphAttention('focusedKey',null));
+    for(const [key,position] of original)assert.deepEqual({...c.graphView.nodePositions.get(key)},position);
+  }
+});
+
+test('collapsing does not undo manual positioning and reopened children follow a moved parent',()=>{
+  const c=monitor();c.state.snapshot=snapshot();c.updateGraphVisibility();
+  c.setGraphAttention('hoveredKey','work-a');
+  c.graphView.nodePositions.set('work-a',{x:900,y:30,z:120});
+  c.setGraphAttention('hoveredKey',null);
+  assert.deepEqual({...c.graphView.nodePositions.get('work-a')},{x:900,y:30,z:120});
+  c.setGraphAttention('hoveredKey','work-a');
+  const first={...c.graphView.nodePositions.get('work-b')};
+  c.setGraphAttention('hoveredKey',null);
+  c.graphView.nodePositions.set('work-a',{x:1080,y:80,z:180});
+  c.setGraphAttention('hoveredKey','work-a');
+  assert.deepEqual({...c.graphView.nodePositions.get('work-b')},{x:first.x+180,y:first.y+50,z:first.z+60});
 });
