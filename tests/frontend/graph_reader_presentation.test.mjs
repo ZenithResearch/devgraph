@@ -21,19 +21,21 @@ function presentation(width = 1000) {
   surface.scrollIntoView = () => { scrolls += 1; };
   svg.focus = () => { assert.equal(map.inert, false, 'restore focus only after the map becomes interactive'); document.activeElement = svg; };
   const c = contextWithFunctions(['syncReaderPresentation', 'setReaderCollapsed', 'setReaderMode'], {
-    document, window: { requestAnimationFrame: callback => callback() },
+    document, detailState: {node: {key:'Project:example'}}, modalRequests: [],
+    openNodeReaderModal(node,trigger) { this.modalRequests.push({node,trigger}); }, window: { requestAnimationFrame: callback => callback() },
     saveGraphPreferences() { saves += 1; },
     text(id, value) { document.getElementById(id).textContent = value; },
   });
   return {c, document, surface, panel, svg, title, layout, map, saves: () => saves, scrolls: () => scrolls};
 }
 
-test('narrow reader disables covered map and close restores focus and saves preference', () => {
+test('narrow reader keeps the graph interactive and close restores focus and saves preference', () => {
   const p = presentation(760);
   p.document.activeElement = p.svg;
   p.c.syncReaderPresentation();
-  assert.equal(p.map.inert, true);
-  assert.equal(p.document.activeElement, p.title);
+  assert.equal(p.map.inert, false);
+  assert.equal(p.document.activeElement, p.svg);
+  p.document.activeElement = p.title;
   p.c.setReaderCollapsed(true);
   assert.equal(p.map.inert, false);
   assert.equal(p.document.activeElement, p.svg);
@@ -53,17 +55,13 @@ test('resizing back to a desktop split restores map interaction without changing
   assert.equal(p.document.activeElement, p.title);
 });
 
-test('expanded reader and return scroll the surface into view and focus its navigation', () => {
+test('the optional modal action never switches to a graph-replacing reading view', () => {
   const p = presentation();
-  p.c.setReaderMode(true);
-  assert.equal(p.surface.classList.contains('reading-view'), true);
-  assert.equal(p.document.activeElement, p.title);
-  assert.equal(p.scrolls(), 1);
-  p.c.setReaderMode(false);
+  p.c.openNodeReaderModal = (node, trigger) => p.c.modalRequests.push({node,trigger});
+  p.c.setReaderMode();
   assert.equal(p.surface.classList.contains('reading-view'), false);
-  assert.equal(p.document.activeElement, p.document.getElementById('reader-mode'));
-  assert.equal(p.scrolls(), 2);
-  p.surface.classList.toggle('is-fullscreen', true);
-  p.c.setReaderMode(true);
-  assert.equal(p.scrolls(), 2, 'fullscreen reading must not scroll the underlying page');
+  assert.equal(p.c.modalRequests.length, 1);
+  assert.equal(p.c.modalRequests[0].node.key, 'Project:example');
+  assert.equal(p.c.modalRequests[0].trigger, p.document.getElementById('reader-mode'));
+  assert.equal(p.scrolls(), 0);
 });

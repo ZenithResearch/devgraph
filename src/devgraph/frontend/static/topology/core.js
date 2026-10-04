@@ -82,12 +82,84 @@
     }
     return {byKey, adjacent, degree};
   }
-  function coordinates(nodes) {
-    const positions = new Map(), ordered = [...nodes].sort((a,b) => a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key));
-    const columns = Math.max(1, Math.ceil(Math.sqrt(nodes.length * 1.618)));
-    const rows = Math.ceil(nodes.length / columns), gap = 66;
-    ordered.forEach((n,i) => positions.set(n.key, {x: (i%columns-(columns-1)/2)*gap, y: (Math.floor(i/columns)-(rows-1)/2)*gap, z: 0}));
-    return positions;
+  const overviewKinds = ['Proposal', 'Initiative', 'Project'];
+  function overviewFilters(value = {}) {
+    const f = filters(value), selected = f.work_kind?.filter(kind => overviewKinds.includes(kind));
+    return {...f, category:['arena','work'], work_kind:selected?.length || f.work_kind?.length === 0 ? selected : [...overviewKinds], observation_status:null, record_status:null};
+  }
+
+  // Containment alone owns neighborhoods. Dependencies never reparent a node.
+  // Pack each subtree as a block, then pack Arena blocks with a generous gutter.
+  function hierarchy(nodes, edges) {
+    const ordered = [...nodes].sort((a,b)=>(a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    const byKey = new Map(ordered.map(n=>[n.key,n])), parents = new Map(), children = new Map();
+    for (const e of [...edges].sort((a,b)=>a.source.localeCompare(b.source)||a.target.localeCompare(b.target))) {
+      if (!byKey.has(e.source) || !byKey.has(e.target) || e.source===e.target || parents.has(e.target)) continue;
+      if (!(e.relationship==='HAS_CHILD' && byKey.get(e.source).kind!=='Arena') && !(e.relationship==='CONTAINS_WORK' && byKey.get(e.source).kind==='Arena')) continue;
+      parents.set(e.target,e.source);
+    }
+    // Defensive cycle handling is deterministic even for incomplete input.
+    const finished=new Set();
+    for (const node of ordered) {
+      const path=new Set();let key=node.key;
+      while (parents.has(key) && !finished.has(key)) {
+        if(path.has(key)){parents.delete(key);break;}
+        path.add(key);key=parents.get(key);
+      }
+      for(const key of path)finished.add(key);
+    }
+    for(const [key,parent] of parents){if(!children.has(parent))children.set(parent,[]);children.get(parent).push(key);}
+    for(const list of children.values())list.sort();
+    const gap=144, level=154, gutter=210, positions=new Map(), groups=[];
+    function pack(blocks, spacing, minimumColumns=1) {
+      if(!blocks.length)return {width:gap,height:80,items:[]};
+      let columns=1,best=Infinity;
+      // Variable-sized subtrees need area-aware packing, not a square node grid.
+      for(let count=Math.max(1,minimumColumns);count<=Math.min(blocks.length,Math.ceil(Math.sqrt(blocks.length)*2));count++){
+        const widths=Array(count).fill(0),heights=[];
+        blocks.forEach((b,i)=>{widths[i%count]=Math.max(widths[i%count],b.width);heights[Math.floor(i/count)]=Math.max(heights[Math.floor(i/count)]||0,b.height);});
+        const width=widths.reduce((a,b)=>a+b,0)+(count-1)*spacing,height=heights.reduce((a,b)=>a+b,0)+(heights.length-1)*spacing;
+        const cost=Math.max(width/1.618,height);if(cost<best){best=cost;columns=count;}
+      }
+      const widths=Array(columns).fill(0), heights=[];
+      blocks.forEach((b,i)=>{widths[i%columns]=Math.max(widths[i%columns],b.width);heights[Math.floor(i/columns)]=Math.max(heights[Math.floor(i/columns)]||0,b.height);});
+      const xs=[],ys=[];let width=0,height=0;
+      widths.forEach((w,i)=>{xs[i]=width;width+=w+spacing;});
+      heights.forEach((h,i)=>{ys[i]=height;height+=h+spacing;});
+      return {width:width-spacing,height:height-spacing,items:blocks.map((b,i)=>({block:b,x:xs[i%columns]+(widths[i%columns]-b.width)/2,y:ys[Math.floor(i/columns)]}))};
+    }
+    const trees=new Map();
+    // Iterative postorder avoids call-stack growth for long valid hierarchies.
+    const work=ordered.filter(n=>n.kind!=='Arena');
+    const pending=work.filter(n=>!parents.has(n.key)||byKey.get(parents.get(n.key))?.kind==='Arena').map(n=>[n.key,false]);
+    while(pending.length){const [key,ready]=pending.pop();if(trees.has(key))continue;
+      const childKeys=children.get(key)||[];
+      if(!ready){pending.push([key,true]);for(const child of childKeys)pending.push([child,false]);continue;}
+      const packed=pack(childKeys.map(key=>trees.get(key)).filter(Boolean),38,Math.min(3,childKeys.length));
+      trees.set(key,{key,width:Math.max(gap,childKeys.length?packed.width:gap),height:childKeys.length?level+packed.height:64,children:childKeys.length?packed.items:[]});
+    }
+    const arenaOf=new Map();
+    for(const node of work){let key=node.key;const trail=[];while(!arenaOf.has(key)&&byKey.get(key)?.kind!=='Arena'&&parents.has(key)){trail.push(key);key=parents.get(key);}
+      const arena=arenaOf.get(key) || (byKey.get(key)?.kind==='Arena'?key:'unassigned');arenaOf.set(node.key,arena);for(const k of trail)arenaOf.set(k,arena);}
+    const arenas=ordered.filter(n=>n.kind==='Arena').map(n=>({key:n.key,title:n.title||n.key}));
+    if(work.some(n=>arenaOf.get(n.key)==='unassigned'))arenas.push({key:'unassigned',title:'Outside an Arena'});
+    const blocks=arenas.map(arena=>{const roots=work.filter(n=>arenaOf.get(n.key)===arena.key&&(!parents.has(n.key)||byKey.get(parents.get(n.key))?.kind==='Arena'));const packed=pack(roots.map(n=>trees.get(n.key)),90);return {...arena,width:Math.max(540,packed.width+128),height:packed.height+160,packed,keys:work.filter(n=>arenaOf.get(n.key)===arena.key).map(n=>n.key)};});
+    const world=pack(blocks,gutter);
+    for(const item of world.items){const b=item.block,x=item.x-world.width/2,y=item.y-world.height/2;
+      groups.push({key:b.key,title:b.title,x,y,width:b.width,height:b.height,keys:b.keys});
+      const stack=b.packed.items.map(child=>({tree:child.block,x:x+(b.width-b.packed.width)/2+child.x,y:y+90+child.y}));
+      while(stack.length){const {tree,x,y}=stack.pop();positions.set(tree.key,{x:x+tree.width/2,y,z:0});for(const child of tree.children)stack.push({tree:child.block,x:x+child.x,y:y+level+child.y});}
+    }
+    return {positions,groups,parents,arenaOf};
+  }
+  function coordinates(nodes, edges=[]) { return hierarchy(nodes,edges).positions; }
+  function regions(groups, positions) {
+    return (groups||[]).map(group=>{
+      const points=group.keys.map(key=>positions.get(key)).filter(Boolean);
+      if(!points.length)return group;
+      const x=Math.min(...points.map(p=>p.x))-72,y=Math.min(...points.map(p=>p.y))-78;
+      return {...group,x,y,width:Math.max(240,Math.max(...points.map(p=>p.x))-x+72),height:Math.max(...points.map(p=>p.y))-y+76};
+    });
   }
   // Spatial-grid collision relaxation: bounded neighbors, O(N + E) per iteration.
   // Long edges have a capped pull so the graph never collapses into a single hub.
@@ -95,12 +167,13 @@
     const points = new Map([...positions].map(([k,p]) => [k,{...p}]));
     const spacing = 44 + 12*(options.separation || 1.5), cell = spacing;
     const rounds = Math.min(80, options.iterations || 30);
+    const anchors = new Map(options.anchors || hierarchy(nodes,edges).positions);
     for (let round=0;round<rounds;round++) {
       const grid = new Map(), force = new Map();
       for (const n of nodes) {
         const p=points.get(n.key); if(!p) continue;
         const key=`${Math.floor(p.x/cell)},${Math.floor(p.y/cell)}`;
-        if(!grid.has(key))grid.set(key,[]);grid.get(key).push(n.key);force.set(n.key,{x:0,y:0});
+        if(!grid.has(key))grid.set(key,[]);grid.get(key).push(n.key);const anchor=anchors.get(n.key)||p;force.set(n.key,{x:(anchor.x-p.x)*.18,y:(anchor.y-p.y)*.24});
       }
       for (const n of nodes) {
         const p=points.get(n.key); if(!p || n.key===options.pinned)continue;
@@ -116,11 +189,11 @@
       for(const e of edges) {
         const a=points.get(e.source),b=points.get(e.target);if(!a||!b)continue;
         const dx=b.x-a.x,dy=b.y-a.y,d=Math.max(1,Math.hypot(dx,dy));
-        const pull=Math.min(1.8,Math.max(-1.8,(d-110)*.003))*(options.strengths?.[e.relationship]??1);
+        const pull=Math.min(1.8,Math.max(-1.8,(d-154)*(['HAS_CHILD','CONTAINS_WORK'].includes(e.relationship)?.003:.0002)))*(options.strengths?.[e.relationship]??1);
         const fa=force.get(e.source),fb=force.get(e.target);if(!fa||!fb)continue;
         fa.x+=dx/d*pull;fa.y+=dy/d*pull;fb.x-=dx/d*pull;fb.y-=dy/d*pull;
       }
-      for(const [key,p]of points){if(key===options.pinned)continue;const f=force.get(key);if(!f)continue;p.x+=Math.max(-8,Math.min(8,f.x));p.y+=Math.max(-8,Math.min(8,f.y));}
+      for(const [key,p]of points){if(key===options.pinned)continue;const f=force.get(key);if(!f)continue;p.x+=Math.max(-8,Math.min(8,f.x));p.y+=Math.max(-8,Math.min(8,f.y));const anchor=anchors.get(key);if(anchor){p.x=Math.max(anchor.x-32,Math.min(anchor.x+32,p.x));p.y=Math.max(anchor.y-24,Math.min(anchor.y+24,p.y));}}
     }
     return [...points];
   }
@@ -158,5 +231,5 @@
     view.pinnedKey=entry.pinned;view.repulsionStrength=entry.separation;view.edgeStrengths=new Map(entry.strengths);
     if(camera)Object.assign(view,entry.camera);
   }
-  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,coordinates,layout,filters,query,preferences,capture,restore};
+  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,overviewKinds,overviewFilters,hierarchy,regions,coordinates,layout,filters,query,preferences,capture,restore};
 })(globalThis);

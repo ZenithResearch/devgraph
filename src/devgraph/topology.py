@@ -252,6 +252,35 @@ def filter_projection(snapshot, filters: TopologyFilter):
     shown_keys = {n["key"] for n in shown}
     shown_edges = [e for e in edges if e["source"] in shown_keys and e["target"] in shown_keys]
     shown_edges = shown_edges[: filters.edge_limit]
+    # Minimal ancestor context keeps the overview layout stable when a parent
+    # type or its connecting lines are filtered out. It never adds rendered nodes.
+    overview_kinds = {"Arena", "Proposal", "Initiative", "Project"}
+    ancestry = {}
+    for edge in all_edges:
+        if edge["relationship"] in {"HAS_CHILD", "CONTAINS_WORK"}:
+            ancestry.setdefault(edge["target"], []).append(edge["source"])
+    layout_keys = {n["key"] for n in shown if n["kind"] in overview_kinds}
+    queue = list(layout_keys)
+    for key in queue:
+        for parent in ancestry.get(key, ()):
+            if (
+                parent not in layout_keys
+                and parent in available
+                and available[parent]["kind"] in overview_kinds
+            ):
+                layout_keys.add(parent)
+                queue.append(parent)
+    layout_context = {
+        "nodes": [
+            {key: node[key] for key in ("key", "kind", "title", "category")}
+            for node in all_nodes if node["key"] in layout_keys
+        ],
+        "edges": [
+            edge for edge in all_edges
+            if edge["relationship"] in {"HAS_CHILD", "CONTAINS_WORK"}
+            and edge["source"] in layout_keys and edge["target"] in layout_keys
+        ],
+    }
     stable = {
         key: value
         for key, value in snapshot.items()
@@ -268,6 +297,7 @@ def filter_projection(snapshot, filters: TopologyFilter):
         "applied_filters": asdict(filters),
         "graph_nodes": shown,
         "graph_edges": shown_edges,
+        "layout_context": layout_context,
         "facets": facets,
         "arenas": [n for n in all_nodes if n["kind"] == "Arena"],
         "relationship_types": sorted({e["relationship"] for e in all_edges}),

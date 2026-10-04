@@ -385,3 +385,34 @@ def test_topology_can_be_imported_without_auth_import_order():
         capture_output=True,
         timeout=10,
     )
+
+
+def test_layout_ancestor_context_survives_hidden_types_and_edges_without_unrelated_work():
+    def node(kind, key):
+        return {"key": f"{kind}:{key}", "kind": kind, "id": key, "title": key,
+                "category": "arena" if kind == "Arena" else "work",
+                "status": "draft", "archived": False, "description": "not layout metadata"}
+
+    snapshot = {
+        "graph_nodes": [node("Arena", "a"), node("Initiative", "i"),
+                        node("Project", "p"), node("Project", "sibling"),
+                        node("Project", "unrelated"), node("Task", "detail")],
+        "graph_edges": [
+            {"source": "Arena:a", "target": "Initiative:i", "relationship": "CONTAINS_WORK"},
+            {"source": "Initiative:i", "target": "Project:p", "relationship": "HAS_CHILD"},
+            {"source": "Initiative:i", "target": "Project:sibling", "relationship": "HAS_CHILD"},
+            {"source": "Project:p", "target": "Task:detail", "relationship": "HAS_CHILD"},
+            {"source": "Project:p", "target": "Project:unrelated", "relationship": "DEPENDS_ON"},
+        ],
+    }
+    result = filter_projection(snapshot, TopologyFilter.parse(
+        "category=work&work_kind=Project&q=p&relationship=none&node_limit=1"
+    ))
+    assert [n["key"] for n in result["graph_nodes"]] == ["Project:p"]
+    assert result["graph_edges"] == []
+    context = result["layout_context"]
+    assert {n["key"] for n in context["nodes"]} == {"Arena:a", "Initiative:i", "Project:p"}
+    assert {e["relationship"] for e in context["edges"]} == {"CONTAINS_WORK", "HAS_CHILD"}
+    assert all(set(n) == {"key", "kind", "title", "category"} for n in context["nodes"])
+    empty = filter_projection(snapshot, TopologyFilter.parse("category=none"))
+    assert empty["layout_context"] == {"nodes": [], "edges": []}

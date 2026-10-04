@@ -75,14 +75,26 @@ choice is remembered in this browser and shared with Project selection. A
 second selector stays available when the graph canvas is fullscreen. Changing
 appearance preserves your graph filters, positions, selection, and local inputs.
 
-Use **Filters** for object categories, individual Work types, category-specific
-statuses, archived items, text and connection types. The legend explains each
-shape. All filters are available through the API and survive a page reload.
-**Clear filters** restores the full supported view. **Hide Observer** reclaims
+The canvas renders Proposals, Initiatives, and Projects. Arenas appear as labeled
+regions, with separate space for work outside an Arena. Containment places each
+parent above its child groups; bounded worker physics relaxes collisions without
+letting dependencies pull families across Arena boundaries. The solids retain
+their 3D appearance; the initial camera faces the hierarchy directly.
+
+Use **Filters** for those three Work types, lifecycle status, archived items,
+text and connection lines. Hiding a parent type or its line does not remove its
+layout context. The API continues supporting every original category and Work
+subtype. Existing saved filters are narrowed to the overview's supported types.
+**Clear filters** restores the overview. **Hide Observer** reclaims
 space without changing the graph. Details stack on narrow windows; wide views
 start with a golden-ratio graph/details split and support reader resizing.
 
-Hover an item for its type, status and connected labels. Click to read details;
+Hover an item for its type, status and connected labels. Click to read details
+beside the graph; narrow screens stack the reader below the interactive canvas.
+Right-click, Shift+F10, or **Open modal** opens the overlay reader and restores
+focus when closed. Reading never switches the graph to a replacement page.
+Issues and Tasks remain accessible through related work in the reader and on
+the Work board. For keyboard selection,
 use **Browse visible items** or search when the map is dense. Overlapping
 picking targets open a chooser. Move items with drag or arrow keys, then use
 **Undo positioning** to revert. Escape cancels a move. **Reset layout** is also

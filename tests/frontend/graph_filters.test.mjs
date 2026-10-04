@@ -148,8 +148,6 @@ test('all-hidden refresh keeps choices and restoring a category reveals fresh re
   assert.equal(c.graphView.edges.length, 0);
   c.graphView.visibleCategories.add('work');
   c.updateGraphVisibility();
-  assert.deepEqual(Array.from(c.graphView.nodes, node => node.key), ['work-a', 'work-b', 'new-work']);
-  assert.deepEqual(Array.from(c.graphView.edges, edge => [edge.source, edge.target]), [
-    ['work-a', 'work-b'], ['work-b', 'new-work'],
-  ]);
+  assert.deepEqual(Array.from(c.graphView.nodes, node => node.key), ['work-a']);
+  assert.deepEqual(Array.from(c.graphView.edges, edge => [edge.source, edge.target]), []);
 });

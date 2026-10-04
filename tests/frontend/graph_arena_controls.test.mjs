@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { contextWithFunctions, frontend, treeDocument } from './monitor_test_helpers.mjs';
 
 const arena = { key: 'Arena:devgraph', category: 'arena', kind: 'Arena', id: 'devgraph', title: 'Devgraph' };
-const task = { key: 'Task:records', category: 'work', kind: 'Task', id: 'records', title: 'Rename records' };
+const task = { key: 'Project:records', category: 'work', kind: 'Project', id: 'records', title: 'Rename records' };
 const outside = { ...task, key: 'Task:outside', id: 'outside', title: 'Outside records' };
 const edges = [{ source: arena.key, target: task.key, relationship: 'CONTAINS_WORK' }];
 
@@ -14,7 +14,7 @@ function controls() {
     'renderArenaFilter', 'reconcileChildren', 'filterGraphByArena', 'renderGraphSearch', 'setGraphArena',
   ], {
     document,
-    graphView: { filters: {}, arenaKey: arena.key, neighborhood: 'Task:previous', visibleCategories: new Set(['arena', 'work']) },
+    graphView: { nodes: [task], filters: {}, arenaKey: arena.key, neighborhood: 'Task:previous', visibleCategories: new Set(['arena', 'work']) },
     state: { snapshot: { graph_nodes: [arena, task, outside], graph_edges: edges } },
     pauseGraphOrbit() {}, updateGraphVisibility() {}, fitGraph() {},
   });
@@ -54,7 +54,7 @@ test('Arena titles are inert text and archived Arenas remain identifiable', () =
   assert.equal(option.children.length, 0);
 });
 
-test('graph search is constrained by Arena reachability but still finds hidden categories', () => {
+test('graph search stays inside the displayed overview', () => {
   const c = controls();
   c.graphView.visibleCategories.clear();
   c.document.getElementById('graph-search').value = 'records';

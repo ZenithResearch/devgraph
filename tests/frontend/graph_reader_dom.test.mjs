@@ -76,6 +76,8 @@ test('a filtered reader distinguishes visible connections from all snapshot conn
 
 test('an inspected node outside the Arena filter offers an explicit return to all nodes', () => {
   const c = readerTree();
+  c.detailState.node = {...c.detailState.node,kind:'Project'};
+  c.state.snapshot.graph_nodes = [c.detailState.node];
   c.graphView.arenaKey = 'Arena:other';
   c.graphView.arenaNodes = [];
   c.graphView.nodes = [];

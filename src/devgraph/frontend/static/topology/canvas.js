@@ -26,7 +26,7 @@
     }
     const ctx = canvas.getContext('2d');
     ctx.setTransform(ratio,0,0,ratio,0,0); ctx.clearRect(0,0,width,height);
-    const candidates = [], occupied = [], positions = view.projected;
+    const candidates = [], occupied = [...(view.regionLabelBoxes || [])], positions = view.projected;
     for (const edge of view.edges) {
       const a=positions.get(edge.source), b=positions.get(edge.target); if(!a||!b)continue;
       if(Math.max(a.x,b.x)<-30||Math.min(a.x,b.x)>width+30||Math.max(a.y,b.y)<-30||Math.min(a.y,b.y)>height+30)continue;
@@ -50,7 +50,7 @@
       if(selected||node.key===previewKey){ctx.strokeStyle=paint.outline;ctx.lineWidth=3/r;ctx.stroke(paths.get(key));}
       if(selected){ctx.strokeStyle=paint.selection;ctx.lineWidth=1.5/r;ctx.beginPath();ctx.arc(0,0,1+6/r,0,Math.PI*2);ctx.stroke();}ctx.restore();
       occupied.push({x:p.x-r-2,y:p.y-r-2,width:(r+2)*2,height:(r+2)*2});
-      if(view.labels!=='none'&&(labelKeys.has(node.key)||(view.labels==='all'&&candidates.length<160))) {
+      if(view.labels!=='none'&&(labelKeys.has(node.key)||(p.scale>.35&&['Initiative','Proposal'].includes(node.kind))||(view.labels==='all'&&candidates.length<160))) {
         const text=node.title.length>36?node.title.slice(0,35)+'…':node.title,w=text.length*7.5+8;
         const c={key:`node:${node.key}`,text,width:w,height:19,priority:node.key===previewKey?0:1};
         candidates.push({...c,x:p.x+r+9,y:p.y-9},{...c,x:p.x-w-r-9,y:p.y-9},{...c,x:p.x-w/2,y:p.y-r-26},{...c,x:p.x-w/2,y:p.y+r+9});

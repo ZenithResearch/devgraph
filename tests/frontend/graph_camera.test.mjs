@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { topologySource } from './monitor_test_helpers.mjs';
 
 const frontend = readFileSync(new URL('../../src/devgraph/frontend/app.py', import.meta.url), 'utf8');
 const functionNames = [
@@ -36,6 +37,7 @@ function camera(width = 1080, height = 420) {
     text() {}, renderGraph() {}, renderGraphSelection() {}, renderGraphSearch() {}, renderArenaFilter() {},
     graphCoordinates(nodes) { return new Map(nodes.map(node => [node.key, node.point])); },
   });
+  vm.runInContext(topologySource, context); context.Topology = context.DevgraphTopology;
   vm.runInContext(source, context);
   return context;
 }
