@@ -58,7 +58,7 @@ function monitor() {
     } },
     topologyPath: () => '/monitor/topology/v1', renderTopologyControls() {}, text() {}, relativeTime() { return 'now'; }, pauseGraphOrbit() {}, invalidateLayout() {}, requestGraphRender() {},
     renderPipeline() {}, renderBars() {}, renderActivity() {}, renderObservations() {},
-    renderForceControls() {}, renderArenaFilter() {}, relaxGraph() {}, fitGraph() {},
+    renderForceControls() {}, renderArenaFilter() {}, relaxGraph() {}, settleRevealedChildren() {}, fitGraph() {},
     renderGraph() {}, renderGraphSelection() {}, renderGraphSearch() {}, loadSelectedDetail() {}, queueMicrotask,
   });
   c.relaxations = 0;
@@ -192,9 +192,10 @@ test('refresh classifies changed parentage without restoring a stale collapsed l
   const c=monitor(); c.state.snapshot=snapshot(); c.updateGraphVisibility();
   c.setGraphAttention('hoveredKey','work-a');
   c.state.snapshot=snapshot(nodes,[]); c.updateGraphVisibility();
+  const refreshed=new Map([...c.graphView.nodePositions].map(([key,p])=>[key,{...p}]));
   c.setGraphAttention('hoveredKey',null);
   assert.deepEqual(Array.from(c.graphView.nodes,n=>n.key),['work-a','work-b'],'newly standalone Issue remains visible after collapse');
-  for(const node of c.graphView.nodes) assert.deepEqual({...c.graphView.nodePositions.get(node.key)},{...c.graphView.layoutPlan.positions.get(node.key)});
+  for(const node of c.graphView.nodes) assert.deepEqual({...c.graphView.nodePositions.get(node.key)},refreshed.get(node.key),'collapse must not restore obsolete parentage positions');
 });
 
 test('revealing, switching, refreshing, and collapsing families keeps every existing node and the camera still',()=>{
@@ -218,7 +219,12 @@ test('revealing, switching, refreshing, and collapsing families keeps every exis
   };
   for(let cycle=0;cycle<3;cycle++){
     still(()=>c.setGraphAttention('hoveredKey',i.key));
-    assert.ok(c.graphView.nodes.some(n=>n.key===task.key),'all descendants are still revealed');
+    assert.ok(!c.graphView.nodes.some(n=>n.key===issue.key||n.key===task.key),'initiative hover keeps deeper work hidden');
+    still(()=>c.setGraphAttention('hoveredKey',p.key));
+    assert.ok(c.graphView.nodes.some(n=>n.key===issue.key));
+    assert.ok(!c.graphView.nodes.some(n=>n.key===task.key));
+    still(()=>c.setGraphAttention('hoveredKey',issue.key));
+    assert.ok(c.graphView.nodes.some(n=>n.key===task.key),'hovering the Issue opens the next level');
     still(()=>c.setGraphAttention('focusedKey',q.key));
     assert.ok(c.graphView.nodes.some(n=>n.key===other.key),'two independently anchored families can be open');
     still(()=>c.setGraphAttention('hoveredKey',q.key));
@@ -241,4 +247,19 @@ test('collapsing does not undo manual positioning and reopened children follow a
   c.graphView.nodePositions.set('work-a',{x:1080,y:80,z:180});
   c.setGraphAttention('hoveredKey','work-a');
   assert.deepEqual({...c.graphView.nodePositions.get('work-b')},{x:first.x+180,y:first.y+50,z:first.z+60});
+});
+
+test('revisiting a settled branch reuses positions until the parent or camera changes',()=>{
+  const c=monitor(),calls=[];c.settleRevealedChildren=keys=>calls.push([...keys]);
+  c.state.snapshot=snapshot();c.updateGraphVisibility();c.setGraphAttention('hoveredKey','work-a');
+  assert.deepEqual(calls,[['work-b']]);
+  const position={x:400,y:280,z:140};
+  c.graphView.revealCache.set('work-b',{parentKey:'work-a',parent:{...c.graphView.nodePositions.get('work-a')},position});
+  c.setGraphAttention('hoveredKey',null);c.setGraphAttention('hoveredKey','work-a');
+  assert.deepEqual({...c.graphView.nodePositions.get('work-b')},position);
+  assert.equal(calls.length,1,'unchanged reopen skips the worker and animation');
+  c.setGraphAttention('hoveredKey',null);c.graphView.nodePositions.get('work-a').x+=200;c.setGraphAttention('hoveredKey','work-a');
+  assert.equal(calls.length,2,'moving the parent rechecks child spacing');
+  c.setGraphAttention('hoveredKey',null);c.graphView.zoom=.6;c.setGraphAttention('hoveredKey','work-a');
+  assert.equal(calls.length,3,'changed projection rechecks screen-space spacing');
 });

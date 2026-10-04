@@ -102,10 +102,17 @@
     const base=new Set(nodes.filter(n=>n.kind==='Arena'||primaryKinds.includes(n.kind)||(kinds.includes(n.kind)&&!parents.has(n.key))).map(n=>n.key));
     const visible=new Set(base), families=new Map();
     for(const root of new Set(roots)){
-      if(!['Initiative','Project'].includes(byKey.get(root)?.kind))continue;
-      const family=new Set([root]),queue=[root];
-      for(const key of queue)for(const child of children.get(key)||[])if(!family.has(child)){family.add(child);queue.push(child);}
-      families.set(root,family);for(const key of family)if(byKey.has(key))visible.add(key);
+      if(!kinds.includes(byKey.get(root)?.kind)||!children.get(root)?.size)continue;
+      // Retain the open ancestor path while drilling into a revealed child.
+      // Each open parent contributes only its own immediate children.
+      const visited=new Set();let current=root;
+      while(current&&!visited.has(current)){
+        visited.add(current);
+        const family=new Set([current,...(children.get(current)||[])]);
+        families.set(current,family);for(const key of family)if(byKey.has(key))visible.add(key);
+        if(base.has(current))break;
+        current=parents.get(current);
+      }
     }
     // Hidden ancestors classify roots and organize the visible branch, but are
     // never promoted into results. Display filters still govern the loaded set.
@@ -120,13 +127,12 @@
   }
   function attentionRoot(key,previous,model) {
     if(!key||!model?.byKey.has(key))return null;
-    const visited=new Set();let current=key,nearest=null;
+    const visited=new Set();let current=key;
     while(current&&!visited.has(current)){
-      if(current===previous)return previous;
-      if(!nearest&&['Initiative','Project'].includes(model.byKey.get(current)?.kind))nearest=current;
+      if(kinds.includes(model.byKey.get(current)?.kind)&&model.children.get(current)?.size)return current;
       visited.add(current);current=model.parents.get(current);
     }
-    return nearest;
+    return null;
   }
 
   // Containment alone owns neighborhoods. Dependencies never reparent a node.
@@ -217,6 +223,59 @@
     }
     return {...plan,positions};
   }
+  function projectPoint(point, camera) {
+    const cy=Math.cos(camera.yaw),sy=Math.sin(camera.yaw),cp=Math.cos(camera.pitch),sp=Math.sin(camera.pitch);
+    const x=point.x*cy-point.z*sy,yawDepth=point.x*sy+point.z*cy;
+    const y=point.y*cp-yawDepth*sp,depth=point.y*sp+yawDepth*cp,distance=camera.cameraDistance||900;
+    const scale=distance/Math.max(distance*.15,distance+depth)*camera.zoom*Math.min(camera.width/1080,camera.height/420);
+    return {x:camera.width/2+camera.panX+x*scale,y:camera.height/2+camera.panY+y*scale,depth,scale,radius:Math.max(4,Math.min(64,16*scale))};
+  }
+  // A short local spring/collision pass in projected pixels. Only newly
+  // revealed children can move; parent anchors and the camera stay untouched.
+  // Converting the displacement back to world space retains each depth band.
+  function revealLayout(nodes, positions, options) {
+    const camera=options.camera,movable=new Set(options.movable),parents=new Map(options.parents);
+    const projected=new Map(nodes.filter(n=>positions.has(n.key)).map(n=>[n.key,projectPoint(positions.get(n.key),camera)]));
+    const families=new Map(),targets=new Map(),points=new Map([...projected].map(([k,p])=>[k,{...p}]));
+    for(const key of [...movable].sort()){
+      const parent=parents.get(key);if(!projected.has(key)||!projected.has(parent)){movable.delete(key);continue;}
+      if(!families.has(parent))families.set(parent,[]);families.get(parent).push(key);
+    }
+    for(const [parent,children] of families){
+      const anchor=projected.get(parent),columns=Math.ceil(Math.sqrt(children.length*1.618));
+      const spacing=Math.max(32,...children.map(key=>projected.get(key).radius*2+12));
+      children.forEach((key,i)=>{
+        const count=Math.min(columns,children.length-Math.floor(i/columns)*columns);
+        const target={x:anchor.x+(i%columns-(count-1)/2)*spacing,y:anchor.y+anchor.radius+spacing+Math.floor(i/columns)*spacing};
+        targets.set(key,target);Object.assign(points.get(key),target);
+      });
+    }
+    const cell=Math.max(64,...[...projected.values()].map(p=>p.radius*2+12));
+    for(let round=0;round<60;round++){
+      const grid=new Map(),forces=new Map();
+      for(const [key,p] of points){const bucket=`${Math.floor(p.x/cell)},${Math.floor(p.y/cell)}`;if(!grid.has(bucket))grid.set(bucket,[]);grid.get(bucket).push(key);}
+      for(const key of movable){
+        const p=points.get(key),target=targets.get(key),f={x:(target.x-p.x)*.025,y:(target.y-p.y)*.025};
+        const cx=Math.floor(p.x/cell),cy=Math.floor(p.y/cell);
+        for(let x=cx-1;x<=cx+1;x++)for(let y=cy-1;y<=cy+1;y++)for(const other of (grid.get(`${x},${y}`)||[]).slice(0,64)){
+          if(other===key)continue;const q=points.get(other);let dx=p.x-q.x,dy=p.y-q.y,d=Math.hypot(dx,dy);
+          if(d<.01){const angle=(depthSeed(key)+depthSeed(other))*2.399963;dx=Math.cos(angle)*(key<other?-1:1);dy=Math.sin(angle)*(key<other?-1:1);d=1;}
+          const gap=Math.max(28,p.radius+q.radius+12);
+          if(d<gap){const push=(gap-d)*(movable.has(other)?.48:.9);f.x+=dx/d*push;f.y+=dy/d*push;}
+        }
+        forces.set(key,f);
+      }
+      for(const [key,f] of forces){const p=points.get(key),target=targets.get(key);p.x=Math.max(target.x-96,Math.min(target.x+96,p.x+Math.max(-8,Math.min(8,f.x))));p.y=Math.max(target.y-64,Math.min(target.y+96,p.y+Math.max(-8,Math.min(8,f.y))));}
+    }
+    const result=new Map([...positions].map(([k,p])=>[k,{...p}]));
+    const cy=Math.cos(camera.yaw),sy=Math.sin(camera.yaw),cp=Math.cos(camera.pitch),sp=Math.sin(camera.pitch);
+    for(const key of movable){
+      const before=projected.get(key),after=points.get(key),p=result.get(key);
+      const dx=(after.x-before.x)/Math.max(.001,before.scale),dy=(after.y-before.y)/Math.max(.001,before.scale),dz=-dy*sp;
+      p.x+=dx*cy+dz*sy;p.y+=dy*cp;p.z+=-dx*sy+dz*cy;
+    }
+    return [...result];
+  }
   function regions(groups, positions) {
     return (groups||[]).map(group=>{
       const points=group.keys.map(key=>positions.get(key)).filter(Boolean);
@@ -301,5 +360,5 @@
     view.pinnedKey=entry.pinned;view.repulsionStrength=entry.separation;view.edgeStrengths=new Map(entry.strengths);
     if(camera)Object.assign(view,entry.camera);
   }
-  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,primaryKinds,overviewKinds,overviewFilters,overviewProjection,attentionRoot,defaultCamera,hierarchy,anchorHierarchy,regions,regionCorners,depthOrder,coordinates,layout,filters,query,preferences,capture,restore};
+  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,primaryKinds,overviewKinds,overviewFilters,overviewProjection,attentionRoot,defaultCamera,hierarchy,anchorHierarchy,projectPoint,revealLayout,regions,regionCorners,depthOrder,coordinates,layout,filters,query,preferences,capture,restore};
 })(globalThis);

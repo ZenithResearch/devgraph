@@ -77,10 +77,13 @@ appearance preserves your graph filters, positions, selection, and local inputs.
 
 The canvas renders Proposals, Initiatives, Projects, and top-level Issues and
 Tasks (no Work parent, regardless of Arena membership). Hover or keyboard-focus
-an Initiative or Project to reveal all matching descendants, including Issues
-and Tasks. Moving into the revealed family keeps it open; selection keeps it
-open while reading. **Collapse child work** restores the overview. Expansion
-keeps the parent anchored, and collapse restores the prior overview positions.
+a parent to reveal only its direct children. Move into a Project or Issue to
+open the next level; siblings do not recursively expand. The ancestor path stays
+open while exploring a deeper branch, and selection keeps it open while reading.
+**Collapse child work** returns to the overview without undoing manual positioning.
+New children settle with local spring and screen-space collision forces; parents,
+existing nodes, and the camera remain fixed. Settled positions are reused while
+the graph and view remain unchanged. Reduced-motion preferences skip the animation.
 Arenas appear as labeled
 volumes, with separate space for work outside an Arena. Containment places each
 parent above and in front of its child groups, with siblings sharing a depth

@@ -117,17 +117,22 @@ test('overview includes parentless Issues and Tasks even when assigned to an Are
   assert.equal(view.context.nodes.some(n=>n.key===f.task.key),false,'collapsed descendants do not consume layout space');
 });
 
-test('Initiative expansion reveals every descendant; Project expansion stays in its own family',()=>{
+test('hover reveals one level; moving into a child retains the path without opening sibling branches',()=>{
   const f=workFamily(),context={nodes:f.nodes,edges:f.edges};
   const initiative=T.overviewProjection(f.nodes,f.edges,context,[f.i.key]);
-  assert.ok([f.issue,f.task,f.direct].every(n=>keys(initiative).includes(n.key)));
+  assert.ok(keys(initiative).includes(f.direct.key));
+  assert.ok([f.issue,f.task].every(n=>!keys(initiative).includes(n.key)),'grandchildren stay hidden');
   assert.ok(!keys(initiative).includes(f.unrelated.key),'dependencies do not expand unrelated children');
   const project=T.overviewProjection(f.nodes,f.edges,context,[f.p.key]);
-  assert.ok([f.issue,f.task].every(n=>keys(project).includes(n.key)));
+  assert.ok(keys(project).includes(f.issue.key));
+  assert.ok(!keys(project).includes(f.task.key));
   assert.ok(!keys(project).includes(f.direct.key));
-  assert.equal(T.attentionRoot(f.p.key,f.i.key,initiative),f.i.key);
-  assert.equal(T.attentionRoot(f.task.key,f.i.key,initiative),f.i.key);
-  assert.equal(T.attentionRoot(f.task.key,null,initiative),f.p.key,'opening child work in the reader reveals its nearest loaded family');
+  const issue=T.overviewProjection(f.nodes,f.edges,context,[f.issue.key]);
+  assert.ok([f.issue,f.task].every(n=>keys(issue).includes(n.key)));
+  assert.ok(!keys(issue).includes(f.direct.key));
+  assert.equal(T.attentionRoot(f.p.key,f.i.key,initiative),f.p.key,'a child parent opens the next level');
+  assert.equal(T.attentionRoot(f.task.key,f.i.key,initiative),f.issue.key);
+  assert.equal(T.attentionRoot(f.task.key,null,initiative),f.issue.key,'reading a leaf retains its immediate parent');
   assert.equal(T.attentionRoot(f.other.key,f.i.key,initiative),f.other.key);
   assert.equal(T.attentionRoot(f.rootTask.key,f.i.key,initiative),null);
 });
@@ -138,18 +143,19 @@ test('filtered ancestors still classify children, and expansion respects filters
   const collapsed=T.overviewProjection(loaded,[],context);
   assert.ok(!keys(collapsed).includes(f.direct.key),'hidden parent does not make a Task top-level');
   const expanded=T.overviewProjection(loaded,[],context,[f.p.key]);
-  assert.ok(keys(expanded).includes(f.task.key),'traversal continues through a filtered intermediate parent');
+  assert.ok(!keys(expanded).includes(f.task.key),'one-level reveal does not skip a filtered intermediate parent');
   assert.ok(!keys(expanded).includes(f.issue.key),'filtered records stay hidden');
   assert.equal(expanded.edges.length,0,'hidden connection types stay hidden');
-  assert.ok(expanded.context.nodes.some(n=>n.key===f.issue.key),'layout retains hidden ancestry');
+  const leaf=T.overviewProjection(loaded,[],context,[f.task.key]);
+  assert.ok(!keys(leaf).includes(f.task.key),'a leaf is not an expansion root');
 });
 
 test('descendant traversal terminates on cycles and ignores missing expansion roots',()=>{
   const f=workFamily(),edges=[...f.edges,edge(f.task,f.p)];
   const view=T.overviewProjection(f.nodes,edges,{nodes:f.nodes,edges},[f.p.key,'missing']);
   assert.equal(view.families.size,1);
-  assert.equal(view.families.get(f.p.key).size,3);
-  assert.equal(T.attentionRoot(f.task.key,'missing',view),f.p.key);
+  assert.equal(view.families.get(f.p.key).size,2);
+  assert.equal(T.attentionRoot(f.task.key,'missing',view),f.task.key);
 });
 
 test('250 and 1500 revealed children preserve all overview anchors and their local depth bands',()=>{
