@@ -80,7 +80,9 @@ volumes, with separate space for work outside an Arena. Containment places each
 parent above and in front of its child groups, with siblings sharing a depth
 range. Bounded 3D worker physics relaxes collisions without letting dependencies
 pull families across Arena boundaries. The angled camera shows the depth on
-arrival; drag the background or enable Orbit to explore it. Reset layout restores
+arrival. Drag the background to pan; hold Command (⌘) and drag to rotate, or
+enable Orbit. Command-drag rotates even when starting over a node. Ordinary
+node dragging still repositions that item. Reset layout restores
 the initial angle and depth. Nearer nodes draw in front in both renderers.
 
 Use **Filters** for those three Work types, lifecycle status, archived items,

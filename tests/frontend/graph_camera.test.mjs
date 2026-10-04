@@ -252,9 +252,9 @@ function gestures() {
   vm.runInContext(frontend.slice(start, end), c);
   return {
     c, captures, classes,
-    send(type, pointerId, x = 0, y = 0, nodeKey = null) {
+    send(type, pointerId, x = 0, y = 0, nodeKey = null, modifiers = {}) {
       listeners.get(type)({
-        type, pointerId, clientX: x, clientY: y, button: 0, shiftKey: false,
+        type, pointerId, clientX: x, clientY: y, button: 0, shiftKey: false, ...modifiers,
         target: { closest() { return nodeKey ? { dataset: { nodeKey } } : null; } },
         preventDefault() {},
       });
@@ -273,6 +273,32 @@ test('pointer cancellation releases capture and does not select a dragged node',
   assert.equal(g.c.state.selectedGraphKey, null);
   assert.equal(g.captures.size, 0);
   assert.equal(g.classes.size, 0);
+});
+
+test('ordinary background drag pans without rotating or moving nodes',()=>{
+  const g=gestures(),before={...g.c.graphView};
+  g.send('pointerdown',1,10,20);
+  g.send('pointermove',1,40,60);
+  g.send('pointerup',1,40,60);
+  near(g.c.graphView.panX,before.panX+30,'pan x');
+  near(g.c.graphView.panY,before.panY+40,'pan y');
+  near(g.c.graphView.yaw,before.yaw,'yaw unchanged');
+  near(g.c.graphView.pitch,before.pitch,'pitch unchanged');
+  assert.equal(g.c.movements.length,0);assert.equal(g.c.state.selectedGraphKey,null);
+});
+
+test('Command-drag rotates from background or nodes without panning or moving an item',()=>{
+  for(const nodeKey of [null,'test-node']){
+    const g=gestures(),before={...g.c.graphView};
+    g.send('pointerdown',1,10,20,nodeKey,{metaKey:true});
+    // Releasing Command during a gesture does not switch modes mid-drag.
+    g.send('pointermove',1,40,60,nodeKey,{metaKey:false});
+    g.send('pointerup',1,40,60,nodeKey);
+    assert.notEqual(g.c.graphView.yaw,before.yaw);assert.notEqual(g.c.graphView.pitch,before.pitch);
+    near(g.c.graphView.panX,before.panX,'pan x unchanged');near(g.c.graphView.panY,before.panY,'pan y unchanged');
+    assert.equal(g.c.movements.length,0);assert.equal(g.c.state.selectedGraphKey,null);
+    assert.equal(g.captures.size,0);
+  }
 });
 
 test('a node click, including small hand jitter, selects without moving neighbors', () => {

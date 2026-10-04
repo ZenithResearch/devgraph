@@ -322,7 +322,7 @@ FRONTEND_HTML = r'''<!doctype html>
           <div class="surface-controls">
             <div class="graph-zoom" role="group" aria-label="Graph zoom"><button class="graph-control" id="graph-zoom-out" type="button" aria-label="Zoom out">−</button><input id="graph-zoom" type="range" min="5" max="400" value="100" step="1" aria-label="Graph zoom percentage"><output id="graph-zoom-value" for="graph-zoom">100%</output><button class="graph-control" id="graph-zoom-in" type="button" aria-label="Zoom in">+</button><button class="graph-control" id="graph-fit" type="button">Fit view</button></div>
             <div class="graph-actions"><button class="graph-control" id="graph-undo" type="button" disabled title="Restore the positions from before your last arrangement change">Undo positioning</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button></div>
-            <details class="legend-panel surface-options"><summary>Legend</summary><div class="surface-popover"><div class="legend-items" id="type-legend"></div><p class="reader-note">Arena regions keep related work together. Parents sit above and in front of their children. Drag the background to explore the depth. Only Proposals, Initiatives, and Projects appear here; read their Issues and Tasks in the sidebar.</p></div></details>
+            <details class="legend-panel surface-options"><summary>Legend</summary><div class="surface-popover"><div class="legend-items" id="type-legend"></div><p class="reader-note">Arena regions keep related work together. Parents sit above and in front of their children. Hold Command (⌘) and drag to explore the depth. Only Proposals, Initiatives, and Projects appear here; read their Issues and Tasks in the sidebar.</p></div></details>
             <details class="graph-settings surface-options"><summary>Arrange nodes</summary><div class="surface-popover"><div class="graph-toolbar-actions"><button class="graph-control" id="graph-orbit" type="button" aria-pressed="false">Orbit: off</button><button class="graph-control" id="graph-settle" type="button">Arrange nodes</button></div><div class="graph-force-panel"><div class="graph-force-copy"><strong>Graph forces</strong><span>3D physics keeps siblings together, preserves depth, and separates Arena neighborhoods.</span><button class="graph-control" id="graph-force-reset" type="button">Reset force defaults</button></div><div class="graph-force-controls" id="graph-force-controls" aria-label="Graph force controls"></div></div></div></details>
           </div>
           <p id="graph-feedback" role="status" aria-live="polite"></p>
@@ -333,7 +333,7 @@ FRONTEND_HTML = r'''<!doctype html>
           </div>
           <dialog id="reader-dialog" class="reader-dialog" aria-labelledby="reader-title"></dialog>
           <details id="graph-result-list"><summary>Browse visible items</summary><div id="graph-result-items"></div><button class="graph-control" id="graph-results-more" hidden>Show more items</button></details>
-          <p class="graph-help" id="graph-help">Click a node to read · Right-click for a reading modal · Scroll/pinch to zoom · Shift-drag to pan · Drag to orbit or move an item · F to fit · Browse visible items for keyboard selection</p>
+          <p class="graph-help" id="graph-help">Click a node to read · Right-click for a reading modal · Scroll/pinch to zoom · Drag background to pan · ⌘-drag to rotate · Drag a node to move it · F to fit · Browse visible items for keyboard selection</p>
           <div class="graph-resize" id="graph-resize" role="separator" tabindex="0" aria-label="Graph height" aria-orientation="horizontal" aria-valuemin="280" aria-valuemax="1200" aria-valuenow="420" aria-valuetext="420 pixels" aria-controls="graph-svg">Drag to resize · Arrow keys adjust height</div>
         </section>
       </section>
@@ -1489,7 +1489,7 @@ FRONTEND_HTML = r'''<!doctype html>
       const candidates = pickGraphNodes(event.clientX,event.clientY);
       const nodeTarget = candidates.length ? {dataset:{nodeKey:candidates[0].key}} : event.target.closest('.graph-node'); pauseGraphOrbit(); event.preventDefault();
       if (graphView.pointers.size === 2) { cancelArrangement(); graphView.pinch = pinchPosition(); graphView.drag = null; graphSvg.classList.remove('dragging', 'node-dragging'); return; }
-      const mode = event.shiftKey ? 'pan' : nodeTarget ? 'node' : 'scene';
+      const mode = event.metaKey ? 'scene' : event.shiftKey ? 'pan' : nodeTarget ? 'node' : 'pan';
       if (mode === 'node') beginArrangement('Move item');
       graphView.drag = { mode, key: nodeTarget?.dataset.nodeKey || null, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, candidates, moved: false, pointerId: event.pointerId };
       graphSvg.classList.add(mode === 'node' ? 'node-dragging' : 'dragging');
