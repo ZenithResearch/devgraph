@@ -65,7 +65,7 @@ test('worker layout is deterministic, finite, nonmutating, and preserves pinned 
   assert.equal(JSON.stringify([...positions]),original);
   assert.equal(JSON.stringify(first),JSON.stringify(T.layout(nodes,edges,positions,{iterations:3,pinned:'Task:1'})));
   assert.deepEqual(new Map(first).get('Task:1'),positions.get('Task:1'));
-  assert.ok(first.every(([,p])=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.z===0));
+  assert.ok(first.every(([,p])=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.z)));
 });
 
 const historyFunctions=['invalidateLayout','beginArrangement','finishArrangement','cancelArrangement','syncUndoControl','undoPositioning'];

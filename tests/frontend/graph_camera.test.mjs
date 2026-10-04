@@ -119,6 +119,32 @@ test('viewport resize preserves zoom and relative camera framing, and a round tr
   near(restored.y, initial.y, 'restored y');
 });
 
+test('fit includes every corner of Arena volumes at oblique camera angles',()=>{
+  const c=camera(920,620),region={x:-420,y:-170,z:-150,width:900,height:440,depth:450,keys:[]};
+  c.graphView.layoutPlan={groups:[region]};c.graphView.nodePositions=new Map();
+  for(const [yaw,pitch] of [[-.32,.24],[.8,-.6],[2.2,.7]]){
+    Object.assign(c.graphView,{yaw,pitch});c.fitGraph();
+    for(const corner of c.Topology.regionCorners(region)){
+      const p=c.projectGraphPoint(corner);
+      assert.ok(p.x>=0&&p.x<=920&&p.y>=0&&p.y<=620,'volume fits, not only its diagonal');
+    }
+  }
+});
+
+test('large 3D volumes retain straight perspective edges instead of clamped depth planes',()=>{
+  const c=camera(1080,720),region={x:-1800,y:-700,z:-200,width:3600,height:1500,depth:500,keys:[]};
+  c.graphView.layoutPlan={groups:[region]};c.graphView.nodePositions=new Map();c.fitGraph();
+  const corners=c.Topology.regionCorners(region);
+  for(const yaw of [-1,.32,2]){
+    c.graphView.yaw=yaw;
+    for(const [a,b] of [[0,1],[0,4],[1,2],[6,7]]){
+      const p=c.projectGraphPoint(corners[a]),q=c.projectGraphPoint(corners[b]);
+      const m=c.projectGraphPoint({x:(corners[a].x+corners[b].x)/2,y:(corners[a].y+corners[b].y)/2,z:(corners[a].z+corners[b].z)/2});
+      near((q.x-p.x)*(m.y-p.y)-(q.y-p.y)*(m.x-p.x),0,'projected edge is straight');
+    }
+  }
+});
+
 test('a fitted graph remains visible when resizing between portrait and landscape', () => {
   const c = camera(320, 900);
   Object.assign(c.graphView, { yaw: 0, pitch: 0 });

@@ -36,6 +36,27 @@ test('bounded physics preserves groups, hierarchy, pinned nodes and hidden posit
   for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++)assert.equal(overlap(boxes[i],boxes[j]),false);
 });
 
+test('families occupy real depth bands and 3D relaxation retains them',()=>{
+  const f=fixture(),h=T.hierarchy(f.nodes,f.edges);
+  assert.ok(h.positions.get(f.i.key).z<h.positions.get(f.p.key).z);
+  assert.ok(h.positions.get(f.i.key).z<h.positions.get(f.q.key).z);
+  assert.ok(Math.abs(h.positions.get(f.p.key).z-h.positions.get(f.q.key).z)<=64);
+  const moved=new Map([...h.positions].map(([k,p])=>[k,{...p,z:p.z+180}]));
+  const settled=new Map(T.layout(f.nodes,f.edges,moved,{anchors:[...h.positions],iterations:40}));
+  for(const [key,p] of settled)assert.ok(Math.abs(p.z-h.positions.get(key).z)<=24);
+  for(const region of T.regions(h.groups,settled)){
+    const corners=T.regionCorners(region);
+    assert.equal(corners.length,8);assert.equal(new Set(corners.map(p=>p.z)).size,2);
+    for(const key of region.keys){const p=settled.get(key);assert.ok(p.z>region.z&&p.z<region.z+region.depth);}
+  }
+});
+
+test('nodes at different depths draw back to front without changing source order',()=>{
+  const nodes=[{key:'near'},{key:'far'},{key:'middle'}],positions=new Map([['near',{depth:-120}],['far',{depth:200}],['middle',{depth:0}]]);
+  assert.deepEqual(Array.from(T.depthOrder(nodes,positions),n=>n.key),['far','middle','near']);
+  assert.deepEqual(nodes.map(n=>n.key),['near','far','middle']);
+});
+
 test('overview filters migrate older broad or Task-only preferences without rendering detailed records',()=>{
   for(const value of [{},{work_kind:['Task']},{category:['receipt'],work_kind:['Project','Task']}]) {
     const f=T.overviewFilters(value);
@@ -61,7 +82,7 @@ test('250 and 1500 Work fixtures keep each parent family in one neighborhood wit
     }
     const start=performance.now(),h=T.hierarchy(nodes,edges),out=new Map(T.layout(nodes,edges,h.positions,{iterations:40,anchors:[...h.positions]}));
     assert.equal(out.size,nodes.length-5);
-    assert.ok([...out.values()].every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.z===0));
+    assert.ok([...out.values()].every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.z)));
     for(const e of edges.filter(e=>e.relationship==='HAS_CHILD')){
       assert.equal(h.arenaOf.get(e.source),h.arenaOf.get(e.target));
       assert.ok(out.get(e.source).y<out.get(e.target).y);

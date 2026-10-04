@@ -76,10 +76,12 @@ second selector stays available when the graph canvas is fullscreen. Changing
 appearance preserves your graph filters, positions, selection, and local inputs.
 
 The canvas renders Proposals, Initiatives, and Projects. Arenas appear as labeled
-regions, with separate space for work outside an Arena. Containment places each
-parent above its child groups; bounded worker physics relaxes collisions without
-letting dependencies pull families across Arena boundaries. The solids retain
-their 3D appearance; the initial camera faces the hierarchy directly.
+volumes, with separate space for work outside an Arena. Containment places each
+parent above and in front of its child groups, with siblings sharing a depth
+range. Bounded 3D worker physics relaxes collisions without letting dependencies
+pull families across Arena boundaries. The angled camera shows the depth on
+arrival; drag the background or enable Orbit to explore it. Reset layout restores
+the initial angle and depth. Nearer nodes draw in front in both renderers.
 
 Use **Filters** for those three Work types, lifecycle status, archived items,
 text and connection lines. Hiding a parent type or its line does not remove its

@@ -322,8 +322,8 @@ FRONTEND_HTML = r'''<!doctype html>
           <div class="surface-controls">
             <div class="graph-zoom" role="group" aria-label="Graph zoom"><button class="graph-control" id="graph-zoom-out" type="button" aria-label="Zoom out">−</button><input id="graph-zoom" type="range" min="5" max="400" value="100" step="1" aria-label="Graph zoom percentage"><output id="graph-zoom-value" for="graph-zoom">100%</output><button class="graph-control" id="graph-zoom-in" type="button" aria-label="Zoom in">+</button><button class="graph-control" id="graph-fit" type="button">Fit view</button></div>
             <div class="graph-actions"><button class="graph-control" id="graph-undo" type="button" disabled title="Restore the positions from before your last arrangement change">Undo positioning</button><button class="graph-control" id="graph-reset" type="button">Reset layout</button></div>
-            <details class="legend-panel surface-options"><summary>Legend</summary><div class="surface-popover"><div class="legend-items" id="type-legend"></div><p class="reader-note">Arena regions keep related work together. Parents sit above their children. Only Proposals, Initiatives, and Projects appear here; read their Issues and Tasks in the sidebar.</p></div></details>
-            <details class="graph-settings surface-options"><summary>Arrange nodes</summary><div class="surface-popover"><div class="graph-toolbar-actions"><button class="graph-control" id="graph-orbit" type="button" aria-pressed="false">Orbit: off</button><button class="graph-control" id="graph-settle" type="button">Arrange nodes</button></div><div class="graph-force-panel"><div class="graph-force-copy"><strong>Graph forces</strong><span>Physics keeps siblings together, preserves hierarchy, and separates Arena neighborhoods.</span><button class="graph-control" id="graph-force-reset" type="button">Reset force defaults</button></div><div class="graph-force-controls" id="graph-force-controls" aria-label="Graph force controls"></div></div></div></details>
+            <details class="legend-panel surface-options"><summary>Legend</summary><div class="surface-popover"><div class="legend-items" id="type-legend"></div><p class="reader-note">Arena regions keep related work together. Parents sit above and in front of their children. Drag the background to explore the depth. Only Proposals, Initiatives, and Projects appear here; read their Issues and Tasks in the sidebar.</p></div></details>
+            <details class="graph-settings surface-options"><summary>Arrange nodes</summary><div class="surface-popover"><div class="graph-toolbar-actions"><button class="graph-control" id="graph-orbit" type="button" aria-pressed="false">Orbit: off</button><button class="graph-control" id="graph-settle" type="button">Arrange nodes</button></div><div class="graph-force-panel"><div class="graph-force-copy"><strong>Graph forces</strong><span>3D physics keeps siblings together, preserves depth, and separates Arena neighborhoods.</span><button class="graph-control" id="graph-force-reset" type="button">Reset force defaults</button></div><div class="graph-force-controls" id="graph-force-controls" aria-label="Graph force controls"></div></div></div></details>
           </div>
           <p id="graph-feedback" role="status" aria-live="polite"></p>
           <div class="graph-layout">
@@ -356,7 +356,7 @@ FRONTEND_HTML = r'''<!doctype html>
     const Topology = DevgraphTopology;
     const state = { timer: null, snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshController: null, refreshQueued: false, pendingSnapshot: null, lastSuccess: null };
     const detailState = { node: null, data: null, error: null, loading: false, serial: 0, controller: null, promise: null, relations: new Map(), support: null, supportLoading: false, supportError: null, documents: new Map(), rendered: null, resourcesSerial: 0, credential: '' };
-    const graphView = { yaw: 0, pitch: 0, zoom: 1, panX: 0, panY: 0, width: 1080, height: 420, fitted: false, expanded: false, pointers: new Map(), pinch: null, orbit: false, frame: null, lastFrame: 0, drag: null, nodes: [], edges: [], nodePositions: new Map(), nodeVelocities: new Map(), edgeStrengths: new Map(), repulsionStrength: 1.5, pinnedKey: null, visibleCategories: new Set(['arena', 'work']), arenaKey: '', arenaNodes: [], neighborhood: null, labels: 'selected', filters: Topology.overviewFilters(), hoveredKey: null, focusedKey: null, history: [], arrangement: null, layoutGeneration: 0, worker: null, index: null, renderFrame: null, preferenceKey: null, preferences: Topology.preferences(), filterSerial: 0 };
+    const graphView = { ...Topology.defaultCamera, zoom: 1, panX: 0, panY: 0, width: 1080, height: 420, fitted: false, expanded: false, pointers: new Map(), pinch: null, orbit: false, frame: null, lastFrame: 0, drag: null, nodes: [], edges: [], nodePositions: new Map(), nodeVelocities: new Map(), edgeStrengths: new Map(), repulsionStrength: 1.5, pinnedKey: null, visibleCategories: new Set(['arena', 'work']), arenaKey: '', arenaNodes: [], neighborhood: null, labels: 'selected', filters: Topology.overviewFilters(), hoveredKey: null, focusedKey: null, history: [], arrangement: null, layoutGeneration: 0, worker: null, index: null, renderFrame: null, preferenceKey: null, preferences: Topology.preferences(), filterSerial: 0 };
     const tokenInput = document.querySelector('#token');
     try { tokenInput.value = sessionStorage.getItem('devgraph-monitor-token') || ''; } catch { tokenInput.value = ''; }
     const text = (id, value) => { const el = document.getElementById(id); if (el.textContent !== String(value)) el.textContent = String(value); };
@@ -509,7 +509,8 @@ FRONTEND_HTML = r'''<!doctype html>
       const cy = Math.cos(graphView.yaw); const sy = Math.sin(graphView.yaw); const cp = Math.cos(graphView.pitch); const sp = Math.sin(graphView.pitch);
       const rotatedX = point.x * cy - point.z * sy; const yawDepth = point.x * sy + point.z * cy;
       const rotatedY = point.y * cp - yawDepth * sp; const depth = point.y * sp + yawDepth * cp;
-      const scale = (720 / (720 + Math.max(-300, Math.min(300, depth)))) * graphView.zoom * graphViewportScale();
+      const distance = graphView.cameraDistance || 900;
+      const scale = (distance / Math.max(distance * .15, distance + depth)) * graphView.zoom * graphViewportScale();
       return { x: graphView.width / 2 + graphView.panX + rotatedX * scale, y: graphView.height / 2 + graphView.panY + rotatedY * scale, depth, scale, radius: Math.max(4, Math.min(64, 16 * scale)) };
     }
 
@@ -535,7 +536,10 @@ FRONTEND_HTML = r'''<!doctype html>
     function fitGraph() {
       pauseGraphOrbit(); graphView.fitted = true; graphView.zoom = 1; graphView.panX = 0; graphView.panY = 0;
       const worldPoints = [...graphCoordinates(graphView.nodes).values()];
-      for (const region of Topology.regions(graphView.layoutPlan?.groups, graphView.nodePositions)) worldPoints.push({x:region.x,y:region.y,z:0},{x:region.x+region.width,y:region.y+region.height,z:0});
+      for (const region of Topology.regions(graphView.layoutPlan?.groups, graphView.nodePositions)) worldPoints.push(...Topology.regionCorners(region));
+      // Keep the whole volume in front of the camera, including while orbiting.
+      // Clamping individual depths would bend straight edges and distort cages.
+      graphView.cameraDistance = Math.max(900, ...worldPoints.map(p=>Math.hypot(p.x,p.y,p.z)*1.6));
       const points = worldPoints.map(projectGraphPoint);
       if (points.length) {
         const left = Math.min(...points.map(point => point.x - point.radius)); const right = Math.max(...points.map(point => point.x + point.radius));
@@ -1081,15 +1085,21 @@ FRONTEND_HTML = r'''<!doctype html>
       const existingNodes = new Map([...nodeLayer.children].map(el => [el.dataset.nodeKey, el]));
       const existingEdges = new Map([...edgeLayer.children].map(el => [el.dataset.edgeKey, el]));
       const edgeKeys = new Set(), candidates = [], occupied = [...(graphView.regionLabelBoxes || [])];
-      for (const node of nodes) {
+      let paintIndex = 0;
+      for (const node of Topology.depthOrder(nodes, positions)) {
         const position = positions.get(node.key), r = position.radius; let group = existingNodes.get(node.key);
         if (!group) {
           group = svgMake('g', { tabindex: 0, role: 'button', 'data-node-key': node.key });
           group.append(svgMake('title'), svgMake('circle', { class: 'graph-node-hit', cx: 0, cy: 0 }), svgMake('use', { class: 'graph-solid', 'pointer-events': 'none' }), svgMake('path', { class: 'graph-sphere' }), svgMake('circle', { class: 'graph-selection-ring', cx: 0, cy: 0 }));
           nodeLayer.append(group);
         }
+        if (nodeLayer.children[paintIndex] !== group) {
+          const focused = group.contains(document.activeElement) ? document.activeElement : null;
+          nodeLayer.insertBefore(group, nodeLayer.children[paintIndex] || null); focused?.focus({preventScroll:true});
+        }
+        paintIndex++;
         const selected = node.key === state.selectedGraphKey, nearby = adjacent.has(node.key), count = graphView.index.degree.get(node.key) || 0;
-        setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}${node.key === previewKey ? ' preview' : ''}`, tabindex: node.key === (graphView.index.byKey.has(state.selectedGraphKey) ? state.selectedGraphKey : nodes[0]?.key) ? 0 : -1, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.32' : '1', 'aria-pressed': selected, 'aria-label': `${Topology.visual(node.kind).label}: ${node.title}, ${node.status}, ${count} visible connections. Press Enter to read; Shift+F10 opens the reading modal; arrow keys move the node.` });
+        setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}${node.key === previewKey ? ' preview' : ''}`, tabindex: node.key === (graphView.index.byKey.has(state.selectedGraphKey) ? state.selectedGraphKey : nodes[0]?.key) ? 0 : -1, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.6' : '1', 'aria-pressed': selected, 'aria-label': `${Topology.visual(node.kind).label}: ${node.title}, ${node.status}, ${count} visible connections. Press Enter to read; Shift+F10 opens the reading modal; arrow keys move the node.` });
         group._parts ||= {title:group.querySelector('title'),hit:group.querySelector('.graph-node-hit'),solid:group.querySelector('.graph-solid'),shape:group.querySelector('.graph-sphere'),ring:group.querySelector('.graph-selection-ring')};
         const titleText = `${Topology.visual(node.kind).label}: ${node.title} · ${node.status}`; if (group._parts.title.textContent !== titleText) group._parts.title.textContent = titleText;
         setSvg(group._parts.hit, { r: Math.max(14, r + 5) });
@@ -1111,7 +1121,7 @@ FRONTEND_HTML = r'''<!doctype html>
         const dx = target.x - source.x, dy = target.y - source.y, distance = Math.max(1, Math.hypot(dx, dy)), ux = dx / distance, uy = dy / distance;
         const sx = source.x + ux * source.radius, sy = source.y + uy * source.radius, tx = target.x - ux * (target.radius + 3), ty = target.y - uy * (target.radius + 3);
         const connected = edge.source === previewKey || edge.target === previewKey;
-        setSvg(path, { d: `M ${sx} ${sy} L ${tx} ${ty}`, 'stroke-width': connected ? 2 : 1, style: `--edge-color:${connected ? 'var(--graph-edge-active)' : 'var(--graph-edge)'}`, opacity: adjacent.size && !connected ? .14 : .8 });
+        setSvg(path, { d: `M ${sx} ${sy} L ${tx} ${ty}`, 'stroke-width': connected ? 2 : 1, style: `--edge-color:${connected ? 'var(--graph-edge-active)' : 'var(--graph-edge)'}`, opacity: adjacent.size && !connected ? .32 : .8 });
         if (candidates.length < 220 && (graphView.labels === 'all' || (graphView.labels === 'selected' && connected))) {
           const label = relationshipLabel(edge.relationship), width = label.length * 6.8 + 8;
           candidates.push({ key: `edge:${key}`, text: label, className: 'graph-edge-label', x: (sx + tx) / 2 - width / 2, y: (sy + ty) / 2 - 23, width, height: 18, priority: 2 });
@@ -1130,10 +1140,14 @@ FRONTEND_HTML = r'''<!doctype html>
       const regions = Topology.regions(graphView.layoutPlan.groups, graphView.nodePositions), keys = new Set(); graphView.regionLabelBoxes = [];
       for (const region of regions) {
         keys.add(region.key); let group = existing.get(region.key);
-        if (!group) { group = svgMake('g', {'data-region-key':region.key, class:'arena-region'}); group.append(svgMake('path'), svgMake('text')); layer.append(group); }
-        const corners = [[region.x,region.y],[region.x+region.width,region.y],[region.x+region.width,region.y+region.height],[region.x,region.y+region.height]].map(([x,y])=>projectGraphPoint({x,y,z:0}));
-        setSvg(group.querySelector('path'), {d:corners.map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ')+' Z'});
-        const label = group.querySelector('text'), origin = corners[0];
+        if (!group) { group = svgMake('g', {'data-region-key':region.key, class:'arena-region'}); group.append(svgMake('path',{class:'arena-volume-back'}),svgMake('path',{class:'arena-volume-side'}),svgMake('path',{class:'arena-volume-frame'}),svgMake('text')); layer.append(group); }
+        const corners = Topology.regionCorners(region).map(projectGraphPoint);
+        const polygon = indices => indices.map((n,i)=>`${i?'L':'M'} ${corners[n].x} ${corners[n].y}`).join(' ')+' Z';
+        setSvg(group.querySelector('.arena-volume-back'), {d:polygon([4,5,6,7])});
+        setSvg(group.querySelector('.arena-volume-side'), {d:polygon([0,3,7,4])});
+        const rails = [0,1,2,3].map(n=>`M ${corners[n].x} ${corners[n].y} L ${corners[n+4].x} ${corners[n+4].y}`).join(' ');
+        setSvg(group.querySelector('.arena-volume-frame'), {d:polygon([0,1,2,3])+' '+polygon([4,5,6,7])+' '+rails});
+        const label = group.querySelector('text'), origin = corners.reduce((top,p)=>p.y<top.y?p:top,corners[0]);
         setSvg(label, {x:origin.x+4,y:origin.y-10}); label.textContent = `${region.title} · ${region.keys.length}`;
         graphView.regionLabelBoxes.push({x:origin.x,y:origin.y-28,width:label.textContent.length*7.5+8,height:22});
       }
@@ -1178,7 +1192,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function resetGraphView() {
-      beginArrangement('Reset layout', true); pauseGraphOrbit(); graphView.yaw = 0; graphView.pitch = 0; graphView.zoom = 1; graphView.panX = 0; graphView.panY = 0; graphView.fitted = false; syncZoomControls(); graphView.pinnedKey = null; for (const node of graphView.nodes) { graphView.nodePositions.delete(node.key); graphView.nodeVelocities.delete(node.key); } syncGraphPhysics(graphView.nodes); finishArrangement(); relaxGraph(40, null); fitGraph(); announceGraph('Layout reset. Undo positioning is available.');
+      beginArrangement('Reset layout', true); pauseGraphOrbit(); Object.assign(graphView, Topology.defaultCamera); graphView.zoom = 1; graphView.panX = 0; graphView.panY = 0; graphView.fitted = false; syncZoomControls(); graphView.pinnedKey = null; for (const node of graphView.nodes) { graphView.nodePositions.delete(node.key); graphView.nodeVelocities.delete(node.key); } syncGraphPhysics(graphView.nodes); finishArrangement(); relaxGraph(40, null); fitGraph(); announceGraph('Layout reset. Undo positioning is available.');
     }
 
     function render(snapshot, observations) {

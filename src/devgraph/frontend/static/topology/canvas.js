@@ -33,7 +33,7 @@
       const dx=b.x-a.x,dy=b.y-a.y,d=Math.max(1,Math.hypot(dx,dy)),ux=dx/d,uy=dy/d;
       const sx=a.x+ux*a.radius,sy=a.y+uy*a.radius,tx=b.x-ux*(b.radius+3),ty=b.y-uy*(b.radius+3);
       const connected=edge.source===previewKey||edge.target===previewKey;
-      ctx.globalAlpha=adjacent.size&&!connected?.14:.8;ctx.strokeStyle=connected?paint.edgeActive:paint.edge;ctx.lineWidth=connected?2:1;
+      ctx.globalAlpha=adjacent.size&&!connected?.32:.8;ctx.strokeStyle=connected?paint.edgeActive:paint.edge;ctx.lineWidth=connected?2:1;
       ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();
       ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(tx-ux*6+uy*3,ty-uy*6-ux*3);ctx.lineTo(tx-ux*6-uy*3,ty-uy*6+ux*3);ctx.fill();
       if(candidates.length<80&&view.labels!=='none'&&(view.labels==='all'||connected)) {
@@ -41,10 +41,10 @@
         candidates.push({key:`edge:${edge.source}|${edge.relationship}|${edge.target}`,text,x:(sx+tx)/2-w/2,y:(sy+ty)/2-23,width:w,height:18,priority:2});
       }
     }
-    for(const node of view.nodes) {
+    for(const node of DevgraphTopology.depthOrder(view.nodes,positions)) {
       const p=positions.get(node.key),r=p.radius;if(p.x+r<0||p.x-r>width||p.y+r<0||p.y-r>height)continue;
       const selected=node.key===selectedKey,art=sprite(node.kind),key=Object.hasOwn(DevgraphTopology.registry,node.kind)?node.kind:'other';
-      ctx.save();ctx.globalAlpha=adjacent.size&&!adjacent.has(node.key)?.32:1;ctx.translate(p.x,p.y);ctx.scale(r,r);
+      ctx.save();ctx.globalAlpha=adjacent.size&&!adjacent.has(node.key)?.6:1;ctx.translate(p.x,p.y);ctx.scale(r,r);
       ctx.drawImage(art,-128/120,-128/120,256/120,256/120);
       ctx.strokeStyle=paint.nodeBorder;ctx.lineWidth=1/r;ctx.stroke(paths.get(key));
       if(selected||node.key===previewKey){ctx.strokeStyle=paint.outline;ctx.lineWidth=3/r;ctx.stroke(paths.get(key));}

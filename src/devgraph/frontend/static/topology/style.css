@@ -209,5 +209,8 @@ button:disabled { opacity:.5; cursor:default; }
  .graph-surface .graph-details:not(.collapsed) { background:linear-gradient(var(--panel),var(--panel)),var(--canvas); }
 }
 
-.arena-region path { fill:var(--aqua); fill-opacity:.035; stroke:var(--aqua); stroke-opacity:.32; stroke-width:1.5; stroke-dasharray:5 5; vector-effect:non-scaling-stroke; }
+.arena-region path { fill:var(--aqua); stroke:var(--aqua); stroke-width:1; vector-effect:non-scaling-stroke; }
+.arena-region .arena-volume-back { fill-opacity:.025; stroke:none; }
+.arena-region .arena-volume-side { fill-opacity:.065; stroke:none; }
+.arena-region .arena-volume-frame { fill:none; stroke-opacity:.28; }
 .arena-region text { fill:var(--ink); font:600 13px var(--font-sans,system-ui); paint-order:stroke; stroke:var(--panel); stroke-width:5px; stroke-linejoin:round; }
