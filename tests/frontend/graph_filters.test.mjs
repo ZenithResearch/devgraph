@@ -8,7 +8,7 @@ const frontend = readFileSync(new URL('../../src/devgraph/frontend/app.py', impo
 const names = [
   'graphLane', 'stableGraphDepth', 'baseGraphCoordinates', 'syncGraphPhysics',
   'filterGraph', 'filterGraphByArena', 'neighborhoodKeys', 'updateGraphVisibility', 'render', 'refresh',
-  'synchronizeCredential', 'applySnapshot',
+  'synchronizeCredential', 'applySnapshot', 'setGraphAttention',
 ];
 const source = names.map(name => {
   const declaration = new RegExp(`^    (?:async )?function ${name}\\(`, 'm').exec(frontend);
@@ -56,7 +56,7 @@ function monitor() {
       if (!elements.has(id)) elements.set(id, { className: '', textContent: '' });
       return elements.get(id);
     } },
-    topologyPath: () => '/monitor/topology/v1', renderTopologyControls() {}, text() {}, relativeTime() { return 'now'; }, pauseGraphOrbit() {},
+    topologyPath: () => '/monitor/topology/v1', renderTopologyControls() {}, text() {}, relativeTime() { return 'now'; }, pauseGraphOrbit() {}, invalidateLayout() {}, requestGraphRender() {},
     renderPipeline() {}, renderBars() {}, renderActivity() {}, renderObservations() {},
     renderForceControls() {}, renderArenaFilter() {}, relaxGraph() {}, fitGraph() {},
     renderGraph() {}, renderGraphSelection() {}, renderGraphSearch() {}, loadSelectedDetail() {}, queueMicrotask,
@@ -150,4 +150,50 @@ test('all-hidden refresh keeps choices and restoring a category reveals fresh re
   c.updateGraphVisibility();
   assert.deepEqual(Array.from(c.graphView.nodes, node => node.key), ['work-a']);
   assert.deepEqual(Array.from(c.graphView.edges, edge => [edge.source, edge.target]), []);
+});
+
+test('hover reveal anchors the parent, preserves the camera, and collapse restores the overview',()=>{
+  const c=monitor(); c.state.snapshot=snapshot(); c.updateGraphVisibility();
+  const position={x:317,y:-54,z:106}; c.graphView.nodePositions.set('work-a',position);
+  c.graphView.panX=73; c.graphView.zoom=1.7;
+  c.fitGraph=()=>assert.fail('hover must not refit the camera');
+  c.setGraphAttention('hoveredKey','work-a');
+  assert.deepEqual(Array.from(c.graphView.nodes,n=>n.key),['work-a','work-b']);
+  assert.deepEqual({...c.graphView.nodePositions.get('work-a')},position);
+  const child={...c.graphView.nodePositions.get('work-b')};
+  c.updateGraphVisibility();
+  assert.deepEqual({...c.graphView.nodePositions.get('work-b')},child,'refresh preserves the expanded arrangement');
+  assert.deepEqual({...c.graphView.layoutPlan.positions.get('work-a')},position,'refresh keeps layout anchors aligned');
+  c.graphView.projected=new Map([['work-a',{x:100,y:100}],['work-b',{x:200,y:200}]]);
+  c.setGraphAttention('hoveredKey',null,{x:150,y:150});
+  assert.equal(c.graphView.hoverRoot,'work-a','crossing the space between parent and child keeps the family open');
+  c.setGraphAttention('hoveredKey','work-b');
+  assert.equal(c.graphView.hoverRoot,'work-a');
+  c.setGraphAttention('hoveredKey',null);
+  assert.deepEqual(Array.from(c.graphView.nodes,n=>n.key),['work-a']);
+  assert.deepEqual({...c.graphView.nodePositions.get('work-a')},position);
+  assert.equal(c.graphView.panX,73); assert.equal(c.graphView.zoom,1.7);
+});
+
+test('keyboard and selected families survive pointer exit and ignore internal focus transfers',()=>{
+  const c=monitor(); c.state.snapshot=snapshot(); c.updateGraphVisibility();
+  c.setGraphAttention('focusedKey','work-a');
+  c.setGraphAttention('hoveredKey','work-a'); c.setGraphAttention('hoveredKey',null);
+  assert.equal(c.graphView.nodes.length,2);
+  c.graphView.movingFocus=true; c.setGraphAttention('focusedKey',null); c.graphView.movingFocus=false;
+  assert.equal(c.graphView.focusRoot,'work-a');
+  c.graphView.selectedRoot='work-a'; c.setGraphAttention('focusedKey',null);
+  assert.equal(c.graphView.nodes.length,2,'reading in the sidebar retains the selected family');
+  c.graphView.selectedRoot=null; c.updateGraphVisibility(true);
+  assert.equal(c.graphView.nodes.length,1);
+});
+
+test('refresh classifies changed parentage without restoring a stale collapsed layout',()=>{
+  const c=monitor(); c.state.snapshot=snapshot(); c.updateGraphVisibility();
+  c.setGraphAttention('hoveredKey','work-a');
+  c.state.snapshot=snapshot(nodes,[]); c.updateGraphVisibility();
+  assert.equal(c.graphView.basePositions,null,'changed parentage invalidates the old overview cache');
+  c.setGraphAttention('hoveredKey',null);
+  assert.deepEqual(Array.from(c.graphView.nodes,n=>n.key),['work-a','work-b'],'newly standalone Issue remains visible after collapse');
+  for(const node of c.graphView.nodes) assert.deepEqual({...c.graphView.nodePositions.get(node.key)},{...c.graphView.layoutPlan.positions.get(node.key)});
 });

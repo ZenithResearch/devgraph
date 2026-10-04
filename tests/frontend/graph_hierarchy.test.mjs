@@ -57,17 +57,18 @@ test('nodes at different depths draw back to front without changing source order
   assert.deepEqual(nodes.map(n=>n.key),['near','far','middle']);
 });
 
-test('overview filters migrate older broad or Task-only preferences without rendering detailed records',()=>{
+test('overview filters admit all Work types while excluding observation and receipt categories',()=>{
   for(const value of [{},{work_kind:['Task']},{category:['receipt'],work_kind:['Project','Task']}]) {
     const f=T.overviewFilters(value);
     assert.deepEqual(Array.from(f.category),['arena','work']);
-    assert.ok(f.work_kind.every(k=>['Proposal','Initiative','Project'].includes(k)));
+    assert.ok(f.work_kind.every(k=>T.kinds.includes(k)));
     assert.ok(f.work_kind.length);
     assert.equal(f.record_status,null);
   }
   assert.deepEqual(Array.from(T.overviewFilters({work_kind:[]}).work_kind),[],'explicit None remains empty');
   assert.match(T.query(T.overviewFilters()),/work_kind=Project/);
-  assert.doesNotMatch(T.query(T.overviewFilters()),/Task|Issue|receipt|observation/);
+  assert.match(T.query(T.overviewFilters()),/work_kind=Task/);
+  assert.doesNotMatch(T.query(T.overviewFilters()),/receipt|observation/);
 });
 
 test('250 and 1500 Work fixtures keep each parent family in one neighborhood without overlaps',()=>{
@@ -98,4 +99,55 @@ test('missing parents, cycles, and empty Arenas terminate with a deterministic f
   const h=T.hierarchy([a,b,empty],[edge(a,b),edge(b,a),{source:'missing',target:a.key,relationship:'HAS_CHILD'}]);
   assert.equal(h.positions.size,2);assert.equal(h.groups.length,2);
   assert.ok([...h.positions.values()].every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)));
+});
+
+function workFamily() {
+  const a=node('Arena','a'),i=node('Initiative','i'),p=node('Project','p'),other=node('Project','other');
+  const issue=node('Issue','child'),task=node('Task','grandchild'),direct=node('Task','direct');
+  const rootIssue=node('Issue','root'),rootTask=node('Task','root'),unrelated=node('Task','unrelated');
+  const nodes=[a,i,p,other,issue,task,direct,rootIssue,rootTask,unrelated];
+  const edges=[edge(a,i,'CONTAINS_WORK'),edge(a,rootIssue,'CONTAINS_WORK'),edge(i,p),edge(p,issue),edge(issue,task),edge(i,direct),edge(other,unrelated),edge(p,unrelated,'DEPENDS_ON')];
+  return {a,i,p,other,issue,task,direct,rootIssue,rootTask,unrelated,nodes,edges};
+}
+const keys=projection=>Array.from(projection.nodes,n=>n.key).sort();
+
+test('overview includes parentless Issues and Tasks even when assigned to an Arena',()=>{
+  const f=workFamily(),view=T.overviewProjection(f.nodes,f.edges);
+  assert.deepEqual(keys(view),[f.a,f.i,f.p,f.other,f.rootIssue,f.rootTask].map(n=>n.key).sort());
+  assert.equal(view.context.nodes.some(n=>n.key===f.task.key),false,'collapsed descendants do not consume layout space');
+});
+
+test('Initiative expansion reveals every descendant; Project expansion stays in its own family',()=>{
+  const f=workFamily(),context={nodes:f.nodes,edges:f.edges};
+  const initiative=T.overviewProjection(f.nodes,f.edges,context,[f.i.key]);
+  assert.ok([f.issue,f.task,f.direct].every(n=>keys(initiative).includes(n.key)));
+  assert.ok(!keys(initiative).includes(f.unrelated.key),'dependencies do not expand unrelated children');
+  const project=T.overviewProjection(f.nodes,f.edges,context,[f.p.key]);
+  assert.ok([f.issue,f.task].every(n=>keys(project).includes(n.key)));
+  assert.ok(!keys(project).includes(f.direct.key));
+  assert.equal(T.attentionRoot(f.p.key,f.i.key,initiative),f.i.key);
+  assert.equal(T.attentionRoot(f.task.key,f.i.key,initiative),f.i.key);
+  assert.equal(T.attentionRoot(f.task.key,null,initiative),f.p.key,'opening child work in the reader reveals its nearest loaded family');
+  assert.equal(T.attentionRoot(f.other.key,f.i.key,initiative),f.other.key);
+  assert.equal(T.attentionRoot(f.rootTask.key,f.i.key,initiative),null);
+});
+
+test('filtered ancestors still classify children, and expansion respects filters and hidden connections',()=>{
+  const f=workFamily(),context={nodes:f.nodes,edges:f.edges};
+  const loaded=f.nodes.filter(n=>![f.issue.key,f.i.key].includes(n.key));
+  const collapsed=T.overviewProjection(loaded,[],context);
+  assert.ok(!keys(collapsed).includes(f.direct.key),'hidden parent does not make a Task top-level');
+  const expanded=T.overviewProjection(loaded,[],context,[f.p.key]);
+  assert.ok(keys(expanded).includes(f.task.key),'traversal continues through a filtered intermediate parent');
+  assert.ok(!keys(expanded).includes(f.issue.key),'filtered records stay hidden');
+  assert.equal(expanded.edges.length,0,'hidden connection types stay hidden');
+  assert.ok(expanded.context.nodes.some(n=>n.key===f.issue.key),'layout retains hidden ancestry');
+});
+
+test('descendant traversal terminates on cycles and ignores missing expansion roots',()=>{
+  const f=workFamily(),edges=[...f.edges,edge(f.task,f.p)];
+  const view=T.overviewProjection(f.nodes,edges,{nodes:f.nodes,edges},[f.p.key,'missing']);
+  assert.equal(view.families.size,1);
+  assert.equal(view.families.get(f.p.key).size,3);
+  assert.equal(T.attentionRoot(f.task.key,'missing',view),f.p.key);
 });

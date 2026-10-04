@@ -75,7 +75,13 @@ choice is remembered in this browser and shared with Project selection. A
 second selector stays available when the graph canvas is fullscreen. Changing
 appearance preserves your graph filters, positions, selection, and local inputs.
 
-The canvas renders Proposals, Initiatives, and Projects. Arenas appear as labeled
+The canvas renders Proposals, Initiatives, Projects, and top-level Issues and
+Tasks (no Work parent, regardless of Arena membership). Hover or keyboard-focus
+an Initiative or Project to reveal all matching descendants, including Issues
+and Tasks. Moving into the revealed family keeps it open; selection keeps it
+open while reading. **Collapse child work** restores the overview. Expansion
+keeps the parent anchored, and collapse restores the prior overview positions.
+Arenas appear as labeled
 volumes, with separate space for work outside an Arena. Containment places each
 parent above and in front of its child groups, with siblings sharing a depth
 range. Bounded 3D worker physics relaxes collisions without letting dependencies
@@ -85,10 +91,12 @@ enable Orbit. Command-drag rotates even when starting over a node. Ordinary
 node dragging still repositions that item. Reset layout restores
 the initial angle and depth. Nearer nodes draw in front in both renderers.
 
-Use **Filters** for those three Work types, lifecycle status, archived items,
+Use **Filters** for all five Work types, lifecycle status, archived items,
 text and connection lines. Hiding a parent type or its line does not remove its
 layout context. The API continues supporting every original category and Work
-subtype. Existing saved filters are narrowed to the overview's supported types.
+subtype. Existing broad overview preferences gain Issues and Tasks; explicit
+subsets and empty selections are preserved. Expansion respects these filters
+and the API result limit, and uses only containment, never dependencies.
 **Clear filters** restores the overview. **Hide Observer** reclaims
 space without changing the graph. Details stack on narrow windows; wide views
 start with a golden-ratio graph/details split and support reader resizing.
@@ -97,8 +105,8 @@ Hover an item for its type, status and connected labels. Click to read details
 beside the graph; narrow screens stack the reader below the interactive canvas.
 Right-click, Shift+F10, or **Open modal** opens the overlay reader and restores
 focus when closed. Reading never switches the graph to a replacement page.
-Issues and Tasks remain accessible through related work in the reader and on
-the Work board. For keyboard selection,
+Related work in the reader and the Work board also provide access to Issues
+and Tasks, including records hidden by current graph filters. For keyboard selection,
 use **Browse visible items** or search when the map is dense. Overlapping
 picking targets open a chooser. Move items with drag or arrow keys, then use
 **Undo positioning** to revert. Escape cancels a move. **Reset layout** is also

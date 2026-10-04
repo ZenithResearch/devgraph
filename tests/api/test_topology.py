@@ -416,3 +416,35 @@ def test_layout_ancestor_context_survives_hidden_types_and_edges_without_unrelat
     assert all(set(n) == {"key", "kind", "title", "category"} for n in context["nodes"])
     empty = filter_projection(snapshot, TopologyFilter.parse("category=none"))
     assert empty["layout_context"] == {"nodes": [], "edges": []}
+
+
+def test_task_layout_context_preserves_hidden_work_parents_and_arena_only_roots():
+    def node(kind, key):
+        return {"key": f"{kind}:{key}", "kind": kind, "id": key, "title": key,
+                "category": "arena" if kind == "Arena" else "work",
+                "status": "draft", "archived": False}
+
+    snapshot = {
+        "graph_nodes": [node("Arena", "a"), node("Project", "p"), node("Issue", "i"),
+                        node("Task", "child"), node("Task", "root"), node("Issue", "unrelated")],
+        "graph_edges": [
+            {"source": "Arena:a", "target": "Project:p", "relationship": "CONTAINS_WORK"},
+            {"source": "Arena:a", "target": "Task:root", "relationship": "CONTAINS_WORK"},
+            {"source": "Project:p", "target": "Issue:i", "relationship": "HAS_CHILD"},
+            {"source": "Issue:i", "target": "Task:child", "relationship": "HAS_CHILD"},
+            {"source": "Task:child", "target": "Issue:unrelated", "relationship": "DEPENDS_ON"},
+        ],
+    }
+    result = filter_projection(snapshot, TopologyFilter.parse(
+        "category=work&work_kind=Task&relationship=none"
+    ))
+    assert {n["key"] for n in result["graph_nodes"]} == {"Task:child", "Task:root"}
+    assert result["graph_edges"] == []
+    context = result["layout_context"]
+    assert {n["key"] for n in context["nodes"]} == {
+        "Arena:a", "Project:p", "Issue:i", "Task:child", "Task:root"
+    }
+    parents = {e["target"]: e["source"] for e in context["edges"]
+               if e["relationship"] == "HAS_CHILD"}
+    assert parents["Task:child"] == "Issue:i"
+    assert "Task:root" not in parents

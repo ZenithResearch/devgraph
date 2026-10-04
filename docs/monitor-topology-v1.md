@@ -60,8 +60,10 @@ request a larger supported limit when a result is partial.
 The optional additive `layout_context` contains minimal `nodes` (key, kind,
 title, category) and containment `edges` for returned overview items and their
 ancestors. It keeps Arena membership and parent grouping available when a
-parent type or relationship line is hidden. Only Arena, Proposal, Initiative,
-and Project context is included, within the existing source budgets; unrelated
+parent type or relationship line is hidden. Arena and all five Work types are
+included, within the existing source budgets.
+This distinguishes top-level Issues and Tasks from children of filtered-out
+parents and supports local descendant reveal. Unrelated
 siblings and dependencies are excluded. These are layout hints, not additional
 rendered results or counts. Clients without this field derive their layout from
 the returned graph. The legacy snapshot and signed request bytes are unchanged.

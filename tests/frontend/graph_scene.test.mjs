@@ -52,3 +52,21 @@ test('unchanged SVG nodes retain identity and focus across projection updates', 
   assert.equal(c.document.activeElement, element);
   assert.match(element.getAttribute('aria-label'), /Revised title, review/);
 });
+
+test('expansion into Canvas keeps one focused node control and restores SVG without losing focus',()=>{
+  const c=scene();
+  const parent={key:'Project:p',kind:'Project',category:'work',title:'Parent',status:'draft'};
+  const children=Array.from({length:250},(_,i)=>({key:`Task:${i}`,kind:'Task',category:'work',title:`Child ${i}`,status:'draft'}));
+  c.DevgraphTopologyCanvas={draw(){return [];}};
+  c.renderGraph([parent],[]);
+  const element=c.document.getElementById('scene-nodes').children[0];
+  element.closest=selector=>selector==='.graph-node'?element:null; element.focus();
+  c.renderGraph([parent,...children],[]);
+  assert.equal(c.graphView.canvasMode,true);
+  assert.equal(c.document.activeElement,element);
+  assert.equal(c.document.getElementById('scene-nodes').children.length,1,'Canvas retains only the focused accessibility control');
+  c.renderGraph([parent],[]);
+  assert.equal(c.graphView.canvasMode,false);
+  assert.equal(c.document.activeElement,element);
+  assert.equal(c.document.getElementById('scene-nodes').children[0],element);
+});

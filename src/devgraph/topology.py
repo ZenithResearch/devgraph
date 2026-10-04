@@ -254,7 +254,7 @@ def filter_projection(snapshot, filters: TopologyFilter):
     shown_edges = shown_edges[: filters.edge_limit]
     # Minimal ancestor context keeps the overview layout stable when a parent
     # type or its connecting lines are filtered out. It never adds rendered nodes.
-    overview_kinds = {"Arena", "Proposal", "Initiative", "Project"}
+    overview_kinds = {"Arena", *MONITORED_WORK_KINDS}
     ancestry = {}
     for edge in all_edges:
         if edge["relationship"] in {"HAS_CHILD", "CONTAINS_WORK"}:

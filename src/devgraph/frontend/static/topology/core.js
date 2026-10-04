@@ -82,7 +82,7 @@
     }
     return {byKey, adjacent, degree};
   }
-  const overviewKinds = ['Proposal', 'Initiative', 'Project'];
+  const primaryKinds = ['Proposal', 'Initiative', 'Project'], overviewKinds = [...kinds];
   const defaultCamera = {yaw:-.32,pitch:.24};
   function depthSeed(key) {
     let hash=0;for(const character of key)hash=(hash*31+character.charCodeAt(0))>>>0;
@@ -91,6 +91,42 @@
   function overviewFilters(value = {}) {
     const f = filters(value), selected = f.work_kind?.filter(kind => overviewKinds.includes(kind));
     return {...f, category:['arena','work'], work_kind:selected?.length || f.work_kind?.length === 0 ? selected : [...overviewKinds], observation_status:null, record_status:null};
+  }
+
+  function overviewProjection(nodes, edges, context = {nodes,edges}, roots = []) {
+    const byKey=new Map(nodes.map(n=>[n.key,n])), parents=new Map(), children=new Map();
+    for(const edge of context.edges)if(edge.relationship==='HAS_CHILD'){
+      if(!parents.has(edge.target))parents.set(edge.target,edge.source);
+      if(!children.has(edge.source))children.set(edge.source,new Set());children.get(edge.source).add(edge.target);
+    }
+    const base=new Set(nodes.filter(n=>n.kind==='Arena'||primaryKinds.includes(n.kind)||(kinds.includes(n.kind)&&!parents.has(n.key))).map(n=>n.key));
+    const visible=new Set(base), families=new Map();
+    for(const root of new Set(roots)){
+      if(!['Initiative','Project'].includes(byKey.get(root)?.kind))continue;
+      const family=new Set([root]),queue=[root];
+      for(const key of queue)for(const child of children.get(key)||[])if(!family.has(child)){family.add(child);queue.push(child);}
+      families.set(root,family);for(const key of family)if(byKey.has(key))visible.add(key);
+    }
+    // Hidden ancestors classify roots and organize the visible branch, but are
+    // never promoted into results. Display filters still govern the loaded set.
+    const ancestors=new Map();for(const edge of context.edges)if(['HAS_CHILD','CONTAINS_WORK'].includes(edge.relationship)){
+      if(!ancestors.has(edge.target))ancestors.set(edge.target,[]);ancestors.get(edge.target).push(edge.source);
+    }
+    const layoutKeys=new Set(visible),queue=[...visible];
+    for(const key of queue)for(const parent of ancestors.get(key)||[])if(!layoutKeys.has(parent)){layoutKeys.add(parent);queue.push(parent);}
+    return {nodes:nodes.filter(n=>visible.has(n.key)),edges:edges.filter(e=>visible.has(e.source)&&visible.has(e.target)),
+      context:{nodes:context.nodes.filter(n=>layoutKeys.has(n.key)),edges:context.edges.filter(e=>layoutKeys.has(e.source)&&layoutKeys.has(e.target))},
+      byKey,parents,children,base,families};
+  }
+  function attentionRoot(key,previous,model) {
+    if(!key||!model?.byKey.has(key))return null;
+    const visited=new Set();let current=key,nearest=null;
+    while(current&&!visited.has(current)){
+      if(current===previous)return previous;
+      if(!nearest&&['Initiative','Project'].includes(model.byKey.get(current)?.kind))nearest=current;
+      visited.add(current);current=model.parents.get(current);
+    }
+    return nearest;
   }
 
   // Containment alone owns neighborhoods. Dependencies never reparent a node.
@@ -245,5 +281,5 @@
     view.pinnedKey=entry.pinned;view.repulsionStrength=entry.separation;view.edgeStrengths=new Map(entry.strengths);
     if(camera)Object.assign(view,entry.camera);
   }
-  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,overviewKinds,overviewFilters,defaultCamera,hierarchy,regions,regionCorners,depthOrder,coordinates,layout,filters,query,preferences,capture,restore};
+  root.DevgraphTopology={kinds,categories,registry,visual,shape,solids,solid,index,primaryKinds,overviewKinds,overviewFilters,overviewProjection,attentionRoot,defaultCamera,hierarchy,regions,regionCorners,depthOrder,coordinates,layout,filters,query,preferences,capture,restore};
 })(globalThis);
