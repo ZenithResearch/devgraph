@@ -30,6 +30,10 @@ _ASSETS = {
     "worker.js": "text/javascript",
     "style.css": "text/css",
     "proof.js": "text/javascript",
+    "check-in.js": "text/javascript",
+    "check-in.css": "text/css",
+    "chooser.js": "text/javascript",
+    "chooser.css": "text/css",
 }
 
 

@@ -30,6 +30,28 @@ for the query contract, signed profile, limits, and compatibility details.
 
 ## Current capabilities
 
+The opening **Daily check-in** replaces the promotional heading and primary
+inventory tiles with a paged Todo list and a review/draft summary. It reads
+**exact base Todo records only**; Proposal, Initiative, Project, Issue, and Task
+are excluded. The [Todo API](../monitor-todos-v1.md) supplies complete filtered
+counts independently of the topology. Accepted is a lifecycle state, not a
+claim that delivery is complete. No due dates or department ownership are inferred.
+
+Search, lifecycle, and current/archived preferences persist within the read
+context; authorization is never part of those preferences. Six items render
+per page. Refresh keeps the focused list stable and offers **Show updates**
+when new content arrives during keyboard reading. Click opens the shared side
+reader, and right-click or Shift+F10 opens its modal. A missing Todo API shows
+an unavailable state rather than fabricated records or zero counts. Graph-wide
+inventory remains available in a disclosure. The main/supporting columns use
+golden-ratio proportions and stack on narrow screens.
+
+An unselected reader offers **Find an item** and **Browse visible items**.
+Overlapping map targets open a bounded, counted item chooser with
+object shape/type, wrapped titles, lifecycle text, and distinguishing IDs for
+duplicate titles. Arrow keys, Home/End, Escape, normal Tab navigation, and
+right-click/Shift+F10 work there; dismissal restores focus where appropriate.
+
 The frontend presents safe work, initiative-observation, and Record summaries;
 recent graph activity; and an interactive 3D topology of monitor-visible stored
 relationships. Operators can orbit the scene, drag nodes, settle or reset the

@@ -921,6 +921,103 @@ class Neo4jGraphStorage:
             records.append(self._node_from_row(row, expected_label))
         return records
 
+    def todo_page(self, query):
+        from devgraph.storage.todos import STATUSES, TodoPage, validate_todo_page
+
+        if query.q:
+            return self._todo_search_page(query)
+        # Todo is a canonical scalar-property label. Deliberately exclude generic
+        # legacy records with no kind, subclasses, and multiply labelled nodes.
+        scope = (
+            "MATCH (n:Todo) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
+            "AND ($archived = 'include' OR n.archived = ($archived = 'only')) "
+        )
+        statement = Query(
+            "CALL () { " + scope +
+            "RETURN count(n) AS total, " +
+            ", ".join(f"count(CASE WHEN n.status = '{status}' THEN 1 END) AS {status}"
+                      for status in STATUSES) +
+            ", count(CASE WHEN $status IS NULL OR n.status = $status THEN 1 END) "
+            "AS matching_count, "
+            "count(CASE WHEN ($status IS NULL OR n.status = $status) "
+            "AND ($after_id IS NULL OR n.id > $after_id) THEN 1 END) AS remaining_count } "
+            "CALL () { " + scope +
+            "AND ($status IS NULL OR n.status = $status) "
+            "AND ($after_id IS NULL OR n.id > $after_id) "
+            "WITH n ORDER BY n.id LIMIT $limit "
+            "RETURN collect({labels: labels(n), id: n.id, archived: n.archived, "
+            "properties: properties(n)}) AS nodes } "
+            "RETURN total, draft, review, accepted, archived, matching_count, "
+            "remaining_count, nodes",
+            timeout=5.0,
+        )
+        rows = self._run_graph(statement, archived=query.archived,
+                               status=query.status, after_id=query.after_id, limit=query.limit + 1)
+        if len(rows) != 1:
+            raise StorageUnavailable("Todo page unavailable")
+        try:
+            row = rows[0]
+            nodes = tuple(self._node_from_row(node, "Todo") for node in row["nodes"])
+            counts = {key: row[key] for key in ("total", *STATUSES)}
+            return validate_todo_page(TodoPage(
+                nodes, counts, row["matching_count"], row["remaining_count"]
+            ), query)
+        except (KeyError, TypeError, ValueError):
+            raise StorageUnavailable("malformed Todo page") from None
+
+    def _todo_search_page(self, query):
+        from devgraph.storage.todos import (
+            SEARCH_SOURCE_LIMIT,
+            TodoPage,
+            select_todo_page,
+            validate_todo_page,
+        )
+
+        # Search must run on redacted display titles. Materialize only bounded
+        # Todo metadata, never descriptions, relationships, or the whole graph.
+        source = self._run_graph(Query(
+            "MATCH (n:Todo) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
+            "AND ($archived = 'include' OR n.archived = ($archived = 'only')) "
+            "WITH n ORDER BY n.id LIMIT $source_limit "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            "n{.id, .archived, .kind, .title, .status, .version} AS properties",
+            timeout=5.0,
+        ), archived=query.archived, source_limit=SEARCH_SOURCE_LIMIT + 1)
+        if len(source) > SEARCH_SOURCE_LIMIT:
+            raise StorageUnavailable("Todo search capacity exceeded")
+        metadata = [self._node_from_row(row, "Todo", validate_canonical=False) for row in source]
+        selected = select_todo_page(metadata, query)
+        if not selected.nodes:
+            return selected
+        rows = self._run_graph(Query(
+            "MATCH (n:Todo) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
+            "AND n.id IN $ids RETURN labels(n) AS labels, n.id AS id, "
+            "n.archived AS archived, properties(n) AS properties ORDER BY n.id LIMIT $limit",
+            timeout=5.0,
+        ), ids=[node.id for node in selected.nodes], limit=query.limit + 2)
+        nodes = tuple(self._node_from_row(row, "Todo") for row in rows)
+        if len(nodes) != len(selected.nodes) or any(
+            node.id != prior.id or node.archived != prior.archived or any(
+                node.properties.get(key) != prior.properties.get(key)
+                for key in ("kind", "title", "status", "version")
+            ) for node, prior in zip(nodes, selected.nodes, strict=True)
+        ):
+            raise StorageUnavailable("Todo search changed during read; retry")
+        return validate_todo_page(TodoPage(
+            nodes, selected.counts, selected.matching_count, selected.remaining_count
+        ), query)
+
+    def todo_detail(self, todo_id):
+        validate_work_object_id(todo_id)
+        rows = self._run_graph(Query(
+            "MATCH (n:Todo {id: $todo_id}) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            "properties(n) AS properties LIMIT 2", timeout=5.0,
+        ), todo_id=todo_id)
+        if len(rows) > 1:
+            raise StorageUnavailable("ambiguous Todo identity")
+        return self._node_from_row(rows[0], "Todo", expected_id=todo_id) if rows else None
+
     def claim_event_receipt(
         self,
         node_id: str,

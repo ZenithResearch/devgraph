@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal, NamedTuple, Protocol
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol
 
 from devgraph.storage.supporting_material import SupportingReference
+
+if TYPE_CHECKING:
+    from devgraph.storage.todos import TodoPage, TodoQuery
 
 
 @dataclass(frozen=True)
@@ -257,6 +260,10 @@ class GraphStorage(Protocol):
         after_id: str | None = None,
         limit: int | None = None,
     ) -> list[NodeRecord]: ...
+
+    def todo_page(self, query: TodoQuery) -> TodoPage: ...
+
+    def todo_detail(self, todo_id: str) -> NodeRecord | None: ...
 
     def monitor_records(self) -> tuple[list[NodeRecord], list[EdgeRecord]]: ...
 

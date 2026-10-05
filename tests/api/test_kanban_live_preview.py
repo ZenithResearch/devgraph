@@ -44,6 +44,8 @@ def fixture():
         if request.headers.get("authorization") != "Bearer real-reader" or not state["valid"]:
             return httpx.Response(401)
         path = request.url.path
+        if path.startswith("/monitor/todos/v1") and state.get("todos"):
+            return httpx.Response(200, json=state["todos"])
         if path == "/ready":
             return httpx.Response(
                 200, json={"ready": True, "current_applied_version": state["version"]}
@@ -103,6 +105,25 @@ def fixture():
         base_url=preview.ORIGIN,
     )
     return client, calls, state
+
+
+def test_todo_preview_preserves_new_envelopes_and_missing_capability():
+    client, calls, state = fixture()
+    auth = {"Authorization": "Bearer real-reader"}
+    assert client.get("/monitor/todos/v1").status_code == 401
+    assert not calls
+    missing = client.get("/monitor/todos/v1?limit=6", headers=auth)
+    assert missing.status_code == 501
+    assert "does not support base Todo" in missing.text
+    state["todos"] = {"schema": "devgraph.todos.v1", "items": [], "counts": {"total": 0}}
+    response = client.get("/monitor/todos/v1?limit=6&status=review", headers=auth)
+    assert response.status_code == 200 and response.json() == state["todos"]
+    assert calls[-1].url.params["status"] == "review"
+    state["todos"] = {"kind": "Todo", "id": "daily", "description": "Read context"}
+    assert client.get("/monitor/todos/v1/daily", headers=auth).json() == state["todos"]
+    assert client.get("/monitor/todos/v1/bad%20id", headers=auth).status_code == 400
+    state["valid"] = False
+    assert client.get("/monitor/todos/v1", headers=auth).status_code == 401
 
 
 def test_live_board_full_counts_pagination_scope_and_legacy_stages():

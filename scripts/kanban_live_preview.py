@@ -64,7 +64,7 @@ def monitor_html():
         '<option value="10" selected>10 seconds</option>': '<option value="10">10 seconds</option>'
         '<option value="60" selected>60 seconds</option>',
         "}, 30000);": "}, 120000);",
-        "Live local state": "Live local data · development preview",
+        "Local graph · View only": "Live local data · Preview · View only",
     }
     html = FRONTEND_HTML
     for old, new in replacements.items():
@@ -411,6 +411,28 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
             raise HTTPException(404, "This scope no longer exists") from None
         except StorageUnavailable:
             raise HTTPException(503, "The graph exceeds this preview's read budget") from None
+
+    @app.get("/monitor/todos/v1")
+    async def todos(request: Request):
+        async with client(credential(request)) as api:
+            try:
+                return await upstream(api, request.url.path + "?" + request.url.query)
+            except HTTPException as error:
+                if error.status_code == 404:
+                    raise HTTPException(
+                        501, "The installed API does not support base Todo reads"
+                    ) from None
+                raise
+
+    @app.get("/monitor/todos/v1/{todo_id}")
+    async def todo(request: Request, todo_id: str):
+        read_credential = credential(request)
+        try:
+            validate_work_object_id(todo_id)
+        except ValueError:
+            raise HTTPException(400, "Invalid Todo identifier") from None
+        async with client(read_credential) as api:
+            return await upstream(api, request.url.path)
 
     @app.get("/work/{kind}/{work_id}/workflow")
     async def workflow(request: Request, kind: str, work_id: str):

@@ -281,18 +281,20 @@ FRONTEND_HTML = r'''<!doctype html>
   </style>
   <link rel="stylesheet" href="/monitor/topology-assets/style.css">
   <link rel="stylesheet" href="/monitor/topology-assets/theme.css">
+  <link rel="stylesheet" href="/monitor/topology-assets/check-in.css">
+  <link rel="stylesheet" href="/monitor/topology-assets/chooser.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to graph monitor</a>
   <div class="shell">
     <aside class="rail" aria-label="Observer navigation"><button type="button" class="graph-control" id="observer-toggle" aria-expanded="true" aria-controls="observer-content">Hide Observer</button><div id="observer-content">
       <div class="brand"><div class="brand-mark">DG</div><div><strong>Dev Graph</strong><span>Observer</span></div></div>
-      <nav><a href="#overview" aria-current="page">Overview</a><a href="#topology">Topology</a><a href="#pipeline">Observation status</a><a href="#activity">Graph activity</a><a href="#observations">Observations</a><a href="/monitor/kanban/">Work board</a><a href="/monitor/selection">Project selection</a></nav>
+      <nav><a href="#overview" aria-current="page">Daily check-in</a><a href="#topology">Topology</a><a href="#pipeline">Observation status</a><a href="#activity">Graph activity</a><a href="#observations">Observations</a><a href="/monitor/kanban/">Work board</a><a href="/monitor/selection">Project selection</a></nav>
       <p class="rail-meta">Local graph · View only</p>
     </div></aside>
     <main id="main">
       <header class="topbar" id="overview">
-        <div><div class="eyebrow">Live local state</div><h1>Your work, connected</h1><p class="subtitle">Explore your work, see how it connects, and read the details behind each item.</p></div>
+        <div class="check-in-date"><span>Daily check-in</span><time id="check-in-date"></time></div>
         <div class="topbar-preferences"><label class="theme-picker"><span>Theme</span><select data-theme-picker aria-label="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="aqua">Aqua</option></select></label><div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Disconnected</span></div></div><span class="theme-status" data-theme-status role="status" aria-live="polite"></span>
       </header>
       <details class="connection-settings" id="connection-settings" open><summary id="connection-summary">Connect to your graph</summary>
@@ -302,11 +304,28 @@ FRONTEND_HTML = r'''<!doctype html>
         <button class="button" type="submit">Connect</button>
       </form></details>
       <p class="status-line" id="status-line" role="status" aria-live="polite">Enter a scoped read credential to inspect the graph.</p>
-      <section class="kpis" aria-label="Graph summary">
+      <section class="daily-check-in" id="daily-check-in" aria-labelledby="todo-title">
+        <div class="check-in-layout">
+          <article class="card todo-panel">
+            <header class="todo-heading"><div><h1 id="todo-title">Todo</h1><p>Priorities and items ready for review.</p></div><span class="todo-scope">Base Todos only</span></header>
+            <div class="todo-tools"><label><span class="sr-only">Find a Todo</span><input id="todo-search" type="search" maxlength="200" placeholder="Find a Todo" autocomplete="off"></label><select id="todo-archive" aria-label="Todo archive visibility"><option value="exclude">Current Todos</option><option value="only">Archived Todos</option></select></div>
+            <div class="todo-filter-tabs" role="group" aria-label="Todo status"><button type="button" class="graph-control" data-todo-status="" aria-pressed="true">All</button><button type="button" class="graph-control" data-todo-status="review" aria-pressed="false">In review</button><button type="button" class="graph-control" data-todo-status="draft" aria-pressed="false">Draft</button><button type="button" class="graph-control" data-todo-status="accepted" aria-pressed="false">Accepted</button></div>
+            <ul id="todo-items" class="todo-items"></ul>
+            <footer class="todo-footer"><span id="todo-page">6 items per page</span><div class="todo-pagination"><button class="graph-control" id="todo-previous" type="button" disabled>Previous</button><button class="graph-control" id="todo-next" type="button" disabled>Next</button></div></footer>
+            <div class="todo-update-line"><p id="todo-status" role="status" aria-live="polite">Connect to load your Todos.</p><button class="graph-control" id="todo-retry" type="button" hidden>Retry</button><button class="graph-control" id="todo-updates" type="button" hidden>Show updates</button></div>
+          </article>
+          <aside class="card check-in-summary" aria-label="Todo check-in summary">
+            <h2>At a glance</h2><p>Start with review decisions, then check what is still taking shape.</p>
+            <dl class="check-in-counts"><div><dt>In review</dt><dd id="todo-count-review">—</dd></div><div><dt>Draft</dt><dd id="todo-count-draft">—</dd></div><div><dt>Accepted</dt><dd id="todo-count-accepted">—</dd></div><div><dt>All matching Todos</dt><dd id="todo-count-total">—</dd></div></dl>
+            <p class="summary-note">Counts include all pages matching your search and archive choice. Accepted items may still have delivery work to finish.</p>
+            <details class="graph-inventory"><summary>Graph inventory</summary><section class="kpis" aria-label="Graph summary">
         <article class="card kpi"><div class="kpi-label">Work items</div><div class="kpi-value" id="total-work">—</div><div class="kpi-note">in your work graph</div></article>
         <article class="card kpi"><div class="kpi-label">Active initiatives</div><div class="kpi-value" id="active-initiatives">—</div><div class="kpi-note">current larger efforts</div></article>
         <article class="card kpi"><div class="kpi-label">Observations</div><div class="kpi-value" id="observation-count">—</div><div class="kpi-note">interpretations supported by evidence</div></article>
         <article class="card kpi"><div class="kpi-label">Pending records</div><div class="kpi-value" id="pending-receipts">—</div><div class="kpi-note" id="receipt-note">Changes recorded; processing pending</div></article>
+            </section></details>
+          </aside>
+        </div>
       </section>
       <section class="card graph-card" id="topology">
         <div class="graph-toolbar">
@@ -329,7 +348,7 @@ FRONTEND_HTML = r'''<!doctype html>
           <div class="graph-layout">
             <div class="graph-scroll"><canvas id="graph-canvas" hidden aria-hidden="true"></canvas><div id="graph-preview" aria-hidden="true"></div><div id="node-chooser" hidden></div><svg class="graph-svg" id="graph-svg" viewBox="0 0 1080 420" tabindex="0" role="group" aria-label="Interactive Dev Graph topology" aria-describedby="graph-help"></svg></div>
             <div class="reader-resize" id="reader-resize" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Details width" aria-valuemin="320" aria-valuemax="600" aria-valuenow="360"></div>
-            <aside class="graph-details" id="graph-details" aria-label="Item reader"><div class="reader-header"><div class="reader-buttons"><button class="graph-control" id="reader-toggle" aria-expanded="true" aria-controls="reader-body">Close reader</button><button class="graph-control" id="reader-mode">Open modal</button></div><p class="reader-eyebrow">Reader</p><h3 id="reader-title" tabindex="-1">Choose an item</h3><div class="graph-details-copy" id="reader-meta">Select a node or search to read its details.</div></div><div id="reader-body" class="reader-body"><p id="reader-status" role="status" aria-live="polite"></p><div id="reader-content"></div></div></aside>
+            <aside class="graph-details" id="graph-details" aria-label="Item reader"><div class="reader-header"><div class="reader-buttons"><button class="graph-control" id="reader-toggle" aria-expanded="true" aria-controls="reader-body">Close reader</button><button class="graph-control" id="reader-mode" disabled>Open modal</button></div><p class="reader-eyebrow">Reader</p><h3 id="reader-title" tabindex="-1">Item details</h3><div class="graph-details-copy" id="reader-meta">Select an item on the map or find it by name.</div></div><div id="reader-body" class="reader-body"><p id="reader-status" role="status" aria-live="polite"></p><div id="reader-content"></div></div></aside>
           </div>
           <dialog id="reader-dialog" class="reader-dialog" aria-labelledby="reader-title"></dialog>
           <details id="graph-result-list"><summary>Browse visible items</summary><div id="graph-result-items"></div><button class="graph-control" id="graph-results-more" hidden>Show more items</button></details>
@@ -352,6 +371,8 @@ FRONTEND_HTML = r'''<!doctype html>
   <script src="/monitor/topology-assets/canvas.js"></script>
   <script src="/monitor/topology-assets/surface.js"></script>
   <script src="/monitor/topology-assets/reader.js"></script>
+  <script src="/monitor/topology-assets/check-in.js"></script>
+  <script src="/monitor/topology-assets/chooser.js"></script>
   <script>
     const Topology = DevgraphTopology;
     const state = { timer: null, snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshController: null, refreshQueued: false, pendingSnapshot: null, lastSuccess: null };
@@ -659,6 +680,7 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function readPath(node) {
+      if (node.category === 'todo' && node.kind === 'Todo') return `/monitor/todos/v1/${encodeURIComponent(node.id)}`;
       if (node.category === 'arena' && node.kind === 'Arena') return `/arenas/${encodeURIComponent(node.id)}`;
       if (node.category === 'work' && ['Proposal', 'Initiative', 'Project', 'Issue', 'Task'].includes(node.kind)) return `/work/${node.kind}/${encodeURIComponent(node.id)}`;
       if (node.category === 'observation') return `/initiative-observations/${encodeURIComponent(node.id)}`;
@@ -680,6 +702,12 @@ FRONTEND_HTML = r'''<!doctype html>
       if (detailState.node?.key !== node.key) {
         resetDetailState(); detailState.node = node; text('graph-feedback', '');
         document.getElementById('reader-body').scrollTop = 0;
+      }
+      if (node.category === 'todo') {
+        if (openReader && !document.getElementById('reader-dialog').open) setReaderCollapsed(false);
+        renderGraphSelection(); loadSelectedDetail();
+        if (openReader) { document.getElementById('graph-details').scrollIntoView({block:'nearest',behavior:'instant'}); document.getElementById('reader-title').focus({preventScroll:true}); }
+        return;
       }
       state.selectedGraphKey = node.key;
       graphView.selectedRoot = Topology.attentionRoot(node.key, graphView.selectedRoot || graphView.hoverRoot || graphView.focusRoot, graphView.revealModel);
@@ -894,11 +922,18 @@ FRONTEND_HTML = r'''<!doctype html>
       const node = detailState.node;
       const latest = (state.snapshot?.graph_nodes || []).find(item => item.key === node?.key);
       if (latest) detailState.node = { ...node, ...latest };
-      text('reader-title', detailState.data?.title || node?.title || 'Choose an item');
-      text('reader-meta', node ? `${Topology.visual(node.kind).label} · ${detailState.data?.status || node.status}` : 'Select an item on the map to start reading.');
+      text('reader-title', detailState.data?.title || node?.title || 'Item details');
+      text('reader-meta', node ? `${Topology.visual(node.kind).label} · ${detailState.data?.status || node.status}` : 'Select an item on the map or find it by name.');
+      document.getElementById('reader-mode').disabled = !node;
       text('reader-status', detailState.loading ? 'Loading details…' : detailState.error ? `${detailState.error}${detailState.data ? ' Showing the last loaded details.' : ''}` : '');
       const content = make('div');
-      if (!node) { content.append(make('p', 'reader-note', 'Find an item to read its description, related work, and supporting material.')); reconcileChildren(document.getElementById('reader-content'), content); return; }
+      if (!node) {
+        const empty = make('div', 'reader-empty'); empty.dataset.uiKey = 'empty-reader';
+        empty.append(make('p', 'reader-note', 'Read a plan, understand its context, and follow the supporting evidence.'));
+        const shortcuts = make('div', 'reader-empty-actions');
+        shortcuts.append(readerButton('Find an item', 'find-item'), readerButton('Browse visible items', 'browse-items'));
+        empty.append(shortcuts); content.append(empty); reconcileChildren(document.getElementById('reader-content'), content); return;
+      }
       const actions = make('details', 'reader-actions'); actions.dataset.uiKey = 'actions'; actions.append(make('summary', '', 'Reader actions'));
       const visible = graphView.nodes.some(item => item.key === node.key);
       const outsideArena = latest && graphView.arenaKey && !graphView.arenaNodes.some(item => item.key === node.key);
@@ -913,7 +948,14 @@ FRONTEND_HTML = r'''<!doctype html>
       if (!latest && onOverview) content.append(make('p', 'reader-note', state.snapshot?.schema === 'devgraph.topology.v1' && Topology.query(graphView.filters) ? 'Hidden by your filters. Its available details are shown below.' : 'This item is outside the current graph snapshot. Its available details are shown below.'));
       else if (!visible && onOverview) content.append(make('p', 'reader-note', outsideArena ? 'This item is outside the selected Arena reachability filter.' : 'This item is hidden by the graph filters.'));
       const data = detailState.data;
-      if (node.category === 'work' && data) {
+      if (node.category === 'todo' && data) {
+        const description = readerSection('Description', 'description');
+        description.append(make('div', data.description ? 'reader-description' : 'reader-note', data.description || 'No description has been written for this Todo.')); content.append(description);
+        const summary = readerSection('Todo context', 'todo-context');
+        summary.append(make('p', 'reader-note', `Base Todo · ${data.status} · Priority ${data.priority}`));
+        if (data.updated_at) summary.append(make('p', 'reader-note', `Last changed ${new Date(data.updated_at).toLocaleString()}`));
+        content.append(summary);
+      } else if (node.category === 'work' && data) {
         const description = readerSection('Description / plan', 'description');
         description.append(make('div', data.description ? 'reader-description' : 'reader-note', data.description || 'No description has been written for this item.'));
         content.append(description);
@@ -994,7 +1036,7 @@ FRONTEND_HTML = r'''<!doctype html>
         const other = (state.snapshot?.graph_nodes || []).find(item => item.key === key);
         const link = make('button', 'reader-link', `${outbound ? '→' : '←'} ${relationshipLabel(edge.relationship)} · ${other?.title || key}`); Object.assign(link.dataset, { action: 'snapshot-node', key, uiKey: `${edge.source}:${edge.relationship}:${edge.target}` }); connections.append(link);
       }
-      content.append(connections);
+      if (node.category !== 'todo') content.append(connections);
       const record = make('details', 'reader-record'); record.dataset.uiKey = 'record'; record.append(make('summary', '', 'Record information'), make('p', 'reader-note', `ID: ${node.id}`));
       if (data?.version !== undefined) record.append(make('p', 'reader-note', `${data.priority !== undefined ? `Priority ${data.priority} · ` : ''}Version ${data.version}`));
       content.append(record); reconcileChildren(document.getElementById('reader-content'), content);
@@ -1299,11 +1341,20 @@ FRONTEND_HTML = r'''<!doctype html>
       text('status-line', `Connected · Updated ${new Date(snapshot.generated_at).toLocaleTimeString()} · Read-only`);
     }
 
+    function refreshCheckIn(load = true) {
+      const date = new Date(), stamp = document.getElementById('check-in-date');
+      stamp.dateTime = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+      stamp.textContent = date.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});
+      checkIn.setPreferenceKey(graphView.preferenceKey ? `${graphView.preferenceKey}:todos` : null);
+      if (load) checkIn.refresh();
+    }
+
     function synchronizeCredential() {
       const credential = tokenInput.value.trim(); if (credential === detailState.credential) return;
       state.refreshController?.abort(); state.refreshController = null;
       detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null; state.connected = false;
       resetDetailState(); state.snapshot = null; state.observations = []; state.selectedGraphKey = null; graphView.neighborhood = null; graphView.arenaKey = '';
+      checkIn.reset();
       invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.hoverRoot=graphView.focusRoot=graphView.selectedRoot=null; graphView.revealSignature=''; graphView.revealCache=null; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
       ['total-work', 'active-initiatives', 'observation-count', 'pending-receipts'].forEach(id => text(id, '—'));
       renderActivity([]); renderObservations([]); renderPipeline({}); renderBars({});
@@ -1324,6 +1375,7 @@ FRONTEND_HTML = r'''<!doctype html>
       synchronizeCredential();
       if (!graphView.preferenceKey) await prepareGraphPreferences();
       if (!tokenInput.value.trim()) { document.getElementById('connection-settings').open = true; text('status-line', 'Enter a read access key to connect.'); return; }
+      refreshCheckIn();
       if (state.refreshPromise) { state.refreshQueued = true; return state.refreshPromise; }
       const epoch = state.authEpoch, filterSerial = graphView.filterSerial, controller = new AbortController(); state.refreshController = controller;
       if (!state.snapshot) text('status-line', 'Loading graph…');
@@ -1526,12 +1578,9 @@ FRONTEND_HTML = r'''<!doctype html>
     }
 
     function showNodeChooser(matches, clientX, clientY) {
-      const panel=document.getElementById('node-chooser'),bounds=document.querySelector('.graph-scroll').getBoundingClientRect();panel.replaceChildren();
-      panel.append(make('strong','','Choose an item'));
-      for(const match of matches.slice(0,20)){const node=graphView.index.byKey.get(match.key);if(!node)continue;const button=make('button','graph-control',`${node.title} · ${Topology.visual(node.kind).label}`);button.addEventListener('click',()=>{panel.hidden=true;selectGraphNode(node);document.getElementById('reader-title').focus();});panel.append(button);}
-      if(matches.length>20)panel.append(make('p','','Zoom in or use Browse visible items for more.'));
-      const close=make('button','graph-control','Close');close.addEventListener('click',()=>{panel.hidden=true;graphSvg.focus();});panel.append(close);panel.hidden=false;
-      panel.style.left=`${Math.max(0,Math.min(bounds.width-260,clientX-bounds.left))}px`;panel.style.top=`${Math.max(0,Math.min(bounds.height-280,clientY-bounds.top))}px`;panel.querySelector('button')?.focus();
+      const items = matches.map(match => graphView.index.byKey.get(match.key)).filter(Boolean);
+      nodeChooser.close({restoreFocus:false});
+      nodeChooser.open(items, {clientX, clientY, returnFocus:graphSvg});
     }
 
     function initializeTopologyControls() {
@@ -1654,6 +1703,24 @@ FRONTEND_HTML = r'''<!doctype html>
       closeButton: document.getElementById('reader-toggle'), modeButton: document.getElementById('reader-mode'),
       title: document.getElementById('reader-title'), fallbackFocus: graphSvg, onRestore: syncReaderPresentation,
     });
+    const checkIn = DevgraphCheckIn.mount({
+      root: document.getElementById('daily-check-in'), request: getJson, reconcile: reconcileChildren,
+      onSelect(item, {modal, returnFocus}) {
+        const node = {...item, key:`Todo:${item.id}`, category:'todo'};
+        if (modal) openNodeReaderModal(node, returnFocus); else selectGraphNode(node);
+      },
+    });
+    refreshCheckIn(false);
+    const nodeChooser = DevgraphChooser.create({
+      panel: document.getElementById('node-chooser'), container: document.querySelector('.graph-scroll'),
+      renderIcon: item => typeSample(item.kind),
+      onSelect(item, {modal}) {
+        const node = graphView.index?.byKey.get(item.key);
+        if (!node) { announceGraph('This item is no longer in the current graph. Search to find it again.'); graphSvg.focus(); return; }
+        if (modal) openNodeReaderModal(node, graphSvg);
+        else { selectGraphNode(node); document.getElementById('reader-title').focus({preventScroll:true}); }
+      },
+    });
     document.addEventListener('contextmenu', openNodeContextMenu);
     document.addEventListener('keydown', openNodeKeyboardMenu);
     const graphSurface = DevgraphGraphSurface.create({
@@ -1684,7 +1751,9 @@ FRONTEND_HTML = r'''<!doctype html>
     document.getElementById('reader-content').addEventListener('click', event => {
       const button = event.target.closest('[data-action]'); if (!button) return;
       const { action, relationship, id, kind, key } = button.dataset;
-      if (action === 'focus' || action === 'neighborhood') focusSelectedNode(action === 'neighborhood');
+      if (action === 'find-item') document.getElementById('graph-search').focus();
+      else if (action === 'browse-items') { const list = document.getElementById('graph-result-list'); list.open = true; renderVisibleItems(); list.querySelector('summary').focus(); }
+      else if (action === 'focus' || action === 'neighborhood') focusSelectedNode(action === 'neighborhood');
       else if (action === 'arena-filter' && detailState.node?.category === 'arena') setGraphArena(detailState.node.key);
       else if (action === 'refresh-detail') loadSelectedDetail();
       else if (action === 'related') { const work = detailState.relations.get(relationship)?.items.find(item => item.id === id && item.kind === kind); if (work) { selectGraphNode(workNode(work)); document.getElementById('reader-title').focus({preventScroll:true}); } }

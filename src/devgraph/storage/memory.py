@@ -413,6 +413,19 @@ class MemoryGraphStorage:
                 records = [node for node in records if node.id > after_id]
         return records if limit is None else records[:limit]
 
+    def todo_page(self, query):
+        from devgraph.storage.todos import select_todo_page
+
+        with self._transaction_lock:
+            return select_todo_page(self._nodes.values(), query)
+
+    def todo_detail(self, todo_id):
+        from devgraph.storage.todos import exact_todo
+
+        validate_work_object_id(todo_id)
+        node = self._nodes.get(("Todo", todo_id))
+        return node if node is not None and exact_todo(node) else None
+
     def claim_event_receipt(
         self,
         node_id: str,

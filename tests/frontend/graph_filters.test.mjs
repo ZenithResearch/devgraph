@@ -44,7 +44,7 @@ function snapshot(graphNodes = nodes, graphEdges = edges) {
 function monitor() {
   const elements = new Map();
   const c = vm.createContext({
-    AbortController,
+    AbortController, refreshCheckIn() {}, checkIn: { reset() {} },
     state: { snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshQueued: false },
     detailState: { credential: 'synthetic-test-credential' },
     graphView: {

@@ -540,6 +540,26 @@ class AuthorizedWorkGraph:
         self._audit(context, CATEGORY_READ, "workflows")
         return redact_mapping(result)
 
+    def monitor_todos(self, credential: str | None, query: str) -> dict:
+        from devgraph.todos import build_todos, parse_todo_query
+
+        context = self._authorize(credential, CATEGORY_READ)
+        if self._monitor_storage is None:
+            raise ValueError("monitor storage is not configured")
+        result = build_todos(self._monitor_storage, parse_todo_query(query))
+        self._audit(context, CATEGORY_READ, "monitor_todos")
+        return result
+
+    def monitor_todo(self, credential: str | None, todo_id: str) -> dict:
+        from devgraph.todos import read_todo
+
+        context = self._authorize(credential, CATEGORY_READ)
+        if self._monitor_storage is None:
+            raise ValueError("monitor storage is not configured")
+        result = read_todo(self._monitor_storage, todo_id)
+        self._audit(context, CATEGORY_READ, "monitor_todo")
+        return result
+
     def monitor_snapshot(self, credential: str | None) -> dict[str, Any]:
         context = self._authorize(credential, CATEGORY_READ)
         if self._monitor_storage is None:

@@ -64,3 +64,33 @@ Browser reads have independent UI evidence. Installed Chrome editing remains
 unqualified until the matched Wallet → native host → secS → Devgraph test passes
 in a disposable account/runner. Keep the consolidated candidate draft until
 that gate is recorded; source and fixture tests cannot substitute for it.
+
+## Daily check-in and chooser follow-up — 2026-10-04
+
+The art-direction, UX, and atomic-design review led to an exact-base Todo
+check-in, a compact date/connection header, secondary graph inventory, an
+actionable empty reader, and a bounded overlap chooser. The main/supporting
+areas use a 1.618:1 split that stacks on small screens. Existing Zenith themes
+and reader behavior are reused.
+
+The additive [Todo contract](../monitor-todos-v1.md) supplies filtered totals
+and six-item UI pages without broadening public Work kinds or write authority.
+Subtype exclusion, redaction, authorization, pagination, concurrent-read
+consistency checks, legacy metadata, focus retention, and credential changes
+have dedicated coverage. No historical bundles or signature vectors changed.
+
+`bash docs/dev/verification.md` passed with 2,361 Python tests and five
+environment-dependent skips. Generated artifacts and static checks passed;
+`uv run ruff check src tests scripts integrations` and `git diff --check` also
+passed. `node --test tests/frontend/*.test.mjs tests/frontend_kanban.mjs` passed
+all 215 tests. No live Neo4j qualification or native signing was performed for this
+additive read/UI follow-up.
+
+Browser checks used the real-data preview for chooser selection and its modal,
+and a clearly labeled disposable in-memory fixture for populated Todo counts,
+pagination, persisted review filtering, sidebar reading, right-click modal,
+focus restoration, and responsive/theme checks at 390 and 1,440 CSS pixels.
+The installed API on port 8080 predates the Todo routes; port 4193 therefore
+shows an explicit unavailable state for Todos while retaining the real graph.
+It never fabricates an empty result or substitutes Tasks. Activating the new
+API on the persistent host is a separate deployment step.
