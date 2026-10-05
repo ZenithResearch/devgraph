@@ -323,10 +323,13 @@ class WorkflowReview(Strict):
 
 
 def catalog() -> dict:
+    from devgraph.progress import PROGRESS_LABELS, stage_progress
+
     return {
+        "progress": PROGRESS_LABELS,
         "schema": "devgraph.workflows.v1",
         "columns": COLUMN_LABELS,
-        "defaults": {kind: default_workflow(kind) for kind in WORK_KINDS},
+        "defaults": {"Todo": None, **{kind: default_workflow(kind) for kind in WORK_KINDS}},
         "workflows": {
             key: {
                 "stages": [
@@ -334,6 +337,7 @@ def catalog() -> dict:
                         id=s,
                         label=label,
                         column=column,
+                        progress=stage_progress(key, s),
                         entry_reviews=list(ENTRY_REVIEWS.get(s, ())),
                         requires_completion=s in COMPLETION_GATES,
                     )

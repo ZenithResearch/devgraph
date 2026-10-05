@@ -15,7 +15,12 @@ from devgraph.workflow_contract import WORK_KINDS
 class WorkflowRead(BaseModel):
     model_config = ConfigDict(extra="allow")
     schema_name: Literal[
-        "devgraph.kanban.v1", "devgraph.workflows.v1", "devgraph.work-workflow.v1"
+        "devgraph.kanban.v1",
+        "devgraph.kanban.v2",
+        "devgraph.todos.v2",
+        "devgraph.progress-migration-report.v1",
+        "devgraph.workflows.v1",
+        "devgraph.work-workflow.v1",
     ] = Field(alias="schema")
 
 
@@ -27,6 +32,16 @@ def query_workflow_snapshot(
     if operation == "board":
         BoardFilter.parse(query)
         path = "/monitor/kanban/v1" + ("?" + query if query else "")
+    elif operation == "board-v2":
+        BoardFilter.parse(query)
+        path = "/monitor/kanban/v2" + ("?" + query if query else "")
+    elif operation == "todos":
+        from devgraph.todo_views import TodoFilters
+
+        TodoFilters.parse(query)
+        path = "/todos/v2" + ("?" + query if query else "")
+    elif operation == "progress-report":
+        path = "/todos/v2/classification-report"
     elif operation == "workflows":
         path = "/workflows/v1"
     elif operation == "workflow" and kind in WORK_KINDS:

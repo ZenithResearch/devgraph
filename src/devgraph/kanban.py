@@ -8,6 +8,7 @@ from urllib.parse import parse_qs
 from devgraph.model.repository import WorkObjectRepository
 from devgraph.model.validation import validate_work_object_id
 from devgraph.policy.redaction import redact_text
+from devgraph.progress import TODO_KINDS, Progress, progress_label
 from devgraph.storage.base import StorageUnavailable
 from devgraph.workflow_contract import COLUMNS, STAGES, WORK_KINDS, decode_state
 from devgraph.workflows import Workflows, fingerprint
@@ -37,6 +38,7 @@ class BoardFilter:
     queue: str = ""
     order: str = "key"
     parentage: str = "any"
+    progress: tuple[str, ...] = ()
 
     @classmethod
     def parse(cls, query):
@@ -47,9 +49,10 @@ class BoardFilter:
             if set(values) - cls.__dataclass_fields__.keys():
                 raise ValueError
             allowed = {
-                "kind": WORK_KINDS,
+                "kind": TODO_KINDS,
+                "progress": tuple(Progress),
                 "workflow": (*STAGES, "unset"),
-                "column": COLUMNS,
+                "column": (*COLUMNS, "unclassified"),
                 "stage": ("unset", *{s for rows in STAGES.values() for s, _, _ in rows}),
             }
             fields = {}
@@ -80,7 +83,7 @@ class BoardFilter:
             for ref in (result.scope, result.after):
                 if ref:
                     kind, identifier = ref.split("/", 1)
-                    if kind not in WORK_KINDS:
+                    if kind not in TODO_KINDS:
                         raise ValueError
                     validate_work_object_id(identifier)
             if result.scope and result.scope.split("/")[0] not in {
@@ -96,15 +99,19 @@ class BoardFilter:
             raise InvalidBoardFilter("invalid_board_filter") from None
 
 
-def build_board(storage, filters: BoardFilter):
+def build_board(storage, filters: BoardFilter, *, version=1):
     work = []
-    for kind in WORK_KINDS:
+    for kind in TODO_KINDS if version == 2 else WORK_KINDS:
         after = None
         while True:
             nodes = storage.query(kind, archived=None, limit=100, after_id=after)
             if len(work) + len(nodes) > 10000:
                 raise StorageUnavailable("board work budget exceeded")
-            work.extend(WorkObjectRepository._from_node(n) for n in nodes)
+            work.extend(
+                WorkObjectRepository._from_node(n)
+                for n in nodes
+                if kind != "Todo" or n.properties.get("kind") == "Todo"
+            )
             if len(nodes) < 100:
                 break
             after = nodes[-1].id
@@ -124,8 +131,15 @@ def build_board(storage, filters: BoardFilter):
     for child, parent in parents.items():
         if by_key[parent].kind not in PARENTS.get(by_key[child].kind, ()):
             raise StorageUnavailable("invalid board parentage")
-    revision = fingerprint((sorted((key, w.version, w.workflow_json) for key, w in by_key.items()),
-                            sorted(parents.items())))
+    revision = fingerprint(
+        (
+            sorted(
+                (key, w.version, w.workflow_json, w.progress, w.archived)
+                for key, w in by_key.items()
+            ),
+            sorted(parents.items()),
+        )
+    )
     if filters.revision and filters.revision != revision:
         raise BoardChanged("Board changed; refresh before continuing.")
     scoped = None
@@ -142,7 +156,11 @@ def build_board(storage, filters: BoardFilter):
                     if child not in scoped:
                         scoped.add(child)
                         pending.append(child)
-    grouped = {column: [] for column in COLUMNS}
+    grouped = {
+        column: []
+        for column in (*COLUMNS, "unclassified")
+        if version == 2 or column != "unclassified"
+    }
     states = {
         key: decode_state(w.workflow_json) if w.workflow_json else None for key, w in by_key.items()
     }
@@ -153,17 +171,25 @@ def build_board(storage, filters: BoardFilter):
     blockers = {}
     for edge in engine.edges("BLOCKS"):
         key, blocking = f"{edge.to_label}/{edge.to_id}", f"{edge.from_label}/{edge.from_id}"
-        if blocking in states and (states[blocking] is None or states[blocking].stage != "done"):
+        if blocking in states and by_key[blocking].progress != Progress.DONE:
             blockers.setdefault(key, []).append(blocking)
     for key, w in by_key.items():
         state = states[key]
         stage, workflow = (state.stage, state.workflow_id) if state else ("unset", "unset")
         label, column = row_info[workflow][stage] if state else ("Stage not set", "backlog")
+        if version == 2:
+            if w.progress is None:
+                column = "unclassified"
+            elif state is None:
+                label = progress_label(w.progress)
+                column = {"not_started": "backlog", "in_progress": "in_progress", "done": "done"}[
+                    w.progress
+                ]
         if (
             filters.queue == "not_started"
-            and (w.status.value == "archived" or not (
-                stage == "backlog" or state is None and w.status.value == "draft"
-            ))
+            and (w.archived or w.progress != Progress.NOT_STARTED)
+            or filters.progress
+            and w.progress not in filters.progress
             or scoped is not None
             and key not in scoped
             or filters.parentage == "standalone"
@@ -178,28 +204,32 @@ def build_board(storage, filters: BoardFilter):
             and column not in filters.column
             or filters.q.casefold() not in f"{redact_text(w.title)} {w.id}".casefold()
             or filters.archived == "exclude"
-            and w.status.value == "archived"
+            and w.archived
             or filters.archived == "only"
-            and w.status.value != "archived"
+            and not w.archived
         ):
             continue
         grouped[column].append((key, w, state, label))
     columns = []
     for column, rows in grouped.items():
-        rows.sort(key=(lambda row: (-row[1].priority, row[0]))
-                  if filters.order == "priority" else lambda row: row[0])
+        rows.sort(
+            key=(lambda row: (-row[1].priority, row[0]))
+            if filters.order == "priority"
+            else lambda row: row[0]
+        )
         if filters.order == "priority" and filters.after and column in filters.column:
             keys = [row[0] for row in rows]
             if filters.after not in keys:
                 raise InvalidBoardFilter("priority_cursor_outside_filter")
-            available = rows[keys.index(filters.after) + 1:]
+            available = rows[keys.index(filters.after) + 1 :]
         else:
-            available = (rows if filters.order == "priority"
-                         else [r for r in rows if r[0] > filters.after])
+            available = (
+                rows if filters.order == "priority" else [r for r in rows if r[0] > filters.after]
+            )
         cards = []
         for key, w, state, label in available[: filters.limit]:
             child_keys = children.get(key, [])
-            completed = sum(bool(states[c] and states[c].stage == "done") for c in child_keys)
+            completed = sum(by_key[c].progress == Progress.DONE for c in child_keys)
             gaps = engine.completion_gaps(w, state) if state else ["Stage not set"]
             cards.append(
                 {
@@ -209,7 +239,16 @@ def build_board(storage, filters: BoardFilter):
                     "title": redact_text(w.title)[:240],
                     "version": str(w.version),
                     "priority": str(w.priority),
-                    "lifecycle": w.status.value,
+                    "lifecycle": "archived" if w.archived else w.status.value,
+                    **(
+                        {
+                            "progress": w.progress,
+                            "progress_label": progress_label(w.progress),
+                            "archived": w.archived,
+                        }
+                        if version == 2
+                        else {}
+                    ),
                     "workflow_id": state.workflow_id if state else None,
                     "stage": state.stage if state else None,
                     "stage_label": label,
@@ -234,16 +273,19 @@ def build_board(storage, filters: BoardFilter):
         {"key": k, "kind": w.kind, "title": redact_text(w.title)[:240]}
         for k, w in sorted(by_key.items())
         if w.kind in {"Initiative", "Project", "Issue"}
-        and (filters.archived != "exclude" or w.status.value != "archived")
-        and (not filters.q or filters.q.casefold() in f"{redact_text(w.title)} {w.id}".casefold()
-             or k == filters.scope)
+        and (filters.archived != "exclude" or not w.archived)
+        and (
+            not filters.q
+            or filters.q.casefold() in f"{redact_text(w.title)} {w.id}".casefold()
+            or k == filters.scope
+        )
     ]
     visible_scopes = scopes[:200]
     selected = next((s for s in scopes if s["key"] == filters.scope), None)
     if selected and selected not in visible_scopes:
         visible_scopes[-1:] = [selected]
     return {
-        "schema": "devgraph.kanban.v1",
+        "schema": f"devgraph.kanban.v{version}",
         "revision": revision,
         "columns": columns,
         "total": sum(len(rows) for rows in grouped.values()),

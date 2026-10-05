@@ -6,67 +6,40 @@
   'use strict';
   const PAGE_SIZE = 6;
 
-  function query(filters = {}, after = null, source = 'todo') {
-    const params = new URLSearchParams({limit:String(PAGE_SIZE), archived:'exclude', queue:'not_started', order:'priority'});
+  const KINDS = ['Todo','Proposal','Initiative','Project','Issue','Task'];
+  function query(filters = {}, after = null) {
+    const params = new URLSearchParams({limit:String(PAGE_SIZE), archived:'exclude', progress:'not_started'});
     if (filters.q?.trim()) params.set('q', filters.q.trim().slice(0, 200));
-    if (source === 'task') {
-      params.set('kind', 'Task'); params.set('parentage', 'standalone'); params.set('column', 'backlog');
-      if (after) { params.set('after', after.key); params.set('revision', after.revision); }
-      return '/monitor/kanban/v1?' + params;
-    }
-    if (after) { params.set('after_id', after.key); params.set('after_priority', after.priority); }
-    return '/monitor/todos/v1?' + params;
+    if (KINDS.includes(filters.kind)) params.set('kind', filters.kind);
+    if (after) { params.set('after', after.key); params.set('revision', after.revision); }
+    return '/todos/v2?' + params;
   }
-
-  function decodeTodos(data) {
-    if (data?.schema !== 'devgraph.todos.v1' || !Array.isArray(data.items) || data.items.length > PAGE_SIZE ||
-        !Number.isSafeInteger(data.matching_count) || data.matching_count < data.items.length ||
-        typeof data.has_more !== 'boolean' || !data.counts || data.counts.total !== data.matching_count)
+  function decode(data) {
+    if (data?.schema !== 'devgraph.todos.v2' || typeof data.revision !== 'string' || !data.revision ||
+        !Array.isArray(data.items) || data.items.length > PAGE_SIZE || typeof data.complete !== 'boolean' ||
+        !Number.isSafeInteger(data.total) || data.total < data.items.length ||
+        !Number.isSafeInteger(data.classification_required) || data.classification_required < 0)
       throw new Error('Invalid Todo queue response');
     const seen = new Set();
     const items = data.items.map(item => {
-      if (item.kind !== 'Todo' || typeof item.id !== 'string' || !item.id || seen.has(item.id) ||
+      if (!KINDS.includes(item.kind) || typeof item.id !== 'string' || !item.id || item.key !== `${item.kind}/${item.id}` || seen.has(item.key) ||
           typeof item.title !== 'string' || typeof item.priority !== 'string' || !/^-?\d+$/.test(item.priority) ||
           typeof item.version !== 'string' || !/^[1-9]\d*$/.test(item.version) || item.archived !== false ||
-          !['draft', 'review', 'accepted'].includes(item.status)) throw new Error('Invalid Todo queue item');
-      seen.add(item.id); return {...item, key:`Todo/${item.id}`};
+          item.progress !== 'not_started') throw new Error('Invalid Todo queue item');
+      seen.add(item.key); return item;
     });
-    if (data.has_more ? (!items.length || data.next_after_id !== items.at(-1).id || data.next_after_priority !== items.at(-1).priority) :
-        (data.next_after_id !== null || data.next_after_priority !== null)) throw new Error('Invalid Todo queue cursor');
-    return {...data, source:'todo', items, counts:{total:data.matching_count},
-      next_after_id:data.has_more ? {key:data.next_after_id,priority:data.next_after_priority} : null};
-  }
-
-  function decode(board, source = 'todo') {
-    if (source === 'todo') return decodeTodos(board);
-    if (board?.schema !== 'devgraph.kanban.v1' || typeof board.revision !== 'string' || !board.revision ||
-        !Array.isArray(board.columns)) throw new Error('Invalid work queue response');
-    const columns = board.columns.filter(column => column.id === 'backlog');
-    if (columns.length !== 1) throw new Error('Invalid work queue column');
-    const column = columns[0];
-    if (!Array.isArray(column.items) || column.items.length > PAGE_SIZE || !Number.isSafeInteger(column.count) ||
-        column.count < column.items.length || column.count !== board.total) throw new Error('Invalid work queue count');
-    const keys = new Set();
-    const items = column.items.map(item => {
-      if (item.kind !== 'Task' || item.parent !== null || typeof item.id !== 'string' || !item.id || item.key !== `${item.kind}/${item.id}` || keys.has(item.key) ||
-          typeof item.title !== 'string' || typeof item.priority !== 'string' || !/^-?\d+$/.test(item.priority) ||
-          typeof item.version !== 'string' || !/^[1-9]\d*$/.test(item.version) || item.column !== 'backlog' ||
-          !['draft','review','accepted'].includes(item.lifecycle) || !(item.stage === 'backlog' || item.stage === null && item.lifecycle === 'draft')) throw new Error('Invalid work queue item');
-      keys.add(item.key);
-      return {...item, status:item.lifecycle, updated_at:null};
-    });
-    if (column.next_cursor !== null && (!items.length || column.next_cursor !== items.at(-1).key)) throw new Error('Invalid work queue cursor');
-    return {source:'task', items, counts:{total:column.count}, matching_count:column.count,
-      generated_at:board.read_at || new Date().toISOString(), has_more:column.next_cursor !== null,
-      next_after_id:column.next_cursor === null ? null : {key:column.next_cursor,revision:board.revision}};
+    if (data.next_cursor !== null && (!items.length || data.next_cursor !== items.at(-1).key)) throw new Error('Invalid Todo queue cursor');
+    return {...data, source:'todo', items, counts:{total:data.total}, generated_at:new Date().toISOString(),
+      has_more:data.next_cursor !== null,
+      next_after_id:data.next_cursor === null ? null : {key:data.next_cursor, revision:data.revision}};
   }
 
   function createController({ request, onChange = () => {} }) {
-    let serial = 0, controller, pending, source = 'todo';
-    const view = { status: 'disconnected', data: null, error: null, filters: {q:''}, cursors: [null], page: 0 };
+    let serial = 0, controller, pending;
+    const view = { status: 'disconnected', data: null, error: null, filters: {q:'',kind:''}, cursors: [null], page: 0 };
     const emit = () => onChange(view);
     function reset() {
-      serial++; controller?.abort(); pending = null; source = 'todo';
+      serial++; controller?.abort(); pending = null;
       Object.assign(view, { status: 'disconnected', data: null, error: null, cursors: [null], page: 0, restart:false }); emit();
     }
     async function refresh({ force = false, page = view.page } = {}) {
@@ -78,15 +51,8 @@
       const task = (async () => {
         try {
           const signal = controller.signal;
-          let payload;
-          try { payload = await request(query(view.filters, view.cursors[page], source), {signal}); }
-          catch (error) {
-            if (epoch !== serial) return;
-            if (source !== 'todo' || ![404, 501].includes(error.status)) throw error;
-            source = 'task'; page = 0; view.cursors = [null];
-            payload = await request(query(view.filters, null, source), {signal});
-          }
-          const result = decode(payload, source);
+          const payload = await request(query(view.filters, view.cursors[page]), {signal});
+          const result = decode(payload);
           if (epoch !== serial) return;
           view.data = result; view.page = page; view.restart = false;
           view.cursors = view.cursors.slice(0, page + 1);
@@ -98,7 +64,7 @@
           if ([401, 403, 404, 501].includes(error.status)) view.data = null;
           if (error.status === 409) { view.cursors = [null]; view.restart = true; }
           view.error = error.status === 409 ? 'The list changed. Retry to continue from the first page.' : [401, 403].includes(error.status) ? 'Access denied. Reconnect with a valid read key.' :
-            view.status === 'unsupported' ? 'This server does not yet support the work queue.' : 'Could not update Todos. Try again.';
+            view.status === 'unsupported' ? 'This server needs the shared Todo progress API before it can show this count.' : 'Could not update Todos. Try again.';
         } finally { if (epoch === serial) { pending = null; emit(); } }
       })();
       pending = task; return task;
@@ -144,14 +110,14 @@
       if (view.data && list.contains(doc.activeElement) && !force && !navigation) { deferredView = view; update.hidden = false; return; }
       deferredView = null; update.hidden = true;
       renderedSignature = signature; displayedItems = new Map((view.data?.items || []).map(item => [item.key, item]));
-      find('todo-count-total').textContent = view.data ? view.data.counts.total : '—';
-      find('todo-source').textContent = view.data?.source === 'task' ? 'Standalone Tasks · no parent Issue, Project, or Initiative. Older Draft records count as not started.' : 'Base Todos · not started. Older Draft records count as not started.';
+      find('todo-count-total').textContent = view.data?.complete ? view.data.counts.total : '—';
+      find('todo-source').textContent = view.data ? `${view.filters.kind || 'All Todo types'} · Not started · not archived. ${view.data.classification_required} historical items need classification and are excluded.${view.data.complete ? '' : ' Complete coverage is unavailable on the installed server.'}` : 'All Todo types · Not started · not archived. Unclassified records are excluded.';
       const content = el('div');
       if (view.data?.items.length) for (const item of view.data.items) {
         const row = el('li', 'todo-row'); row.dataset.uiKey = item.key;
         const button = el('button', 'todo-item'); button.type = 'button'; button.dataset.todoId = item.key;
         const copy = el('span', 'todo-item-copy'); copy.append(el('span', 'todo-item-title', item.title));
-        const meta = el('span', 'todo-item-meta'); meta.append(el('span', 'todo-state', `${item.kind} · ${item.stage === null ? 'Draft · Stage not set' : 'Not started'}`), el('span', '', 'Priority ' + item.priority));
+        const meta = el('span', 'todo-item-meta'); meta.append(el('span', 'todo-state', `${item.kind} · Not started${item.parent ? ' · ' + item.parent : ''}`), el('span', '', 'Priority ' + item.priority));
         if (item.updated_at) { const time = el('time', '', new Date(item.updated_at).toLocaleDateString([], {month:'short',day:'numeric'})); time.dateTime = item.updated_at; time.title = 'Last changed ' + new Date(item.updated_at).toLocaleString(); meta.append(time); } copy.append(meta);
         const mark = el('span', 'todo-item-mark', '↗'); mark.setAttribute('aria-hidden', 'true'); button.append(copy, mark); row.append(button); content.append(row);
       } else {
@@ -195,11 +161,12 @@
     function filter(patch) {
       cancelNavigation();
       const result = controller.filter(patch);
-      try { if (preferenceKey) localStorage.setItem(preferenceKey, JSON.stringify({version:3, ...controller.view.filters})); } catch { /* Filtering remains available without browser storage. */ }
+      try { if (preferenceKey) localStorage.setItem(preferenceKey, JSON.stringify({version:4, ...controller.view.filters})); } catch { /* Filtering remains available without browser storage. */ }
       return result;
     }
     let searchTimer;
     find('todo-search').addEventListener('input', event => { clearTimeout(searchTimer); searchTimer = setTimeout(() => filter({q:event.target.value}), 250); });
+    find('todo-kind').addEventListener('change', event => filter({kind:event.target.value}));
     find('todo-retry').addEventListener('click', () => controller.refresh({force:true}));
     find('todo-next').addEventListener('click', () => navigate(() => controller.next(), find('todo-next')));
     find('todo-previous').addEventListener('click', () => navigate(() => controller.previous(), find('todo-previous')));
@@ -218,13 +185,14 @@
       setPreferenceKey(key) {
         if (!key || key === preferenceKey) return; preferenceKey = key;
         let value; try { value = JSON.parse(localStorage.getItem(key)); } catch { value = null; }
-        const filters = {q:''};
-        if (value?.version === 3 && typeof value.q === 'string') filters.q = value.q.slice(0,200);
-        Object.assign(controller.view.filters, filters); find('todo-search').value = filters.q; render(controller.view);
+        const filters = {q:'',kind:''};
+        if (value?.version === 4 && typeof value.q === 'string') filters.q = value.q.slice(0,200);
+        if (value?.version === 4 && KINDS.includes(value.kind)) filters.kind = value.kind;
+        Object.assign(controller.view.filters, filters); find('todo-kind').value = filters.kind; find('todo-search').value = filters.q; render(controller.view);
       },
       reset() {
         clearTimeout(searchTimer); cancelNavigation(); deferredView = null; preferenceKey = null;
-        Object.assign(controller.view.filters, {q:''});
+        Object.assign(controller.view.filters, {q:'',kind:''}); find('todo-kind').value = '';
         find('todo-search').value = ''; controller.reset();
       },
     };

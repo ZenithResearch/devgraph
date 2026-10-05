@@ -91,6 +91,9 @@ class ReadProjection:
             and (archived is None or n.archived == archived)
         ][:limit]
 
+    def get_node(self, kind, identifier):
+        return next((n for n in self.nodes if (n.label, n.id) == (kind, identifier)), None)
+
     def list_edges(self, relationship, *, limit):
         return [e for e in self.edges if e.relationship == relationship][:limit]
 
@@ -176,6 +179,8 @@ async def read_projection(client):
                     artifact_ids=tuple(row["artifact_ids"]),
                     external_link_ids=tuple(row["external_link_ids"]),
                     workflow_json=None,
+                    progress=None,
+                    archived=row["status"] == "archived",
                 )
                 nodes.append(
                     NodeRecord(
@@ -412,6 +417,46 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
         except StorageUnavailable:
             raise HTTPException(503, "The graph exceeds this preview's read budget") from None
 
+    @app.get("/monitor/kanban/v2")
+    async def board_v2(request: Request):
+        try:
+            data = await projection(request)
+            return {
+                **build_board(data, BoardFilter.parse(request.url.query), version=2),
+                "read_at": data.read_at,
+                "complete": False,
+                "unavailable_kinds": ["Todo"],
+            }
+        except InvalidBoardFilter:
+            raise HTTPException(400, "Invalid board filter") from None
+        except BoardChanged:
+            raise HTTPException(409, "Refresh this board") from None
+
+    @app.get("/todos/v2")
+    async def todos_v2(request: Request):
+        from devgraph.todo_views import TodoFilters, todo_page
+
+        try:
+            data = await projection(request)
+            return {
+                **todo_page(data, TodoFilters.parse(request.url.query)),
+                "complete": False,
+                "unavailable_kinds": ["Todo"],
+            }
+        except InvalidBoardFilter:
+            raise HTTPException(400, "Invalid Todo filter") from None
+        except BoardChanged:
+            raise HTTPException(409, "Refresh this list") from None
+
+    @app.get("/todos/v2/{kind}/{identifier}")
+    async def todo_v2(request: Request, kind: str, identifier: str):
+        from devgraph.todo_views import todo_detail
+
+        try:
+            return todo_detail(await projection(request), kind, identifier)
+        except MissingWorkObjectError:
+            raise HTTPException(404) from None
+
     @app.get("/monitor/todos/v1")
     async def todos(request: Request):
         async with client(credential(request)) as api:
@@ -450,6 +495,8 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
             "kind": kind,
             "id": work_id,
             "version": str(node.properties["version"]),
+            "progress": None,
+            "archived": node.archived,
             "workflow": None,
             "default_workflow": default_workflow(kind),
             "transitions": [],
@@ -465,9 +512,14 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
         if kind not in WORK_KINDS or not (
             not tail
             or tail == "supporting-material"
-            or tail in {
-                "relationships/children", "relationships/parent", "relationships/dependencies",
-                "relationships/dependents", "relationships/blockers", "relationships/blocked",
+            or tail
+            in {
+                "relationships/children",
+                "relationships/parent",
+                "relationships/dependencies",
+                "relationships/dependents",
+                "relationships/blockers",
+                "relationships/blocked",
             }
             or re.fullmatch(r"supporting-material/Artifact/[A-Za-z0-9_.:-]+/document", tail)
         ):

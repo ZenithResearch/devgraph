@@ -159,18 +159,28 @@ def test_live_board_full_counts_pagination_scope_and_legacy_stages():
     assert all(r.method == "GET" or r.url.path == "/query/cypher" for r in calls)
 
 
-def test_legacy_preview_queue_includes_only_unparented_draft_tasks():
+def test_legacy_preview_never_classifies_unparented_draft_tasks():
     client, _, _ = fixture()
-    response = client.get("/monitor/kanban/v1", headers={"Authorization": "Bearer real-reader"},
-                          params={"kind": "Task", "parentage": "standalone", "queue": "not_started",
-                                  "column": "backlog", "order": "priority", "limit": 2})
+    response = client.get(
+        "/monitor/kanban/v1",
+        headers={"Authorization": "Bearer real-reader"},
+        params={
+            "kind": "Task",
+            "parentage": "standalone",
+            "queue": "not_started",
+            "column": "backlog",
+            "order": "priority",
+            "limit": 2,
+        },
+    )
     assert response.status_code == 200
     board = response.json()
-    assert board["total"] == 5
+    assert board["total"] == 0
     cards = board["columns"][0]["items"]
-    assert [c["id"] for c in cards] == ["t105", "t106"]
-    assert all(c["stage"] is None and c["lifecycle"] == "draft" and c["parent"] is None
-               for c in cards)
+    assert cards == []
+    assert all(
+        c["stage"] is None and c["lifecycle"] == "draft" and c["parent"] is None for c in cards
+    )
 
 
 def test_real_credentials_session_denials_revocation_and_closed_write_boundary():

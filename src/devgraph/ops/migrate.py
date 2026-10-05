@@ -164,21 +164,27 @@ def load_manifest(path: Path, *, payload_override: Mapping[int, Path] | None = N
                 if expected_version == 24
                 else (
                     name,
-                    "".join(
-                        part.title() for part in name.removesuffix("_id").split("_")
-                    ),
+                    "".join(part.title() for part in name.removesuffix("_id").split("_")),
                     "id",
                 )
             )
-            if match is None or (
-                match.group(1),
-                match.group(3),
-                match.group(4),
-            ) != expected_definition:
+            if (
+                match is None
+                or (
+                    match.group(1),
+                    match.group(3),
+                    match.group(4),
+                )
+                != expected_definition
+            ):
                 raise ManifestError("payload_definition_mismatch")
         elif (
-            (expected_version, name) not in {(23, "canonical_work_object_persistence_v1"),
-                                             (27, "workflow_metadata_v1")}
+            (expected_version, name)
+            not in {
+                (23, "canonical_work_object_persistence_v1"),
+                (27, "workflow_metadata_v1"),
+                (28, "todo_progress_v1"),
+            }
             or statement.count(";") != 1
             or name not in statement
         ):
@@ -201,8 +207,10 @@ def load_manifest(path: Path, *, payload_override: Mapping[int, Path] | None = N
     if (
         len(kinds) < 23
         or kinds[:23] != ["schema_ddl"] * 22 + ["transactional_data"]
-        or any(kind != ("transactional_data" if i == 27 else "schema_ddl")
-               for i, kind in enumerate(kinds[23:], 24))
+        or any(
+            kind != ("transactional_data" if i in (27, 28) else "schema_ddl")
+            for i, kind in enumerate(kinds[23:], 24)
+        )
     ):
         raise ManifestError("invalid_migration_kind_order")
     referenced = {Path(item.payload_path).name for item in migrations}
@@ -215,10 +223,14 @@ def load_manifest(path: Path, *, payload_override: Mapping[int, Path] | None = N
 def render_constraint_mirror(manifest: Manifest) -> str:
     # Operational mutexes are private storage metadata, not ontology classes.
     # Preserve the published ontology bundle when adding this internal guard.
-    return MIRROR_HEADER + b"".join(
-        item.payload for item in manifest.migrations
-        if item.kind == "schema_ddl" and item.name != "work_mutation_guard_id"
-    ).decode()
+    return (
+        MIRROR_HEADER
+        + b"".join(
+            item.payload
+            for item in manifest.migrations
+            if item.kind == "schema_ddl" and item.name != "work_mutation_guard_id"
+        ).decode()
+    )
 
 
 def normalize_definition(value: str) -> str:
@@ -279,7 +291,11 @@ def _journal_reason(record: MigrationJournal, migration: Migration) -> str | Non
     if record.runner_schema_version != RUNNER_SCHEMA_VERSION:
         return "operator_hold_runner_schema_version"
     if record.state not in {
-        "pending", "ddl_started", "ddl_observed", "applied", "recoverable_ddl_not_applied"
+        "pending",
+        "ddl_started",
+        "ddl_observed",
+        "applied",
+        "recoverable_ddl_not_applied",
     }:
         return "operator_hold_journal_state"
     if not isinstance(record.owner_attempt_id, str) or not record.owner_attempt_id:
@@ -496,8 +512,7 @@ def apply_migrations(
             if record.state == "ddl_started" and record.owner_attempt_id == current_owner
         ]
         if len(recoverable) == 1 and all(
-            record.state in {"applied", "ddl_started"}
-            for record in by_version.values()
+            record.state in {"applied", "ddl_started"} for record in by_version.values()
         ):
             recovery_journal: MigrationJournal | None = recoverable[0]
         elif not recoverable and all(

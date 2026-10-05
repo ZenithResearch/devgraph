@@ -21,7 +21,7 @@ AUTHORITY_HEADER = "X-Devgraph-Work-Authority"
 
 
 def register_named_work(app: FastAPI, services: ApiServices) -> None:
-    async def submit(request: Request, response: Response, *, arena: bool):
+    async def submit(request: Request, response: Response, *, arena: bool, version: int = 1):
         selected = {}
         relevant = {b"authorization", b"idempotency-key", b"x-devgraph-work-authority"}
         for name, value in request.scope["headers"]:
@@ -67,7 +67,9 @@ def register_named_work(app: FastAPI, services: ApiServices) -> None:
         except (asyncio.TimeoutError, TimeoutError):
             raise SecSWorkDenied("named_work_request_timeout") from None
         try:
-            (ArenaRequest if arena else WorkRequest).from_json(raw)
+            parsed = (ArenaRequest if arena else WorkRequest).from_json(raw)
+            if not arena and parsed.version != version:
+                raise InvalidWorkRequest("invalid_named_request_domain")
         except (InvalidArenaRequest, InvalidWorkRequest):
             raise SecSWorkDenied("invalid_named_request_domain") from None
         work, receipt, duplicate = await run_in_threadpool(
@@ -77,9 +79,20 @@ def register_named_work(app: FastAPI, services: ApiServices) -> None:
             idempotency_key=key,
         )
         response.status_code = (
-            201 if receipt.operation in ("devgraph.work.create.v1", "devgraph.arena.create.v1")
-            and not duplicate else 200
+            201
+            if receipt.operation
+            in ("devgraph.work.create.v1", "devgraph.arena.create.v1", "devgraph.work.create.v2")
+            and not duplicate
+            else 200
         )
+        if version == 2:
+            from devgraph.todo_views import todo_summary
+
+            return {
+                "schema": "devgraph.work-result.v2",
+                "work": None if work is None else todo_summary(work, description=True),
+                "receipt": _receipt_envelope(receipt, duplicate=duplicate),
+            }
         if arena:
             return ArenaMutationResultEnvelope(
                 arena=work if isinstance(work, Arena) else None,
@@ -94,6 +107,10 @@ def register_named_work(app: FastAPI, services: ApiServices) -> None:
     @app.post("/work-operations/v1", response_model=MutationResultEnvelope)
     async def execute(request: Request, response: Response):
         return await submit(request, response, arena=False)
+
+    @app.post("/work-operations/v2")
+    async def execute_v2(request: Request, response: Response):
+        return await submit(request, response, arena=False, version=2)
 
     @app.post("/arena-operations/v1", response_model=ArenaMutationResultEnvelope)
     async def execute_arena(request: Request, response: Response):

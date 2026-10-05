@@ -29,6 +29,7 @@ from devgraph.auth.secs_issue_create import (
     _strict_json_object,
 )
 from devgraph.model.validation import validate_version, validate_work_object_id
+from devgraph.progress_contract import ProgressSet, ProposalReject
 from devgraph.workflow_contract import (
     PARENTS,
     RECORD_KINDS,
@@ -70,6 +71,9 @@ WorkOperation = Literal[
     "workflow.assign",
     "workflow.review",
     "workflow.transition",
+    "progress.set",
+    "restore",
+    "proposal.reject",
 ]
 
 
@@ -117,15 +121,26 @@ class _Conversion(ConvertProposalRequest):
 
 
 class _Envelope(_Strict):
-    schema_name: Literal["devgraph.work-request.v1"] = Field(alias="schema")
+    schema_name: Literal["devgraph.work-request.v1", "devgraph.work-request.v2"] = Field(
+        alias="schema"
+    )
     operation: WorkOperation
-    kind: WorkKind
+    kind: Literal["Todo", "Proposal", "Initiative", "Project", "Issue", "Task"]
     id: str
     expected_version: int | None
     payload: dict
 
 
+WORK_OPERATIONS_V2 = tuple(op for op in WORK_OPERATIONS if op != "status") + (
+    "progress.set",
+    "restore",
+    "proposal.reject",
+)
+
 _PAYLOAD_TYPES = {
+    "progress.set": ProgressSet,
+    "restore": _Strict,
+    "proposal.reject": ProposalReject,
     "create": CreateWorkObjectRequest,
     "patch": UpdateWorkObjectRequest,
     "status": StatusTransitionRequest,
@@ -160,6 +175,19 @@ class WorkRequest:
         try:
             value = _strict_json_object(raw, maximum_bytes=131_072, reason="invalid_work_request")
             envelope = _Envelope.model_validate(value, strict=True)
+            legacy = envelope.schema_name == WORK_REQUEST_SCHEMA
+            if legacy and (envelope.kind == "Todo" or envelope.operation not in WORK_OPERATIONS):
+                raise ValueError("v2 operation requires v2 request")
+            if not legacy and envelope.operation == "status":
+                raise ValueError("legacy status is not canonical progress")
+            if envelope.kind == "Todo" and envelope.operation not in {
+                "create",
+                "patch",
+                "archive",
+                "restore",
+                "progress.set",
+            }:
+                raise ValueError("base Todo has no subtype lifecycle")
             validate_work_object_id(envelope.id)
             if envelope.operation == "create":
                 if envelope.expected_version is not None:
@@ -215,6 +243,15 @@ class WorkRequest:
                 for evidence in payload["evidence"]:
                     if evidence["url"]:
                         resources.add(f"ExternalLink/{evidence['id']}")
+            if envelope.operation == "progress.set":
+                resources.add(f"ReviewPacket/{payload['record_id']}")
+                for evidence in payload["evidence"]:
+                    if evidence["url"]:
+                        resources.add(f"ExternalLink/{evidence['id']}")
+            if envelope.operation == "proposal.reject":
+                if envelope.kind != "Proposal":
+                    raise ValueError("proposal disposition requires Proposal")
+                resources.add(f"Decision/{payload['decision_id']}")
             materialized = envelope.model_dump(mode="json", by_alias=True)
             materialized["payload"] = payload
             canonical = _canonical_json(materialized)
@@ -232,12 +269,17 @@ class WorkRequest:
         )
 
     @property
+    def version(self) -> int:
+        return 2 if json.loads(self.canonical)["schema"] == "devgraph.work-request.v2" else 1
+
+    @property
     def authority_operation(self) -> str:
-        return f"devgraph.work.{self.operation}.v1"
+        return f"devgraph.work.{self.operation}.v{self.version}"
 
     @property
     def digest(self) -> str:
-        return hashlib.sha256(WORK_REQUEST_DOMAIN + self.canonical).hexdigest()
+        domain = f"devgraph.work-request.v{self.version}\x00".encode()
+        return hashlib.sha256(domain + self.canonical).hexdigest()
 
     @property
     def payload(self) -> dict:

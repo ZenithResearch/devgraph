@@ -23,8 +23,9 @@ SOURCE_EDGE_LIMIT = 50_000
 MAX_QUERY_BYTES = 2_048
 OBSERVATION_STATUSES = ("unclaimed", "claimed", "amended", "rejected", "unknown")
 RECORD_STATUSES = tuple(x.value for x in OutboxStatus) + ("unknown",)
-FACETS = ("category", "work_kind", "work_status", "observation_status", "record_status")
+FACETS = ("category", "work_kind", "work_status", "observation_status", "record_status", "progress")
 ENUMS = {
+    "progress": ("not_started", "in_progress", "done"),
     "category": CATEGORIES,
     "work_kind": MONITORED_WORK_KINDS,
     "work_status": tuple(x.value for x in WorkStatus) + ("unknown",),
@@ -42,6 +43,7 @@ class TopologyFilter:
     category: tuple[str, ...] | None = None
     work_kind: tuple[str, ...] | None = None
     work_status: tuple[str, ...] | None = None
+    progress: tuple[str, ...] | None = None
     observation_status: tuple[str, ...] | None = None
     record_status: tuple[str, ...] | None = None
     relationship: tuple[str, ...] | None = None
@@ -172,7 +174,9 @@ def _matches(node, filters, skip=None):
     category = node["category"]
     checks = {"category": category}
     if category == "work":
-        checks.update(work_kind=node["kind"], work_status=node["status"])
+        checks.update(
+            work_kind=node["kind"], work_status=node["status"], progress=node.get("todo_progress")
+        )
     elif category == "observation":
         checks["observation_status"] = node["status"]
     elif category == "receipt":
@@ -227,6 +231,9 @@ def filter_projection(snapshot, filters: TopologyFilter):
                 counts[node["category"]] += 1
             elif facet.startswith("work_") and node["category"] == "work":
                 counts[node["kind"] if facet == "work_kind" else node["status"]] += 1
+            elif facet == "progress" and node["category"] == "work":
+                if node.get("todo_progress") is not None:
+                    counts[node["todo_progress"]] += 1
             elif facet == "observation_status" and node["category"] == "observation":
                 counts[node["status"]] += 1
             elif facet == "record_status" and node["category"] == "receipt":
@@ -273,12 +280,15 @@ def filter_projection(snapshot, filters: TopologyFilter):
     layout_context = {
         "nodes": [
             {key: node[key] for key in ("key", "kind", "title", "category")}
-            for node in all_nodes if node["key"] in layout_keys
+            for node in all_nodes
+            if node["key"] in layout_keys
         ],
         "edges": [
-            edge for edge in all_edges
+            edge
+            for edge in all_edges
             if edge["relationship"] in {"HAS_CHILD", "CONTAINS_WORK"}
-            and edge["source"] in layout_keys and edge["target"] in layout_keys
+            and edge["source"] in layout_keys
+            and edge["target"] in layout_keys
         ],
     }
     stable = {

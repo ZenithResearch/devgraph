@@ -129,6 +129,7 @@ class MemoryMigrationStore:
         if self.owner != attempt_id or migration.name not in {
             "canonical_work_object_persistence_v1",
             "workflow_metadata_v1",
+            "todo_progress_v1",
         }:
             return False
         record = MigrationJournal.transactional_applied(migration, attempt_id, completed_at)
@@ -152,11 +153,12 @@ def manifest() -> Manifest:
 def test_empty_first_run_applies_all_and_second_run_is_noop() -> None:
     store = MemoryMigrationStore()
     first = apply_migrations(manifest(), store, attempt_id="attempt-a")
-    assert first == MigrationStatus.clean(27, manifest())
+    assert first == MigrationStatus.clean(28, manifest())
     assert len(store.ddl_calls) == 25
     assert store.transactional_calls == [
         "canonical_work_object_persistence_v1",
         "workflow_metadata_v1",
+        "todo_progress_v1",
     ]
     assert store.transitions[:4] == [
         (None, "pending"),
@@ -170,6 +172,7 @@ def test_empty_first_run_applies_all_and_second_run_is_noop() -> None:
     assert store.transactional_calls == [
         "canonical_work_object_persistence_v1",
         "workflow_metadata_v1",
+        "todo_progress_v1",
     ]
 
 
@@ -280,7 +283,7 @@ def test_applied_transactional_marker_allows_explicit_stale_owner_recovery() -> 
 
     assert recovered.ready is True
     assert store.owner is None
-    assert len(store.transactional_calls) == 2
+    assert len(store.transactional_calls) == 3
 
 
 def test_applied_checksum_drift_fails_closed_without_mutation() -> None:

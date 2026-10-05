@@ -1,9 +1,10 @@
 /* Shared topology behavior. No DOM, credentials, dependencies, or network access. */
 (function (root) {
   'use strict';
-  const kinds = ['Proposal', 'Initiative', 'Project', 'Issue', 'Task'];
+  const kinds = ['Todo', 'Proposal', 'Initiative', 'Project', 'Issue', 'Task'];
   const categories = ['arena', 'work', 'observation', 'receipt'];
   const registry = {
+    Todo: { label: "Todo", color: "#c6cbd2", shape: "octahedron", pose: [.4,.1,.7], description: "A simple item to do" },
     Proposal: { label: 'Proposal', color: '#b49bff', shape: 'tetrahedron', pose: [-.12,.38,.04], description: 'A suggested change awaiting a decision' },
     Initiative: { label: 'Initiative', color: '#7baaff', shape: 'icosahedron', pose: [.18,.3,.08], description: 'A larger effort spanning projects' },
     Project: { label: 'Project', color: '#60c7ba', shape: 'cube', pose: [-.42,.58,0], description: 'A bounded delivery effort' },
@@ -332,7 +333,7 @@
     const text=(key,max)=>typeof value[key]==='string'?value[key].slice(0,max):'';
     const stateValues=['draft','review','accepted','archived','unknown'];
     return {category:enumFacet('category',categories),work_kind:enumFacet('work_kind',kinds),
-      work_status:enumFacet('work_status',stateValues),observation_status:enumFacet('observation_status',['unclaimed','claimed','amended','rejected','unknown']),
+      progress:enumFacet('progress',['not_started','in_progress','done']),work_status:enumFacet('work_status',stateValues),observation_status:enumFacet('observation_status',['unclaimed','claimed','amended','rejected','unknown']),
       record_status:enumFacet('record_status',['pending','dispatched_dry_run','retry_scheduled','failed','unknown']),
       relationship:Array.isArray(value.relationship)?[...new Set(value.relationship.filter(x=>typeof x==='string'&&/^[A-Z][A-Z0-9_]{0,63}$/.test(x)))].sort():null,
       archived:['include','exclude','only'].includes(value.archived)?value.archived:'include',arena:text('arena',280),anchor:text('anchor',280),q:text('q',200).trim().toLowerCase()};

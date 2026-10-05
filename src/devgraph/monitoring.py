@@ -13,7 +13,7 @@ from devgraph.model.initiative_observations import (
 from devgraph.policy.redaction import redact_text
 from devgraph.storage.base import GraphStorage
 
-MONITORED_WORK_KINDS = ("Proposal", "Initiative", "Project", "Issue", "Task")
+MONITORED_WORK_KINDS = ("Todo", "Proposal", "Initiative", "Project", "Issue", "Task")
 WORK_PROGRESS_SCHEMA_VERSION = "devgraph.work-progress.v0"
 _WORK_STATUS_VALUES = tuple(status.value for status in WorkStatus)
 _TERMINAL_STATUS_VALUES = frozenset(status.value for status in TERMINAL_STATUSES)
@@ -131,8 +131,10 @@ def build_monitor_snapshot(storage: GraphStorage) -> dict[str, Any]:
         )
     for kind in MONITORED_WORK_KINDS:
         for node in storage.query(kind, archived=None, limit=None):
+            if kind == "Todo" and node.properties.get("kind") != "Todo":
+                continue
             work_by_kind[kind] += 1
-            status = str(node.properties.get("status", "unknown"))
+            status = "archived" if node.archived else str(node.properties.get("status", "unknown"))
             work_by_status[status] += 1
             title = str(node.properties.get("title", node.id))
             activity.append(
@@ -154,6 +156,7 @@ def build_monitor_snapshot(storage: GraphStorage) -> dict[str, Any]:
                 category="work",
                 archived=node.archived,
             )
+            work_node["todo_progress"] = node.properties.get("progress")
             # Decimal strings preserve canonical i64 versions in JavaScript clients.
             version = node.properties.get("version")
             work_node["version"] = str(version) if type(version) is int and version > 0 else None
@@ -210,7 +213,9 @@ def build_monitor_snapshot(storage: GraphStorage) -> dict[str, Any]:
     receipts = storage.query(EVENT_RECEIPT_LABEL, archived=False, limit=None)
     outbox_by_status: Counter[str] = Counter()
     for node in receipts:
-        receipt_status = str(node.properties.get("status", "unknown"))
+        receipt_status = (
+            "archived" if node.archived else str(node.properties.get("status", "unknown"))
+        )
         outbox_by_status[receipt_status] += 1
         receipt_title = (
             f"{node.properties.get('subject_label', 'subject')} · "
@@ -279,6 +284,14 @@ def build_monitor_snapshot(storage: GraphStorage) -> dict[str, Any]:
         if edge["relationship"] == "HAS_CHILD":
             child_keys_by_parent.setdefault(edge["source"], []).append(edge["target"])
     for node in graph_nodes:
+        if node["category"] == "work":
+            children = [nodes_by_key[k] for k in child_keys_by_parent.get(node["key"], [])]
+            done = sum(c.get("todo_progress") == "done" for c in children)
+            node["child_progress"] = {
+                "total": len(children),
+                "completed": done,
+                "percent": round(done * 100 / len(children)) if children else 0,
+            }
         progress = _progress_projection(
             node,
             nodes_by_key=nodes_by_key,

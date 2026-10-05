@@ -75,7 +75,7 @@ from devgraph.ops.signer_profile import (
     inspect_signer_key,
 )
 from devgraph.storage.base import StorageUnavailable
-from devgraph.work_requests import WORK_OPERATIONS, InvalidWorkRequest
+from devgraph.work_requests import WORK_OPERATIONS, WORK_OPERATIONS_V2, InvalidWorkRequest
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8080"
 HOST_ROOT = DEFAULT_HOST_ROOT
@@ -637,8 +637,12 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="explicitly add Arena and membership permissions",
     )
-    plan.add_argument("--include-workflows", action="store_true", default=None,
-                      help="explicitly add workflow moves and evidence attestations")
+    plan.add_argument(
+        "--include-workflows",
+        action="store_true",
+        default=None,
+        help="explicitly add workflow moves and evidence attestations",
+    )
     apply = grant_commands.add_parser("apply", help="activate a reviewed private plan file")
     apply.add_argument("--plan-file", type=Path, required=True)
     grant_commands.add_parser("status", help="verify current producer and receiver authority")
@@ -669,10 +673,10 @@ def _parser() -> argparse.ArgumentParser:
         help="run bounded read-only Devgraph queries with the local credential",
     )
     query_commands = query.add_subparsers(dest="query_command", required=True)
-    for operation in ("board", "workflows", "workflow"):
+    for operation in ("board", "board-v2", "todos", "progress-report", "workflows", "workflow"):
         workflow_read = query_commands.add_parser(operation, help="read workflow stages or board")
         workflow_read.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
-        if operation == "board":
+        if operation in ("board", "board-v2", "todos"):
             workflow_read.add_argument("--filter", default="", help="bounded API filter query")
         if operation == "workflow":
             workflow_read.add_argument("kind", choices=WORK_KINDS)
@@ -739,7 +743,7 @@ def _parser() -> argparse.ArgumentParser:
 
     work = subcommands.add_parser("work", help="execute signed named Work mutations")
     work_commands = work.add_subparsers(dest="work_operation", required=True)
-    for operation in WORK_OPERATIONS:
+    for operation in dict.fromkeys((*WORK_OPERATIONS, *WORK_OPERATIONS_V2)):
         command = work_commands.add_parser(operation, help=f"sign and execute {operation}")
         command.add_argument("--request-file", type=Path, required=True)
         command.add_argument("--idempotency-key-file", type=Path, required=True)
@@ -876,8 +880,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                         result = work_grants.apply_grant(plan_file=args.plan_file)
                     elif args.auth_work_command == "renew":
                         result = work_grants.renew_grant(
-                            ttl_hours=args.ttl_hours, include_arenas=args.include_arenas,
-                            include_workflows=args.include_workflows
+                            ttl_hours=args.ttl_hours,
+                            include_arenas=args.include_arenas,
+                            include_workflows=args.include_workflows,
                         )
                     elif args.auth_work_command == "rotate-verifier":
                         result = work_grants.rotate_verifier(ttl_hours=args.ttl_hours)
@@ -948,12 +953,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(_json(read_logs(args.service, args.stream, args.lines, log_root=log_root)))
             return 0
         if args.command == "query":
-            if args.query_command in ("board", "workflow", "workflows"):
+            if args.query_command in (
+                "board",
+                "board-v2",
+                "todos",
+                "progress-report",
+                "workflow",
+                "workflows",
+            ):
                 from devgraph.ops.workflow_client import query_workflow_snapshot
 
-                result = query_workflow_snapshot(operation=args.query_command,
-                    query=getattr(args, "filter", ""), kind=getattr(args, "kind", None),
-                    work_id=getattr(args, "work_id", None), config_path=args.config)
+                result = query_workflow_snapshot(
+                    operation=args.query_command,
+                    query=getattr(args, "filter", ""),
+                    kind=getattr(args, "kind", None),
+                    work_id=getattr(args, "work_id", None),
+                    config_path=args.config,
+                )
                 print(json.dumps(result, indent=2, sort_keys=True))
                 return 0
 

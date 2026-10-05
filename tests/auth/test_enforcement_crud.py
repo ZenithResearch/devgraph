@@ -289,7 +289,7 @@ def test_archive_work_object_succeeds_with_write_scope():
 
     archived = graph.archive_work_object(FAKE_CREDENTIAL, "Task", "task-1")
 
-    assert archived.status == WorkStatus.ARCHIVED
+    assert archived.archived and archived.status == WorkStatus.DRAFT
     node = storage.get_node("Task", "task-1")
     assert node is not None and node.archived is True
     assert audit_log.records[-1].operation == "archive_work_object"

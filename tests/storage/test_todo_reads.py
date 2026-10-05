@@ -13,14 +13,27 @@ from devgraph.storage.todos import SEARCH_SOURCE_LIMIT, TodoQuery
 
 def row(item_id="a", title="Review", **kwargs):
     todo = Todo(id=item_id, title=title, workflow_json=None, **kwargs)
-    return {"labels": ["Todo"], "id": item_id, "archived": False,
-            "properties": {"id": item_id, "archived": False, **todo.to_node_properties()}}
+    return {
+        "labels": ["Todo"],
+        "id": item_id,
+        "archived": False,
+        "properties": {"id": item_id, "archived": False, **todo.to_node_properties()},
+    }
 
 
 def aggregate(rows):
-    return [{"total": len(rows), "draft": len(rows), "review": 0, "accepted": 0,
-             "archived": 0, "matching_count": len(rows), "remaining_count": len(rows),
-             "nodes": rows}]
+    return [
+        {
+            "total": len(rows),
+            "draft": len(rows),
+            "review": 0,
+            "accepted": 0,
+            "archived": 0,
+            "matching_count": len(rows),
+            "remaining_count": len(rows),
+            "nodes": rows,
+        }
+    ]
 
 
 def test_memory_and_neo4j_agree_on_bounded_exact_label_counts_page_and_detail():
@@ -42,11 +55,14 @@ def test_memory_and_neo4j_agree_on_bounded_exact_label_counts_page_and_detail():
     assert "LIMIT 2" in calls[1][0].text
 
 
-@pytest.mark.parametrize("mutate", [
-    lambda rows: rows[0].update(labels=["Todo", "Task"]),
-    lambda rows: rows[0]["properties"].update(kind="Task"),
-    lambda rows: rows.append(deepcopy(rows[0])),
-])
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda rows: rows[0].update(labels=["Todo", "Task"]),
+        lambda rows: rows[0]["properties"].update(kind="Task"),
+        lambda rows: rows.append(deepcopy(rows[0])),
+    ],
+)
 def test_driver_rows_cannot_smuggle_subtypes_or_duplicate_identities(mutate):
     rows = [row()]
     mutate(rows)
@@ -59,8 +75,11 @@ def test_search_counts_use_redacted_titles_and_batch_only_selected_descriptions(
     rows = [row("a", "Review token=hidden-phrase"), row("b", "Review normal")]
     source = deepcopy(rows)
     for entry in source:
-        entry["properties"] = {k: v for k, v in entry["properties"].items()
-                               if k in ("id", "archived", "kind", "title", "status", "version")}
+        entry["properties"] = {
+            k: v
+            for k, v in entry["properties"].items()
+            if k in ("id", "archived", "kind", "title", "status", "version")
+        }
     storage, calls = _storage_with_row_batches(source)
     result = storage.todo_page(TodoQuery(q="hidden-phrase"))
     assert not result.nodes and result.counts["total"] == 0
@@ -99,43 +118,66 @@ def test_memory_ignores_wrong_label_wrong_kind_and_untyped_legacy_rows():
     assert storage.todo_detail("legacy") is None
 
 
-@pytest.mark.parametrize("options", [
-    {"limit": 0}, {"limit": 101}, {"limit": True}, {"after_id": "bad/id"},
-    {"status": "done"}, {"archived": "yes"}, {"q": "x" * 201}, {"q": "\x00"},
-])
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"limit": 0},
+        {"limit": 101},
+        {"limit": True},
+        {"after_id": "bad/id"},
+        {"status": "done"},
+        {"archived": "yes"},
+        {"q": "x" * 201},
+        {"q": "\x00"},
+    ],
+)
 def test_query_limits_validated_before_storage(options):
     with pytest.raises(ValueError):
         TodoQuery(**options)
 
 
-@pytest.mark.parametrize("counts,remaining,nodes,query", [
-    (dict(total=2, draft=2, review=0, accepted=0, archived=0), 2, [], TodoQuery(limit=1)),
-    (dict(total=3, draft=3, review=0, accepted=0, archived=0), 2, [row("b")],
-     TodoQuery(limit=2, after_id="a")),
-    (dict(total=1, draft=0, review=1, accepted=0, archived=0), 1, [row()], TodoQuery()),
-    (dict(total=0, draft=0, review=0, accepted=0, archived=0), 0, [row()], TodoQuery()),
-])
+@pytest.mark.parametrize(
+    "counts,remaining,nodes,query",
+    [
+        (dict(total=2, draft=2, review=0, accepted=0, archived=0), 2, [], TodoQuery(limit=1)),
+        (
+            dict(total=3, draft=3, review=0, accepted=0, archived=0),
+            2,
+            [row("b")],
+            TodoQuery(limit=2, after_id="a"),
+        ),
+        (dict(total=1, draft=0, review=1, accepted=0, archived=0), 1, [row()], TodoQuery()),
+        (dict(total=0, draft=0, review=0, accepted=0, archived=0), 0, [row()], TodoQuery()),
+    ],
+)
 def test_aggregate_and_page_disagreement_fails_instead_of_inventing_empty_or_complete(
     counts, remaining, nodes, query
 ):
-    storage, _ = _storage_with_row_batches([{
-        **counts, "matching_count": counts["total"], "remaining_count": remaining, "nodes": nodes,
-    }])
+    storage, _ = _storage_with_row_batches(
+        [
+            {
+                **counts,
+                "matching_count": counts["total"],
+                "remaining_count": remaining,
+                "nodes": nodes,
+            }
+        ]
+    )
     with pytest.raises(StorageUnavailable):
         storage.todo_page(query)
 
 
 def test_empty_page_after_end_and_full_page_use_cursor_relative_count():
     counts = dict(total=5, draft=5, review=0, accepted=0, archived=0)
-    storage, calls = _storage_with_row_batches([
-        {**counts, "matching_count": 5, "remaining_count": 0, "nodes": []}
-    ])
+    storage, calls = _storage_with_row_batches(
+        [{**counts, "matching_count": 5, "remaining_count": 0, "nodes": []}]
+    )
     result = storage.todo_page(TodoQuery(after_id="z", limit=2))
     assert result.nodes == () and result.matching_count == 5 and result.remaining_count == 0
     assert "AS remaining_count" in calls[0][0].text
-    storage, _ = _storage_with_row_batches([
-        {**counts, "matching_count": 5, "remaining_count": 3, "nodes": [row("c"), row("d")]}
-    ])
+    storage, _ = _storage_with_row_batches(
+        [{**counts, "matching_count": 5, "remaining_count": 3, "nodes": [row("c"), row("d")]}]
+    )
     result = storage.todo_page(TodoQuery(after_id="b", limit=1))
     assert len(result.nodes) == 2 and result.remaining_count == 3
 
@@ -145,8 +187,11 @@ def test_priority_queue_metadata_and_hydration_agree_across_adapters():
     storage, calls = _storage_with_row_batches(rows, rows)
     memory = MemoryGraphStorage()
     for r in rows:
-        memory.create_node("Todo", r["id"], {
-            k: v for k, v in r["properties"].items() if k not in ("id", "archived")})
+        memory.create_node(
+            "Todo",
+            r["id"],
+            {k: v for k, v in r["properties"].items() if k not in ("id", "archived")},
+        )
     query = TodoQuery(queue="not_started", order="priority", limit=1)
     result = storage.todo_page(query)
     assert result == memory.todo_page(query)
@@ -168,18 +213,28 @@ def test_queue_obeys_recorded_workflow_instead_of_assuming_every_draft_is_unstar
     storage = MemoryGraphStorage()
     records = []
     for key, state, status in [
-        ("old-draft", None, "draft"), ("old-review", None, "review"),
-        ("old-accepted", None, "accepted"), ("backlog", "backlog", "accepted"),
+        ("old-draft", None, "draft"),
+        ("old-review", None, "review"),
+        ("old-accepted", None, "accepted"),
+        ("backlog", "backlog", "accepted"),
         ("started", "intake", "draft"),
     ]:
         props = row(key)["properties"]
-        props.update(status=status, workflow_json=encode_state(
-            WorkflowState(workflow_id="execution.v1", stage=state)) if state else None)
+        props.update(
+            progress="not_started" if state == "backlog" else "in_progress" if state else None,
+            status=status,
+            workflow_json=encode_state(WorkflowState(workflow_id="execution.v1", stage=state))
+            if state
+            else None,
+        )
         records.append(NodeRecord("Todo", key, props))
     result = select_todo_page(records, TodoQuery(queue="not_started", order="priority"))
-    assert [n.id for n in result.nodes] == ["backlog", "old-draft"]
-    assert result.counts["total"] == 2
-    storage._nodes = {("Todo", "invalid"): NodeRecord("Todo", "invalid", {
-        **row()["properties"], "workflow_json": "invalid"})}
+    assert [n.id for n in result.nodes] == ["backlog"]
+    assert result.counts["total"] == 1
+    storage._nodes = {
+        ("Todo", "invalid"): NodeRecord(
+            "Todo", "invalid", {**row()["properties"], "workflow_json": "invalid"}
+        )
+    }
     with pytest.raises(StorageUnavailable, match="workflow"):
         storage.todo_page(TodoQuery(queue="not_started"))

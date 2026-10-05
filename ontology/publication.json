@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "ontology_id": "https://zenith-research.ca/ontology",
-  "version": "0.7.0",
-  "release": "v0.7.0",
-  "published_at": "2026-10-03T20:00:00Z",
-  "canonical_base_url": "https://zenith-research.ca/ontology/v0.7.0",
+  "version": "0.8.0",
+  "release": "v0.8.0",
+  "published_at": "2026-10-05T20:00:00Z",
+  "canonical_base_url": "https://zenith-research.ca/ontology/v0.8.0",
   "supported_versions": [
     "0.1.0",
     "0.2.0",
@@ -12,14 +12,15 @@
     "0.4.0",
     "0.5.0",
     "0.6.0",
-    "0.7.0"
+    "0.7.0",
+    "0.8.0"
   ],
   "discovery_url": "https://zenith-research.ca/.well-known/zenith-ontology",
   "authority": {
     "name": "Devgraph",
     "repository": "https://github.com/ZenithResearch/devgraph",
     "source_path": "ontology/",
-    "release_tag": "ontology-v0.7.0"
+    "release_tag": "ontology-v0.8.0"
   },
   "compatibility": {
     "mode": "additive",
@@ -28,7 +29,7 @@
   },
   "files": [
     {
-      "source": "ontology/release-notes/v0.7.0.md",
+      "source": "ontology/release-notes/v0.8.0.md",
       "target": "README.md",
       "media_type": "text/markdown"
     },
@@ -83,7 +84,7 @@
       "media_type": "text/markdown"
     },
     {
-      "source": "ontology/compatibility/v0.7.0.md",
+      "source": "ontology/compatibility/v0.8.0.md",
       "target": "compatibility.md",
       "media_type": "text/markdown"
     },
@@ -116,6 +117,11 @@
       "source": "ontology/workflows.json",
       "target": "workflows.json",
       "media_type": "application/json"
+    },
+    {
+      "source": "ontology/todo-progress.md",
+      "target": "todo-progress.md",
+      "media_type": "text/markdown"
     }
   ]
 }

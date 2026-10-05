@@ -23,9 +23,7 @@ def observation_body() -> dict:
         "title": "Portable initiative graph",
         "problem": "Public project intent is difficult to discover across hosts.",
         "desired_state": "Evidence-backed initiatives can be claimed and federated.",
-        "evidence_urls": [
-            "https://github.com/Owner/Repository/tree/abcdef123456/src"
-        ],
+        "evidence_urls": ["https://github.com/Owner/Repository/tree/abcdef123456/src"],
         "confidence": 0.82,
         "observed_by": "scout-key-1",
     }
@@ -49,12 +47,8 @@ def test_create_get_list_and_idempotent_receipt_contract() -> None:
 
     assert created.status_code == 201
     payload = created.json()
-    assert payload["observation"]["schema_version"] == (
-        "devgraph.initiative-observation.v0"
-    )
-    assert payload["observation"]["subject_url"] == (
-        "https://github.com/owner/repository"
-    )
+    assert payload["observation"]["schema_version"] == ("devgraph.initiative-observation.v0")
+    assert payload["observation"]["subject_url"] == ("https://github.com/owner/repository")
     assert payload["observation"]["authorship"] == "inferred"
     assert payload["observation"]["claim_status"] == "unclaimed"
     assert payload["receipt"]["subject_label"] == "Artifact"
@@ -157,9 +151,7 @@ def test_monitor_snapshot_projects_work_observations_and_receipts() -> None:
     assert "Artifact:observation-1" in graph_keys
     assert "Artifact:private-artifact-1" not in graph_keys
     assert len(snapshot["graph_edges"]) == 2
-    assert {edge["relationship"] for edge in snapshot["graph_edges"]} == {
-        "EMITTED_EVENT"
-    }
+    assert {edge["relationship"] for edge in snapshot["graph_edges"]} == {"EMITTED_EVENT"}
     assert "private-monitor-secret" not in response.text
 
 
@@ -186,7 +178,7 @@ def test_official_frontend_is_dependency_free_and_never_embeds_a_credential() ->
     assert "Node separation" in response.text
     assert "Reset force defaults" in response.text
     assert ".graph-node:focus-visible .graph-sphere" in response.text
-    assert "final work items accepted or archived" in response.text
+    assert "child items Done" in response.text
     assert "edgeStrengths: new Map()" in response.text
     assert "repulsionStrength: 1.5" in response.text
     assert "sessionStorage" in response.text

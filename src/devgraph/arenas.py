@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from devgraph.arena_contract import Arena, ArenaMembership
 from devgraph.arena_requests import ArenaRequest
-from devgraph.model.base import WorkStatus, utc_now
+from devgraph.model.base import utc_now
 from devgraph.model.repository import (
     MissingWorkObjectError,
     WorkObjectAlreadyExistsError,
@@ -216,7 +216,7 @@ class ArenaMutations:
                 expected_version=request.expected_version,
                 actual_version=member.version,
             )
-        if member.status == WorkStatus.ARCHIVED:
+        if member.archived:
             raise ArenaConflict("archived Work cannot change membership")
         membership = self.repository.membership(member.kind, member.id)
         if (membership.root_kind, membership.root_id) != (member.kind, member.id):

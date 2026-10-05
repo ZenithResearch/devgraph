@@ -205,6 +205,8 @@ class GraphStorage(Protocol):
         properties: dict[str, Any] | None = None,
     ) -> NodeRecord: ...
 
+    def restore_node(self, label: str, node_id: str, properties: dict[str, Any]) -> NodeRecord: ...
+
     def create_edge(
         self,
         from_label: str,
@@ -237,7 +239,6 @@ class GraphStorage(Protocol):
         target_resource: str | None = None,
         limit: int = 50,
     ) -> list[SupportingReference]: ...
-
 
     def supporting_material_nodes(self, keys: list[tuple[str, str]]) -> list[NodeRecord]: ...
 

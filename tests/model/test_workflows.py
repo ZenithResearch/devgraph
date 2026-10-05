@@ -10,6 +10,7 @@ from devgraph.kanban import BoardChanged, BoardFilter, build_board
 from devgraph.model.base import WorkStatus
 from devgraph.model.work import Issue
 from devgraph.named_work import NamedWorkMutations
+from devgraph.progress import stage_progress
 from devgraph.storage.memory import MemoryGraphStorage
 from devgraph.workflow_contract import LAYERS, STAGES, decode_state
 from devgraph.workflows import WorkflowConflict, Workflows
@@ -260,7 +261,11 @@ def test_every_stage_has_an_explicit_column_and_done_has_no_forward_edge():
             state.stage = stage
             from devgraph.workflow_contract import encode_state
 
-            work = replace(s.work, workflow_json=encode_state(state))
+            work = replace(
+                s.work,
+                workflow_json=encode_state(state),
+                progress=stage_progress(state.workflow_id, state.stage),
+            )
             transitions = Workflows(s.storage).transitions(work)
             assert bool(transitions) == (stage != "done")
 
@@ -271,8 +276,9 @@ def test_external_evidence_edit_invalidates_an_approved_gate():
     s.review("requirements")
     s.move("developer_plan_approval")
     s.review("developer_plan")
-    assert not Workflows(s.storage).gaps(s.work, decode_state(s.work.workflow_json),
-                                         "ceo_plan_approval")
+    assert not Workflows(s.storage).gaps(
+        s.work, decode_state(s.work.workflow_json), "ceo_plan_approval"
+    )
     node = s.storage.get_node("ExternalLink", "evidence-2")
     s.storage.update_node("ExternalLink", node.id, {**node.properties, "title": "Changed"})
     with pytest.raises(WorkflowConflict):
@@ -281,11 +287,17 @@ def test_external_evidence_edit_invalidates_an_approved_gate():
 
 def test_completed_child_does_not_approve_parent_and_workflow_survives_writes():
     from devgraph.workflow_contract import encode_state
+
     s = Scenario("Project")
     child = create(s.service, "Task", "child")
     state = decode_state(child.workflow_json)
     state.stage = "done"  # Completed fixture; parent's approval still has its own boundary.
-    completed = replace(child, workflow_json=encode_state(state), version=child.version + 1)
+    completed = replace(
+        child,
+        workflow_json=encode_state(state),
+        progress=stage_progress(state.workflow_id, state.stage),
+        version=child.version + 1,
+    )
     s.storage.update_node(child.kind, child.id, completed.to_node_properties())
     s.storage.create_edge("Project", s.work.id, "HAS_CHILD", "Task", child.id)
     s.move("planning")
@@ -304,12 +316,14 @@ def test_completed_child_does_not_approve_parent_and_workflow_survives_writes():
     assert s.work.workflow_json == original
 
 
-@pytest.mark.parametrize("parent,child", [("Initiative", "Issue"), ("Initiative", "Task"),
-                                         ("Project", "Task")])
+@pytest.mark.parametrize(
+    "parent,child", [("Initiative", "Issue"), ("Initiative", "Task"), ("Project", "Task")]
+)
 def test_flattened_parentage_inherits_root_arena(parent, child):
     from tests.model.test_arena_runtime import add_arena, assign
 
     from devgraph.arenas import ArenaMutations
+
     storage = MemoryGraphStorage()
     work = NamedWorkMutations(storage)
     arena = ArenaMutations(storage)
@@ -319,8 +333,9 @@ def test_flattened_parentage_inherits_root_arena(parent, child):
         create(work, parent, "parent")
         storage.create_edge("Initiative", "root", "HAS_CHILD", parent, "parent")
     create(work, child, "child")
-    storage.create_edge(parent, "root" if parent == "Initiative" else "parent",
-                        "HAS_CHILD", child, "child")
+    storage.create_edge(
+        parent, "root" if parent == "Initiative" else "parent", "HAS_CHILD", child, "child"
+    )
     assign(arena, "Initiative", "root", 1, arena=ref("Arena", "gallery", 1))
     membership = arena.repository.membership(child, "child")
     assert membership.inherited and membership.arena.id == "gallery"

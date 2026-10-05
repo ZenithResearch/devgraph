@@ -1,5 +1,10 @@
 # Current-state evidence and limits
 
+Canonical Todo progress, independent archive and v2 reads/writes are described in
+[Todo progress v2](todo-progress-v2.md). Legacy lifecycle/status descriptions below
+remain the v1 compatibility contract; they do not determine canonical progress.
+
+
 This page records the combined official-frontend and private macOS deployment
 baseline. Repository behavior and live machine state remain separate evidence.
 

@@ -10,10 +10,10 @@ function model(names=[]) {
   });
 }
 
-test('the visual registry gives all eight types different shapes and colors',()=>{
+test('the visual registry gives all nine types different shapes and colors',()=>{
   const {Topology:T}=model(), entries=Object.values(T.registry);
-  assert.equal(entries.length,8);assert.equal(new Set(entries.map(v=>v.color)).size,8);
-  assert.equal(new Set(Object.keys(T.registry).map(k=>T.shape(k,12))).size,8);
+  assert.equal(entries.length,9);assert.equal(new Set(entries.map(v=>v.color)).size,9);
+  assert.equal(new Set(Object.keys(T.registry).map(k=>T.shape(k,12))).size,9);
   assert.equal(T.visual('EventReceipt').label,'Record');
 });
 

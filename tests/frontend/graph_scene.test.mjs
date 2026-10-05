@@ -46,11 +46,11 @@ test('unchanged SVG nodes retain identity and focus across projection updates', 
   const solid = element.querySelector('.graph-solid');
   assert.equal(solid.getAttribute('href'), '#graph-solid-Task');
   element.focus();
-  c.renderGraph([{ ...node, title: 'Revised title', status: 'review' }], []);
+  c.renderGraph([{ ...node, title: 'Revised title', status: 'review', todo_progress: 'in_progress' }], []);
   assert.equal(c.document.getElementById('scene-nodes').children[0], element);
   assert.equal(element.querySelector('.graph-solid'), solid);
   assert.equal(c.document.activeElement, element);
-  assert.match(element.getAttribute('aria-label'), /Revised title, review/);
+  assert.match(element.getAttribute('aria-label'), /Revised title, In progress/);
 });
 
 test('expansion into Canvas keeps one focused node control and restores SVG without losing focus',()=>{

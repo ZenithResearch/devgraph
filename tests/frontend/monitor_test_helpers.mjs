@@ -20,7 +20,7 @@ export function contextWithFunctions(names, globals) {
   const context = vm.createContext({ URLSearchParams, TextEncoder, ...globals });
   vm.runInContext(topologySource, context);
   context.Topology = context.DevgraphTopology;
-  vm.runInContext(functionsSource(names), context);
+  vm.runInContext(functionsSource([...new Set(['progressLabel', ...names])]), context);
   return context;
 }
 

@@ -1,12 +1,12 @@
 """Protected board reads and allowlisted page assets; no bearer write route."""
 
 from importlib.resources import files
+from typing import Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
 from devgraph.api.routes import _credential
-from devgraph.api.schemas import WorkKind
 from devgraph.frontend.selection import _HEADERS
 
 
@@ -48,6 +48,13 @@ def register_kanban(app: FastAPI, services):
         response.headers["Cache-Control"] = "no-store"
         return graph.kanban(_credential(authorization), request.url.query)
 
+    @app.get("/monitor/kanban/v2")
+    def board_v2(
+        request: Request, response: Response, authorization: str | None = Header(default=None)
+    ):
+        response.headers["Cache-Control"] = "no-store"
+        return graph.kanban(_credential(authorization), request.url.query, version=2)
+
     @app.get("/workflows/v1")
     def workflows(response: Response, authorization: str | None = Header(default=None)):
         response.headers["Cache-Control"] = "no-store"
@@ -55,7 +62,7 @@ def register_kanban(app: FastAPI, services):
 
     @app.get("/work/{kind}/{work_id}/workflow")
     def workflow(
-        kind: WorkKind,
+        kind: Literal["Todo", "Proposal", "Initiative", "Project", "Issue", "Task"],
         work_id: str,
         response: Response,
         authorization: str | None = Header(default=None),

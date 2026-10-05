@@ -18,7 +18,7 @@ def fixture():
     services = build_services(frozenset({SCOPE_READ}))
     repository = WorkObjectRepository(services.storage)
     repository.create(Task(id="new-task", title="Current work"))
-    repository.create(Task(id="old-task", title="Legacy work", workflow_json=None))
+    repository.create(Task(id="old-task", title="Legacy work", workflow_json=None, progress=None))
     return TestClient(create_app(services)), services
 
 
@@ -114,6 +114,7 @@ def test_page_security_and_asset_allowlist(fixture):
 
 def test_scope_picker_is_bounded_and_searchable(fixture):
     from devgraph.model.work import Project
+
     api, services = fixture
     repo = WorkObjectRepository(services.storage)
     for i in range(250):
@@ -130,11 +131,17 @@ def test_frontend_workflow_privacy_and_uncertain_dispatch():
     import shutil
     import subprocess
     from pathlib import Path
+
     node = shutil.which("node")
     if not node:
         pytest.skip("Node is needed for frontend contract checks")
-    subprocess.run([node, "--test", str(Path(__file__).parents[1] / "frontend_kanban.mjs")],
-                   check=True, capture_output=True, text=True, timeout=30)
+    subprocess.run(
+        [node, "--test", str(Path(__file__).parents[1] / "frontend_kanban.mjs")],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
 
 
 def test_not_started_standalone_tasks_are_priority_ordered_with_complete_counts(fixture):
@@ -151,30 +158,43 @@ def test_not_started_standalone_tasks_are_priority_ordered_with_complete_counts(
         parent = repo.create(cls(id=cls.__name__.lower(), title="Parent"))
         child = repo.create(Task(id="child-" + parent.id, title="Excluded child", priority=99))
         storage.create_edge(parent.kind, parent.id, "HAS_CHILD", child.kind, child.id)
-    for identifier, priority in [("z-high", 9223372036854775807), ("a-next", 9223372036854775806),
-                                 ("b-tie", 9223372036854775806), ("low", -9223372036854775808)]:
+    for identifier, priority in [
+        ("z-high", 9223372036854775807),
+        ("a-next", 9223372036854775806),
+        ("b-tie", 9223372036854775806),
+        ("low", -9223372036854775808),
+    ]:
         repo.create(Task(id=identifier, title="Start " + identifier, priority=priority))
     for status in (WorkStatus.REVIEW, WorkStatus.ACCEPTED):
-        work = replace(Task(id=status.value, title="Legacy not Draft", workflow_json=None),
-                       status=status)
+        work = replace(
+            Task(id=status.value, title="Legacy not Draft", workflow_json=None, progress=None),
+            status=status,
+        )
         storage.create_node("Task", work.id, work.to_node_properties())
-    repo.create(Task(id="started", title="Started", workflow_json=encode_state(
-        WorkflowState(workflow_id="execution.v1", stage="intake"))))
-    query = ("/monitor/kanban/v1?kind=Task&parentage=standalone&queue=not_started"
-             "&order=priority&column=backlog&limit=2")
+    repo.create(
+        Task(
+            id="started",
+            title="Started",
+            workflow_json=encode_state(WorkflowState(workflow_id="execution.v1", stage="intake")),
+        )
+    )
+    query = (
+        "/monitor/kanban/v1?kind=Task&parentage=standalone&queue=not_started"
+        "&order=priority&column=backlog&limit=2"
+    )
     first = read(api, query).json()
-    assert first["total"] == 6  # Four priority cases plus new/old tasks from fixture.
+    assert first["total"] == 5  # Four priority cases plus new/old tasks from fixture.
     assert [c["id"] for c in first["columns"][0]["items"]] == ["z-high", "a-next"]
     next_query = query + "&after=Task/a-next&revision=" + first["revision"]
     second = read(api, next_query).json()
     assert [c["id"] for c in second["columns"][0]["items"]] == ["b-tie", "new-task"]
     assert all(c["parent"] is None for c in second["columns"][0]["items"])
-    assert second["total"] == 6
+    assert second["total"] == 5
     # Changing containment invalidates the continuation even if a storage adapter
     # has not changed content versions yet.
     storage.create_edge("Issue", "issue", "HAS_CHILD", "Task", "a-next")
     assert read(api, next_query).status_code == 409
-    assert read(api, query).json()["total"] == 5
+    assert read(api, query).json()["total"] == 4
 
 
 def test_queue_cursor_scope_and_redacted_search(fixture):
@@ -183,5 +203,11 @@ def test_queue_cursor_scope_and_redacted_search(fixture):
     repo.create(Task(id="safe", title="token=hidden-substring"))
     assert read(api, "/monitor/kanban/v1?q=hidden-substring").json()["total"] == 0
     board = read(api, "/monitor/kanban/v1?column=backlog&order=priority").json()
-    assert read(api, "/monitor/kanban/v1?column=backlog&order=priority&after=Task/missing&revision="
-                + board["revision"]).status_code == 400
+    assert (
+        read(
+            api,
+            "/monitor/kanban/v1?column=backlog&order=priority&after=Task/missing&revision="
+            + board["revision"],
+        ).status_code
+        == 400
+    )

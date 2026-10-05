@@ -23,13 +23,13 @@ test('large maps reuse bounded solid sprites across frames, zoom and unknown kin
   const ctx = context(), canvas = { getContext: () => ctx };
   const draw = () => c.DevgraphTopologyCanvas.draw(canvas, view, null, null, new Set(), new Set(), x => x, () => []);
   draw();
-  assert.equal(sprites.length, 9, 'one sprite per registered kind and one shared fallback');
+  assert.equal(sprites.length, 10, 'one sprite per registered kind and one shared fallback');
   assert.equal(images.length, 1500);
   for (const position of view.projected.values()) position.radius = 14;
   draw();
-  assert.equal(sprites.length, 9, 'zoom does not rebuild artwork');
+  assert.equal(sprites.length, 10, 'zoom does not rebuild artwork');
   assert.equal(images.length, 3000);
-  assert.equal(new Set(images).size, 9);
+  assert.equal(new Set(images).size, 10);
   assert.ok(sprites.every(sprite => sprite.width === 256 && sprite.height === 256));
 });
 

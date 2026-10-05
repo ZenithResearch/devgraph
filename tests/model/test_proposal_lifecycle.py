@@ -21,9 +21,7 @@ class FailingConversionDecisionStorage(MemoryGraphStorage):
     ) -> EdgeRecord:
         if relationship == "CONVERSION_DECIDED_BY":
             raise RuntimeError("simulated conversion provenance write failure")
-        return super().create_edge(
-            from_label, from_id, relationship, to_label, to_id, properties
-        )
+        return super().create_edge(from_label, from_id, relationship, to_label, to_id, properties)
 
 
 def test_accepting_proposal_requires_decision_provenance():
@@ -73,7 +71,7 @@ def test_archived_proposal_cannot_convert_to_accepted_work_edge():
     lifecycle.create_proposal(proposal)
     archived = lifecycle.archive_proposal(proposal.id)
 
-    assert archived.status == WorkStatus.ARCHIVED
+    assert archived.archived and archived.status == WorkStatus.DRAFT
     with pytest.raises(ProposalLifecycleError, match="Only accepted proposals can convert"):
         lifecycle.convert_accepted_proposal_to_issue(proposal.id, issue_id="issue-1")
 
@@ -149,9 +147,7 @@ class FailingAcceptanceDecisionStorage(MemoryGraphStorage):
     ) -> EdgeRecord:
         if relationship == "ACCEPTED_BY_DECISION":
             raise RuntimeError("simulated acceptance provenance write failure")
-        return super().create_edge(
-            from_label, from_id, relationship, to_label, to_id, properties
-        )
+        return super().create_edge(from_label, from_id, relationship, to_label, to_id, properties)
 
 
 def test_acceptance_rolls_back_status_and_decision_when_provenance_edge_write_fails():
@@ -187,14 +183,10 @@ def test_conversion_rolls_back_issue_and_edges_when_provenance_edge_write_fails(
 
     assert storage.get_node("Issue", "issue-1") is None
     assert [
-        edge
-        for edge in storage.list_edges("CONVERTED_TO")
-        if edge.from_id == proposal.id
+        edge for edge in storage.list_edges("CONVERTED_TO") if edge.from_id == proposal.id
     ] == []
     assert [
-        edge
-        for edge in storage.list_edges("CONVERSION_DECIDED_BY")
-        if edge.from_id == "issue-1"
+        edge for edge in storage.list_edges("CONVERSION_DECIDED_BY") if edge.from_id == "issue-1"
     ] == []
 
 
@@ -277,4 +269,4 @@ def test_active_accepted_and_archived_fixture_builders_cover_lifecycle_examples(
 
     assert active.status == WorkStatus.DRAFT
     assert accepted.status == WorkStatus.ACCEPTED
-    assert archived.status == WorkStatus.ARCHIVED
+    assert archived.archived and archived.status == WorkStatus.DRAFT

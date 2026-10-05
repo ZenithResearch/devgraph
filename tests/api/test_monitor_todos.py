@@ -29,8 +29,11 @@ def add_todo(storage, item_id, *, status=WorkStatus.DRAFT, title=None, **kwargs)
 def fixture():
     services = build_services(frozenset({SCOPE_READ}))
     for item_id, status in [
-        ("a", WorkStatus.DRAFT), ("b", WorkStatus.REVIEW),
-        ("c", WorkStatus.ACCEPTED), ("d", WorkStatus.ARCHIVED), ("e", WorkStatus.REVIEW),
+        ("a", WorkStatus.DRAFT),
+        ("b", WorkStatus.REVIEW),
+        ("c", WorkStatus.ACCEPTED),
+        ("d", WorkStatus.ARCHIVED),
+        ("e", WorkStatus.REVIEW),
     ]:
         add_todo(services.storage, item_id, status=status, title="Daily " + item_id)
     for cls in (Proposal, Initiative, Project, Issue, Task):
@@ -38,7 +41,8 @@ def fixture():
         services.storage.create_node(work.kind, work.id, work.to_node_properties())
     # Simulate malformed legacy storage without admitting this through writes.
     services.storage._nodes[("Todo", "mismatch")] = NodeRecord(
-        "Todo", "mismatch", {"kind": "Task", "title": "Daily mismatch"})
+        "Todo", "mismatch", {"kind": "Task", "title": "Daily mismatch"}
+    )
     services.storage.create_node("Todo", "legacy", {"title": "Daily legacy"})
     return services, TestClient(create_app(services))
 
@@ -78,9 +82,14 @@ def test_archive_search_and_no_results_are_distinct_from_subtypes():
 
 def test_detail_redaction_identity_and_lossless_signed64_numbers():
     services, api = fixture()
-    add_todo(services.storage, "safe", title="Review password=private-value",
-             description="Read Bearer sensitive-material", priority=-9223372036854775808,
-             version=9223372036854775807)
+    add_todo(
+        services.storage,
+        "safe",
+        title="Review password=private-value",
+        description="Read Bearer sensitive-material",
+        priority=-9223372036854775808,
+        version=9223372036854775807,
+    )
     result = api.get(PATH + "/safe", headers=HEADERS)
     assert result.status_code == 200 and result.headers["cache-control"] == "no-store"
     data = result.json()
@@ -99,14 +108,34 @@ def test_detail_redaction_identity_and_lossless_signed64_numbers():
         assert api.get(PATH + "/" + item_id, headers=HEADERS).status_code == 404
 
 
-@pytest.mark.parametrize("query", [
-    "limit=0", "limit=101", "limit=true", "limit=1&limit=2", "kind=Task",
-    "status=done", "status=", "archived=true", "after_id=../bad", "after_id=",
-    "q=" + "a" * 201, "q=%00", "q=%0A", "q=%GG", "q=%FF", "q=a&q=b", "q",
-    "order=invalid", "queue=all", "order=priority&after_id=a",
-    "after_priority=2", "order=priority&after_priority=2",
-    "order=priority&after_id=a&after_priority=9223372036854775808",
-])
+@pytest.mark.parametrize(
+    "query",
+    [
+        "limit=0",
+        "limit=101",
+        "limit=true",
+        "limit=1&limit=2",
+        "kind=Task",
+        "status=done",
+        "status=",
+        "archived=true",
+        "after_id=../bad",
+        "after_id=",
+        "q=" + "a" * 201,
+        "q=%00",
+        "q=%0A",
+        "q=%GG",
+        "q=%FF",
+        "q=a&q=b",
+        "q",
+        "order=invalid",
+        "queue=all",
+        "order=priority&after_id=a",
+        "after_priority=2",
+        "order=priority&after_priority=2",
+        "order=priority&after_id=a&after_priority=9223372036854775808",
+    ],
+)
 def test_filters_are_strict_and_safe(query):
     _, api = fixture()
     response = api.get(PATH + "?" + query, headers=HEADERS)
@@ -114,22 +143,32 @@ def test_filters_are_strict_and_safe(query):
     assert response.json()["detail"] == "invalid_todo_filter"
 
 
-def test_not_started_priority_queue_preserves_exact_base_type_and_legacy_defaults():
+def test_not_started_priority_queue_uses_progress_independently_of_status():
     services, api = fixture()
-    for item_id, priority in [("z-high", 9223372036854775807), ("low", -9223372036854775808),
-                              ("b-tie", 2), ("a-tie", 2)]:
+    for item_id, priority in [
+        ("z-high", 9223372036854775807),
+        ("low", -9223372036854775808),
+        ("b-tie", 2),
+        ("a-tie", 2),
+    ]:
         add_todo(services.storage, item_id, priority=priority)
     query = {"queue": "not_started", "order": "priority", "limit": 2}
     first = api.get(PATH, params=query, headers=HEADERS).json()
-    assert first["matching_count"] == 5
-    assert first["counts"] == dict(total=5, draft=5, review=0, accepted=0, archived=0)
+    assert first["matching_count"] == 8
+    assert first["counts"] == dict(total=8, draft=5, review=2, accepted=1, archived=0)
     assert [x["id"] for x in first["items"]] == ["z-high", "a-tie"]
     assert first["next_after_priority"] == "2"
-    second = api.get(PATH, params={**query, "after_id": first["next_after_id"],
-                                  "after_priority": first["next_after_priority"]},
-                     headers=HEADERS).json()
+    second = api.get(
+        PATH,
+        params={
+            **query,
+            "after_id": first["next_after_id"],
+            "after_priority": first["next_after_priority"],
+        },
+        headers=HEADERS,
+    ).json()
     assert [x["id"] for x in second["items"]] == ["b-tie", "a"]
-    assert second["matching_count"] == 5
+    assert second["matching_count"] == 8
     assert "next_after_priority" not in api.get(PATH, headers=HEADERS).json()
     empty = api.get(PATH, params={**query, "q": "subtype"}, headers=HEADERS).json()
     assert empty["matching_count"] == 0
@@ -138,8 +177,10 @@ def test_not_started_priority_queue_preserves_exact_base_type_and_legacy_default
 def test_auth_precedes_filter_parsing_and_storage_and_writes_remain_unavailable():
     for scopes, expected in [(frozenset(), 403), (frozenset({SCOPE_WRITE}), 403)]:
         services = build_services(scopes)
+
         def forbidden_storage(*args):
             raise AssertionError("storage must not be called")
+
         services.storage.todo_page = forbidden_storage
         services.storage.todo_detail = forbidden_storage
         api = TestClient(create_app(services))
@@ -155,8 +196,10 @@ def test_auth_precedes_filter_parsing_and_storage_and_writes_remain_unavailable(
 
 def test_storage_failure_is_not_an_empty_success_and_has_no_sensitive_detail():
     services, api = fixture()
+
     def fail(*args):
         raise StorageUnavailable("secret=must-not-appear")
+
     services.storage.todo_page = fail
     response = api.get(PATH, headers=HEADERS)
     assert response.status_code == 503

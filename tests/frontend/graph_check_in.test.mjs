@@ -6,51 +6,36 @@ import vm from 'node:vm';
 import {deferred, contextWithFunctions, treeDocument, fakeClock, flushPromises} from './monitor_test_helpers.mjs';
 const require = createRequire(import.meta.url);
 const CheckIn = require('../../src/devgraph/frontend/static/topology/check-in.js');
-const item = (id = 'a') => ({kind:'Todo', id, title:'Start the plan', status:'draft', priority:'2', version:'1', archived:false});
+const item = (id = 'a') => ({kind:'Todo', key:`Todo/${id}`, progress:'not_started', id, title:'Start the plan', status:'draft', priority:'2', version:'1', archived:false});
 const page = (items = [item()], extra = {}) => {
   const total=extra.counts?.total ?? items.length;
-  return {schema:'devgraph.todos.v1', generated_at:extra.generated_at || '2026-10-04T12:00:00Z', items,
-    counts:{total}, matching_count:total, has_more:extra.has_more || false,
-    next_after_id:extra.next_after_id ?? null, next_after_priority:extra.has_more ? items.at(-1).priority : null};
+  return {schema:'devgraph.todos.v2', revision:'r1', complete:true, classification_required:0, items,
+    total, next_cursor:extra.has_more ? items.at(-1)?.key : null};
 };
-const taskPage = (items = [{...item(),kind:'Task',key:'Task/a',lifecycle:'draft',parent:null,stage:null,column:'backlog'}], extra = {}) => ({
-  schema:'devgraph.kanban.v1',revision:'r1',total:items.length,columns:[{id:'backlog',count:items.length,items,next_cursor:null}], ...extra,
-});
 
-test('base Todo queue is first choice; standalone Task fallback uses server filtering and priority cursors', () => {
-  let url = new URL(CheckIn.query({q:'hello & goodbye'}, {key:'todo:a',priority:'9223372036854775807'}),'https://localhost');
-  assert.equal(url.pathname,'/monitor/todos/v1');
-  assert.equal(url.searchParams.get('queue'),'not_started'); assert.equal(url.searchParams.get('order'),'priority');
-  assert.equal(url.searchParams.get('after_priority'),'9223372036854775807');
+test('daily query defaults to all six kinds, explicit progress and independent archival', () => {
+  const url = new URL(CheckIn.query({q:'hello & goodbye'}, {key:'Todo/a',revision:'r1'}),'https://localhost');
+  assert.equal(url.pathname,'/todos/v2');
+  assert.equal(url.searchParams.get('progress'),'not_started');
+  assert.equal(url.searchParams.get('archived'),'exclude');
+  assert.equal(url.searchParams.get('after'),'Todo/a');
+  assert.equal(url.searchParams.has('kind'),false);
   assert.equal(url.searchParams.get('q'),'hello & goodbye');
-  url = new URL(CheckIn.query({}, {key:'Task/a',revision:'r1'}, 'task'),'https://localhost');
-  assert.equal(url.pathname,'/monitor/kanban/v1');
-  for (const [key,value] of Object.entries({kind:'Task',parentage:'standalone',column:'backlog',after:'Task/a',revision:'r1'})) assert.equal(url.searchParams.get(key),value);
 });
-
-test('base Todos never admit subtypes; fallback never admits parented Tasks or other kinds', () => {
-  assert.equal(CheckIn.decode(page()).items[0].key,'Todo/a');
-  for (const kind of ['Proposal','Initiative','Project','Issue','Task']) assert.throws(()=>CheckIn.decode(page([{...item(),kind}])));
-  assert.equal(CheckIn.decode(taskPage(), 'task').items[0].key,'Task/a');
-  for (const parent of ['Issue/i','Project/p','Initiative/n']) {
-    const data=taskPage(); data.columns[0].items[0].parent=parent;
-    assert.throws(()=>CheckIn.decode(data,'task'));
+test('all Todo types and parented work are included; only explicit Not started counts', () => {
+  for (const kind of ['Todo','Proposal','Initiative','Project','Issue','Task']) {
+    assert.equal(CheckIn.decode(page([{...item(),kind,key:`${kind}/a`,parent:'Project/p'}])).items[0].kind,kind);
   }
-});
-
-test('fallback excludes started or archived work and preserves exact signed64 priorities', () => {
-  for (const change of [{stage:'intake'},{stage:'done'},{lifecycle:'review'},{lifecycle:'accepted'},{lifecycle:'archived'}]) {
-    const data=taskPage(); Object.assign(data.columns[0].items[0],change); assert.throws(()=>CheckIn.decode(data,'task'));
+  for (const change of [{progress:null},{progress:'in_progress'},{progress:'done'},{archived:true}]) {
+    assert.throws(()=>CheckIn.decode(page([{...item(),...change}])));
   }
   assert.equal(CheckIn.decode(page([{...item(),priority:'-9223372036854775808'}])).items[0].priority,'-9223372036854775808');
 });
-
-test('invalid count, duplicate identity, oversized page, and invalid cursor fail closed', () => {
-  assert.throws(() => CheckIn.decode(page([item(),item()])));
-  assert.throws(() => CheckIn.decode(page(Array.from({length:7},(_,i)=>item(String(i))))));
-  assert.throws(() => CheckIn.decode({...page(), next_after_id:'a'}));
-  assert.throws(() => CheckIn.decode({...page(), has_more:true}));
-  assert.throws(() => CheckIn.decode(page([], {counts:{total:-1}})));
+test('invalid count, duplicate identity, oversized page and cursor fail closed', () => {
+  assert.throws(()=>CheckIn.decode(page([item(),item()])));
+  assert.throws(()=>CheckIn.decode(page(Array.from({length:7},(_,i)=>item(String(i))))));
+  assert.throws(()=>CheckIn.decode({...page(),next_cursor:'wrong'}));
+  assert.throws(()=>CheckIn.decode(page([], {counts:{total:-1}})));
 });
 
 function harness() {
@@ -80,26 +65,21 @@ test('a filter change rejects late unfiltered results and resets pagination', as
 test('pagination uses server cursors, and a failed next page retains the current page', async () => {
   const {controller,requests}=harness(); let pending=controller.refresh();
   requests[0].resolve(page([item('a')],{has_more:true,next_after_id:'a'})); await pending;
-  pending=controller.next(); assert.match(requests[1].path,/after_id=a/);
+  pending=controller.next(); assert.match(requests[1].path,/after=Todo%2Fa/);
   requests[1].reject(new Error('offline')); await pending;
   assert.equal(controller.view.page,0); assert.equal(controller.view.data.items[0].id,'a');
   pending=controller.next(); requests[2].resolve(page([item('b')])); await pending;
   assert.equal(controller.view.page,1);
-  pending=controller.previous(); assert.doesNotMatch(requests[3].path,/after_id=/);
+  pending=controller.previous(); assert.doesNotMatch(requests[3].path,/after=/);
   requests[3].resolve(page([item('a')],{has_more:true,next_after_id:'a'})); await pending;
   assert.equal(controller.view.page,0);
 });
 
-test('missing base capability falls back once, while empty base Todos do not broaden the list', async () => {
+test('an old host is unsupported, never broadens into a Draft-based count', async () => {
   const {controller,requests}=harness(); const pending=controller.refresh();
-  requests[0].reject(Object.assign(new Error('old host'),{status:501})); await flushPromises();
-  assert.match(requests[1].path,/kind=Task&parentage=standalone/);
-  requests[1].resolve(taskPage()); await pending;
-  assert.equal(controller.view.data.source,'task');
-  const again=controller.refresh(); assert.match(requests[2].path,/kanban/); requests[2].resolve(taskPage()); await again;
-  controller.reset(); const empty=controller.refresh(); requests[3].resolve(page([])); await empty;
-  assert.equal(controller.view.data.source,'todo'); assert.equal(controller.view.data.counts.total,0);
-  assert.equal(requests.length,4);
+  requests[0].reject(Object.assign(new Error('old host'),{status:501})); await pending;
+  assert.equal(requests.length,1); assert.equal(controller.view.status,'unsupported');
+  assert.equal(controller.view.data,null);
 });
 
 test('authorization and transient Todo failures never trigger fallback', async () => {
@@ -110,14 +90,13 @@ test('authorization and transient Todo failures never trigger fallback', async (
   }
 });
 
-test('a changed fallback board keeps old rows and retries from the first page', async () => {
+test('a changed list retains rows and retries from the first page', async () => {
   const {controller,requests}=harness(); let pending=controller.refresh();
-  requests[0].reject(Object.assign(new Error('old host'),{status:404})); await flushPromises();
-  const data=taskPage(); data.columns[0].next_cursor='Task/a'; requests[1].resolve(data); await pending;
-  pending=controller.next(); requests[2].reject(Object.assign(new Error('changed'),{status:409})); await pending;
-  assert.equal(controller.view.data.items[0].id,'a'); assert.match(controller.view.error,/list changed/);
-  pending=controller.refresh({force:true}); assert.doesNotMatch(requests[3].path,/after=/);
-  requests[3].resolve(taskPage()); await pending; assert.equal(controller.view.page,0);
+  requests[0].resolve(page([item()],{has_more:true})); await pending;
+  pending=controller.next(); requests[1].reject(Object.assign(new Error('changed'),{status:409})); await pending;
+  assert.equal(controller.view.data.items[0].id,'a');
+  pending=controller.refresh({force:true}); assert.doesNotMatch(requests[2].path,/after=/);
+  requests[2].resolve(page()); await pending; assert.equal(controller.view.page,0);
 });
 
 test('revoked access clears previous rows and counts', async () => {
@@ -128,8 +107,8 @@ test('revoked access clears previous rows and counts', async () => {
 
 test('Todo reader path cannot accidentally use the five-kind Work API', () => {
   const c=contextWithFunctions(['readPath']);
-  assert.equal(c.readPath({category:'todo',kind:'Todo',id:'daily:1'}),'/monitor/todos/v1/daily%3A1');
-  assert.equal(c.readPath({category:'work',kind:'Todo',id:'daily:1'}),null);
+  assert.equal(c.readPath({category:'todo',kind:'Todo',id:'daily:1'}),'/todos/v2/Todo/daily%3A1');
+  assert.equal(c.readPath({category:'work',kind:'Todo',id:'daily:1'}),'/todos/v2/Todo/daily%3A1');
 });
 
 function mounted({saved = {}, denyStorage = false} = {}) {
@@ -159,7 +138,7 @@ function mounted({saved = {}, denyStorage = false} = {}) {
   };
   doc.body = doc.createElement('body'); doc.documentElement = doc.createElement('html'); doc.body.focus();
   const root = doc.createElement('section'), elements = new Map(); doc.body.append(root);
-  for (const id of ['todo-items','todo-status','todo-updates','todo-retry','todo-previous','todo-next','todo-count-total','todo-page','todo-search','todo-source']) {
+  for (const id of ['todo-items','todo-status','todo-updates','todo-retry','todo-previous','todo-next','todo-count-total','todo-page','todo-kind','todo-search','todo-source']) {
     const node = doc.createElement(id === 'todo-items' ? 'ul' : id === 'todo-search' ? 'input' : /updates|retry|previous|next/.test(id) ? 'button' : 'span');
     node.id = id; elements.set(id, node); root.append(node);
   }
@@ -219,7 +198,7 @@ test('background changes update counts without moving focus outside the Todo lis
 });
 
 test('credential reset clears deferred private rows, counts and controls, aborts work, and preserves scoped saves', async () => {
-  const key = 'identity-one:todos', saved = JSON.stringify({version:3,q:'private search'});
+  const key = 'identity-one:todos', saved = JSON.stringify({version:4,q:'private search'});
   const f = mounted({saved:{[key]:saved}}); f.controller.setPreferenceKey(key); await f.load(); f.first().focus();
   await f.load(page([item('deferred')]));
   const pending = f.controller.refresh(); const request = f.requests.at(-1);
@@ -246,14 +225,14 @@ test('revoked access immediately clears a focused deferred list and every count'
 
 test('scoped saved filters apply before the first request and UI changes persist only that scope', async () => {
   const key = 'identity-one:todos', other = 'graph-preferences';
-  const f = mounted({saved:{[key]:JSON.stringify({version:3,q:'retained'}),[other]:'unchanged'}});
+  const f = mounted({saved:{[key]:JSON.stringify({version:4,q:'retained'}),[other]:'unchanged'}});
   f.controller.setPreferenceKey(key);
   await f.load(); const first = new URL(f.requests[0].path, 'https://localhost');
-  assert.equal(first.pathname, '/monitor/todos/v1'); assert.equal(first.searchParams.get('q'), 'retained');
+  assert.equal(first.pathname, '/todos/v2'); assert.equal(first.searchParams.get('q'), 'retained');
   assert.equal(first.searchParams.get('archived'), 'exclude');
   f.elements.get('todo-search').value = 'revised'; f.elements.get('todo-search').emit('input'); f.clock.expireAll();
   assert.equal(f.requests.length, 2); assert.match(f.requests[1].path, /q=revised/);
-  assert.deepEqual(JSON.parse(f.stored.get(key)), {version:3,q:'revised'});
+  assert.deepEqual(JSON.parse(f.stored.get(key)), {version:4,q:'revised',kind:''});
   f.requests[1].resolve(page([])); await flushPromises();
   assert.equal(f.stored.get(other), 'unchanged');
   assert.ok(f.writes.every(write => write.key === key));

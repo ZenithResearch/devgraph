@@ -37,12 +37,18 @@ class TodoQuery:
             raise ValueError("incomplete_todo_priority_cursor")
         if self.after_priority is not None:
             import re
-            if (self.order != "priority" or not isinstance(self.after_priority, str)
-                    or not re.fullmatch(r"-?(0|[1-9][0-9]{0,18})", self.after_priority)
-                    or not -(2**63) <= int(self.after_priority) < 2**63):
+
+            if (
+                self.order != "priority"
+                or not isinstance(self.after_priority, str)
+                or not re.fullmatch(r"-?(0|[1-9][0-9]{0,18})", self.after_priority)
+                or not -(2**63) <= int(self.after_priority) < 2**63
+            ):
                 raise ValueError("invalid_todo_priority_cursor")
-        if not isinstance(self.q, str) or len(self.q) > 200 or any(
-            ord(character) < 32 or ord(character) == 127 for character in self.q
+        if (
+            not isinstance(self.q, str)
+            or len(self.q) > 200
+            or any(ord(character) < 32 or ord(character) == 127 for character in self.q)
         ):
             raise ValueError("invalid_todo_search")
 
@@ -60,16 +66,15 @@ def exact_todo(node: NodeRecord) -> bool:
 
 
 def not_started(node):
-    from devgraph.workflow_contract import decode_state
+    from devgraph.progress import validate_progress
 
-    state = node.properties.get("workflow_json")
     try:
-        return not node.archived and (
-            decode_state(state).stage == "backlog"
-            if state else node.properties.get("status") == "draft"
+        value = validate_progress(
+            node.properties.get("progress"), node.properties.get("workflow_json")
         )
     except (ValueError, TypeError):
-        raise StorageUnavailable("invalid Todo workflow") from None
+        raise StorageUnavailable("invalid Todo workflow or progress") from None
+    return not node.archived and value == "not_started"
 
 
 def order_key(node, query):
@@ -84,29 +89,38 @@ def order_key(node, query):
 def after_cursor(node, query):
     if query.after_id is None:
         return True
-    cursor = ((-int(query.after_priority), query.after_id)
-              if query.order == "priority" else (query.after_id,))
+    cursor = (
+        (-int(query.after_priority), query.after_id)
+        if query.order == "priority"
+        else (query.after_id,)
+    )
     return order_key(node, query) > cursor
 
 
 def validate_todo_page(page: TodoPage, query: TodoQuery) -> TodoPage:
     expected = {"total", *STATUSES}
-    if set(page.counts) != expected or any(
-        type(value) is not int or value < 0 for value in page.counts.values()
-    ) or sum(page.counts[key] for key in STATUSES) != page.counts["total"]:
+    if (
+        set(page.counts) != expected
+        or any(type(value) is not int or value < 0 for value in page.counts.values())
+        or sum(page.counts[key] for key in STATUSES) != page.counts["total"]
+    ):
         raise StorageUnavailable("invalid Todo counts")
     if type(page.matching_count) is not int or page.matching_count < 0:
         raise StorageUnavailable("invalid Todo matching count")
     expected_count = page.counts[query.status] if query.status else page.counts["total"]
     if page.matching_count != expected_count:
         raise StorageUnavailable("invalid Todo matching count")
-    if (type(page.remaining_count) is not int or not 0 <= page.remaining_count <= expected_count
-            or (query.after_id is None and page.remaining_count != expected_count)
-            or len(page.nodes) != min(query.limit + 1, page.remaining_count)):
+    if (
+        type(page.remaining_count) is not int
+        or not 0 <= page.remaining_count <= expected_count
+        or (query.after_id is None and page.remaining_count != expected_count)
+        or len(page.nodes) != min(query.limit + 1, page.remaining_count)
+    ):
         raise StorageUnavailable("Todo page changed during read; retry")
     keys = [order_key(node, query) for node in page.nodes]
     if keys != sorted(set(keys)) or any(
-        not exact_todo(node) or not after_cursor(node, query)
+        not exact_todo(node)
+        or not after_cursor(node, query)
         or (query.queue == "not_started" and not not_started(node))
         or (query.status is not None and node.properties.get("status") != query.status)
         or (query.archived == "exclude" and node.archived)

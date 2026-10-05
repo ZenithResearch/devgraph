@@ -263,7 +263,6 @@ class AuthorizedWorkGraph:
         self._audit(context, CATEGORY_READ, "supporting_material")
         return result
 
-
     def work_document(
         self,
         credential: str | None,
@@ -303,7 +302,6 @@ class AuthorizedWorkGraph:
         self._audit(context, CATEGORY_READ, "work_document")
         return result
 
-
     def _supporting_reader(self) -> SupportingMaterialReader:
         if self._monitor_storage is None:
             raise RuntimeError("supporting material storage is not configured")
@@ -321,16 +319,20 @@ class AuthorizedWorkGraph:
         self._audit(context, CATEGORY_READ, "get_work_object")
         return work_object
 
-    def read_arenas(self, credential, *, arena_id=None, include_archived=False,
-                    after_id=None, limit=50):
+    def read_arenas(
+        self, credential, *, arena_id=None, include_archived=False, after_id=None, limit=50
+    ):
         context = self._authorize(credential, CATEGORY_READ)
         from devgraph.arenas import ArenaRepository
 
         if self._monitor_storage is None:
             raise RuntimeError("Arena storage is not configured")
         repository = ArenaRepository(self._monitor_storage)
-        result = repository.get(arena_id) if arena_id is not None else repository.list(
-            include_archived=include_archived, after_id=after_id, limit=limit)
+        result = (
+            repository.get(arena_id)
+            if arena_id is not None
+            else repository.list(include_archived=include_archived, after_id=after_id, limit=limit)
+        )
         self._audit(context, CATEGORY_READ, "read_arenas")
         return result
 
@@ -341,7 +343,8 @@ class AuthorizedWorkGraph:
         if self._monitor_storage is None:
             raise RuntimeError("Arena storage is not configured")
         result = ArenaRepository(self._monitor_storage).members(
-            arena_id, after_resource=after_resource, limit=limit)
+            arena_id, after_resource=after_resource, limit=limit
+        )
         self._audit(context, CATEGORY_READ, "arena_members")
         return result
 
@@ -520,11 +523,11 @@ class AuthorizedWorkGraph:
         self._audit(context, CATEGORY_READ, "monitor_topology")
         return result
 
-    def kanban(self, credential: str | None, query: str) -> dict:
+    def kanban(self, credential: str | None, query: str, *, version=1) -> dict:
         from devgraph.kanban import BoardFilter, build_board
 
         context = self._authorize(credential, CATEGORY_READ)
-        result = build_board(self._monitor_storage, BoardFilter.parse(query))
+        result = build_board(self._monitor_storage, BoardFilter.parse(query), version=version)
         self._audit(context, CATEGORY_READ, "kanban")
         return result
 
@@ -535,10 +538,39 @@ class AuthorizedWorkGraph:
         from devgraph.workflows import Workflows
 
         context = self._authorize(credential, CATEGORY_READ)
-        result = catalog() if kind is None else Workflows(self._monitor_storage).detail(
-            WorkObjectRepository(self._monitor_storage).get_by_id(kind, work_id))
+        result = (
+            catalog()
+            if kind is None
+            else Workflows(self._monitor_storage).detail(
+                WorkObjectRepository(self._monitor_storage).get_by_id(kind, work_id)
+            )
+        )
         self._audit(context, CATEGORY_READ, "workflows")
         return redact_mapping(result)
+
+    def progress_report(self, credential):
+        from devgraph.todo_views import classification_report
+
+        context = self._authorize(credential, CATEGORY_READ)
+        if self._monitor_storage is None:
+            raise ValueError("monitor storage is not configured")
+        result = classification_report(self._monitor_storage)
+        self._audit(context, CATEGORY_READ, "progress_report")
+        return result
+
+    def todos_v2(self, credential, query="", *, kind=None, work_id=None):
+        from devgraph.todo_views import TodoFilters, todo_detail, todo_page
+
+        context = self._authorize(credential, CATEGORY_READ)
+        if self._monitor_storage is None:
+            raise ValueError("monitor storage is not configured")
+        result = (
+            todo_detail(self._monitor_storage, kind, work_id)
+            if kind
+            else todo_page(self._monitor_storage, TodoFilters.parse(query))
+        )
+        self._audit(context, CATEGORY_READ, "todos_v2")
+        return result
 
     def monitor_todos(self, credential: str | None, query: str) -> dict:
         from devgraph.todos import build_todos, parse_todo_query

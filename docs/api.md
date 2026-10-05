@@ -1,5 +1,10 @@
 # HTTP API reference
 
+Canonical Todo progress, independent archive and v2 reads/writes are described in
+[Todo progress v2](todo-progress-v2.md). Legacy lifecycle/status descriptions below
+remain the v1 compatibility contract; they do not determine canonical progress.
+
+
 The API is created by `devgraph.api.create_app(ApiServices(...))`. The app
 factory remains an injected composition boundary rather than a deployment
 launcher. The package separately includes a loopback-only macOS local-host

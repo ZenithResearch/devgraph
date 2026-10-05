@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import replace
 
-from devgraph.model.base import WorkStatus, utc_now
+from devgraph.model.base import utc_now
 from devgraph.model.external_links import ExternalLink
 from devgraph.model.repository import (
     InvalidStatusTransitionError,
@@ -14,6 +14,7 @@ from devgraph.model.repository import (
     WorkObjectRepository,
 )
 from devgraph.model.work import Decision, Handoff, ReviewPacket
+from devgraph.progress import Progress, stage_progress
 from devgraph.storage.base import StorageUnavailable
 from devgraph.workflow_contract import (
     COMPLETION_GATES,
@@ -179,22 +180,19 @@ class Workflows:
             {r.subject for r in ledger.requirements if r.outcome == "excluded"} if ledger else set()
         )
         for child in self.children(work):
-            child_state = decode_state(child.workflow_json) if child.workflow_json else None
-            if (
-                child_state is None or child_state.stage != "done"
-            ) and f"{child.kind}/{child.id}" not in exclusions:
+            if child.progress != Progress.DONE and f"{child.kind}/{child.id}" not in exclusions:
                 gaps.append("Complete child work or record its explicit scope exclusion.")
                 break
         for edge in self.related("BLOCKS", work, incoming=True):
             blocker = self.work(edge.from_label, edge.from_id)
-            if not blocker.workflow_json or decode_state(blocker.workflow_json).stage != "done":
+            if blocker.progress != Progress.DONE:
                 gaps.append("Resolve blocking work before completing this item.")
                 break
         return gaps
 
     def gaps(self, work, state, target):
         gaps = []
-        if work.status == WorkStatus.ARCHIVED:
+        if work.archived:
             return ["Archived work cannot move."]
         if target == "blocked_waiting_input":
             return []
@@ -217,23 +215,32 @@ class Workflows:
                 gaps.append(f"Record current {phase.replace('_', ' ')} approval and evidence.")
         if target in COMPLETION_GATES:
             gaps.extend(self.completion_gaps(work, state))
-        if target == "done" and work.kind == "Proposal":
-            provenance = [
-                e
-                for e in self.edges("ACCEPTED_BY_DECISION")
-                if (e.from_label, e.from_id) == (work.kind, work.id)
-            ]
-            if work.status != WorkStatus.ACCEPTED or len(provenance) != 1:
-                gaps.append(
-                    "Accept this proposal with Decision provenance before closing its handoff."
-                )
+        if target == "done" and work.kind == "Proposal" and self.disposition(work) is None:
+            gaps.append("Record the proposal disposition with valid Decision provenance.")
         return list(dict.fromkeys(gaps))
+
+    def disposition(self, work):
+        found = []
+        for relation, value in (
+            ("ACCEPTED_BY_DECISION", "accepted"),
+            ("REJECTED_BY_DECISION", "rejected"),
+        ):
+            for edge in self.related(relation, work):
+                node = self.node("Decision", edge.to_id) if edge.to_label == "Decision" else None
+                if node is None or node.archived:
+                    return None
+                try:
+                    self.repository._from_node(node)
+                except (ValueError, TypeError):
+                    return None
+                found.append(value)
+        return found[0] if len(found) == 1 else None
 
     def transitions(self, work):
         if not work.workflow_json:
             return []
         state = decode_state(work.workflow_json)
-        if state.stage == "done" or work.status == WorkStatus.ARCHIVED:
+        if state.stage == "done" or (work.archived):
             return []
         if state.stage == "blocked_waiting_input":
             targets = [state.resume_stage]
@@ -255,14 +262,20 @@ class Workflows:
 
     def _save(self, work, state):
         updated = replace(
-            work, workflow_json=encode_state(state), updated_at=utc_now(), version=work.version + 1
+            work,
+            workflow_json=encode_state(state),
+            progress=stage_progress(state.workflow_id, state.stage),
+            updated_at=utc_now(),
+            version=work.version + 1,
         )
         self.storage.update_node(work.kind, work.id, updated.to_node_properties())
         return updated
 
     def execute(self, work, operation, payload):
-        if work.status == WorkStatus.ARCHIVED:
+        if work.archived:
             raise WorkflowConflict("Archived work cannot change workflow.")
+        if work.kind == "Todo":
+            raise WorkflowConflict("Base Todos use shared progress without a detailed workflow.")
         if operation == "workflow.assign":
             if work.workflow_json is not None:
                 raise WorkflowConflict("Workflow is already assigned; moves do not reassign it.")
@@ -271,6 +284,11 @@ class Workflows:
                 raise WorkflowConflict(
                     "Classify into Backlog or Planning, then record the required gates."
                 )
+            if (
+                work.progress in (Progress.IN_PROGRESS, Progress.DONE)
+                and payload["stage"] == "backlog"
+            ):
+                raise WorkflowConflict("Started work cannot be classified as Not started.")
             state = WorkflowState(workflow_id=payload["workflow_id"], stage=payload["stage"])
             return self._save(work, state)
         if work.workflow_json is None:
@@ -372,23 +390,23 @@ class Workflows:
     def detail(self, work):
         state = decode_state(work.workflow_json) if work.workflow_json else None
         children = self.children(work)
-        done = sum(
-            bool(c.workflow_json and decode_state(c.workflow_json).stage == "done")
-            for c in children
-        )
+        done = sum(c.progress == Progress.DONE for c in children)
         requirements = self.requirements(work)
-        unfinished = [c for c in children if not c.workflow_json or
-                      decode_state(c.workflow_json).stage != "done"]
+        unfinished = [c for c in children if c.progress != Progress.DONE]
         return {
             "schema": "devgraph.work-workflow.v1",
             "kind": work.kind,
             "id": work.id,
             "version": str(work.version),
+            "progress": work.progress,
+            "archived": work.archived,
             "workflow": state.model_dump() if state else None,
-            "default_workflow": default_workflow(work.kind),
+            "default_workflow": None if work.kind == "Todo" else default_workflow(work.kind),
             "transitions": self.transitions(work),
             "child_progress": {"done": done, "total": len(children)},
-            "completion_gaps": self.completion_gaps(work, state) if state else ["Stage not set"],
+            "completion_gaps": self.completion_gaps(work, state)
+            if state
+            else ([] if work.kind == "Todo" else ["Stage not set"]),
             "requirement_subjects": [
                 {
                     "subject": f"{kind}/{identifier}",

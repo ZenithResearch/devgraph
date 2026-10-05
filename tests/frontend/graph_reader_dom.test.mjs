@@ -8,7 +8,7 @@ function readerTree() {
   const node = { key: 'Task:read-plan', id: 'read-plan', kind: 'Task', category: 'work', title: 'Read plan', status: 'draft' };
   const c = contextWithFunctions([
     'safeSourceUrl', 'readPath', 'readerButton', 'readerSection', 'appendSource',
-    'reconcileChildren', 'renderGraphSelection', 'documentStateMessage', 'relationshipLabel',
+    'reconcileChildren', 'progressLabel','renderGraphSelection', 'documentStateMessage', 'relationshipLabel',
   ], {
     URL, document,
     state: { snapshot: { graph_nodes: [node], graph_edges: [] }, selectedGraphKey: node.key },

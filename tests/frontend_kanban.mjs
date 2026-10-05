@@ -6,9 +6,9 @@ const raw=request({kind:'Task',id:'test-one',version:'7'},'workflow.transition',
 const key='stable-recovery-key-1234';
 function provider({deny=false,lost=false,malformed=false}={}) {
  const calls=[];
- const body=JSON.stringify({work:{kind:'Task',id:'test-one'},receipt:{receipt_id:'receipt-1',operation:'devgraph.work.workflow.transition.v1',subject_label:'Task',subject_id:malformed?'other':'test-one',duplicate:false}});
+ const body=JSON.stringify({work:{kind:'Task',id:'test-one'},receipt:{receipt_id:'receipt-1',operation:'devgraph.work.workflow.transition.v2',subject_label:'Task',subject_id:malformed?'other':'test-one',duplicate:false}});
  return {calls,async devgraph(m){calls.push(m);switch(m.action){
- case 'connect':return {connection_id:'c',actor_id:'actor',receiver_profile:'profile',capabilities:['read','work.v1','workflow.v1']};
+ case 'connect':return {connection_id:'c',actor_id:'actor',receiver_profile:'profile',capabilities:['read','work.v1','workflow.v1','progress.v1']};
  case 'authorize':if(deny)throw Object.assign(Error('Cancelled'),{dispatched:false});return {authorization_id:'a'};
  case 'execute':if(lost)throw Error('Port lost');return {stream_id:'s',status:200,content_type:'application/json',content_encoding:'identity',limit:8192,dispatched:true};
  case 'pull':return {stream_id:'s',seq:0,total:Buffer.byteLength(body),chunk_b64:Buffer.from(body).toString('base64url'),done:true};
@@ -45,6 +45,6 @@ test('lost execution and unmatched receipt remain uncertain; no automatic retry'
 });
 test('old native bridge remains read-only and is disposed',async()=>{
  const calls=[];const wallet=new Wallet({devgraph:async m=>{calls.push(m.action);return {connection_id:'old',capabilities:['read','work.v1']}}});
- await assert.rejects(wallet.connect(),/needs the Kanban workflow update/);
+ await assert.rejects(wallet.connect(),/needs the Todo progress update/);
  assert.equal(wallet.connection,null);assert.deepEqual(calls,['connect','dispose']);
 });

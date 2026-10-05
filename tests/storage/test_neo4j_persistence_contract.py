@@ -55,9 +55,7 @@ def _canonical_row(*, labels: list[str] | None = None, archived: object = False)
 
 
 @pytest.mark.parametrize("kind, work_class", WORK_OBJECT_TYPES.items())
-def test_all_work_kinds_hydrate_identically_in_memory_and_simulated_neo4j(
-    kind, work_class
-) -> None:
+def test_all_work_kinds_hydrate_identically_in_memory_and_simulated_neo4j(kind, work_class) -> None:
     work_object = work_class(
         id=f"{kind.lower()}-1",
         title=f"Canonical {kind}",
@@ -117,16 +115,14 @@ def test_proposal_lifecycle_rehydration_preserves_creation_identity() -> None:
 
 def test_proposal_lifecycle_rehydration_rejects_nonproposal_and_archive_mismatch() -> None:
     proposal = Proposal(id="proposal-1", title="Strict")
-    properties = proposal.to_node_properties()
+    properties = {
+        k: v for k, v in proposal.to_node_properties().items() if not k.startswith("progress")
+    }
 
     with pytest.raises(ProposalLifecycleError):
-        ProposalLifecycle._proposal_from_node(
-            NodeRecord("Task", proposal.id, properties, False)
-        )
+        ProposalLifecycle._proposal_from_node(NodeRecord("Task", proposal.id, properties, False))
     with pytest.raises(ProposalLifecycleError):
-        ProposalLifecycle._proposal_from_node(
-            NodeRecord("Proposal", proposal.id, properties, True)
-        )
+        ProposalLifecycle._proposal_from_node(NodeRecord("Proposal", proposal.id, properties, True))
 
 
 def test_proposal_lifecycle_rejects_initially_accepted_proposal() -> None:
@@ -174,9 +170,7 @@ def test_generic_node_operations_preserve_safe_protocol_substitutability() -> No
     create_parameters = calls[-1][1]
     persisted_properties = cast(dict[str, object], create_parameters["properties"])
     assert create_parameters["node_id"] == "event-receipt-1"
-    assert set(persisted_properties) == set(properties) | {
-        "__devgraph_generic_encoding"
-    }
+    assert set(persisted_properties) == set(properties) | {"__devgraph_generic_encoding"}
     assert persisted_properties["__devgraph_generic_encoding"] == "json-v1"
     assert all(isinstance(value, str) for value in persisted_properties.values())
 
@@ -185,9 +179,7 @@ def test_generic_node_operations_preserve_safe_protocol_substitutability() -> No
     )
 
     encoded_properties = Neo4jGraphStorage._generic_properties(properties)
-    storage, _ = _storage_with_rows(
-        [_generic_row(properties=encoded_properties)]
-    )
+    storage, _ = _storage_with_rows([_generic_row(properties=encoded_properties)])
     assert storage.get_node("EventReceipt", "event-receipt-1") == NodeRecord(
         "EventReceipt", "event-receipt-1", properties, False
     )
@@ -198,15 +190,12 @@ def test_generic_node_operations_preserve_safe_protocol_substitutability() -> No
         "kind": "delivery",
         "redacted_summary": {"safe": 2, "nested": {"value": False}},
     }
-    storage, calls = _storage_with_rows(
-        [_generic_row(properties=updated_properties)]
+    storage, calls = _storage_with_rows([_generic_row(properties=updated_properties)])
+    assert (
+        storage.update_node("EventReceipt", "event-receipt-1", updated_properties).properties
+        == updated_properties
     )
-    assert storage.update_node(
-        "EventReceipt", "event-receipt-1", updated_properties
-    ).properties == updated_properties
-    updated_persisted = cast(
-        dict[str, object], calls[-1][1]["replacement_properties"]
-    )
+    updated_persisted = cast(dict[str, object], calls[-1][1]["replacement_properties"])
     assert set(updated_persisted) == set(updated_properties) | {
         "id",
         "archived",
@@ -215,9 +204,7 @@ def test_generic_node_operations_preserve_safe_protocol_substitutability() -> No
     assert updated_persisted["id"] == "event-receipt-1"
     assert updated_persisted["archived"] is False
     assert updated_persisted["__devgraph_generic_encoding"] == "json-v1"
-    assert all(
-        isinstance(updated_persisted[key], str) for key in updated_properties
-    )
+    assert all(isinstance(updated_persisted[key], str) for key in updated_properties)
     assert "n.kind IS NULL" not in calls[-1][0]
 
     storage, calls = _storage_with_rows(
@@ -232,9 +219,7 @@ def test_generic_create_rejects_existing_identity_without_mutation() -> None:
     storage, calls = _storage_with_rows([])
 
     with pytest.raises(KeyError, match="already exists"):
-        storage.create_node(
-            "EventReceipt", "event-receipt-1", {"state": "pending"}
-        )
+        storage.create_node("EventReceipt", "event-receipt-1", {"state": "pending"})
 
     assert "MERGE (n:`EventReceipt`" in calls[-1][0]
     assert "ON CREATE SET" in calls[-1][0]
@@ -282,9 +267,7 @@ def test_event_receipt_claim_rejects_mismatched_digest_before_storage() -> None:
 
 
 def test_legacy_generic_sentinel_string_is_not_decoded_without_node_marker() -> None:
-    properties: dict[str, object] = {
-        "message": '__devgraph_generic_json_v1__:{"legacy":true}'
-    }
+    properties: dict[str, object] = {"message": '__devgraph_generic_json_v1__:{"legacy":true}'}
     storage, _ = _storage_with_rows([_generic_row(properties=properties)])
 
     record = storage.get_node("EventReceipt", "event-receipt-1")
@@ -304,9 +287,7 @@ def test_legacy_generic_update_atomically_converts_all_properties() -> None:
         [_generic_row(properties=encoded)],
     )
 
-    record = storage.update_node(
-        "EventReceipt", "event-receipt-1", {"state": "retry-scheduled"}
-    )
+    record = storage.update_node("EventReceipt", "event-receipt-1", {"state": "retry-scheduled"})
 
     assert record.properties == merged
     assert len(calls) == 2
@@ -330,9 +311,7 @@ def test_legacy_generic_archive_with_properties_atomically_converts_all_properti
         [_generic_row(archived=True, properties=encoded)],
     )
 
-    record = storage.archive_node(
-        "EventReceipt", "event-receipt-1", {"state": "failed"}
-    )
+    record = storage.archive_node("EventReceipt", "event-receipt-1", {"state": "failed"})
 
     assert record.archived is True
     assert record.properties == merged
@@ -343,9 +322,7 @@ def test_legacy_generic_archive_with_properties_atomically_converts_all_properti
 def test_health_does_not_expose_raw_driver_exception() -> None:
     class UnavailableDriver:
         def verify_connectivity(self) -> None:
-            raise neo4j_module.ServiceUnavailable(
-                "bolt://internal.example?credential=raw-secret"
-            )
+            raise neo4j_module.ServiceUnavailable("bolt://internal.example?credential=raw-secret")
 
     storage = object.__new__(Neo4jGraphStorage)
     cast(Any, storage)._driver = UnavailableDriver()
@@ -370,9 +347,7 @@ def test_generic_partial_payload_under_work_label_remains_generic() -> None:
         "title": "legacy todo",
         "status": "done",
     }
-    updated_row = _generic_row(
-        label="Todo", node_id="todo-1", properties=updated_properties
-    )
+    updated_row = _generic_row(label="Todo", node_id="todo-1", properties=updated_properties)
     storage, calls = _storage_with_rows([updated_row])
     updated = storage.update_node("Todo", "todo-1", updated_properties)
     assert updated.properties == updated_properties
@@ -408,9 +383,12 @@ def test_generic_query_and_edges_accept_safe_non_work_labels() -> None:
         "properties": {},
     }
     storage, _ = _storage_with_rows([edge_row])
-    assert storage.create_edge(
-        "Task", "task-1", "EMITTED_EVENT", "EventReceipt", "event-receipt-1"
-    ).to_label == "EventReceipt"
+    assert (
+        storage.create_edge(
+            "Task", "task-1", "EMITTED_EVENT", "EventReceipt", "event-receipt-1"
+        ).to_label
+        == "EventReceipt"
+    )
 
 
 @pytest.mark.parametrize("label", ["eventReceipt", "Event Receipt", "EventReceipt` MATCH (n)"])
@@ -438,7 +416,7 @@ def test_legacy_work_update_then_archive_sequence_remains_supported() -> None:
     storage, calls = _storage_with_rows([archived_row])
 
     assert storage.update_node("Task", task.id, archived.to_node_properties()).archived is True
-    assert "n.archived = true" in calls[-1][0]
+    assert "THEN true ELSE n.archived END" in calls[-1][0]
 
     assert storage.archive_node("Task", task.id).archived is True
     assert "n.archived = false" not in calls[-1][0]
@@ -597,7 +575,7 @@ def test_get_rejects_kind_label_id_and_archive_mismatch() -> None:
         _canonical_row(labels=["Issue"]),
         {**_canonical_row(), "id": "other"},
         _canonical_row(archived="false"),
-        _canonical_row(archived=True),
+        _canonical_row(archived="invalid"),
     ]
     for row in cases:
         storage, _ = _storage_with_rows([row])
@@ -609,9 +587,10 @@ def test_get_rejects_kind_label_id_and_archive_mismatch() -> None:
 def test_query_uses_bounded_parameterized_id_keyset(limit: int) -> None:
     storage, calls = _storage_with_rows([])
 
-    assert storage.query(
-        label="Task", archived=False, descending=True, after_id="task-9", limit=limit
-    ) == []
+    assert (
+        storage.query(label="Task", archived=False, descending=True, after_id="task-9", limit=limit)
+        == []
+    )
     query, parameters = calls[0]
     assert "task-9" not in query
     assert "$after_id" in query
@@ -940,16 +919,12 @@ def test_v23_preflight_backfills_legacy_archive_and_journals_last_atomically() -
 
 
 def test_v23_zero_journal_result_rolls_back_backfills() -> None:
-    storage = TransactionalMigrationStorage(
-        [_legacy_task_row(status="draft")], journal_applied=0
-    )
+    storage = TransactionalMigrationStorage([_legacy_task_row(status="draft")], journal_applied=0)
     migration = load_manifest(ROOT / "migrations/manifest.json").migrations[22]
     store = Neo4jMigrationStore(cast(Neo4jGraphStorage, storage))
 
     with pytest.raises(StorageUnavailable, match="journal marker failed"):
-        store.apply_transactional_data(
-            migration, "attempt-v23", "2026-01-01T00:00:00+00:00"
-        )
+        store.apply_transactional_data(migration, "attempt-v23", "2026-01-01T00:00:00+00:00")
 
     assert storage.writes == []
 
@@ -973,9 +948,7 @@ def test_v23_preflight_missing_kind_rolls_back_without_backfill_or_journal() -> 
     store = Neo4jMigrationStore(cast(Neo4jGraphStorage, storage))
 
     with pytest.raises(StorageUnavailable, match="canonical persistence preflight failed"):
-        store.apply_transactional_data(
-            migration, "attempt-v23", "2026-01-01T00:00:00+00:00"
-        )
+        store.apply_transactional_data(migration, "attempt-v23", "2026-01-01T00:00:00+00:00")
     assert storage.writes == []
 
 
@@ -988,8 +961,7 @@ def test_repository_round_trip_over_simulated_neo4j_row() -> None:
     assert loaded.title == "Canonical"
     assert loaded.priority == 3
     assert loaded.to_node_properties() == {
-        key: value
-        for key, value in storage.get_node("Task", "task-1").properties.items()
+        key: value for key, value in storage.get_node("Task", "task-1").properties.items()
     }
 
 
@@ -1009,8 +981,9 @@ def test_topology_materialization_retries_concurrent_change_and_has_finite_query
         unstable.monitor_records()
 
 
-@pytest.mark.parametrize("metadata", [None,
-    '{"schema_version":1,"workflow_id":"execution.v1","stage":"backlog"}'])
+@pytest.mark.parametrize(
+    "metadata", [None, '{"schema_version":1,"workflow_id":"execution.v1","stage":"backlog"}']
+)
 def test_v27_admits_metadata_without_backfilling_any_work(metadata):
     row = _legacy_task_row(status="draft")
     row["properties"]["archived"] = False
@@ -1033,5 +1006,68 @@ def test_v27_rejects_malformed_workflow_without_any_writes():
     migration = load_manifest(ROOT / "migrations/manifest.json").migrations[26]
     with pytest.raises(StorageUnavailable):
         Neo4jMigrationStore(cast(Neo4jGraphStorage, storage)).apply_transactional_data(
-            migration, "attempt-v27", "2026-10-03T00:00:00+00:00")
+            migration, "attempt-v27", "2026-10-03T00:00:00+00:00"
+        )
     assert storage.writes == []
+
+
+class ProgressMigrationStorage(TransactionalMigrationStorage):
+    def __init__(self, rows, *, conflict=False, journal_applied=1):
+        super().__init__(rows, journal_applied=journal_applied)
+        self.conflict = conflict
+
+    def list_edges(self, relationship, *, limit):
+        return []
+
+    def _run_graph(self, query, **parameters):
+        if "SET n.progress_schema = 1" in query:
+            assert "WHERE n.version = $expected_version" in query
+            if self.conflict:
+                return [{"changed": 0}]
+            self.writes.append(("progress", parameters))
+            return [{"changed": 1}]
+        return super()._run_graph(query, **parameters)
+
+
+def test_v28_reports_contradiction_preserves_archive_history_and_journals_atomically():
+    row = _canonical_row()
+    row["properties"].update(progress="done", status="accepted", archived=True)
+    storage = ProgressMigrationStorage([row])
+    migration = load_manifest(ROOT / "migrations/manifest.json").migrations[27]
+    assert Neo4jMigrationStore(storage).apply_transactional_data(
+        migration, "a", "2026-10-05T00:00:00+00:00"
+    )
+    assert [x[0] for x in storage.writes] == ["progress", "journal"]
+    params = storage.writes[0][1]
+    assert params["progress"] is None and params["archived"] is True
+    import json
+
+    history = json.loads(params["history"])
+    assert history["source"]["progress"] == "done" and history["reasons"]
+
+
+@pytest.mark.parametrize("conflict,journal", [(True, 1), (False, 0)])
+def test_v28_version_or_journal_conflict_rolls_back_every_progress_write(conflict, journal):
+    storage = ProgressMigrationStorage(
+        [_canonical_row()], conflict=conflict, journal_applied=journal
+    )
+    migration = load_manifest(ROOT / "migrations/manifest.json").migrations[27]
+    with pytest.raises(StorageUnavailable):
+        Neo4jMigrationStore(storage).apply_transactional_data(
+            migration, "a", "2026-10-05T00:00:00+00:00"
+        )
+    assert storage.writes == []
+
+
+def test_neo4j_restored_legacy_status_is_not_a_new_archive_transition():
+    row = _canonical_row()
+    row["properties"].update(status="archived", version=3)
+    storage, calls = _storage_with_rows([row])
+    storage.update_node(
+        "Task",
+        "task-1",
+        {k: v for k, v in row["properties"].items() if k not in {"id", "archived"}},
+    )
+    query, _ = calls[0]
+    assert "WITH n, n.status AS previous_status" in query
+    assert "CASE WHEN previous_status <> 'archived' THEN true ELSE n.archived END" in query

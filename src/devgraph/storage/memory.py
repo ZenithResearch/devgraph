@@ -87,9 +87,11 @@ class MemoryGraphStorage:
             node = self._nodes.get(key)
             if node is None:
                 raise StorageUnavailable("missing containment target")
-            result.append(WorkContainment(
-                node, tuple(incoming[key]["HAS_CHILD"]), tuple(incoming[key]["CONTAINS_WORK"])
-            ))
+            result.append(
+                WorkContainment(
+                    node, tuple(incoming[key]["HAS_CHILD"]), tuple(incoming[key]["CONTAINS_WORK"])
+                )
+            )
         return result
 
     def work_containment(self, label: str, node_id: str) -> WorkContainment | None:
@@ -104,12 +106,15 @@ class MemoryGraphStorage:
         validate_arena_page(arena_id, after_resource, limit)
         with self._transaction_lock:
             # Select unique targets; their incoming duplicate edges remain visible above.
-            keys = sorted({
-                (edge.to_label, edge.to_id) for edge in self._edges
-                if (edge.from_label, edge.from_id, edge.relationship)
-                == ("Arena", arena_id, "CONTAINS_WORK")
-                and (after_resource is None or f"{edge.to_label}/{edge.to_id}" > after_resource)
-            })[:limit]
+            keys = sorted(
+                {
+                    (edge.to_label, edge.to_id)
+                    for edge in self._edges
+                    if (edge.from_label, edge.from_id, edge.relationship)
+                    == ("Arena", arena_id, "CONTAINS_WORK")
+                    and (after_resource is None or f"{edge.to_label}/{edge.to_id}" > after_resource)
+                }
+            )[:limit]
             return self._work_containment(keys)
 
     def update_node(self, label: str, node_id: str, properties: dict[str, Any]) -> NodeRecord:
@@ -118,7 +123,13 @@ class MemoryGraphStorage:
         canonical = self._is_canonical_payload(
             label, existing.properties
         ) or self._is_canonical_payload(label, properties)
-        if canonical and (existing.archived or existing.properties.get("status") == "archived"):
+        if canonical and (
+            existing.archived
+            or (
+                existing.properties.get("status") == "archived"
+                and not existing.properties.get("progress_schema")
+            )
+        ):
             raise KeyError(f"archived {label}: {node_id}")
         node_properties = properties
         if canonical:
@@ -134,7 +145,9 @@ class MemoryGraphStorage:
                     label,
                     node_id,
                     properties,
-                    archived=properties.get("status") == "archived",
+                    archived=existing.archived
+                    if properties.get("progress_schema")
+                    else properties.get("status") == "archived",
                 )
             except (TypeError, ValueError) as exc:
                 raise StorageUnavailable("malformed canonical work object") from exc
@@ -148,7 +161,12 @@ class MemoryGraphStorage:
             id=existing.id,
             properties={**existing.properties, **node_properties},
             archived=(
-                existing.archived or (canonical and node_properties.get("status") == "archived")
+                existing.archived
+                or (
+                    canonical
+                    and node_properties.get("status") == "archived"
+                    and existing.properties.get("status") != "archived"
+                )
             ),
         )
         self._nodes[(label, node_id)] = updated
@@ -166,12 +184,14 @@ class MemoryGraphStorage:
             label, existing.properties
         ) or self._is_canonical_payload(label, properties)
         if canonical_payload and existing.archived:
-            if properties is None and existing.properties.get("status") == "archived":
+            if properties is None:
                 return existing
             raise KeyError(f"already archived {label}: {node_id}")
         if not canonical_payload:
             archived_properties = {**existing.properties, **(properties or {})}
         elif properties is None:
+            if existing.properties.get("status") != "archived":
+                raise StorageUnavailable("malformed canonical work object")
             try:
                 validate_canonical_work_object_properties(
                     label,
@@ -200,7 +220,7 @@ class MemoryGraphStorage:
                 or new_version != current_version + 1
                 or canonical.get("created_at") != existing.properties.get("created_at")
                 or canonical.get("kind") != label
-                or canonical.get("status") != "archived"
+                or (not canonical.get("progress_schema") and canonical.get("status") != "archived")
             ):
                 raise KeyError(f"missing, stale, or inconsistent {label}: {node_id}")
             archived_properties = dict(canonical)
@@ -212,6 +232,22 @@ class MemoryGraphStorage:
         )
         self._nodes[(label, node_id)] = archived
         return archived
+
+    def restore_node(self, label, node_id, properties):
+        existing = self._require_node(label, node_id)
+        canonical = validate_canonical_work_object_properties(
+            label, node_id, properties, archived=False
+        )
+        if (
+            not existing.archived
+            or canonical.get("progress_schema") != 1
+            or canonical["version"] != existing.properties["version"] + 1
+            or canonical["created_at"] != existing.properties["created_at"]
+        ):
+            raise KeyError("missing, stale, or inconsistent restore")
+        node = NodeRecord(label, node_id, {**existing.properties, **canonical}, archived=False)
+        self._nodes[(label, node_id)] = node
+        return node
 
     def create_edge(
         self,
@@ -325,7 +361,6 @@ class MemoryGraphStorage:
                 for (kind, item_id), via in sorted(paths.items())[:limit]
             ]
 
-
     def supporting_material_nodes(self, keys: list[tuple[str, str]]) -> list[NodeRecord]:
         validate_supporting_keys(keys)
         with self.transaction():
@@ -351,13 +386,15 @@ class MemoryGraphStorage:
         with self._transaction_lock:
             nodes = [n for n in self._nodes.values() if n.label in PUBLIC_LABELS]
             nodes.sort(key=lambda n: (n.label, n.id))
-            nodes = deepcopy(nodes[:SOURCE_NODE_LIMIT + 1])
+            nodes = deepcopy(nodes[: SOURCE_NODE_LIMIT + 1])
             keys = {(n.label, n.id) for n in nodes}
-            edges = [e for e in self._edges if (e.from_label, e.from_id) in keys
-                     and (e.to_label, e.to_id) in keys]
-            edges.sort(key=lambda e: (e.from_label, e.from_id, e.relationship,
-                                      e.to_label, e.to_id))
-            return nodes, deepcopy(edges[:SOURCE_EDGE_LIMIT + 1])
+            edges = [
+                e
+                for e in self._edges
+                if (e.from_label, e.from_id) in keys and (e.to_label, e.to_id) in keys
+            ]
+            edges.sort(key=lambda e: (e.from_label, e.from_id, e.relationship, e.to_label, e.to_id))
+            return nodes, deepcopy(edges[: SOURCE_EDGE_LIMIT + 1])
 
     def list_edges(
         self, relationship: str | None = None, *, limit: int | None = None

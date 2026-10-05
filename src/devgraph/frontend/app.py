@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Dependency-free official DevGraph operator frontend."""
 
-FRONTEND_HTML = r'''<!doctype html>
+FRONTEND_HTML = r"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -307,8 +307,8 @@ FRONTEND_HTML = r'''<!doctype html>
       <section class="daily-check-in" id="daily-check-in" aria-labelledby="todo-title">
         <article class="card todo-panel">
           <header class="todo-heading"><div><h1 id="todo-title">Todo</h1><p>Not started · highest priority first</p></div><div class="todo-total"><span>At a glance</span><strong id="todo-count-total">—</strong><span>to start</span></div></header>
-          <div class="todo-tools"><label><span class="sr-only">Find work to start</span><input id="todo-search" type="search" maxlength="200" placeholder="Find work to start" autocomplete="off"></label></div>
-          <p class="todo-scope-note" id="todo-source">Base Todos · not started. Older Draft records count as not started.</p>
+          <div class="todo-tools"><label><span class="sr-only">Find work to start</span><input id="todo-search" type="search" maxlength="200" placeholder="Find work to start" autocomplete="off"></label><label><span class="sr-only">Todo type</span><select id="todo-kind"><option value="">All types</option><option>Todo</option><option>Proposal</option><option>Initiative</option><option>Project</option><option>Issue</option><option>Task</option></select></label></div>
+          <p class="todo-scope-note" id="todo-source">All Todo types · Not started · not archived. Unclassified records are excluded.</p>
           <ul id="todo-items" class="todo-items"></ul>
           <footer class="todo-footer"><span id="todo-page">6 items per page</span><div class="todo-pagination"><button class="graph-control" id="todo-previous" type="button" disabled>Previous</button><button class="graph-control" id="todo-next" type="button" disabled>Next</button></div></footer>
           <div class="todo-update-line"><p id="todo-status" role="status" aria-live="polite">Connect to load work waiting to start.</p><button class="graph-control" id="todo-retry" type="button" hidden>Retry</button><button class="graph-control" id="todo-updates" type="button" hidden>Show updates</button></div>
@@ -372,7 +372,7 @@ FRONTEND_HTML = r'''<!doctype html>
     const detailState = { node: null, data: null, error: null, loading: false, serial: 0, controller: null, promise: null, relations: new Map(), support: null, supportLoading: false, supportError: null, documents: new Map(), rendered: null, resourcesSerial: 0, credential: '' };
     const graphView = { ...Topology.defaultCamera, zoom: 1, panX: 0, panY: 0, width: 1080, height: 420, fitted: false, expanded: false, pointers: new Map(), pinch: null, orbit: false, frame: null, lastFrame: 0, drag: null, nodes: [], edges: [], nodePositions: new Map(), nodeVelocities: new Map(), edgeStrengths: new Map(), repulsionStrength: 1.5, pinnedKey: null, visibleCategories: new Set(['arena', 'work']), arenaKey: '', arenaNodes: [], neighborhood: null, labels: 'selected', filters: Topology.overviewFilters(), hoveredKey: null, focusedKey: null, history: [], arrangement: null, layoutGeneration: 0, worker: null, index: null, renderFrame: null, preferenceKey: null, preferences: Topology.preferences(), filterSerial: 0 };
     const tokenInput = document.querySelector('#token');
-    try { tokenInput.value = sessionStorage.getItem('devgraph-monitor-token') || ''; } catch { tokenInput.value = ''; }
+    tokenInput.value = ''; try { sessionStorage.removeItem('devgraph-monitor-token'); } catch {}
     const text = (id, value) => { const el = document.getElementById(id); if (el.textContent !== String(value)) el.textContent = String(value); };
     const headers = () => ({ Authorization: `Bearer ${tokenInput.value.trim()}` });
     const make = (tag, className, value) => { const node = document.createElement(tag); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; };
@@ -659,7 +659,7 @@ FRONTEND_HTML = r'''<!doctype html>
       const group = svgMake('g', { class: 'graph-tooltip', role: 'tooltip' });
       group.append(svgMake('rect', { class: 'graph-tooltip-panel', x, y, width, height, rx: 9 }));
       const title = svgMake('text', { class: 'graph-tooltip-title', x: x + 12, y: y + 21 }); title.textContent = node.title.length > 38 ? `${node.title.slice(0, 37)}…` : node.title;
-      const meta = svgMake('text', { class: 'graph-tooltip-meta', x: x + 12, y: y + 39 }); meta.textContent = `${node.kind} · ${node.status}${node.archived ? ' · archived' : ''}`;
+      const meta = svgMake('text', { class: 'graph-tooltip-meta', x: x + 12, y: y + 39 }); meta.textContent = `${node.kind} · ${['Todo','Proposal','Initiative','Project','Issue','Task'].includes(node.kind) ? progressLabel(node.todo_progress) : node.status}${node.archived ? ' · archived' : ''}`;
       const copy = svgMake('text', { class: 'graph-tooltip-copy', x: x + 12, y: y + 57 }); copy.textContent = `${connected} connection${connected === 1 ? '' : 's'} · drag to pull graph · click to inspect`;
       group.append(title, meta, copy); layer.append(group);
     }
@@ -668,12 +668,16 @@ FRONTEND_HTML = r'''<!doctype html>
       try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null; } catch { return null; }
     }
 
+    function progressLabel(value) {
+      return ({not_started:'Not started',in_progress:'In progress',done:'Done'})[value] || 'Needs classification';
+    }
+
     function workNode(work) {
       return (state.snapshot?.graph_nodes || []).find(node => node.kind === work.kind && node.id === work.id) || { key: `${work.kind}:${work.id}`, category: 'work', archived: work.status === 'archived', ...work };
     }
 
     function readPath(node) {
-      if (node.category === 'todo' && node.kind === 'Todo') return `/monitor/todos/v1/${encodeURIComponent(node.id)}`;
+      if (['Todo','Proposal','Initiative','Project','Issue','Task'].includes(node.kind)) return `/todos/v2/${node.kind}/${encodeURIComponent(node.id)}`;
       if (node.category === 'arena' && node.kind === 'Arena') return `/arenas/${encodeURIComponent(node.id)}`;
       if (node.category === 'work' && ['Proposal', 'Initiative', 'Project', 'Issue', 'Task'].includes(node.kind)) return `/work/${node.kind}/${encodeURIComponent(node.id)}`;
       if (node.category === 'observation') return `/initiative-observations/${encodeURIComponent(node.id)}`;
@@ -809,7 +813,7 @@ FRONTEND_HTML = r'''<!doctype html>
         do {
           const cursor = last ? `${last.kind}/${last.id}` : null;
           const after = cursor ? `&after_resource=${encodeURIComponent(cursor)}` : '';
-          const data = await getJson(`${readPath(node)}/relationships/${relationship}?limit=50${after}`, { signal: controller.signal });
+          const data = await getJson(`${`/work/${node.kind}/${encodeURIComponent(node.id)}`}/relationships/${relationship}?limit=50${after}`, { signal: controller.signal });
           if (!current()) return;
           items.push(...data.items); hasMore = data.items.length === 50;
           last = data.items.at(-1);
@@ -834,7 +838,7 @@ FRONTEND_HTML = r'''<!doctype html>
         let items = [], cursor = more ? prior?.next_cursor : null, data;
         do {
           const after = cursor ? `&after=${encodeURIComponent(cursor)}` : '';
-          data = await getJson(`${readPath(node)}/supporting-material?limit=50${after}`, { signal: controller.signal });
+          data = await getJson(`${`/work/${node.kind}/${encodeURIComponent(node.id)}`}/supporting-material?limit=50${after}`, { signal: controller.signal });
           if (!current()) return;
           items.push(...data.items);
           if (data.next_cursor && data.next_cursor === cursor) throw new Error('Supporting pagination did not advance.');
@@ -863,7 +867,7 @@ FRONTEND_HTML = r'''<!doctype html>
       detailState.documents.set(id, pending); renderGraphSelection();
       const current = () => serial === detailState.serial && epoch === state.authEpoch && resourceSerial === detailState.resourcesSerial && detailState.documents.get(id) === pending;
       try {
-        const data = await getJson(`${readPath(node)}/supporting-material/Artifact/${encodeURIComponent(id)}/document`, { signal: controller.signal });
+        const data = await getJson(`${`/work/${node.kind}/${encodeURIComponent(node.id)}`}/supporting-material/Artifact/${encodeURIComponent(id)}/document`, { signal: controller.signal });
         if (!current()) return;
         detailState.documents.set(id, data);
       } catch (error) {
@@ -916,7 +920,7 @@ FRONTEND_HTML = r'''<!doctype html>
       const latest = (state.snapshot?.graph_nodes || []).find(item => item.key === node?.key);
       if (latest) detailState.node = { ...node, ...latest };
       text('reader-title', detailState.data?.title || node?.title || 'Item details');
-      text('reader-meta', node ? `${Topology.visual(node.kind).label} · ${detailState.data?.status || node.status}` : 'Select an item on the map or find it by name.');
+      text('reader-meta', node ? `${Topology.visual(node.kind).label} · ${['Todo','Proposal','Initiative','Project','Issue','Task'].includes(node.kind) ? progressLabel(detailState.data?.progress ?? node.todo_progress) : node.status}${(detailState.data?.archived ?? node.archived) ? ' · Archived' : ''}` : 'Select an item on the map or find it by name.');
       document.getElementById('reader-mode').disabled = !node;
       text('reader-status', detailState.loading ? 'Loading details…' : detailState.error ? `${detailState.error}${detailState.data ? ' Showing the last loaded details.' : ''}` : '');
       const content = make('div');
@@ -945,22 +949,22 @@ FRONTEND_HTML = r'''<!doctype html>
         const description = readerSection('Description', 'description');
         description.append(make('div', data.description ? 'reader-description' : 'reader-note', data.description || 'No description has been written for this Todo.')); content.append(description);
         const summary = readerSection('Todo context', 'todo-context');
-        summary.append(make('p', 'reader-note', `Base Todo · ${data.status} · Priority ${data.priority}`));
+        summary.append(make('p', 'reader-note', `Base Todo · ${progressLabel(data.progress)} · Priority ${data.priority}`));
         if (data.updated_at) summary.append(make('p', 'reader-note', `Last changed ${new Date(data.updated_at).toLocaleString()}`));
         content.append(summary);
       } else if (node.category === 'work' && data) {
         const description = readerSection('Description / plan', 'description');
         description.append(make('div', data.description ? 'reader-description' : 'reader-note', data.description || 'No description has been written for this item.'));
         content.append(description);
-        const workflowSection = readerSection('Workflow', 'workflow'); workflowSection.append(make('p', 'reader-note', latest?.workflow ? `${latest.workflow.label} · ${latest.workflow.id}` : 'Stage not set · shown in Backlog on the work board')); content.append(workflowSection);
-        if (latest?.progress) { const p = latest.progress; const section = readerSection('Lifecycle summary', 'progress'); section.append(make('p', 'reader-note', `${p.percent}% complete · ${p.completed} of ${p.total} final work items accepted or archived`)); content.append(section); }
+        const workflowSection = readerSection('Workflow', 'workflow'); workflowSection.append(make('p', 'reader-note', latest?.workflow ? `${latest.workflow.label} · ${latest.workflow.id}` : data?.stage ? data.stage.replaceAll('_', ' ') : 'No detailed stage assigned')); content.append(workflowSection);
+        if (latest?.child_progress) { const p = latest.child_progress; const section = readerSection('Lifecycle summary', 'progress'); section.append(make('p', 'reader-note', `${p.percent}% complete · ${p.completed} of ${p.total} child items Done`)); content.append(section); }
         const relationships = [['parent', 'Parent'], ['children', 'Child work'], ['dependencies', 'Depends on'], ['dependents', 'Needed by'], ...(node.kind === 'Task' ? [['blockers', 'Blocked by'], ['blocked', 'Blocks']] : [])];
         const section = readerSection('Related work', 'relationships');
         for (const [rel, label] of relationships) {
           const entry = detailState.relations.get(rel); const group = make('details'); group.dataset.uiKey = rel; group.dataset.relationship = rel;
           group.append(make('summary', '', label)); const body = make('div');
           if (!entry?.loaded) body.append(make('p', 'reader-note', entry?.loading ? 'Loading…' : entry?.error || 'Open to load related work.'));
-          for (const work of entry?.items || []) { const link = make('button', 'reader-link', work.title); Object.assign(link.dataset, { action: 'related', relationship: rel, id: work.id, kind: work.kind, uiKey: `${work.kind}:${work.id}` }); link.append(make('small', '', `${work.kind} · ${work.status}`)); body.append(link); }
+          for (const work of entry?.items || []) { const link = make('button', 'reader-link', work.title); Object.assign(link.dataset, { action: 'related', relationship: rel, id: work.id, kind: work.kind, uiKey: `${work.kind}:${work.id}` }); link.append(make('small', '', `${work.kind} · ${progressLabel(work.progress)}`)); body.append(link); }
           if (entry?.loaded && !entry.items.length) body.append(make('p', 'reader-note', 'No related work in this section.'));
           if (entry?.loaded && (entry.loading || entry.error || entry.stale)) body.append(make('p', 'reader-note', entry.error ? `${entry.error} Showing the last loaded related work.` : entry.loading ? 'Updating related work…' : 'Showing the last loaded related work.'));
           if (entry?.error) body.append(readerButton('Retry', 'relationship-retry', { relationship: rel }));
@@ -1224,9 +1228,9 @@ FRONTEND_HTML = r'''<!doctype html>
         }
         paintIndex++;
         const selected = node.key === state.selectedGraphKey, nearby = adjacent.has(node.key), count = graphView.index.degree.get(node.key) || 0;
-        setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}${node.key === previewKey ? ' preview' : ''}`, tabindex: node.key === (graphView.index.byKey.has(state.selectedGraphKey) ? state.selectedGraphKey : nodes[0]?.key) ? 0 : -1, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.6' : '1', 'aria-pressed': selected, 'aria-label': `${Topology.visual(node.kind).label}: ${node.title}, ${node.status}, ${count} visible connections. Press Enter to read; Shift+F10 opens the reading modal; arrow keys move the node.` });
+        setSvg(group, { class: `graph-node ${node.category}${selected ? ' selected' : ''}${node.key === previewKey ? ' preview' : ''}`, tabindex: node.key === (graphView.index.byKey.has(state.selectedGraphKey) ? state.selectedGraphKey : nodes[0]?.key) ? 0 : -1, transform: `translate(${position.x} ${position.y})`, opacity: adjacent.size && !nearby ? '.6' : '1', 'aria-pressed': selected, 'aria-label': `${Topology.visual(node.kind).label}: ${node.title}, ${node.category === 'work' || node.category === 'todo' ? progressLabel(node.todo_progress ?? node.progress) : node.status}, ${count} visible connections. Press Enter to read; Shift+F10 opens the reading modal; arrow keys move the node.` });
         group._parts ||= {title:group.querySelector('title'),hit:group.querySelector('.graph-node-hit'),solid:group.querySelector('.graph-solid'),shape:group.querySelector('.graph-sphere'),ring:group.querySelector('.graph-selection-ring')};
-        const titleText = `${Topology.visual(node.kind).label}: ${node.title} · ${node.status}`; if (group._parts.title.textContent !== titleText) group._parts.title.textContent = titleText;
+        const titleText = `${Topology.visual(node.kind).label}: ${node.title} · ${node.category === 'work' || node.category === 'todo' ? progressLabel(node.todo_progress ?? node.progress) : node.status}`; if (group._parts.title.textContent !== titleText) group._parts.title.textContent = titleText;
         setSvg(group._parts.hit, { r: Math.max(14, r + 5) });
         setSvg(group._parts.solid, { href: `#graph-solid-${Object.hasOwn(Topology.registry,node.kind)?node.kind:'other'}`, transform: `scale(${r})` });
         setSvg(group._parts.shape, { d: nodeShape(node.kind, r), fill: 'none' });
@@ -1287,7 +1291,7 @@ FRONTEND_HTML = r'''<!doctype html>
       const scoped = {nodes: graphView.nodes};
       const nodes = scoped.nodes.filter(node => `${node.title} ${node.id}`.toLowerCase().includes(query));
       const desired = make('div'); desired.append(make('p', 'reader-note', `${nodes.length} matches ${graphView.arenaKey ? 'reachable from the Arena filter' : 'in the loaded graph'}`));
-      for (const node of nodes.slice(0, 30)) { const button = make('button', 'search-result', node.title); button.dataset.nodeKey = node.key; button.dataset.uiKey = node.key; button.append(make('small', '', `${Topology.visual(node.kind).label} · ${node.status}${graphView.visibleCategories.has(node.category) ? '' : ' · hidden category'}`)); desired.append(button); }
+      for (const node of nodes.slice(0, 30)) { const button = make('button', 'search-result', node.title); button.dataset.nodeKey = node.key; button.dataset.uiKey = node.key; button.append(make('small', '', `${Topology.visual(node.kind).label} · ${node.category === 'work' || node.category === 'todo' ? progressLabel(node.todo_progress ?? node.progress) : node.status}${graphView.visibleCategories.has(node.category) ? '' : ' · hidden category'}`)); desired.append(button); }
       if (nodes.length > 30) desired.append(make('p', 'reader-note', 'Showing 30 results. Refine your search for more.'));
       reconcileChildren(root, desired);
     }
@@ -1491,7 +1495,7 @@ FRONTEND_HTML = r'''<!doctype html>
     function renderTopologyControls() {
       const snapshot=state.snapshot,facets=snapshot?.facets||{};
       document.querySelectorAll('[data-graph-category]').forEach(el=> {el.checked=graphView.visibleCategories.has(el.dataset.graphCategory); if(el.dataset.graphCategory==='work')el.indeterminate=el.checked&&graphView.filters.work_kind!==null&&graphView.filters.work_kind.length!==Topology.kinds.length;});
-      for(const facet of ['work_kind','work_status','observation_status','record_status']) {
+      for(const facet of ['work_kind','progress','observation_status','record_status']) {
         const root=document.getElementById(`facet-${facet}`); if(!root)continue;
         const selected=graphView.filters[facet];
         for(const input of root.querySelectorAll('input')) {input.checked=selected===null||selected.includes(input.value);input.disabled=facet==='work_kind'&&!graphView.visibleCategories.has('work');const count=root.querySelector(`[data-count="${input.value}"]`);if(count)count.textContent=String(facets[facet]?.[input.value]??0);}
@@ -1500,7 +1504,7 @@ FRONTEND_HTML = r'''<!doctype html>
       const query=document.getElementById('filter-query'); if(query&&document.activeElement!==query)query.value=graphView.filters.q;
       const relationships=document.getElementById('filter-relationships');
       if(relationships){const chosen=graphView.filters.relationship,options=snapshot?.relationship_types||[];const signature=JSON.stringify([options,chosen]);if(relationships.dataset.signature!==signature){relationships.dataset.signature=signature;relationships.replaceChildren();for(const value of options){const label=make('label'),input=make('input');input.type='checkbox';input.value=value;input.checked=chosen===null||chosen.includes(value);input.addEventListener('change',()=>{graphView.filters.relationship=[...relationships.querySelectorAll('input:checked')].map(x=>x.value);applyGraphFilters();});label.append(input,make('span','',relationshipLabel(value)));relationships.append(label);}}}
-      const summary=document.getElementById('filter-summary');if(summary){summary.replaceChildren();const f=graphView.filters;for(const key of Object.keys(f)){const value=f[key];if(value===null||value===''||key==='category'||(key==='work_kind'&&value?.length===Topology.overviewKinds.length)||(key==='archived'&&value==='include'))continue;const labels={category:'Types',work_kind:'Work types',work_status:'Work status',observation_status:'Observation status',record_status:'Record status',relationship:'Connections',arena:'Arena',anchor:'Connected view',q:'Search',archived:'Archived'};const label=Array.isArray(value)?value.length?value.map(x=>x==='receipt'?'Record':x).join(', '):'None':value;const chip=make('button','filter-chip',`${labels[key]}: ${label} ×`);chip.type='button';chip.setAttribute('aria-label',`Clear ${labels[key]} filter`);chip.addEventListener('click',()=>{graphView.filters[key]=Topology.overviewFilters()[key];applyGraphFilters();});summary.append(chip);}if(!summary.children.length)summary.append(make('span','','Overview and top-level work'));}
+      const summary=document.getElementById('filter-summary');if(summary){summary.replaceChildren();const f=graphView.filters;for(const key of Object.keys(f)){const value=f[key];if(value===null||value===''||key==='category'||(key==='work_kind'&&value?.length===Topology.overviewKinds.length)||(key==='archived'&&value==='include'))continue;const labels={category:'Types',work_kind:'Work types',progress:'Progress',work_status:'Legacy status',observation_status:'Observation status',record_status:'Record status',relationship:'Connections',arena:'Arena',anchor:'Connected view',q:'Search',archived:'Archived'};const label=Array.isArray(value)?value.length?value.map(x=>x==='receipt'?'Record':x).join(', '):'None':value;const chip=make('button','filter-chip',`${labels[key]}: ${label} ×`);chip.type='button';chip.setAttribute('aria-label',`Clear ${labels[key]} filter`);chip.addEventListener('click',()=>{graphView.filters[key]=Topology.overviewFilters()[key];applyGraphFilters();});summary.append(chip);}if(!summary.children.length)summary.append(make('span','','Overview and top-level work'));}
       if(snapshot?.scope_error)text('graph-meta','Saved scope unavailable. Choose another Arena or clear filters.');
       syncUndoControl(); renderVisibleItems();
     }
@@ -1519,7 +1523,7 @@ FRONTEND_HTML = r'''<!doctype html>
       if(!node){target.textContent='';return;}
       const total=node.connection_count??Math.max(0,adjacent.size-1);const shown=labels.filter(label=>label.key.startsWith('node:')&&label.key!==`node:${key}`).length;
       const qualified=state.snapshot?.complete===false&&node.connection_count===undefined?'loaded connections':'connected items';
-      target.textContent=`${node.title} · ${Topology.visual(node.kind).label} · ${node.status} — ${shown} of ${total} ${qualified} labelled. Open details for the list.`;
+      target.textContent=`${node.title} · ${Topology.visual(node.kind).label} · ${node.category === 'work' || node.category === 'todo' ? progressLabel(node.todo_progress ?? node.progress) : node.status} — ${shown} of ${total} ${qualified} labelled. Open details for the list.`;
     }
 
     function pickGraphNodes(clientX, clientY) {
@@ -1585,7 +1589,7 @@ FRONTEND_HTML = r'''<!doctype html>
       window.addEventListener('hashchange', updateNavigation); updateNavigation();
       const legend=document.getElementById('type-legend');for(const kind of Topology.overviewKinds){const item=make('div','legend-sample');item.title=Topology.visual(kind).description;item.append(typeSample(kind),make('span','',Topology.visual(kind).label));legend.append(item);}
       const grid=document.getElementById('filter-grid');
-      const facets=[['work_kind','Work types',Topology.overviewKinds],['work_status','Work status',['draft','review','accepted','archived','unknown']]];
+      const facets=[['work_kind','Work types',Topology.overviewKinds],['progress','Progress',['not_started','in_progress','done']]];
       for(const [key,title,values]of facets){const field=make('fieldset');field.id=`facet-${key}`;field.append(make('legend','',title));for(const value of values){const label=make('label'),input=make('input');input.type='checkbox';input.value=value;input.checked=true;input.addEventListener('change',()=>{graphView.filters[key]=[...field.querySelectorAll('input:checked')].map(x=>x.value);applyGraphFilters();});label.append(input);if(key==='work_kind')label.append(typeSample(value));label.append(make('span','',value==='dispatched_dry_run'?'Processed locally (dry run)':value.replaceAll('_',' ')));const count=make('span','filter-count','0');count.dataset.count=value;label.append(count);field.append(label);}const all=make('button','graph-control','All'),none=make('button','graph-control','None');all.type=none.type='button';all.addEventListener('click',()=>{graphView.filters[key]=null;applyGraphFilters();});none.addEventListener('click',()=>{graphView.filters[key]=[];applyGraphFilters();});field.append(all,none);grid.append(field);}
       const options=make('fieldset');options.append(make('legend','','More filters'));const archive=make('select');archive.id='filter-archived';archive.setAttribute('aria-label','Archived items');for(const [value,label]of [['include','Include archived'],['exclude','Hide archived'],['only','Only archived']]){const option=make('option','',label);option.value=value;archive.append(option);}archive.addEventListener('change',()=>{graphView.filters.archived=archive.value;applyGraphFilters();});
       const query=make('input');query.type='search';query.id='filter-query';query.placeholder='Filter titles or IDs';query.setAttribute('aria-label','Filter titles or IDs');let searchTimer;query.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{graphView.filters.q=query.value;applyGraphFilters();},200);});options.append(archive,query);grid.append(options);
@@ -1787,9 +1791,9 @@ FRONTEND_HTML = r'''<!doctype html>
     document.getElementById('graph-settle').addEventListener('click', settleGraph); document.getElementById('graph-force-reset').addEventListener('click', resetForceStrengths);
     const orbitButton = document.getElementById('graph-orbit'); orbitButton.addEventListener('click', toggleGraphOrbit);
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { orbitButton.disabled = true; orbitButton.textContent = 'Orbit: reduced motion'; orbitButton.title = 'Continuous orbit follows your reduced-motion preference'; }
-    document.getElementById('auth-form').addEventListener('submit', event => { event.preventDefault(); try { sessionStorage.setItem('devgraph-monitor-token', tokenInput.value.trim()); } catch { announceGraph('Access works for this page; tab storage is unavailable.'); } schedule(); refresh(); });
+    document.getElementById('auth-form').addEventListener('submit', event => { event.preventDefault(); schedule(); refresh(); });
     document.getElementById('refresh-rate').addEventListener('change', schedule);
     schedule(); if (tokenInput.value) refresh();
   </script>
 </body>
-</html>'''
+</html>"""

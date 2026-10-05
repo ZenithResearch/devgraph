@@ -1,5 +1,12 @@
 # Changelog
 
+## Todo progress, archive and daily check-in
+
+- Add canonical three-state progress for base Todo and every subtype, preserving legacy signed requests. Base Todos can complete without a subtype workflow.
+- Separate archival from progress, preserve guarded subtype completion and proposal dispositions, and report ambiguous history through forward migration 28.
+- Add bounded v2 Todo/Kanban reads, priority-based daily counts, consistent reader/topology labels, and remove credential persistence.
+- Publish ontology v0.8.0 without rewriting older releases. See `docs/todo-progress-v2.md` for compatibility and installed qualification boundaries.
+
 ## [Unreleased]
 
 ### Added
