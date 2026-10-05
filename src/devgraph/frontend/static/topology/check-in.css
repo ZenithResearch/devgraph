@@ -73,9 +73,19 @@ main { container-type:inline-size; }
 .manager-item-meta { font:12px/1.5 var(--sans); color:var(--muted); overflow-wrap:anywhere; }
 .manager-empty { padding:12px 0; color:var(--muted); font:13px/1.5 var(--sans); }
 .manager-note { margin-top:16px; }
-.project-filters { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-.project-filters label { display:grid; flex:1 1 130px; gap:4px; min-width:0; color:var(--muted); font:12px/1.4 var(--sans); }
+.project-heading-tools { display:flex; align-items:center; gap:10px; }
+.project-heading-tools > span { color:var(--muted); font:11px var(--sans); white-space:nowrap; }
+.project-filter-menu { position:relative; }
+.project-filter-menu > summary { display:flex; align-items:center; gap:5px; min-height:30px; padding:4px 7px; list-style:none; border:1px solid var(--line); border-radius:7px; color:var(--ink); cursor:pointer; font:12px var(--sans); }
+.project-filter-menu > summary::-webkit-details-marker { display:none; }
+.project-filter-menu > summary:hover,.project-filter-menu[open] > summary { background:var(--aqua-soft); }
+.project-filter-count { border-radius:4px; background:var(--aqua-soft); padding:1px 4px; font-variant-numeric:tabular-nums; }
+.project-filter-popover { position:absolute; top:calc(100% + 6px); right:0; z-index:12; width:min(290px,calc(100vw - 66px)); padding:14px; border:1px solid var(--line); border-radius:10px; background:linear-gradient(var(--panel),var(--panel)),var(--canvas); box-shadow:var(--shadow-elevated); }
+.project-filters { display:grid; gap:12px; }
+.project-filters label { display:grid; gap:4px; min-width:0; color:var(--muted); font:12px/1.4 var(--sans); }
 .project-filters select { width:100%; min-width:0; min-height:36px; padding:6px 8px; color:var(--ink); background:var(--canvas); border:1px solid var(--line); border-radius:8px; font:13px var(--sans); text-overflow:ellipsis; }
+.project-filter-actions { display:flex; justify-content:space-between; gap:8px; margin-top:14px; }
+.project-filter-actions button { min-height:32px; font:12px var(--sans); }
 @container (max-width:880px) {
   .manager-columns { grid-template-columns:1fr; gap:16px; }
   .manager-list { max-height:210px; }

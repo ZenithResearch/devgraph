@@ -321,8 +321,10 @@ FRONTEND_HTML = r"""<!doctype html>
             <div><strong id="manager-dependencies">—</strong><span>Dependencies to check</span></div>
           </div>
           <div class="manager-columns">
-            <section aria-labelledby="manager-projects-title"><div class="manager-section-heading"><h3 id="manager-projects-title">Projects</h3><span id="manager-projects-count" role="status" aria-live="polite"></span></div>
-              <div class="project-filters" role="group" aria-label="Project filters"><label>Arena<select id="project-arena" aria-controls="manager-projects" disabled><option value="">All arenas</option></select></label><label>Initiative<select id="project-initiative" aria-controls="manager-projects" disabled><option value="">All initiatives</option></select></label></div>
+            <section aria-labelledby="manager-projects-title"><div class="manager-section-heading"><h3 id="manager-projects-title">Projects</h3><div class="project-heading-tools"><span id="manager-projects-count" role="status" aria-live="polite"></span>
+              <details class="project-filter-menu" id="project-filter-menu"><summary id="project-filter-toggle" aria-label="Filter projects"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4h12M4 8h8M6 12h4"/></svg><span>Filter</span><span class="project-filter-count" id="project-filter-count" hidden></span></summary>
+                <div class="project-filter-popover" role="group" aria-label="Project filters"><div class="project-filters"><label>Arena<select id="project-arena" aria-controls="manager-projects" disabled><option value="">All arenas</option></select></label><label>Initiative<select id="project-initiative" aria-controls="manager-projects" disabled><option value="">All initiatives</option></select></label></div><div class="project-filter-actions"><button class="graph-control" id="project-filters-clear" type="button" disabled>Clear</button><button class="graph-control" id="project-filters-done" type="button">Done</button></div></div>
+              </details></div></div>
               <ul class="manager-list" id="manager-projects"><li class="manager-empty">Connect to see your projects.</li></ul></section>
             <section aria-labelledby="manager-attention-title"><div class="manager-section-heading"><h3 id="manager-attention-title">Needs attention</h3><span id="manager-attention-count"></span></div><ul class="manager-list" id="manager-attention"><li class="manager-empty">Recorded reviews and dependencies appear here.</li></ul></section>
           </div>
@@ -1352,6 +1354,13 @@ FRONTEND_HTML = r"""<!doctype html>
         }
         reconcileChildren(select, desired); select.value = filters[name]; select.disabled = !snapshot;
       }
+      const activeFilters = Number(Boolean(filters.arena)) + Number(Boolean(filters.initiative));
+      text('project-filter-count', activeFilters); document.getElementById('project-filter-count').hidden = !activeFilters;
+      const filterToggle = document.getElementById('project-filter-toggle');
+      filterToggle.setAttribute('aria-label', activeFilters ? `Filter projects, ${activeFilters} active` : 'Filter projects');
+      filterToggle.title = [['arena', summary.projectArenas], ['initiative', summary.projectInitiatives]].filter(([name]) => filters[name]).map(([name, options]) => `${name === 'arena' ? 'Arena' : 'Initiative'}: ${options.find(item => item.key === filters[name])?.title || 'unavailable in this view'}`).join(' · ') || 'Filter by Arena or Initiative';
+      document.getElementById('project-filters-clear').disabled = !activeFilters;
+      if (!snapshot) document.getElementById('project-filter-menu').open = false;
       const knownCount = value => !snapshot ? '—' : summary.unclassified ? (value ? `${value}+` : '—') : value;
       text('manager-started', knownCount(summary.started)); text('manager-review', knownCount(summary.reviewing));
       text('manager-dependencies', snapshot ? summary.dependencies : '—');
@@ -1770,6 +1779,16 @@ FRONTEND_HTML = r"""<!doctype html>
       projectFilters.update(name === 'arena' ? {arena:event.target.value,initiative:''} : {initiative:event.target.value});
       renderManagerOverview(state.snapshot); document.getElementById('manager-projects').scrollTop = 0;
     });
+    const projectFilterMenu = document.getElementById('project-filter-menu');
+    const closeProjectFilters = () => { projectFilterMenu.open = false; document.getElementById('project-filter-toggle').focus({preventScroll:true}); };
+    document.getElementById('project-filters-done').addEventListener('click', closeProjectFilters);
+    document.getElementById('project-filters-clear').addEventListener('click', () => {
+      projectFilters.update({arena:'',initiative:''}); renderManagerOverview(state.snapshot);
+      document.getElementById('manager-projects').scrollTop = 0; closeProjectFilters();
+    });
+    projectFilterMenu.addEventListener('keydown', event => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); closeProjectFilters(); } });
+    document.addEventListener('click', event => { if (projectFilterMenu.open && !projectFilterMenu.contains(event.target)) projectFilterMenu.open = false; });
+    document.addEventListener('focusin', event => { if (projectFilterMenu.open && !projectFilterMenu.contains(event.target)) projectFilterMenu.open = false; });
     refreshCheckIn(false);
     const nodeChooser = DevgraphChooser.create({
       panel: document.getElementById('node-chooser'), container: document.querySelector('.graph-scroll'),
