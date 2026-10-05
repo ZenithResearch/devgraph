@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createRequire} from 'node:module';
 import {contextWithFunctions, treeDocument} from './monitor_test_helpers.mjs';
-const {briefing} = createRequire(import.meta.url)('../../src/devgraph/frontend/static/topology/check-in.js');
+const {briefing, createProjectFilters} = createRequire(import.meta.url)('../../src/devgraph/frontend/static/topology/check-in.js');
 const node = (id, kind = 'Project', extra = {}) => ({key:`${kind}:${id}`, id, kind, title:id, category:'work', status:'draft', archived:false, ...extra});
 const snapshot = (nodes, edges = []) => ({graph_nodes:nodes, graph_edges:edges});
 
@@ -13,7 +13,7 @@ test('briefing excludes archived work, deduplicates and never maps legacy lifecy
   assert.equal(report.unclassified,3);
   assert.equal(report.started,1);
   assert.equal(report.reviewing,1);
-  assert.equal(report.projectTotal,3);
+  assert.equal(report.projectTotal,2);
   assert.deepEqual(report.attention.map(row=>row.reason),['Layer review']);
 });
 
@@ -61,7 +61,7 @@ test('refresh keeps briefing reader triggers and scroll, while a credential rese
     return elements.get(id);
   };
   const c = contextWithFunctions(['renderManagerOverview','reconcileChildren'],{document,
-    DevgraphCheckIn:{briefing}, text(id,value){document.getElementById(id).textContent=String(value);},
+    DevgraphCheckIn:{briefing}, projectFilters:createProjectFilters(null), text(id,value){document.getElementById(id).textContent=String(value);},
     make(tag,cls,value){const el=document.createElement(tag);if(cls)el.className=cls;if(value!==undefined)el.textContent=value;return el;},
   });
   const data = snapshot([node('private')]);
@@ -73,4 +73,66 @@ test('refresh keeps briefing reader triggers and scroll, while a credential rese
   c.renderManagerOverview(null);
   assert.doesNotMatch(list.textContent,/private/);
   assert.equal(document.getElementById('manager-started').textContent,'—');
+});
+
+function projectFixture() {
+  const nodes = [node('alpha','Arena'),node('beta','Arena'),node('one','Initiative'),node('two','Initiative'),
+    node('a'),node('b'),node('standalone'),node('archived','Project',{archived:true}),node('task','Task')];
+  const edge = (source,target,relationship='HAS_CHILD') => ({source,target,relationship});
+  return snapshot(nodes,[edge('Arena:alpha','Initiative:one','CONTAINS_WORK'),edge('Arena:beta','Initiative:two','CONTAINS_WORK'),
+    edge('Initiative:one','Project:a'),edge('Initiative:one','Project:archived'),edge('Initiative:two','Project:b'),
+    edge('Project:a','Task:task'),edge('Project:standalone','Project:a','DEPENDS_ON')]);
+}
+
+test('project-only list includes standalone projects by default and intersects inherited Arena and Initiative filters', () => {
+  const data=projectFixture(), all=briefing(data);
+  assert.deepEqual(all.projects.map(n=>n.kind),['Project','Project','Project']);
+  assert.equal(all.projectTotal,3);
+  assert.deepEqual(all.projectArenas.map(n=>n.key),['Arena:alpha','Arena:beta']);
+  const scoped=briefing(data,{arena:'Arena:alpha'});
+  assert.deepEqual(scoped.projects.map(n=>n.id),['a']);
+  assert.deepEqual(scoped.projectInitiatives.map(n=>n.key),['Initiative:one']);
+  assert.deepEqual(briefing(data,{initiative:'Initiative:two'}).projects.map(n=>n.id),['b']);
+  assert.equal(briefing(data,{arena:'Arena:alpha',initiative:'Initiative:two'}).projectTotal,0);
+  assert.equal(briefing(data,{arena:'Initiative:one'}).projectTotal,0);
+  assert.equal(briefing(data,{initiative:'Initiative:missing'}).projectTotal,0);
+  assert.equal(scoped.attentionTotal,all.attentionTotal,'project selectors do not change the separate attention queue');
+});
+
+test('ancestor context preserves filters when parent nodes or hierarchy lines are hidden in the map', () => {
+  const data=projectFixture();
+  data.layout_context={nodes:data.graph_nodes.map(({key,kind,title})=>({key,kind,title})),edges:data.graph_edges.filter(e=>e.relationship!=='DEPENDS_ON')};
+  data.graph_nodes=data.graph_nodes.filter(n=>n.kind==='Project');data.graph_edges=[];
+  const report=briefing(data,{arena:'Arena:alpha',initiative:'Initiative:one'});
+  assert.deepEqual(report.projects.map(n=>n.id),['a']);
+  assert.equal(report.projectArenas.length,2);
+  data.layout_context.edges.push({source:'Project:a',target:'Initiative:one',relationship:'HAS_CHILD'});
+  assert.equal(briefing(data,{arena:'Arena:alpha'}).projectTotal,1,'malformed cycles remain bounded');
+});
+
+test('filtering precedes the six-row limit and keeps the entire matching count', () => {
+  const data=projectFixture();
+  for(let i=0;i<20;i++){
+    const extra=node(`extra${i}`);data.graph_nodes.push(extra);
+    data.graph_edges.push({source:'Initiative:one',target:extra.key,relationship:'HAS_CHILD'});
+  }
+  const report=briefing(data,{arena:'Arena:alpha',initiative:'Initiative:one'});
+  assert.equal(report.projectTotal,21);assert.equal(report.projects.length,6);
+  assert.deepEqual(briefing(data,{initiative:'Initiative:two'}).projects.map(n=>n.id),['b']);
+});
+
+test('saved project filters are scoped, allowlisted and clear on credential reset without storing authority', () => {
+  const records=new Map(),storage={getItem:key=>records.get(key),setItem:(key,value)=>records.set(key,value)};
+  const filters=createProjectFilters(storage);filters.setPreferenceKey('scope-a');
+  filters.update({arena:'Arena:alpha',initiative:'Initiative:one',credential:'must-not-persist'});
+  assert.deepEqual(JSON.parse(records.get('scope-a')),{version:1,arena:'Arena:alpha',initiative:'Initiative:one'});
+  const reload=createProjectFilters(storage);reload.setPreferenceKey('scope-a');assert.deepEqual(reload.value,filters.value);
+  reload.setPreferenceKey('scope-b');assert.deepEqual(reload.value,{arena:'',initiative:''});
+  reload.setPreferenceKey('scope-a');reload.reset();assert.deepEqual(reload.value,{arena:'',initiative:''});
+  assert.equal(records.size,1);
+  for(const saved of ['broken',JSON.stringify({version:99,arena:'wrong'}),JSON.stringify({version:1,arena:[],initiative:{}})]){
+    records.set('invalid',saved);const invalid=createProjectFilters(storage);invalid.setPreferenceKey('invalid');assert.deepEqual(invalid.value,{arena:'',initiative:''});
+  }
+  const denied=createProjectFilters({getItem(){throw new Error('blocked');},setItem(){throw new Error('blocked');}});
+  denied.setPreferenceKey('private');denied.update({arena:'Arena:alpha'});assert.equal(denied.value.arena,'Arena:alpha');
 });

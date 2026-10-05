@@ -321,7 +321,9 @@ FRONTEND_HTML = r"""<!doctype html>
             <div><strong id="manager-dependencies">—</strong><span>Dependencies to check</span></div>
           </div>
           <div class="manager-columns">
-            <section aria-labelledby="manager-projects-title"><div class="manager-section-heading"><h3 id="manager-projects-title">Projects & initiatives</h3><span id="manager-projects-count"></span></div><ul class="manager-list" id="manager-projects"><li class="manager-empty">Connect to see your projects.</li></ul></section>
+            <section aria-labelledby="manager-projects-title"><div class="manager-section-heading"><h3 id="manager-projects-title">Projects</h3><span id="manager-projects-count" role="status" aria-live="polite"></span></div>
+              <div class="project-filters" role="group" aria-label="Project filters"><label>Arena<select id="project-arena" aria-controls="manager-projects" disabled><option value="">All arenas</option></select></label><label>Initiative<select id="project-initiative" aria-controls="manager-projects" disabled><option value="">All initiatives</option></select></label></div>
+              <ul class="manager-list" id="manager-projects"><li class="manager-empty">Connect to see your projects.</li></ul></section>
             <section aria-labelledby="manager-attention-title"><div class="manager-section-heading"><h3 id="manager-attention-title">Needs attention</h3><span id="manager-attention-count"></span></div><ul class="manager-list" id="manager-attention"><li class="manager-empty">Recorded reviews and dependencies appear here.</li></ul></section>
           </div>
           <p class="manager-note" id="manager-note">Progress comes from recorded states. Missing states are never counted as completed work.</p>
@@ -1339,7 +1341,17 @@ FRONTEND_HTML = r"""<!doctype html>
     }
 
     function renderManagerOverview(snapshot) {
-      const summary = DevgraphCheckIn.briefing(snapshot);
+      const filters = projectFilters.value, summary = DevgraphCheckIn.briefing(snapshot, filters);
+      for (const [name, options, allLabel] of [['arena', summary.projectArenas, 'All arenas'], ['initiative', summary.projectInitiatives, 'All initiatives']]) {
+        const select = document.getElementById(`project-${name}`), desired = make('div');
+        for (const item of [{key:'',title:allLabel}, ...options]) {
+          const option = make('option', '', item.title); option.setAttribute('value', item.key); option.dataset.uiKey = item.key || 'all'; desired.append(option);
+        }
+        if (filters[name] && !options.some(item => item.key === filters[name])) {
+          const missing = make('option', '', `Selected ${name} unavailable in this view`); missing.setAttribute('value', filters[name]); missing.dataset.uiKey = filters[name]; desired.append(missing);
+        }
+        reconcileChildren(select, desired); select.value = filters[name]; select.disabled = !snapshot;
+      }
       const knownCount = value => !snapshot ? '—' : summary.unclassified ? (value ? `${value}+` : '—') : value;
       text('manager-started', knownCount(summary.started)); text('manager-review', knownCount(summary.reviewing));
       text('manager-dependencies', snapshot ? summary.dependencies : '—');
@@ -1358,7 +1370,7 @@ FRONTEND_HTML = r"""<!doctype html>
         if (!entries.length) desired.append(make('li', 'manager-empty', empty));
         reconcileChildren(document.getElementById(id), desired);
       }
-      rows('manager-projects', summary.projects.map(node => ({node, reason:progressLabel(node.todo_progress)})), snapshot ? 'No projects or initiatives in this map scope.' : 'Connect to see your projects.');
+      rows('manager-projects', summary.projects.map(node => ({node, reason:progressLabel(node.todo_progress)})), snapshot ? 'No projects match these filters in the current map scope.' : 'Connect to see your projects.');
       rows('manager-attention', summary.attention, snapshot ? 'No recorded reviews or unresolved dependencies in this view.' : 'Recorded reviews and dependencies appear here.');
     }
 
@@ -1381,6 +1393,7 @@ FRONTEND_HTML = r"""<!doctype html>
       stamp.dateTime = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
       stamp.textContent = date.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});
       checkIn.setPreferenceKey(graphView.preferenceKey ? `${graphView.preferenceKey}:start-queue` : null);
+      projectFilters.setPreferenceKey(graphView.preferenceKey ? `${graphView.preferenceKey}:project-list` : null);
       if (load) checkIn.refresh();
     }
 
@@ -1389,7 +1402,7 @@ FRONTEND_HTML = r"""<!doctype html>
       state.refreshController?.abort(); state.refreshController = null;
       detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null; state.connected = false;
       resetDetailState(); state.snapshot = null; state.observations = []; state.selectedGraphKey = null; graphView.neighborhood = null; graphView.arenaKey = '';
-      checkIn.reset(); renderManagerOverview(null);
+      checkIn.reset(); projectFilters.reset(); renderManagerOverview(null);
       invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.hoverRoot=graphView.focusRoot=graphView.selectedRoot=null; graphView.revealSignature=''; graphView.revealCache=null; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
       ['total-work', 'active-initiatives', 'observation-count', 'pending-receipts'].forEach(id => text(id, '—'));
       renderActivity([]); renderObservations([]); renderPipeline({}); renderBars({});
@@ -1738,6 +1751,7 @@ FRONTEND_HTML = r"""<!doctype html>
       closeButton: document.getElementById('reader-toggle'), modeButton: document.getElementById('reader-mode'),
       title: document.getElementById('reader-title'), fallbackFocus: graphSvg, onRestore: syncReaderPresentation,
     });
+    const projectFilters = DevgraphCheckIn.createProjectFilters({getItem:key => localStorage.getItem(key), setItem:(key,value) => localStorage.setItem(key,value)});
     const checkIn = DevgraphCheckIn.mount({
       root: document.getElementById('todo-panel'), request: getJson, reconcile: reconcileChildren,
       onSelect(item, {modal, returnFocus}) {
@@ -1749,6 +1763,12 @@ FRONTEND_HTML = r"""<!doctype html>
       const trigger = event.target.closest('[data-node-key]');
       const node = state.snapshot?.graph_nodes.find(item => item.key === trigger?.dataset.nodeKey);
       if (node) openNodeReaderModal(node, trigger);
+    });
+    for (const name of ['arena','initiative']) document.getElementById(`project-${name}`).addEventListener('change', event => {
+      // An explicit Arena change starts a fresh Initiative selection; a refresh
+      // never silently broadens a saved selection that became unavailable.
+      projectFilters.update(name === 'arena' ? {arena:event.target.value,initiative:''} : {initiative:event.target.value});
+      renderManagerOverview(state.snapshot); document.getElementById('manager-projects').scrollTop = 0;
     });
     refreshCheckIn(false);
     const nodeChooser = DevgraphChooser.create({

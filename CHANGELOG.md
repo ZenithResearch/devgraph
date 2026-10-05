@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+- Limit the daily project list to Projects and add saved Arena/Initiative filters using containment and inherited Arena membership; dependency links never imply membership.
+
 - Make the daily Todo queue a compact vertical panel and give the main check-in area to scoped project progress, reviews and dependency follow-up. Preserve exact Todo counts and keep unclassified history explicit.
 
 ### Added

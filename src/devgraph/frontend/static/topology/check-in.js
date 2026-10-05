@@ -7,8 +7,57 @@
   const PAGE_SIZE = 6;
 
   const KINDS = ['Todo','Proposal','Initiative','Project','Issue','Task'];
+  function projectScope(snapshot, projects, filters) {
+    // Ancestor context survives map type/relationship filters. Dependencies must
+    // never imply membership in an Initiative or Arena.
+    const context = snapshot?.layout_context || {};
+    const nodes = new Map([...(context.nodes || []), ...(snapshot?.graph_nodes || [])].map(n => [n.key,n]));
+    const parents = new Map();
+    for (const edge of [...(context.edges || []), ...(snapshot?.graph_edges || [])]) {
+      if (edge.relationship !== 'HAS_CHILD' && edge.relationship !== 'CONTAINS_WORK') continue;
+      const parent = nodes.get(edge.source);
+      if (!parent || (edge.relationship === 'CONTAINS_WORK' && parent.kind !== 'Arena')) continue;
+      if (edge.relationship === 'HAS_CHILD' && !['Initiative','Project','Issue'].includes(parent.kind)) continue;
+      if (!parents.has(edge.target)) parents.set(edge.target, new Set());
+      parents.get(edge.target).add(edge.source);
+    }
+    const ancestry = new Map();
+    for (const project of projects) {
+      const seen = new Set([project.key]), queue = [...(parents.get(project.key) || [])];
+      for (let index=0; index<queue.length; index++) {
+        const key = queue[index]; if (seen.has(key)) continue;
+        seen.add(key); queue.push(...(parents.get(key) || []));
+      }
+      seen.delete(project.key); ancestry.set(project.key, seen);
+    }
+    const options = (kind, candidates) => [...new Set(candidates.flatMap(n => [...ancestry.get(n.key)]))]
+      .map(key => nodes.get(key)).filter(n => n?.kind === kind)
+      .sort((a,b) => a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
+    const inArena = projects.filter(n => !filters.arena || (nodes.get(filters.arena)?.kind === 'Arena' && ancestry.get(n.key).has(filters.arena)));
+    return {projects:inArena.filter(n => !filters.initiative || (nodes.get(filters.initiative)?.kind === 'Initiative' && ancestry.get(n.key).has(filters.initiative))),
+      arenas:options('Arena',projects), initiatives:options('Initiative',inArena)};
+  }
+
+  function createProjectFilters(storage) {
+    let key = null, value = {arena:'',initiative:''};
+    const clean = raw => Object.fromEntries(['arena','initiative'].map(name => [name, typeof raw?.[name] === 'string' ? raw[name].slice(0,280) : '']));
+    return {
+      get value() { return {...value}; },
+      setPreferenceKey(next) {
+        if (!next || next === key) return;
+        key = next; value = clean(null);
+        try { const saved = JSON.parse(storage.getItem(key)); if (saved?.version === 1) value = clean(saved); } catch { /* Storage is optional. */ }
+      },
+      update(patch) {
+        value = clean({...value,...patch});
+        try { if (key) storage.setItem(key,JSON.stringify({version:1,...value})); } catch { /* Filtering still works. */ }
+      },
+      reset() { key = null; value = clean(null); },
+    };
+  }
+
   // This is a scoped reading aid, not an inferred workflow or completion rollup.
-  function briefing(snapshot) {
+  function briefing(snapshot, filters = {}) {
     const nodes = new Map((snapshot?.graph_nodes || []).filter(n => KINDS.includes(n.kind)).map(n => [n.key, n]));
     const archived = node => node.archived === true || node.status === 'archived';
     const work = [...nodes.values()].filter(n => !archived(n));
@@ -39,9 +88,10 @@
     const order = (a, b) => Number(attention.has(b.key)) - Number(attention.has(a.key)) ||
       (changed.get(`${b.kind}:${b.id}`) || 0) - (changed.get(`${a.kind}:${a.id}`) || 0) ||
       a.title.localeCompare(b.title) || a.key.localeCompare(b.key);
-    const projects = work.filter(n => ['Project','Initiative'].includes(n.kind)).sort(order);
+    const scope = projectScope(snapshot, work.filter(n => n.kind === 'Project'), filters);
+    const projects = scope.projects.sort(order);
     const actions = [...attention.values()].sort((a, b) => order(a.node,b.node));
-    return {projects:projects.slice(0,6), projectTotal:projects.length,
+    return {projects:projects.slice(0,6), projectTotal:projects.length, projectArenas:scope.arenas, projectInitiatives:scope.initiatives,
       attention:actions.slice(0,4).map(row => ({node:row.node, reason:[...row.reasons].join(' · ')})), attentionTotal:actions.length,
       started:work.filter(n => n.todo_progress === 'in_progress').length, reviewing, dependencies:dependencies.size,
       unclassified:work.filter(n => !['not_started','in_progress','done'].includes(n.todo_progress)).length};
@@ -236,5 +286,5 @@
       },
     };
   }
-  return { PAGE_SIZE, query, decode, createController, mount, briefing };
+  return { PAGE_SIZE, query, decode, createController, mount, briefing, createProjectFilters };
 });

@@ -73,6 +73,9 @@ main { container-type:inline-size; }
 .manager-item-meta { font:12px/1.5 var(--sans); color:var(--muted); overflow-wrap:anywhere; }
 .manager-empty { padding:12px 0; color:var(--muted); font:13px/1.5 var(--sans); }
 .manager-note { margin-top:16px; }
+.project-filters { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.project-filters label { display:grid; flex:1 1 130px; gap:4px; min-width:0; color:var(--muted); font:12px/1.4 var(--sans); }
+.project-filters select { width:100%; min-width:0; min-height:36px; padding:6px 8px; color:var(--ink); background:var(--canvas); border:1px solid var(--line); border-radius:8px; font:13px var(--sans); text-overflow:ellipsis; }
 @container (max-width:880px) {
   .manager-columns { grid-template-columns:1fr; gap:16px; }
   .manager-list { max-height:210px; }

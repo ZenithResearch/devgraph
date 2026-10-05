@@ -22,7 +22,7 @@ function refreshMonitor() {
     graphView: { preferenceKey: 'fixture', filters: {}, filterSerial: 0, pointers: new Map(), nodePositions: new Map(), nodeVelocities: new Map() },
     text(id, value) { document.getElementById(id).textContent = value; },
     render(snapshot, observations) { rendered.push({ snapshot, observations }); },
-    invalidateLayout() {}, announceGraph() {}, refreshCheckIn() {}, checkIn: { reset() {} },
+    invalidateLayout() {}, announceGraph() {}, refreshCheckIn() {}, checkIn: { reset() {} }, projectFilters: { reset() {} },
     prepareGraphPreferences() { c.graphView.preferenceKey = 'fixture'; },
     updateGraphVisibility() {}, loadSelectedDetail() {},
     renderManagerOverview() {}, renderActivity() {}, renderObservations() {}, renderPipeline() {}, renderBars() {},
