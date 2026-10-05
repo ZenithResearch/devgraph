@@ -7,6 +7,45 @@
   const PAGE_SIZE = 6;
 
   const KINDS = ['Todo','Proposal','Initiative','Project','Issue','Task'];
+  // This is a scoped reading aid, not an inferred workflow or completion rollup.
+  function briefing(snapshot) {
+    const nodes = new Map((snapshot?.graph_nodes || []).filter(n => KINDS.includes(n.kind)).map(n => [n.key, n]));
+    const archived = node => node.archived === true || node.status === 'archived';
+    const work = [...nodes.values()].filter(n => !archived(n));
+    const attention = new Map(), dependencies = new Set();
+    const add = (node, reason) => {
+      if (!node || archived(node) || node.todo_progress === 'done') return;
+      if (!attention.has(node.key)) attention.set(node.key, {node, reasons:new Set()});
+      attention.get(node.key).reasons.add(reason);
+    };
+    for (const edge of snapshot?.graph_edges || []) {
+      const [dependent, prerequisite] = edge.relationship === 'BLOCKS' ? [edge.target, edge.source] :
+        edge.relationship === 'DEPENDS_ON' ? [edge.source, edge.target] : [];
+      if (!dependent) continue;
+      const node = nodes.get(dependent), other = nodes.get(prerequisite);
+      if (!node || archived(node) || node.todo_progress === 'done' || other?.todo_progress === 'done') continue;
+      dependencies.add(node.key);
+      add(node, other ? `Check dependency: ${other.title}` : 'Dependency outside this view');
+    }
+    let reviewing = 0;
+    for (const node of work) {
+      // Only explicit canonical progress and a recorded stage can establish a review.
+      if (node.todo_progress !== 'in_progress') continue;
+      if (['review','plan_approval'].includes(node.workflow?.column)) { reviewing++; add(node, node.workflow.label || 'Review required'); }
+      if (node.workflow?.column === 'waiting') add(node, node.workflow.label || 'Waiting for input');
+    }
+    const changed = new Map((snapshot?.recent_activity || []).filter(row => row.type === 'work')
+      .map(row => [`${row.label}:${row.id}`, Date.parse(row.timestamp) || 0]));
+    const order = (a, b) => Number(attention.has(b.key)) - Number(attention.has(a.key)) ||
+      (changed.get(`${b.kind}:${b.id}`) || 0) - (changed.get(`${a.kind}:${a.id}`) || 0) ||
+      a.title.localeCompare(b.title) || a.key.localeCompare(b.key);
+    const projects = work.filter(n => ['Project','Initiative'].includes(n.kind)).sort(order);
+    const actions = [...attention.values()].sort((a, b) => order(a.node,b.node));
+    return {projects:projects.slice(0,6), projectTotal:projects.length,
+      attention:actions.slice(0,4).map(row => ({node:row.node, reason:[...row.reasons].join(' · ')})), attentionTotal:actions.length,
+      started:work.filter(n => n.todo_progress === 'in_progress').length, reviewing, dependencies:dependencies.size,
+      unclassified:work.filter(n => !['not_started','in_progress','done'].includes(n.todo_progress)).length};
+  }
   function query(filters = {}, after = null) {
     const params = new URLSearchParams({limit:String(PAGE_SIZE), archived:'exclude', progress:'not_started'});
     if (filters.q?.trim()) params.set('q', filters.q.trim().slice(0, 200));
@@ -197,5 +236,5 @@
       },
     };
   }
-  return { PAGE_SIZE, query, decode, createController, mount };
+  return { PAGE_SIZE, query, decode, createController, mount, briefing };
 });

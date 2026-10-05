@@ -25,7 +25,7 @@ function refreshMonitor() {
     invalidateLayout() {}, announceGraph() {}, refreshCheckIn() {}, checkIn: { reset() {} },
     prepareGraphPreferences() { c.graphView.preferenceKey = 'fixture'; },
     updateGraphVisibility() {}, loadSelectedDetail() {},
-    renderActivity() {}, renderObservations() {}, renderPipeline() {}, renderBars() {},
+    renderManagerOverview() {}, renderActivity() {}, renderObservations() {}, renderPipeline() {}, renderBars() {},
     getJson(path, options) { const task = deferred(); requests.push({ path, options, ...task }); return task.promise; },
   });
   return { c, requests, rendered };

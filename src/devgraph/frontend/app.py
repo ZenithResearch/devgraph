@@ -304,14 +304,27 @@ FRONTEND_HTML = r"""<!doctype html>
         <button class="button" type="submit">Connect</button>
       </form></details>
       <p class="status-line" id="status-line" role="status" aria-live="polite">Enter a scoped read credential to inspect the graph.</p>
-      <section class="daily-check-in" id="daily-check-in" aria-labelledby="todo-title">
-        <article class="card todo-panel">
+      <section class="daily-check-in" id="daily-check-in" aria-label="Daily check-in">
+        <article class="card todo-panel" id="todo-panel" aria-labelledby="todo-title">
           <header class="todo-heading"><div><h1 id="todo-title">Todo</h1><p>Not started · highest priority first</p></div><div class="todo-total"><span>At a glance</span><strong id="todo-count-total">—</strong><span>to start</span></div></header>
           <div class="todo-tools"><label><span class="sr-only">Find work to start</span><input id="todo-search" type="search" maxlength="200" placeholder="Find work to start" autocomplete="off"></label><label><span class="sr-only">Todo type</span><select id="todo-kind"><option value="">All types</option><option>Todo</option><option>Proposal</option><option>Initiative</option><option>Project</option><option>Issue</option><option>Task</option></select></label></div>
-          <p class="todo-scope-note" id="todo-source">All Todo types · Not started · not archived. Unclassified records are excluded.</p>
+          <details class="todo-list-note"><summary>About this list</summary><p class="todo-scope-note" id="todo-source">All Todo types · Not started · not archived. Unclassified records are excluded.</p></details>
           <ul id="todo-items" class="todo-items"></ul>
           <footer class="todo-footer"><span id="todo-page">6 items per page</span><div class="todo-pagination"><button class="graph-control" id="todo-previous" type="button" disabled>Previous</button><button class="graph-control" id="todo-next" type="button" disabled>Next</button></div></footer>
           <div class="todo-update-line"><p id="todo-status" role="status" aria-live="polite">Connect to load work waiting to start.</p><button class="graph-control" id="todo-retry" type="button" hidden>Retry</button><button class="graph-control" id="todo-updates" type="button" hidden>Show updates</button></div>
+        </article>
+        <article class="card manager-panel" id="manager-panel" aria-labelledby="manager-title">
+          <header class="manager-heading"><div><h2 id="manager-title">Project pulse</h2><p id="manager-scope">Current map scope · non-archived work</p></div><a href="/monitor/kanban/">Open board ↗</a></header>
+          <div class="manager-metrics" aria-label="Recorded progress in the current map">
+            <div><strong id="manager-started">—</strong><span>In progress</span></div>
+            <div><strong id="manager-review">—</strong><span>In review</span></div>
+            <div><strong id="manager-dependencies">—</strong><span>Dependencies to check</span></div>
+          </div>
+          <div class="manager-columns">
+            <section aria-labelledby="manager-projects-title"><div class="manager-section-heading"><h3 id="manager-projects-title">Projects & initiatives</h3><span id="manager-projects-count"></span></div><ul class="manager-list" id="manager-projects"><li class="manager-empty">Connect to see your projects.</li></ul></section>
+            <section aria-labelledby="manager-attention-title"><div class="manager-section-heading"><h3 id="manager-attention-title">Needs attention</h3><span id="manager-attention-count"></span></div><ul class="manager-list" id="manager-attention"><li class="manager-empty">Recorded reviews and dependencies appear here.</li></ul></section>
+          </div>
+          <p class="manager-note" id="manager-note">Progress comes from recorded states. Missing states are never counted as completed work.</p>
           <details class="graph-inventory"><summary>Graph inventory</summary><section class="kpis" aria-label="Graph summary">
             <article class="card kpi"><div class="kpi-label">Work items</div><div class="kpi-value" id="total-work">—</div></article>
             <article class="card kpi"><div class="kpi-label">Active initiatives</div><div class="kpi-value" id="active-initiatives">—</div></article>
@@ -1325,8 +1338,33 @@ FRONTEND_HTML = r"""<!doctype html>
       beginArrangement('Reset layout', true); pauseGraphOrbit(); Object.assign(graphView, Topology.defaultCamera); graphView.zoom = 1; graphView.panX = 0; graphView.panY = 0; graphView.fitted = false; syncZoomControls(); graphView.pinnedKey = null; for (const node of graphView.nodes) { graphView.nodePositions.delete(node.key); graphView.nodeVelocities.delete(node.key); } syncGraphPhysics(graphView.nodes); finishArrangement(); relaxGraph(40, null); fitGraph(); announceGraph('Layout reset. Undo positioning is available.');
     }
 
+    function renderManagerOverview(snapshot) {
+      const summary = DevgraphCheckIn.briefing(snapshot);
+      const knownCount = value => !snapshot ? '—' : summary.unclassified ? (value ? `${value}+` : '—') : value;
+      text('manager-started', knownCount(summary.started)); text('manager-review', knownCount(summary.reviewing));
+      text('manager-dependencies', snapshot ? summary.dependencies : '—');
+      text('manager-projects-count', snapshot ? `${summary.projects.length} of ${summary.projectTotal}` : '');
+      text('manager-attention-count', snapshot ? `${summary.attention.length} of ${summary.attentionTotal}` : '');
+      text('manager-scope', `Current map scope · non-archived work${snapshot?.complete === false ? ' · partial view' : ''}`);
+      text('manager-note', !snapshot ? 'Connect to see recorded progress and dependencies.' : summary.unclassified ? `${summary.unclassified} items have no classified progress. Progress and review counts are incomplete; dependencies need checking.` : 'Recorded states only. Dependencies are prompts to check, not verified blockers.');
+      function rows(id, entries, empty) {
+        const desired = make('div');
+        for (const {node, reason} of entries) {
+          const row = make('li'); row.dataset.uiKey = node.key;
+          const button = make('button', 'manager-item'); button.type = 'button'; button.dataset.nodeKey = node.key;
+          button.append(make('span', 'manager-item-title', node.title), make('span', 'manager-item-meta', `${node.kind} · ${reason}`));
+          row.append(button); desired.append(row);
+        }
+        if (!entries.length) desired.append(make('li', 'manager-empty', empty));
+        reconcileChildren(document.getElementById(id), desired);
+      }
+      rows('manager-projects', summary.projects.map(node => ({node, reason:progressLabel(node.todo_progress)})), snapshot ? 'No projects or initiatives in this map scope.' : 'Connect to see your projects.');
+      rows('manager-attention', summary.attention, snapshot ? 'No recorded reviews or unresolved dependencies in this view.' : 'Recorded reviews and dependencies appear here.');
+    }
+
     function render(snapshot, observations) {
       state.snapshot = snapshot;
+      renderManagerOverview(snapshot);
       text('total-work', snapshot.total_work); text('active-initiatives', snapshot.active_initiatives); text('observation-count', snapshot.observation_count); text('pending-receipts', snapshot.pending_receipts);
       text('receipt-note', `${snapshot.receipt_count} records in the local outbox`); const age = relativeTime(snapshot.generated_at); text('generated-at', age === 'now' ? 'updated just now' : `updated ${age} ago`);
       updateGraphVisibility(); renderPipeline(snapshot.observation_by_status); renderBars(snapshot.work_by_kind); renderActivity(snapshot.recent_activity); renderObservations(observations);
@@ -1351,7 +1389,7 @@ FRONTEND_HTML = r"""<!doctype html>
       state.refreshController?.abort(); state.refreshController = null;
       detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null; state.connected = false;
       resetDetailState(); state.snapshot = null; state.observations = []; state.selectedGraphKey = null; graphView.neighborhood = null; graphView.arenaKey = '';
-      checkIn.reset();
+      checkIn.reset(); renderManagerOverview(null);
       invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.hoverRoot=graphView.focusRoot=graphView.selectedRoot=null; graphView.revealSignature=''; graphView.revealCache=null; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
       ['total-work', 'active-initiatives', 'observation-count', 'pending-receipts'].forEach(id => text(id, '—'));
       renderActivity([]); renderObservations([]); renderPipeline({}); renderBars({});
@@ -1701,11 +1739,16 @@ FRONTEND_HTML = r"""<!doctype html>
       title: document.getElementById('reader-title'), fallbackFocus: graphSvg, onRestore: syncReaderPresentation,
     });
     const checkIn = DevgraphCheckIn.mount({
-      root: document.getElementById('daily-check-in'), request: getJson, reconcile: reconcileChildren,
+      root: document.getElementById('todo-panel'), request: getJson, reconcile: reconcileChildren,
       onSelect(item, {modal, returnFocus}) {
         const node = item.kind === 'Todo' ? {...item, key:`Todo:${item.id}`, category:'todo'} : workNode(item);
         if (modal) openNodeReaderModal(node, returnFocus); else selectGraphNode(node);
       },
+    });
+    document.getElementById('manager-panel').addEventListener('click', event => {
+      const trigger = event.target.closest('[data-node-key]');
+      const node = state.snapshot?.graph_nodes.find(item => item.key === trigger?.dataset.nodeKey);
+      if (node) openNodeReaderModal(node, trigger);
     });
     refreshCheckIn(false);
     const nodeChooser = DevgraphChooser.create({

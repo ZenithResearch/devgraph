@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+- Make the daily Todo queue a compact vertical panel and give the main check-in area to scoped project progress, reviews and dependency follow-up. Preserve exact Todo counts and keep unclassified history explicit.
+
 ### Added
 
 - Add the separately signed Work v2 protocol with base Todo, progress attestations, restoration and proposal rejection — shared consumers can adopt progress without changing historical v1 bytes.
