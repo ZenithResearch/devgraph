@@ -30,21 +30,30 @@ for the query contract, signed profile, limits, and compatibility details.
 
 ## Current capabilities
 
-The opening **Daily check-in** replaces the promotional heading and primary
-inventory tiles with a paged Todo list and a review/draft summary. It reads
-**exact base Todo records only**; Proposal, Initiative, Project, Issue, and Task
-are excluded. The [Todo API](../monitor-todos-v1.md) supplies complete filtered
-counts independently of the topology. Accepted is a lifecycle state, not a
-claim that delivery is complete. No due dates or department ownership are inferred.
+The opening **Daily check-in** is a Todo list of **not-started work**, highest
+priority first. It prefers exact base Todo records, excluding every subtype.
+If the server has no base Todo read capability (404/501), it instead reads only
+Tasks with **no parent Issue, Project, or Initiative**. A successful empty Todo
+response stays empty; authorization failures and transient outages never trigger
+fallback. The source is labelled above the list. No records are created or changed.
 
-Search, lifecycle, and current/archived preferences persist within the read
-context; authorization is never part of those preferences. Six items render
-per page. Refresh keeps the focused list stable and offers **Show updates**
-when new content arrives during keyboard reading. Click opens the shared side
-reader, and right-click or Shift+F10 opens its modal. A missing Todo API shows
-an unavailable state rather than fabricated records or zero counts. Graph-wide
-inventory remains available in a disclosure. The main/supporting columns use
-golden-ratio proportions and stack on narrow screens.
+Older records qualify only with Draft lifecycle status. Where a workflow is
+recorded, only its explicit Backlog stage qualifies; archived records are always
+excluded. A compact **At a glance** total counts the entire matching list, not
+just the six visible rows. Larger priority numbers sort first, with ID as the
+tie-breaker, without rounding signed 64-bit values.
+
+Search persists within the read context; credentials and source detection do not.
+Six items render per page. Refresh keeps the focused list stable and offers
+**Show updates** when content changes during keyboard reading. Click opens the
+shared side reader, and right-click or Shift+F10 opens its modal. Graph-wide
+inventory remains in a disclosure. The list spans the available width and wraps
+on narrow screens; the graph/reader retain their golden-ratio layout.
+
+The [Todo API](../monitor-todos-v1.md) and [Work board API](kanban.md) apply queue,
+priority and parentage filters before counting and pagination. The live preview
+can use the installed older host through its read-only Work projection without
+migrating that host or inventing workflow stages.
 
 An unselected reader offers **Find an item** and **Browse visible items**.
 Overlapping map targets open a bounded, counted item chooser with

@@ -305,27 +305,20 @@ FRONTEND_HTML = r'''<!doctype html>
       </form></details>
       <p class="status-line" id="status-line" role="status" aria-live="polite">Enter a scoped read credential to inspect the graph.</p>
       <section class="daily-check-in" id="daily-check-in" aria-labelledby="todo-title">
-        <div class="check-in-layout">
-          <article class="card todo-panel">
-            <header class="todo-heading"><div><h1 id="todo-title">Todo</h1><p>Priorities and items ready for review.</p></div><span class="todo-scope">Base Todos only</span></header>
-            <div class="todo-tools"><label><span class="sr-only">Find a Todo</span><input id="todo-search" type="search" maxlength="200" placeholder="Find a Todo" autocomplete="off"></label><select id="todo-archive" aria-label="Todo archive visibility"><option value="exclude">Current Todos</option><option value="only">Archived Todos</option></select></div>
-            <div class="todo-filter-tabs" role="group" aria-label="Todo status"><button type="button" class="graph-control" data-todo-status="" aria-pressed="true">All</button><button type="button" class="graph-control" data-todo-status="review" aria-pressed="false">In review</button><button type="button" class="graph-control" data-todo-status="draft" aria-pressed="false">Draft</button><button type="button" class="graph-control" data-todo-status="accepted" aria-pressed="false">Accepted</button></div>
-            <ul id="todo-items" class="todo-items"></ul>
-            <footer class="todo-footer"><span id="todo-page">6 items per page</span><div class="todo-pagination"><button class="graph-control" id="todo-previous" type="button" disabled>Previous</button><button class="graph-control" id="todo-next" type="button" disabled>Next</button></div></footer>
-            <div class="todo-update-line"><p id="todo-status" role="status" aria-live="polite">Connect to load your Todos.</p><button class="graph-control" id="todo-retry" type="button" hidden>Retry</button><button class="graph-control" id="todo-updates" type="button" hidden>Show updates</button></div>
-          </article>
-          <aside class="card check-in-summary" aria-label="Todo check-in summary">
-            <h2>At a glance</h2><p>Start with review decisions, then check what is still taking shape.</p>
-            <dl class="check-in-counts"><div><dt>In review</dt><dd id="todo-count-review">—</dd></div><div><dt>Draft</dt><dd id="todo-count-draft">—</dd></div><div><dt>Accepted</dt><dd id="todo-count-accepted">—</dd></div><div><dt>All matching Todos</dt><dd id="todo-count-total">—</dd></div></dl>
-            <p class="summary-note">Counts include all pages matching your search and archive choice. Accepted items may still have delivery work to finish.</p>
-            <details class="graph-inventory"><summary>Graph inventory</summary><section class="kpis" aria-label="Graph summary">
-        <article class="card kpi"><div class="kpi-label">Work items</div><div class="kpi-value" id="total-work">—</div><div class="kpi-note">in your work graph</div></article>
-        <article class="card kpi"><div class="kpi-label">Active initiatives</div><div class="kpi-value" id="active-initiatives">—</div><div class="kpi-note">current larger efforts</div></article>
-        <article class="card kpi"><div class="kpi-label">Observations</div><div class="kpi-value" id="observation-count">—</div><div class="kpi-note">interpretations supported by evidence</div></article>
-        <article class="card kpi"><div class="kpi-label">Pending records</div><div class="kpi-value" id="pending-receipts">—</div><div class="kpi-note" id="receipt-note">Changes recorded; processing pending</div></article>
-            </section></details>
-          </aside>
-        </div>
+        <article class="card todo-panel">
+          <header class="todo-heading"><div><h1 id="todo-title">Todo</h1><p>Not started · highest priority first</p></div><div class="todo-total"><span>At a glance</span><strong id="todo-count-total">—</strong><span>to start</span></div></header>
+          <div class="todo-tools"><label><span class="sr-only">Find work to start</span><input id="todo-search" type="search" maxlength="200" placeholder="Find work to start" autocomplete="off"></label></div>
+          <p class="todo-scope-note" id="todo-source">Base Todos · not started. Older Draft records count as not started.</p>
+          <ul id="todo-items" class="todo-items"></ul>
+          <footer class="todo-footer"><span id="todo-page">6 items per page</span><div class="todo-pagination"><button class="graph-control" id="todo-previous" type="button" disabled>Previous</button><button class="graph-control" id="todo-next" type="button" disabled>Next</button></div></footer>
+          <div class="todo-update-line"><p id="todo-status" role="status" aria-live="polite">Connect to load work waiting to start.</p><button class="graph-control" id="todo-retry" type="button" hidden>Retry</button><button class="graph-control" id="todo-updates" type="button" hidden>Show updates</button></div>
+          <details class="graph-inventory"><summary>Graph inventory</summary><section class="kpis" aria-label="Graph summary">
+            <article class="card kpi"><div class="kpi-label">Work items</div><div class="kpi-value" id="total-work">—</div></article>
+            <article class="card kpi"><div class="kpi-label">Active initiatives</div><div class="kpi-value" id="active-initiatives">—</div></article>
+            <article class="card kpi"><div class="kpi-label">Observations</div><div class="kpi-value" id="observation-count">—</div></article>
+            <article class="card kpi"><div class="kpi-label">Pending records</div><div class="kpi-value" id="pending-receipts">—</div><div class="kpi-note" id="receipt-note"></div></article>
+          </section></details>
+        </article>
       </section>
       <section class="card graph-card" id="topology">
         <div class="graph-toolbar">
@@ -1345,7 +1338,7 @@ FRONTEND_HTML = r'''<!doctype html>
       const date = new Date(), stamp = document.getElementById('check-in-date');
       stamp.dateTime = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
       stamp.textContent = date.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});
-      checkIn.setPreferenceKey(graphView.preferenceKey ? `${graphView.preferenceKey}:todos` : null);
+      checkIn.setPreferenceKey(graphView.preferenceKey ? `${graphView.preferenceKey}:start-queue` : null);
       if (load) checkIn.refresh();
     }
 
@@ -1706,7 +1699,7 @@ FRONTEND_HTML = r'''<!doctype html>
     const checkIn = DevgraphCheckIn.mount({
       root: document.getElementById('daily-check-in'), request: getJson, reconcile: reconcileChildren,
       onSelect(item, {modal, returnFocus}) {
-        const node = {...item, key:`Todo:${item.id}`, category:'todo'};
+        const node = item.kind === 'Todo' ? {...item, key:`Todo:${item.id}`, category:'todo'} : workNode(item);
         if (modal) openNodeReaderModal(node, returnFocus); else selectGraphNode(node);
       },
     });

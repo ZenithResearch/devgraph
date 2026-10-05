@@ -6,33 +6,51 @@ import vm from 'node:vm';
 import {deferred, contextWithFunctions, treeDocument, fakeClock, flushPromises} from './monitor_test_helpers.mjs';
 const require = createRequire(import.meta.url);
 const CheckIn = require('../../src/devgraph/frontend/static/topology/check-in.js');
-const item = (id = 'a') => ({kind:'Todo', id, title:'Review the plan', status:'review', priority:'2', version:'1', updated_at:'2026-10-04T12:00:00Z'});
-const page = (items = [item()], extra = {}) => ({schema:'devgraph.todos.v1', generated_at:'2026-10-04T12:00:00Z', items, counts:{total:items.length, review:items.length, draft:0, accepted:0, archived:0}, has_more:false, next_after_id:null, ...extra});
+const item = (id = 'a') => ({kind:'Todo', id, title:'Start the plan', status:'draft', priority:'2', version:'1', archived:false});
+const page = (items = [item()], extra = {}) => {
+  const total=extra.counts?.total ?? items.length;
+  return {schema:'devgraph.todos.v1', generated_at:extra.generated_at || '2026-10-04T12:00:00Z', items,
+    counts:{total}, matching_count:total, has_more:extra.has_more || false,
+    next_after_id:extra.next_after_id ?? null, next_after_priority:extra.has_more ? items.at(-1).priority : null};
+};
+const taskPage = (items = [{...item(),kind:'Task',key:'Task/a',lifecycle:'draft',parent:null,stage:null,column:'backlog'}], extra = {}) => ({
+  schema:'devgraph.kanban.v1',revision:'r1',total:items.length,columns:[{id:'backlog',count:items.length,items,next_cursor:null}], ...extra,
+});
 
-test('base Todo reads have independent, bounded filters and an encoded cursor', () => {
-  const path = CheckIn.query({status:'review', archived:'only', q:'hello & goodbye', work_kind:['Task']}, 'todo:a');
-  const url = new URL(path,'https://localhost');
+test('base Todo queue is first choice; standalone Task fallback uses server filtering and priority cursors', () => {
+  let url = new URL(CheckIn.query({q:'hello & goodbye'}, {key:'todo:a',priority:'9223372036854775807'}),'https://localhost');
   assert.equal(url.pathname,'/monitor/todos/v1');
-  assert.deepEqual([...url.searchParams], [['limit','6'],['archived','only'],['status','review'],['q','hello & goodbye'],['after_id','todo:a']]);
+  assert.equal(url.searchParams.get('queue'),'not_started'); assert.equal(url.searchParams.get('order'),'priority');
+  assert.equal(url.searchParams.get('after_priority'),'9223372036854775807');
+  assert.equal(url.searchParams.get('q'),'hello & goodbye');
+  url = new URL(CheckIn.query({}, {key:'Task/a',revision:'r1'}, 'task'),'https://localhost');
+  assert.equal(url.pathname,'/monitor/kanban/v1');
+  for (const [key,value] of Object.entries({kind:'Task',parentage:'standalone',column:'backlog',after:'Task/a',revision:'r1'})) assert.equal(url.searchParams.get(key),value);
 });
 
-test('every concrete Todo subtype is rejected rather than included in the daily list', () => {
-  for (const kind of ['Proposal','Initiative','Project','Issue','Task']) assert.throws(() => CheckIn.decode(page([{...item(),kind}])));
-  assert.equal(CheckIn.decode(page()).items[0].kind, 'Todo');
+test('base Todos never admit subtypes; fallback never admits parented Tasks or other kinds', () => {
+  assert.equal(CheckIn.decode(page()).items[0].key,'Todo/a');
+  for (const kind of ['Proposal','Initiative','Project','Issue','Task']) assert.throws(()=>CheckIn.decode(page([{...item(),kind}])));
+  assert.equal(CheckIn.decode(taskPage(), 'task').items[0].key,'Task/a');
+  for (const parent of ['Issue/i','Project/p','Initiative/n']) {
+    const data=taskPage(); data.columns[0].items[0].parent=parent;
+    assert.throws(()=>CheckIn.decode(data,'task'));
+  }
 });
 
-test('legacy timestamps and lossless signed64 metadata remain readable', () => {
-  const value = page([{...item(), version:'9223372036854775807', priority:'-9223372036854775808', updated_at:null}]);
-  assert.equal(CheckIn.decode(value).items[0].priority, '-9223372036854775808');
-  assert.throws(() => CheckIn.decode(page([{...item(),version:'0'}])));
+test('fallback excludes started or archived work and preserves exact signed64 priorities', () => {
+  for (const change of [{stage:'intake'},{stage:'done'},{lifecycle:'review'},{lifecycle:'accepted'},{lifecycle:'archived'}]) {
+    const data=taskPage(); Object.assign(data.columns[0].items[0],change); assert.throws(()=>CheckIn.decode(data,'task'));
+  }
+  assert.equal(CheckIn.decode(page([{...item(),priority:'-9223372036854775808'}])).items[0].priority,'-9223372036854775808');
 });
 
-test('invalid count, duplicate identity, oversized page, and non-advancing cursor fail closed', () => {
+test('invalid count, duplicate identity, oversized page, and invalid cursor fail closed', () => {
   assert.throws(() => CheckIn.decode(page([item(),item()])));
   assert.throws(() => CheckIn.decode(page(Array.from({length:7},(_,i)=>item(String(i))))));
-  assert.throws(() => CheckIn.decode(page([], {has_more:true,next_after_id:'a'})));
-  assert.throws(() => CheckIn.decode(page([item()], {has_more:true,next_after_id:'b'})));
-  assert.throws(() => CheckIn.decode(page([], {counts:{total:-1,review:0,draft:0,accepted:0,archived:0}})));
+  assert.throws(() => CheckIn.decode({...page(), next_after_id:'a'}));
+  assert.throws(() => CheckIn.decode({...page(), has_more:true}));
+  assert.throws(() => CheckIn.decode(page([], {counts:{total:-1}})));
 });
 
 function harness() {
@@ -52,7 +70,7 @@ test('credential reset aborts and discards old results even if transport ignores
 
 test('a filter change rejects late unfiltered results and resets pagination', async () => {
   const {controller,requests}=harness(); const first=controller.refresh();
-  const filtered=controller.filter({status:'review'});
+  const filtered=controller.filter({q:'review'});
   requests[1].resolve(page([item('review')])); await filtered;
   requests[0].resolve(page([item('old')])); await first;
   assert.equal(controller.view.data.items[0].id,'review');
@@ -72,13 +90,34 @@ test('pagination uses server cursors, and a failed next page retains the current
   assert.equal(controller.view.page,0);
 });
 
-test('unsupported server is distinct from zero Todos and waits for explicit retry', async () => {
+test('missing base capability falls back once, while empty base Todos do not broaden the list', async () => {
   const {controller,requests}=harness(); const pending=controller.refresh();
-  requests[0].reject(Object.assign(new Error('old host'),{status:501})); await pending;
-  assert.equal(controller.view.status,'unsupported'); assert.equal(controller.view.data,null);
-  await controller.refresh(); assert.equal(requests.length,1);
-  const retry=controller.refresh({force:true}); requests[1].resolve(page([])); await retry;
-  assert.equal(controller.view.status,'ready'); assert.equal(controller.view.data.counts.total,0);
+  requests[0].reject(Object.assign(new Error('old host'),{status:501})); await flushPromises();
+  assert.match(requests[1].path,/kind=Task&parentage=standalone/);
+  requests[1].resolve(taskPage()); await pending;
+  assert.equal(controller.view.data.source,'task');
+  const again=controller.refresh(); assert.match(requests[2].path,/kanban/); requests[2].resolve(taskPage()); await again;
+  controller.reset(); const empty=controller.refresh(); requests[3].resolve(page([])); await empty;
+  assert.equal(controller.view.data.source,'todo'); assert.equal(controller.view.data.counts.total,0);
+  assert.equal(requests.length,4);
+});
+
+test('authorization and transient Todo failures never trigger fallback', async () => {
+  for (const status of [401,403,400,503]) {
+    const {controller,requests}=harness(); const pending=controller.refresh();
+    requests[0].reject(Object.assign(new Error('failure'),{status})); await pending;
+    assert.equal(requests.length,1); assert.equal(controller.view.status,'error');
+  }
+});
+
+test('a changed fallback board keeps old rows and retries from the first page', async () => {
+  const {controller,requests}=harness(); let pending=controller.refresh();
+  requests[0].reject(Object.assign(new Error('old host'),{status:404})); await flushPromises();
+  const data=taskPage(); data.columns[0].next_cursor='Task/a'; requests[1].resolve(data); await pending;
+  pending=controller.next(); requests[2].reject(Object.assign(new Error('changed'),{status:409})); await pending;
+  assert.equal(controller.view.data.items[0].id,'a'); assert.match(controller.view.error,/list changed/);
+  pending=controller.refresh({force:true}); assert.doesNotMatch(requests[3].path,/after=/);
+  requests[3].resolve(taskPage()); await pending; assert.equal(controller.view.page,0);
 });
 
 test('revoked access clears previous rows and counts', async () => {
@@ -120,16 +159,11 @@ function mounted({saved = {}, denyStorage = false} = {}) {
   };
   doc.body = doc.createElement('body'); doc.documentElement = doc.createElement('html'); doc.body.focus();
   const root = doc.createElement('section'), elements = new Map(); doc.body.append(root);
-  for (const id of ['todo-items','todo-status','todo-updates','todo-retry','todo-previous','todo-next','todo-count-total','todo-count-review','todo-count-draft','todo-count-accepted','todo-page','todo-search','todo-archive']) {
-    const node = doc.createElement(id === 'todo-items' ? 'ul' : id === 'todo-search' ? 'input' : id === 'todo-archive' ? 'select' : /updates|retry|previous|next/.test(id) ? 'button' : 'span');
+  for (const id of ['todo-items','todo-status','todo-updates','todo-retry','todo-previous','todo-next','todo-count-total','todo-page','todo-search','todo-source']) {
+    const node = doc.createElement(id === 'todo-items' ? 'ul' : id === 'todo-search' ? 'input' : /updates|retry|previous|next/.test(id) ? 'button' : 'span');
     node.id = id; elements.set(id, node); root.append(node);
   }
-  elements.get('todo-archive').value = 'exclude';
-  const statusButtons = ['', 'review', 'draft', 'accepted'].map(value => {
-    const button = doc.createElement('button'); button.dataset.todoStatus = value; root.append(button); return button;
-  });
   root.querySelector = selector => elements.get(selector.slice(1));
-  root.querySelectorAll = selector => { assert.equal(selector, '[data-todo-status]'); return statusButtons; };
   const stored = new Map(Object.entries(saved)), writes = [], requests = [], selections = [];
   const context = contextWithFunctions(['reconcileChildren'], {
     document: doc, AbortController, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
@@ -144,7 +178,7 @@ function mounted({saved = {}, denyStorage = false} = {}) {
     onSelect(value, options) {selections.push({value, options});},
   });
   const list = elements.get('todo-items');
-  return {controller, doc, root, elements, statusButtons, stored, writes, requests, selections, clock, list,
+  return {controller, doc, root, elements, stored, writes, requests, selections, clock, list,
     first: () => list.querySelector('button'),
     async load(value = page()) {const pending = controller.refresh(); requests.at(-1).resolve(value); await pending;},
   };
@@ -168,7 +202,7 @@ test('focused rows keep their matching counts and selection snapshot until the l
   await f.load(page([item('latest'),item('latest-2'),item('latest-3')]));
   // Safari pointer activation need not focus a button before dispatching click.
   f.elements.get('todo-updates').emit('click');
-  assert.equal(f.first().dataset.todoId, 'latest');
+  assert.equal(f.first().dataset.todoId, 'Todo/latest');
   assert.equal(f.doc.activeElement, f.first());
   assert.equal(f.elements.get('todo-updates').hidden, true);
   assert.equal(f.elements.get('todo-count-total').textContent, '3');
@@ -181,14 +215,11 @@ test('background changes update counts without moving focus outside the Todo lis
   await f.load(page([{...item('draft'),status:'draft'}], {counts:{total:9,review:4,draft:3,accepted:2,archived:0}}));
   assert.equal(f.doc.activeElement, search);
   assert.equal(f.elements.get('todo-count-total').textContent, '9');
-  assert.equal(f.elements.get('todo-count-review').textContent, '4');
-  assert.equal(f.elements.get('todo-count-draft').textContent, '3');
-  assert.equal(f.elements.get('todo-count-accepted').textContent, '2');
   assert.match(f.elements.get('todo-page').textContent, /1 shown/);
 });
 
 test('credential reset clears deferred private rows, counts and controls, aborts work, and preserves scoped saves', async () => {
-  const key = 'identity-one:todos', saved = JSON.stringify({version:1,status:'review',archived:'only',q:'private search'});
+  const key = 'identity-one:todos', saved = JSON.stringify({version:3,q:'private search'});
   const f = mounted({saved:{[key]:saved}}); f.controller.setPreferenceKey(key); await f.load(); f.first().focus();
   await f.load(page([item('deferred')]));
   const pending = f.controller.refresh(); const request = f.requests.at(-1);
@@ -197,36 +228,34 @@ test('credential reset clears deferred private rows, counts and controls, aborts
   assert.equal(request.options.signal.aborted, true); assert.equal(f.first(), null);
   assert.equal(f.elements.get('todo-count-total').textContent, '—');
   assert.equal(f.elements.get('todo-updates').hidden, true);
-  assert.equal(f.elements.get('todo-search').value, ''); assert.equal(f.elements.get('todo-archive').value, 'exclude');
-  assert.equal(f.controller.view.filters.status, ''); assert.equal(f.clock.timers.size, 0);
+  assert.equal(f.elements.get('todo-search').value, '');
+  assert.equal(f.controller.view.filters.q, ''); assert.equal(f.clock.timers.size, 0);
   request.resolve(page([item('stale')])); await pending;
   assert.equal(f.first(), null); assert.equal(f.stored.get(key), saved);
   f.controller.setPreferenceKey(key);
   assert.equal(f.elements.get('todo-search').value, 'private search');
-  assert.equal(f.statusButtons[1].getAttribute('aria-pressed'), 'true');
 });
 
 test('revoked access immediately clears a focused deferred list and every count', async () => {
   const f = mounted(); await f.load(); f.first().focus(); await f.load(page([item('new')]));
   const pending = f.controller.refresh(); f.requests.at(-1).reject(Object.assign(new Error('Denied'), {status:403})); await pending;
   assert.equal(f.first(), null); assert.equal(f.elements.get('todo-updates').hidden, true);
-  for (const key of ['total','review','draft','accepted']) assert.equal(f.elements.get('todo-count-' + key).textContent, '—');
+  for (const key of ['total']) assert.equal(f.elements.get('todo-count-' + key).textContent, '—');
   assert.match(f.elements.get('todo-status').textContent, /Access denied/);
 });
 
 test('scoped saved filters apply before the first request and UI changes persist only that scope', async () => {
   const key = 'identity-one:todos', other = 'graph-preferences';
-  const f = mounted({saved:{[key]:JSON.stringify({version:1,status:'review',archived:'only',q:'retained'}),[other]:'unchanged'}});
+  const f = mounted({saved:{[key]:JSON.stringify({version:3,q:'retained'}),[other]:'unchanged'}});
   f.controller.setPreferenceKey(key);
   await f.load(); const first = new URL(f.requests[0].path, 'https://localhost');
-  assert.equal(first.searchParams.get('status'), 'review'); assert.equal(first.searchParams.get('q'), 'retained');
-  assert.equal(first.searchParams.get('archived'), 'only');
+  assert.equal(first.pathname, '/monitor/todos/v1'); assert.equal(first.searchParams.get('q'), 'retained');
+  assert.equal(first.searchParams.get('archived'), 'exclude');
   f.elements.get('todo-search').value = 'revised'; f.elements.get('todo-search').emit('input'); f.clock.expireAll();
   assert.equal(f.requests.length, 2); assert.match(f.requests[1].path, /q=revised/);
-  assert.deepEqual(JSON.parse(f.stored.get(key)), {version:1,status:'review',archived:'only',q:'revised'});
+  assert.deepEqual(JSON.parse(f.stored.get(key)), {version:3,q:'revised'});
   f.requests[1].resolve(page([])); await flushPromises();
-  f.elements.get('todo-archive').value = 'exclude'; f.elements.get('todo-archive').emit('change');
-  assert.equal(JSON.parse(f.stored.get(key)).status, ''); assert.equal(f.stored.get(other), 'unchanged');
+  assert.equal(f.stored.get(other), 'unchanged');
   assert.ok(f.writes.every(write => write.key === key));
   f.requests.at(-1).resolve(page([])); await flushPromises();
 });
@@ -234,10 +263,10 @@ test('scoped saved filters apply before the first request and UI changes persist
 test('malformed or unavailable preference storage does not prevent filtering and data display', async () => {
   for (const options of [{saved:{prefs:'not json'}}, {denyStorage:true}]) {
     const f = mounted(options); f.controller.setPreferenceKey('prefs');
-    assert.equal(f.controller.view.filters.status, ''); assert.equal(f.elements.get('todo-search').value, '');
-    f.statusButtons[1].emit('click');
-    assert.match(f.requests[0].path, /status=review/);
-    f.requests[0].resolve(page()); await flushPromises(); assert.equal(f.first().dataset.todoId, 'a');
+    assert.equal(f.controller.view.filters.q, ''); assert.equal(f.elements.get('todo-search').value, '');
+    f.elements.get('todo-search').value='plan'; f.elements.get('todo-search').emit('input'); f.clock.expireAll();
+    assert.match(f.requests[0].path, /q=plan/);
+    f.requests[0].resolve(page()); await flushPromises(); assert.equal(f.first().dataset.todoId, 'Todo/a');
   }
 });
 
@@ -246,10 +275,10 @@ test('last-page Next and first-page Previous recover lost button focus to the ne
   const next = f.elements.get('todo-next'); next.focus(); const advancing = next.emit('click');
   f.requests.at(-1).resolve(page([item('b')])); await advancing;
   assert.equal(next.disabled, true); assert.equal(f.doc.activeElement, f.first());
-  assert.equal(f.first().dataset.todoId, 'b'); assert.equal(f.elements.get('todo-updates').hidden, true);
+  assert.equal(f.first().dataset.todoId, 'Todo/b'); assert.equal(f.elements.get('todo-updates').hidden, true);
   const previous = f.elements.get('todo-previous'); previous.focus(); const returning = previous.emit('click');
   f.requests.at(-1).resolve(page([item('a')], {has_more:true,next_after_id:'a'})); await returning;
-  assert.equal(previous.disabled, true); assert.equal(f.doc.activeElement, f.first()); assert.equal(f.first().dataset.todoId, 'a');
+  assert.equal(previous.disabled, true); assert.equal(f.doc.activeElement, f.first()); assert.equal(f.first().dataset.todoId, 'Todo/a');
 });
 
 test('pagination preserves an enabled trigger and does not reclaim focus moved elsewhere', async () => {
@@ -260,7 +289,7 @@ test('pagination preserves an enabled trigger and does not reclaim focus moved e
   pending = next.emit('click'); f.elements.get('todo-search').focus();
   f.requests.at(-1).resolve(page([item('c')])); await pending;
   assert.equal(f.doc.activeElement, f.elements.get('todo-search'));
-  assert.equal(f.first().dataset.todoId, 'c');
+  assert.equal(f.first().dataset.todoId, 'Todo/c');
 });
 
 test('credential reset during pagination prevents later focus recovery or data resurrection', async () => {
@@ -293,5 +322,5 @@ test('a refresh returning to the displayed revision clears obsolete deferred upd
   assert.equal(f.elements.get('todo-updates').hidden, true);
   assert.ok(f.first() === button); assert.ok(f.doc.activeElement === button);
   f.elements.get('todo-updates').emit('click');
-  assert.ok(f.first() === button); assert.equal(f.first().dataset.todoId, 'a');
+  assert.ok(f.first() === button); assert.equal(f.first().dataset.todoId, 'Todo/a');
 });

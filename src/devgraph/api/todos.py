@@ -25,6 +25,9 @@ def register_todos(app: FastAPI, services):
             ("archived", {"type": "string", "enum": ["exclude", "include", "only"],
                           "default": "exclude"}),
             ("q", {"type": "string", "maxLength": 200}),
+            ("queue", {"type": "string", "enum": ["not_started"]}),
+            ("order", {"type": "string", "enum": ["id", "priority"], "default": "id"}),
+            ("after_priority", {"type": "string", "maxLength": 20}),
         )
     ]
 

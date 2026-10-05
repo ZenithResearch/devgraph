@@ -69,7 +69,14 @@ Authenticated reads:
 Board query keys: `scope=Kind/id`, `descendants=true|false`, repeated `kind`,
 `workflow`, `stage`, `column`, `q`, `archived=exclude|include|only`, `limit=1..100`,
 `after=Kind/id` and `revision`. A continuation needs one column and its previous
-revision. Legacy absence uses `workflow=unset` or `stage=unset`.
+revision. Optional `queue=not_started` includes only non-archived explicit Backlog
+or legacy Draft work. `parentage=standalone` excludes any item with a recorded
+Work parent, including archived parents. The default is `parentage=any`.
+`order=priority` sorts descending by exact signed 64-bit priority, then canonical
+key ascending; default `order=key` preserves existing ordering. Priority cursors
+must still belong to the filtered column, and a containment change invalidates
+the board revision. Search compares redacted displayed titles and IDs.
+Legacy absence uses `workflow=unset` or `stage=unset`.
 
 ```sh
 devgraph query workflows

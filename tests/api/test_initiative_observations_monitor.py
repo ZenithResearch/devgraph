@@ -174,7 +174,7 @@ def test_official_frontend_is_dependency_free_and_never_embeds_a_credential() ->
     assert monitor_alias.text == response.text
     assert response.headers["content-type"].startswith("text/html")
     assert 'id="daily-check-in"' in response.text
-    assert "Base Todos only" in response.text
+    assert "Not started · highest priority first" in response.text
     assert "Work map" in response.text
     assert "renderGraph" in response.text
     assert "Orbit: off" in response.text

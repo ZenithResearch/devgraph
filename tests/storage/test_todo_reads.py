@@ -138,3 +138,48 @@ def test_empty_page_after_end_and_full_page_use_cursor_relative_count():
     ])
     result = storage.todo_page(TodoQuery(after_id="b", limit=1))
     assert len(result.nodes) == 2 and result.remaining_count == 3
+
+
+def test_priority_queue_metadata_and_hydration_agree_across_adapters():
+    rows = [row("a", priority=-9223372036854775808), row("z", priority=9223372036854775807)]
+    storage, calls = _storage_with_row_batches(rows, rows)
+    memory = MemoryGraphStorage()
+    for r in rows:
+        memory.create_node("Todo", r["id"], {
+            k: v for k, v in r["properties"].items() if k not in ("id", "archived")})
+    query = TodoQuery(queue="not_started", order="priority", limit=1)
+    result = storage.todo_page(query)
+    assert result == memory.todo_page(query)
+    assert [n.id for n in result.nodes] == ["z", "a"]
+    assert ".priority, .workflow_json" in calls[0][0].text
+    assert calls[0][1]["source_limit"] == SEARCH_SOURCE_LIMIT + 1
+    assert calls[1][1]["ids"] == ["z", "a"]
+    changed = deepcopy(rows)
+    changed[1]["properties"]["priority"] = 0
+    storage, _ = _storage_with_row_batches(rows, changed)
+    with pytest.raises(StorageUnavailable, match="changed"):
+        storage.todo_page(query)
+
+
+def test_queue_obeys_recorded_workflow_instead_of_assuming_every_draft_is_unstarted():
+    from devgraph.storage.todos import select_todo_page
+    from devgraph.workflow_contract import WorkflowState, encode_state
+
+    storage = MemoryGraphStorage()
+    records = []
+    for key, state, status in [
+        ("old-draft", None, "draft"), ("old-review", None, "review"),
+        ("old-accepted", None, "accepted"), ("backlog", "backlog", "accepted"),
+        ("started", "intake", "draft"),
+    ]:
+        props = row(key)["properties"]
+        props.update(status=status, workflow_json=encode_state(
+            WorkflowState(workflow_id="execution.v1", stage=state)) if state else None)
+        records.append(NodeRecord("Todo", key, props))
+    result = select_todo_page(records, TodoQuery(queue="not_started", order="priority"))
+    assert [n.id for n in result.nodes] == ["backlog", "old-draft"]
+    assert result.counts["total"] == 2
+    storage._nodes = {("Todo", "invalid"): NodeRecord("Todo", "invalid", {
+        **row()["properties"], "workflow_json": "invalid"})}
+    with pytest.raises(StorageUnavailable, match="workflow"):
+        storage.todo_page(TodoQuery(queue="not_started"))

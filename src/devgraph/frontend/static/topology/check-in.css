@@ -3,19 +3,14 @@
 .check-in-date time { font-variant-numeric:tabular-nums; }
 .topbar .topbar-preferences { flex-direction:row; align-items:center; gap:20px; }
 .daily-check-in { margin:16px 0 24px; }
-.check-in-layout { display:grid; grid-template-columns:minmax(0,1.618fr) minmax(240px,1fr); gap:20px; }
-.todo-panel,.check-in-summary { min-width:0; padding:clamp(16px,2vw,24px); }
+.todo-panel { padding:24px; }
 .todo-heading { display:flex; justify-content:space-between; align-items:baseline; gap:16px; margin-bottom:20px; }
 .todo-heading h1 { margin:0; font:600 24px/1.2 var(--sans); letter-spacing:-.025em; }
 .todo-heading p { margin:6px 0 0; font-size:13px; color:var(--muted); }
-.todo-scope { font-size:12px; color:var(--muted); white-space:nowrap; }
 .todo-tools { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
 .todo-tools label { flex:1 1 180px; }
-.todo-tools input,.todo-tools select { width:100%; min-height:40px; padding:8px 10px; background:var(--canvas); border:1px solid var(--line); border-radius:8px; font:13px var(--sans); color:var(--ink); }
-.todo-tools select { flex:0 1 140px; width:auto; }
-.todo-filter-tabs { display:flex; flex-wrap:wrap; gap:4px; margin:12px 0; }
-.todo-filter-tabs button { font:13px var(--sans); min-height:36px; }
-.todo-items { list-style:none; padding:0; margin:0; min-height:200px; }
+.todo-tools input { width:100%; min-height:40px; padding:8px 10px; background:var(--canvas); border:1px solid var(--line); border-radius:8px; font:13px var(--sans); color:var(--ink); }
+.todo-items { list-style:none; padding:0; margin:0; max-height:440px; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .todo-row + .todo-row { border-top:1px solid var(--line); }
 .todo-item { display:flex; width:100%; align-items:center; justify-content:space-between; gap:16px; padding:14px 4px; min-height:64px; background:transparent; border:0; text-align:left; color:var(--ink); cursor:pointer; border-radius:6px; }
 .todo-item:hover { background:var(--aqua-soft); }
@@ -33,14 +28,6 @@
 .todo-pagination button { min-height:36px; font:13px var(--sans); }
 .todo-update-line { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:12px; }
 #todo-status { color:var(--muted); font:12px/1.5 var(--sans); margin:0; }
-.check-in-summary { display:flex; flex-direction:column; align-self:start; }
-.check-in-summary h2 { font-size:15px; }
-.check-in-summary > p { color:var(--muted); font:13px/1.6 var(--sans); margin:8px 0 20px; }
-.check-in-counts { display:grid; gap:0; margin:0; }
-.check-in-counts > div { display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:12px 0; border-top:1px solid var(--line); }
-.check-in-counts dt { color:var(--muted); font-size:13px; }
-.check-in-counts dd { margin:0; font:500 22px/1.2 var(--sans); font-variant-numeric:tabular-nums; }
-.check-in-summary .summary-note { font-size:12px; margin:16px 0 0; }
 .graph-inventory { margin:16px 0 0; border-top:1px solid var(--line); padding-top:16px; }
 .graph-inventory summary { cursor:pointer; color:var(--muted); font-size:13px; }
 .graph-inventory .kpis { display:block; margin:8px 0 0; }
@@ -52,10 +39,12 @@
 .reader-empty-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 @media (max-width:760px) {
-  .check-in-layout { grid-template-columns:minmax(0,1fr); gap:12px; }
-  .check-in-summary { padding:16px; }
-  .check-in-counts { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 20px; }
   .topbar { flex-wrap:wrap; gap:12px; }
   .topbar .topbar-preferences { width:100%; justify-content:space-between; margin:0; gap:12px; }
   .todo-heading { flex-wrap:wrap; gap:8px; }
+  .todo-panel { padding:16px; }
 }
+.todo-total { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 10px; color:var(--muted); font-size:12px; }
+.todo-total strong { color:var(--ink); font:600 26px/1.2 var(--sans); font-variant-numeric:tabular-nums; }
+.todo-total > span:first-child { flex-basis:100%; }
+.todo-scope-note { color:var(--muted); font-size:12px; margin:10px 0; }

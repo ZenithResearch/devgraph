@@ -19,6 +19,9 @@ class TodoQuery:
     status: str | None = None
     archived: str = "exclude"
     q: str = ""
+    queue: str = ""
+    order: str = "id"
+    after_priority: str | None = None
 
     def __post_init__(self):
         validate_page_limit(self.limit)
@@ -28,6 +31,16 @@ class TodoQuery:
             raise ValueError("invalid_todo_status")
         if self.archived not in ("include", "exclude", "only"):
             raise ValueError("invalid_todo_archive_filter")
+        if self.queue not in ("", "not_started") or self.order not in ("id", "priority"):
+            raise ValueError("invalid_todo_order_or_queue")
+        if self.order == "priority" and bool(self.after_id) != (self.after_priority is not None):
+            raise ValueError("incomplete_todo_priority_cursor")
+        if self.after_priority is not None:
+            import re
+            if (self.order != "priority" or not isinstance(self.after_priority, str)
+                    or not re.fullmatch(r"-?(0|[1-9][0-9]{0,18})", self.after_priority)
+                    or not -(2**63) <= int(self.after_priority) < 2**63):
+                raise ValueError("invalid_todo_priority_cursor")
         if not isinstance(self.q, str) or len(self.q) > 200 or any(
             ord(character) < 32 or ord(character) == 127 for character in self.q
         ):
@@ -46,6 +59,36 @@ def exact_todo(node: NodeRecord) -> bool:
     return node.label == "Todo" and node.properties.get("kind") == "Todo"
 
 
+def not_started(node):
+    from devgraph.workflow_contract import decode_state
+
+    state = node.properties.get("workflow_json")
+    try:
+        return not node.archived and (
+            decode_state(state).stage == "backlog"
+            if state else node.properties.get("status") == "draft"
+        )
+    except (ValueError, TypeError):
+        raise StorageUnavailable("invalid Todo workflow") from None
+
+
+def order_key(node, query):
+    if query.order == "id":
+        return (node.id,)
+    priority = node.properties.get("priority")
+    if type(priority) is not int or not -(2**63) <= priority < 2**63:
+        raise StorageUnavailable("invalid Todo priority")
+    return (-priority, node.id)
+
+
+def after_cursor(node, query):
+    if query.after_id is None:
+        return True
+    cursor = ((-int(query.after_priority), query.after_id)
+              if query.order == "priority" else (query.after_id,))
+    return order_key(node, query) > cursor
+
+
 def validate_todo_page(page: TodoPage, query: TodoQuery) -> TodoPage:
     expected = {"total", *STATUSES}
     if set(page.counts) != expected or any(
@@ -61,9 +104,10 @@ def validate_todo_page(page: TodoPage, query: TodoQuery) -> TodoPage:
             or (query.after_id is None and page.remaining_count != expected_count)
             or len(page.nodes) != min(query.limit + 1, page.remaining_count)):
         raise StorageUnavailable("Todo page changed during read; retry")
-    keys = [node.id for node in page.nodes]
+    keys = [order_key(node, query) for node in page.nodes]
     if keys != sorted(set(keys)) or any(
-        not exact_todo(node) or (query.after_id is not None and node.id <= query.after_id)
+        not exact_todo(node) or not after_cursor(node, query)
+        or (query.queue == "not_started" and not not_started(node))
         or (query.status is not None and node.properties.get("status") != query.status)
         or (query.archived == "exclude" and node.archived)
         or (query.archived == "only" and not node.archived)
@@ -100,11 +144,14 @@ def select_todo_page(records, query: TodoQuery) -> TodoPage:
             if query.archived == "only" and not node.archived:
                 continue
             scanned += 1
-            if query.q and scanned > SEARCH_SOURCE_LIMIT:
+            bounded = query.q or query.queue or query.order == "priority"
+            if bounded and scanned > SEARCH_SOURCE_LIMIT:
                 raise StorageUnavailable("Todo search capacity exceeded")
             if node.id in seen:
                 raise StorageUnavailable("ambiguous Todo identity")
             seen.add(node.id)
+            if query.queue == "not_started" and not not_started(node):
+                continue
             title = node.properties.get("title")
             if not isinstance(title, str):
                 raise StorageUnavailable("malformed Todo title")
@@ -118,9 +165,9 @@ def select_todo_page(records, query: TodoQuery) -> TodoPage:
             if query.status is not None and status != query.status:
                 continue
             matching_count += 1
-            if query.after_id is None or node.id > query.after_id:
+            if after_cursor(node, query):
                 remaining_count += 1
                 yield node
 
-    nodes = tuple(nsmallest(query.limit + 1, candidates(), key=lambda node: node.id))
+    nodes = tuple(nsmallest(query.limit + 1, candidates(), key=lambda node: order_key(node, query)))
     return validate_todo_page(TodoPage(nodes, counts, matching_count, remaining_count), query)

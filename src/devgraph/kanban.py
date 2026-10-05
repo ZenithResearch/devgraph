@@ -34,6 +34,9 @@ class BoardFilter:
     limit: int = 30
     after: str = ""
     revision: str = ""
+    queue: str = ""
+    order: str = "key"
+    parentage: str = "any"
 
     @classmethod
     def parse(cls, query):
@@ -69,6 +72,10 @@ class BoardFilter:
             if not 1 <= result.limit <= 100 or len(result.q) > 200:
                 raise ValueError
             if result.archived not in {"include", "exclude", "only"}:
+                raise ValueError
+            if result.queue not in {"", "not_started"} or result.order not in {"key", "priority"}:
+                raise ValueError
+            if result.parentage not in {"any", "standalone"}:
                 raise ValueError
             for ref in (result.scope, result.after):
                 if ref:
@@ -117,7 +124,8 @@ def build_board(storage, filters: BoardFilter):
     for child, parent in parents.items():
         if by_key[parent].kind not in PARENTS.get(by_key[child].kind, ()):
             raise StorageUnavailable("invalid board parentage")
-    revision = fingerprint(sorted((key, w.version, w.workflow_json) for key, w in by_key.items()))
+    revision = fingerprint((sorted((key, w.version, w.workflow_json) for key, w in by_key.items()),
+                            sorted(parents.items())))
     if filters.revision and filters.revision != revision:
         raise BoardChanged("Board changed; refresh before continuing.")
     scoped = None
@@ -152,8 +160,14 @@ def build_board(storage, filters: BoardFilter):
         stage, workflow = (state.stage, state.workflow_id) if state else ("unset", "unset")
         label, column = row_info[workflow][stage] if state else ("Stage not set", "backlog")
         if (
-            scoped is not None
+            filters.queue == "not_started"
+            and (w.status.value == "archived" or not (
+                stage == "backlog" or state is None and w.status.value == "draft"
+            ))
+            or scoped is not None
             and key not in scoped
+            or filters.parentage == "standalone"
+            and key in parents
             or filters.kind
             and w.kind not in filters.kind
             or filters.workflow
@@ -162,7 +176,7 @@ def build_board(storage, filters: BoardFilter):
             and stage not in filters.stage
             or filters.column
             and column not in filters.column
-            or filters.q.casefold() not in f"{w.title} {w.id}".casefold()
+            or filters.q.casefold() not in f"{redact_text(w.title)} {w.id}".casefold()
             or filters.archived == "exclude"
             and w.status.value == "archived"
             or filters.archived == "only"
@@ -172,8 +186,16 @@ def build_board(storage, filters: BoardFilter):
         grouped[column].append((key, w, state, label))
     columns = []
     for column, rows in grouped.items():
-        rows.sort(key=lambda row: row[0])
-        available = [r for r in rows if r[0] > filters.after]
+        rows.sort(key=(lambda row: (-row[1].priority, row[0]))
+                  if filters.order == "priority" else lambda row: row[0])
+        if filters.order == "priority" and filters.after and column in filters.column:
+            keys = [row[0] for row in rows]
+            if filters.after not in keys:
+                raise InvalidBoardFilter("priority_cursor_outside_filter")
+            available = rows[keys.index(filters.after) + 1:]
+        else:
+            available = (rows if filters.order == "priority"
+                         else [r for r in rows if r[0] > filters.after])
         cards = []
         for key, w, state, label in available[: filters.limit]:
             child_keys = children.get(key, [])
@@ -213,7 +235,7 @@ def build_board(storage, filters: BoardFilter):
         for k, w in sorted(by_key.items())
         if w.kind in {"Initiative", "Project", "Issue"}
         and (filters.archived != "exclude" or w.status.value != "archived")
-        and (not filters.q or filters.q.casefold() in f"{w.title} {w.id}".casefold()
+        and (not filters.q or filters.q.casefold() in f"{redact_text(w.title)} {w.id}".casefold()
              or k == filters.scope)
     ]
     visible_scopes = scopes[:200]

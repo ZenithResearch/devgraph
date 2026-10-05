@@ -103,12 +103,36 @@ def test_detail_redaction_identity_and_lossless_signed64_numbers():
     "limit=0", "limit=101", "limit=true", "limit=1&limit=2", "kind=Task",
     "status=done", "status=", "archived=true", "after_id=../bad", "after_id=",
     "q=" + "a" * 201, "q=%00", "q=%0A", "q=%GG", "q=%FF", "q=a&q=b", "q",
+    "order=invalid", "queue=all", "order=priority&after_id=a",
+    "after_priority=2", "order=priority&after_priority=2",
+    "order=priority&after_id=a&after_priority=9223372036854775808",
 ])
 def test_filters_are_strict_and_safe(query):
     _, api = fixture()
     response = api.get(PATH + "?" + query, headers=HEADERS)
     assert response.status_code == 400
     assert response.json()["detail"] == "invalid_todo_filter"
+
+
+def test_not_started_priority_queue_preserves_exact_base_type_and_legacy_defaults():
+    services, api = fixture()
+    for item_id, priority in [("z-high", 9223372036854775807), ("low", -9223372036854775808),
+                              ("b-tie", 2), ("a-tie", 2)]:
+        add_todo(services.storage, item_id, priority=priority)
+    query = {"queue": "not_started", "order": "priority", "limit": 2}
+    first = api.get(PATH, params=query, headers=HEADERS).json()
+    assert first["matching_count"] == 5
+    assert first["counts"] == dict(total=5, draft=5, review=0, accepted=0, archived=0)
+    assert [x["id"] for x in first["items"]] == ["z-high", "a-tie"]
+    assert first["next_after_priority"] == "2"
+    second = api.get(PATH, params={**query, "after_id": first["next_after_id"],
+                                  "after_priority": first["next_after_priority"]},
+                     headers=HEADERS).json()
+    assert [x["id"] for x in second["items"]] == ["b-tie", "a"]
+    assert second["matching_count"] == 5
+    assert "next_after_priority" not in api.get(PATH, headers=HEADERS).json()
+    empty = api.get(PATH, params={**query, "q": "subtype"}, headers=HEADERS).json()
+    assert empty["matching_count"] == 0
 
 
 def test_auth_precedes_filter_parsing_and_storage_and_writes_remain_unavailable():

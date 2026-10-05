@@ -1,6 +1,6 @@
 # Exact-base Todo monitor reads v1
 
-The Todo check-in reads only records whose storage label is exactly `Todo` and
+This read projection includes only records whose storage label is exactly `Todo` and
 whose persisted `kind` is exactly `Todo`. Proposal, Initiative, Project, Issue,
 and Task are subclasses in the model, but **none are included** in this view.
 Multiply labelled Neo4j nodes, mismatched `kind` values, and untyped legacy
@@ -29,6 +29,9 @@ Existing signed snapshot/topology profiles do not authorize these new paths.
 | `after_id` | Exclusive ascending ID cursor; omit on the first page. |
 | `status` | Optional exact `draft`, `review`, `accepted`, or `archived` lifecycle state. Omit for all states allowed by archive visibility. |
 | `archived` | `exclude` (default), `include`, or `only`. |
+| `queue` | Optional `not_started`: exclude archived; include explicit workflow Backlog, or Draft when no workflow is recorded. Applied before counts. |
+| `order` | `id` (default) or `priority` descending, with ID ascending as tie-breaker. |
+| `after_priority` | With priority ordering, use this decimal string together with `after_id`; both are required for continuation. |
 | `q` | Literal case-insensitive substring of the **redacted displayed title** or ID. Trimmed; maximum 200 characters. No description search. |
 
 Unknown parameters, duplicate parameters, malformed percent/UTF-8 encodings,
@@ -79,12 +82,24 @@ example, default archive exclusion produces `archived: 0`; a contradictory
 `status=draft&archived=only` has no items and zero matching count, while its
 summary counts still describe the archived search scope.
 
-Records are ordered by canonical ID ascending, independent of priority.
+By default records are ordered by canonical ID ascending, independent of priority.
 `has_more` is determined using one look-ahead record. `next_after_id` is the last
 returned ID only when another page exists; otherwise it is null. An empty page
 contains `items: []`, `has_more: false`, and `next_after_id: null`; its counts
 still describe the full filter scope. A client can keep its own prior cursors
 for a Previous button. Reset pagination when any filter changes.
+
+With `order=priority`, records sort by descending signed 64-bit priority and
+ascending ID. An additive `next_after_priority` decimal string accompanies
+`next_after_id` when more items exist; both are null on the last page. Send both
+as the next request's cursor. It is a current-state priority/ID tuple, not a pinned
+snapshot: priority edits can move records between pages. Refresh from the first
+page to obtain the current ordering. Default ID-order responses are unchanged.
+
+The daily UI uses `queue=not_started&order=priority&limit=6`. Without a status
+selection, `counts.total` and `matching_count` both count the full unstarted list.
+An empty successful response never causes the UI to substitute other work. Only
+an absent API (404/501) enables the explicitly labelled standalone Task fallback.
 
 Priority and version are **decimal strings**, preserving the complete signed
 64-bit priority and positive signed 64-bit version ranges in JavaScript. Do not
@@ -106,18 +121,19 @@ introduced for base Todo.
 
 ## Bounds and consistency
 
-Unsearched Neo4j reads use a Todo-label-scoped aggregate and a bounded page in
+Default ID-ordered Neo4j reads without search/queue filters use a Todo-label-scoped aggregate and a bounded page in
 one statement. They hydrate at most `limit + 1` records; aggregate computation
 still depends on the number of base Todos. Existing `todo_id` uniqueness is
 reused. No query scans or hydrates the complete graph or its relationships.
 
 Search has to compare the same redacted title shown to the user, so neither
 hidden credential text nor description text can be discovered through counts.
-It materializes only ID/title/status/version/archive metadata for up to 10,000
+Search, priority order, and the not-started queue materialize only bounded metadata
+(ID/title/status/version/archive, plus priority/workflow for queue or priority reads) for up to 10,000
 exact-base Todos within the archive scope, then computes the search counts and
 hydrates the selected page in one bounded batch. Exceeding that source budget
 returns 503; it never silently truncates or reports incomplete counts as total.
-Each Neo4j statement has a five-second timeout. A search may use two statements.
+Each Neo4j statement has a five-second timeout. A metadata read may use two statements.
 
 Pagination is a **current-state read**, not a pinned snapshot. Counts and pages
 can change between requests, and inserts before the cursor require a refresh
@@ -137,6 +153,6 @@ and [concurrent data access reference](https://neo4j.com/docs/operations-manual/
 Successful responses and storage-unavailable responses use `Cache-Control:
 no-store`. Storage failures return a safe 503 and must be shown as unavailable or
 stale by the UI, not as zero Todos. An older host without these routes returns
-404; a connecting preview must distinguish that missing capability from an
-empty successful list. No live-host read, storage mutation, or performance claim
+404 (501 from the preview); the daily UI then uses the standalone Task queue,
+while a successful empty list remains empty. No live-host read, storage mutation, or performance claim
 is implied by repository tests.

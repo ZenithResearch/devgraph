@@ -94,3 +94,31 @@ The installed API on port 8080 predates the Todo routes; port 4193 therefore
 shows an explicit unavailable state for Todos while retaining the real graph.
 It never fabricates an empty result or substitutes Tasks. Activating the new
 API on the persistent host is a separate deployment step.
+
+
+## Not-started Todo queue correction — 2026-10-04
+
+The opening list now prefers exact-base Todos, with a labelled standalone Task
+fallback only when base Todo reads are unsupported (404/501). Tasks with any
+Issue, Project, or Initiative parent are excluded from fallback. Empty base
+results, permission denials, and transient failures never broaden the source.
+Only explicit workflow Backlog or legacy Draft records qualify; archived records
+are excluded. Larger priorities sort first without rounding signed 64-bit values.
+The compact At a glance total counts the full filtered queue, while six rows
+render per page. The previous status summary and unused list height are removed.
+
+The optional queue/order/parentage filters preserve existing default read
+behavior, legacy Work envelopes, signing, and stored data. Todo priority cursors
+use priority plus ID; board cursors remain revision-bound, now including
+containment changes. Neo4j priority/queue reads use bounded metadata then hydrate
+only the selected page. Live database qualification was not performed for those
+new optional query paths; memory/driver parity and inconsistency handling pass.
+
+Verification: `bash docs/dev/verification.md` exited 0 with 2,376 tests passed,
+five environment-dependent skips, and generated/static checks passing. The full
+frontend command passed 217 tests; Ruff including integrations and diff checks
+passed. Browser QA on the real-data preview showed one eligible standalone Draft
+Task, complete reader content, right-click modal/focus restoration, and a 390px
+layout with no horizontal document overflow. The installed host remains on its
+existing release; the preview can now show the agreed fallback through its
+read-only Work projection. No workflow or parentage values were changed.

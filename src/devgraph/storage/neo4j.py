@@ -924,7 +924,7 @@ class Neo4jGraphStorage:
     def todo_page(self, query):
         from devgraph.storage.todos import STATUSES, TodoPage, validate_todo_page
 
-        if query.q:
+        if query.q or query.queue or query.order == "priority":
             return self._todo_search_page(query)
         # Todo is a canonical scalar-property label. Deliberately exclude generic
         # legacy records with no kind, subclasses, and multiply labelled nodes.
@@ -969,18 +969,21 @@ class Neo4jGraphStorage:
         from devgraph.storage.todos import (
             SEARCH_SOURCE_LIMIT,
             TodoPage,
+            order_key,
             select_todo_page,
             validate_todo_page,
         )
 
         # Search must run on redacted display titles. Materialize only bounded
         # Todo metadata, never descriptions, relationships, or the whole graph.
+        extra_fields = (", .priority, .workflow_json"
+                        if query.queue or query.order == "priority" else "")
         source = self._run_graph(Query(
             "MATCH (n:Todo) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
             "AND ($archived = 'include' OR n.archived = ($archived = 'only')) "
             "WITH n ORDER BY n.id LIMIT $source_limit "
             "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
-            "n{.id, .archived, .kind, .title, .status, .version} AS properties",
+            "n{.id, .archived, .kind, .title, .status, .version" + extra_fields + "} AS properties",
             timeout=5.0,
         ), archived=query.archived, source_limit=SEARCH_SOURCE_LIMIT + 1)
         if len(source) > SEARCH_SOURCE_LIMIT:
@@ -995,11 +998,15 @@ class Neo4jGraphStorage:
             "n.archived AS archived, properties(n) AS properties ORDER BY n.id LIMIT $limit",
             timeout=5.0,
         ), ids=[node.id for node in selected.nodes], limit=query.limit + 2)
-        nodes = tuple(self._node_from_row(row, "Todo") for row in rows)
+        nodes = tuple(sorted((self._node_from_row(row, "Todo") for row in rows),
+                             key=lambda node: order_key(node, query)))
+        compared = ("kind", "title", "status", "version")
+        if extra_fields:
+            compared += ("priority", "workflow_json")
         if len(nodes) != len(selected.nodes) or any(
             node.id != prior.id or node.archived != prior.archived or any(
                 node.properties.get(key) != prior.properties.get(key)
-                for key in ("kind", "title", "status", "version")
+                for key in compared
             ) for node, prior in zip(nodes, selected.nodes, strict=True)
         ):
             raise StorageUnavailable("Todo search changed during read; retry")

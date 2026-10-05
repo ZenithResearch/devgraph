@@ -22,7 +22,7 @@ def parse_todo_query(query: str) -> TodoQuery:
         if len(query) > 4096 or re.search(r"%(?![0-9a-fA-F]{2})", query):
             raise ValueError
         pairs = parse_qsl(query, keep_blank_values=True, errors="strict",
-                          strict_parsing=True, max_num_fields=6)
+                          strict_parsing=True, max_num_fields=8)
         values = dict(pairs)
         if len(values) != len(pairs) or set(values) - TodoQuery.__dataclass_fields__.keys():
             raise ValueError
@@ -60,12 +60,15 @@ def build_todos(storage, query: TodoQuery):
     page = storage.todo_page(query)
     nodes = page.nodes[:query.limit]
     more = len(page.nodes) > query.limit
-    return {
+    result = {
         "schema": "devgraph.todos.v1", "generated_at": utc_now().isoformat(),
         "items": [project_todo(node) for node in nodes],
         "next_after_id": nodes[-1].id if more else None, "has_more": more,
         "counts": page.counts, "matching_count": page.matching_count,
     }
+    if query.order == "priority":
+        result["next_after_priority"] = str(nodes[-1].properties["priority"]) if more else None
+    return result
 
 
 def read_todo(storage, todo_id):
