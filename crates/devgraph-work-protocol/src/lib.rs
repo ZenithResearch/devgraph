@@ -214,13 +214,24 @@ impl WorkRequest {
         if text(&value, "schema")? == "devgraph.arena-request.v1" {
             return Self::parse_arena(value);
         }
-        if text(&value, "schema")? != "devgraph.work-request.v1" {
+        let v2 = text(&value, "schema")? == "devgraph.work-request.v2";
+        if !v2 && text(&value, "schema")? != "devgraph.work-request.v1" {
             return Err("invalid_work_request");
         }
         let op = text(&value, "operation")?.to_string();
         let label = text(&value, "kind")?.to_string();
         let id = text(&value, "id")?.to_string();
-        if !kind(&label) || !identifier(&id) {
+        if !(kind(&label) || v2 && label == "Todo") || !identifier(&id) {
+            return Err("invalid_work_request");
+        }
+        if (v2 && op == "status")
+            || (!v2 && matches!(op.as_str(), "progress.set" | "restore" | "proposal.reject"))
+            || (label == "Todo"
+                && !matches!(
+                    op.as_str(),
+                    "create" | "patch" | "archive" | "restore" | "progress.set"
+                ))
+        {
             return Err("invalid_work_request");
         }
         if op == "create" {
@@ -291,7 +302,51 @@ impl WorkRequest {
                     return Err("invalid_work_request");
                 }
             }
-            "archive" => exact(&payload, &[])?,
+            "archive" | "restore" => exact(&payload, &[])?,
+            "progress.set" => {
+                let allowed = [
+                    "progress",
+                    "reason",
+                    "record_id",
+                    "evidence",
+                    "requirements",
+                ];
+                if fields.keys().any(|k| !allowed.contains(&k.as_str())) {
+                    return Err("invalid_work_request");
+                }
+                let progress = text(&payload, "progress")?.to_string();
+                let reason = text(&payload, "reason")?.to_string();
+                if !matches!(progress.as_str(), "not_started" | "in_progress" | "done")
+                    || reason.trim().is_empty()
+                {
+                    return Err("invalid_work_request");
+                }
+                let normalized = workflow::normalize(
+                    "workflow.review",
+                    serde_json::json!({
+                        "record_id": text(&payload, "record_id")?, "phase": "requirements",
+                        "verdict": "approved", "summary": reason,
+                        "evidence": payload.get("evidence").cloned().unwrap_or(serde_json::json!([])),
+                        "requirements": payload.get("requirements").cloned().unwrap_or(serde_json::json!([])),
+                    }),
+                    &mut resources,
+                )?;
+                payload = serde_json::json!({"progress": progress, "reason": reason,
+                    "record_id": normalized["record_id"], "evidence": normalized["evidence"],
+                    "requirements": normalized["requirements"]});
+            }
+            "proposal.reject" => {
+                exact(&payload, &["decision_id", "reason"])?;
+                let reason = text(&payload, "reason")?;
+                if label != "Proposal"
+                    || !identifier(text(&payload, "decision_id")?)
+                    || reason.trim().is_empty()
+                    || reason.chars().count() > 8192
+                {
+                    return Err("invalid_work_request");
+                }
+                resources.insert(format!("Decision/{}", text(&payload, "decision_id")?));
+            }
             "accept" | "convert" => {
                 if label != "Proposal" {
                     return Err("invalid_work_request");
@@ -372,7 +427,7 @@ impl WorkRequest {
         Ok(Self {
             value,
             canonical,
-            operation: format!("devgraph.work.{op}.v1"),
+            operation: format!("devgraph.work.{op}.v{}", if v2 { 2 } else { 1 }),
             resources: resources.into_iter().collect(),
         })
     }
@@ -455,6 +510,8 @@ impl WorkRequest {
     pub fn request_domain(&self) -> &'static [u8] {
         if self.value["schema"] == "devgraph.arena-request.v1" {
             b"devgraph.arena-request.v1\0"
+        } else if self.value["schema"] == "devgraph.work-request.v2" {
+            b"devgraph.work-request.v2\0"
         } else {
             b"devgraph.work-request.v1\0"
         }
