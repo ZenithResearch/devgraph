@@ -62,7 +62,17 @@ def _has_arenas(policy):
 
 
 def _has_workflows(policy):
-    return any(r["operation"].startswith("devgraph.work.workflow.") for r in policy["rules"])
+    return any(
+        r["operation"].startswith("devgraph.work.workflow.") and r["operation"].endswith(".v1")
+        for r in policy["rules"]
+    )
+
+
+def _has_progress(policy):
+    return any(
+        r["operation"].startswith("devgraph.work.") and r["operation"].endswith(".v2")
+        for r in policy["rules"]
+    )
 
 
 ARENA_SCOPES = {
@@ -176,11 +186,34 @@ def _operator_lock():
 
 
 def _policy(
-    public, version, start, end, *, revoked=False, include_arenas=False, include_workflows=False
+    public,
+    version,
+    start,
+    end,
+    *,
+    revoked=False,
+    include_arenas=False,
+    include_workflows=False,
+    include_progress=False,
 ):
     scopes = [(f"devgraph.work.{operation}.v1", kinds) for operation, kinds in SCOPES.items()]
     if include_workflows:
         scopes.extend((f"devgraph.work.{op}.v1", kinds) for op, kinds in WORKFLOW_SCOPES.items())
+    if include_progress:
+        progress_scopes = {
+            **{op: kinds for op, kinds in SCOPES.items() if op != "status"},
+            **WORKFLOW_SCOPES,
+        }
+        progress_scopes.update(
+            {
+                **{op: ("Todo", *KINDS) for op in ("create", "patch", "archive", "restore")},
+                "progress.set": ("Todo", *KINDS, "ReviewPacket", "ExternalLink"),
+                "proposal.reject": ("Proposal", "Decision"),
+            }
+        )
+        scopes.extend((f"devgraph.work.{op}.v2", kinds) for op, kinds in progress_scopes.items())
+        if include_arenas:
+            scopes.append(("devgraph.work.parent.set.v2", ("Arena",)))
     if include_arenas:
         scopes.extend((f"devgraph.arena.{op}.v1", kinds) for op, kinds in ARENA_SCOPES.items())
         scopes.append(("devgraph.work.parent.set.v1", ("Arena",)))
@@ -239,6 +272,7 @@ def _validate_policy(policy, public=None):
                 revoked=first["status"] == "revoked",
                 include_arenas=_has_arenas(policy),
                 include_workflows=_has_workflows(policy),
+                include_progress=_has_progress(policy),
             )
             for rule in expected["rules"]:
                 rule["actor_id"] = actor
@@ -251,6 +285,7 @@ def _validate_policy(policy, public=None):
                 revoked=first["status"] == "revoked",
                 include_arenas=_has_arenas(policy),
                 include_workflows=_has_workflows(policy),
+                include_progress=_has_progress(policy),
             )
         if type(policy["schema_version"]) is not int or _json(policy) != _json(expected):
             raise ValueError()
@@ -466,6 +501,7 @@ def _plan(
     revoke=False,
     include_arenas=None,
     include_workflows=None,
+    include_progress=None,
 ):
     if type(ttl_hours) is not int or not 1 <= ttl_hours <= 8760:
         raise WorkGrantError("grant lifetime must be 1 through 8760 hours")
@@ -484,6 +520,10 @@ def _plan(
         include_arenas = exists and _has_arenas(previous["policy"])
     if include_workflows is None:
         include_workflows = exists and _has_workflows(previous["policy"])
+    if include_progress is None:
+        include_progress = exists and _has_progress(previous["policy"])
+    if type(include_progress) is not bool:
+        raise WorkGrantError("Progress grant selection must be a boolean")
     if type(include_workflows) is not bool:
         raise WorkGrantError("Workflow grant selection must be a boolean")
     if type(include_arenas) is not bool:
@@ -496,6 +536,7 @@ def _plan(
         revoked=revoke,
         include_arenas=include_arenas,
         include_workflows=include_workflows,
+        include_progress=include_progress,
     )
     return {
         "schema": PLAN_SCHEMA,
@@ -510,9 +551,20 @@ def _plan(
     }
 
 
-def plan_grant(ttl_hours=720, *, renew=False, include_arenas=None, include_workflows=None):
+def plan_grant(
+    ttl_hours=720,
+    *,
+    renew=False,
+    include_arenas=None,
+    include_workflows=None,
+    include_progress=None,
+):
     return _plan(
-        ttl_hours, renew=renew, include_arenas=include_arenas, include_workflows=include_workflows
+        ttl_hours,
+        renew=renew,
+        include_arenas=include_arenas,
+        include_workflows=include_workflows,
+        include_progress=include_progress,
     )
 
 
@@ -668,7 +720,15 @@ def apply_grant(plan_file: Path):
         ) from None
 
 
-def _renew(ttl_hours, *, rotate=False, revoke=False, include_arenas=None, include_workflows=None):
+def _renew(
+    ttl_hours,
+    *,
+    rotate=False,
+    revoke=False,
+    include_arenas=None,
+    include_workflows=None,
+    include_progress=None,
+):
     try:
         with _operator_lock():
             return _apply(
@@ -679,6 +739,7 @@ def _renew(ttl_hours, *, rotate=False, revoke=False, include_arenas=None, includ
                     revoke=revoke,
                     include_arenas=include_arenas,
                     include_workflows=include_workflows,
+                    include_progress=include_progress,
                 )
             )
     except (
@@ -693,8 +754,15 @@ def _renew(ttl_hours, *, rotate=False, revoke=False, include_arenas=None, includ
         ) from None
 
 
-def renew_grant(ttl_hours=720, *, include_arenas=None, include_workflows=None):
-    return _renew(ttl_hours, include_arenas=include_arenas, include_workflows=include_workflows)
+def renew_grant(
+    ttl_hours=720, *, include_arenas=None, include_workflows=None, include_progress=None
+):
+    return _renew(
+        ttl_hours,
+        include_arenas=include_arenas,
+        include_workflows=include_workflows,
+        include_progress=include_progress,
+    )
 
 
 def rotate_verifier(ttl_hours=720):

@@ -18,7 +18,7 @@ Migration 28 maps explicit Backlog → Not started, explicit active stages → I
 
 ## Signed writes
 
-`POST /work-operations/v2` admits `devgraph.work-request.v2`; the SHA-256 digest domain is `devgraph.work-request.v2\0`. The exact semantic operation is `devgraph.work.<operation>.v2`. Existing versions, resource grants, idempotency keys, transaction and EventReceipt handling remain mandatory. Read credentials never authorize writes.
+`POST /todo-operations/v2` admits `devgraph.work-request.v2`; the SHA-256 digest domain is `devgraph.work-request.v2\0`. The exact semantic operation is `devgraph.work.<operation>.v2`. Existing versions, resource grants, idempotency keys, transaction and EventReceipt handling remain mandatory. Read credentials never authorize writes.
 
 V2 create supports all six kinds, assigning new records Not started. `progress.set` takes progress, record_id, reason, evidence and requirements; it records a ReviewPacket attestation bound to the subject revision. Detailed stage changes use workflow.transition and reviews. `restore` has an empty payload. `proposal.reject` takes decision_id and reason. Legacy `status` is not admitted in v2. Existing operations have the same payload grammar as v1.
 

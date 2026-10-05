@@ -122,8 +122,8 @@
         const mark = el('span', 'todo-item-mark', '↗'); mark.setAttribute('aria-hidden', 'true'); button.append(copy, mark); row.append(button); content.append(row);
       } else {
         const empty = el('li', 'todo-empty'); empty.dataset.uiKey = 'empty';
-        const title = view.status === 'unsupported' ? 'Todo unavailable on this server' : view.status === 'error' ? 'Todos could not be loaded' : view.data ? 'No Todos in this view' : view.status === 'loading' ? 'Loading your check-in' : 'Your daily Todo list';
-        empty.append(el('strong', '', title), el('p', '', view.status === 'unsupported' ? 'Connect to a server that supports the current Work board API.' : view.data ? 'No not-started items match this view. Clear your search to see the full list.' : 'Find work waiting to start. Select an item to read its context.'));
+        const title = view.status === 'unsupported' ? 'Todo unavailable on this server' : view.status === 'error' ? 'Todos could not be loaded' : view.data?.classification_required && !view.filters.q && !view.filters.kind ? 'Progress needs classification' : view.data ? 'No Todos in this view' : view.status === 'loading' ? 'Loading your check-in' : 'Your daily Todo list';
+        empty.append(el('strong', '', title), el('p', '', view.status === 'unsupported' ? 'Connect to a server that supports the current Work board API.' : view.data?.classification_required && !view.filters.q && !view.filters.kind ? 'Historical items will appear here once their progress is explicitly classified as Not started.' : view.data ? 'No not-started items match this view. Adjust the filters to explore the list.' : 'Find work waiting to start. Select an item to read its context.'));
         content.append(empty);
       }
       if (reconcile) reconcile(list, content); else list.replaceChildren(...content.children);

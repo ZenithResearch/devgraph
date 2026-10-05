@@ -20,7 +20,7 @@ def raw(operation="create", version=None, payload=None, kind="Todo"):
 
 def submit(client, data, key=KEY):
     return client.post(
-        "/work-operations/v2",
+        "/todo-operations/v2",
         content=data,
         headers={"X-Devgraph-Work-Authority": b64(proof(data, key)), "Idempotency-Key": key},
     )
@@ -74,10 +74,10 @@ def test_v1_v2_endpoint_and_authority_domains_cannot_be_interchanged():
     headers = {"X-Devgraph-Work-Authority": b64(proof(data)), "Idempotency-Key": KEY}
     assert client.post("/work-operations/v1", content=data, headers=headers).status_code == 403
     headers["X-Devgraph-Work-Authority"] = b64(proof(data, operation="devgraph.work.create.v1"))
-    assert client.post("/work-operations/v2", content=data, headers=headers).status_code == 403
+    assert client.post("/todo-operations/v2", content=data, headers=headers).status_code == 403
     assert (
         client.post(
-            "/work-operations/v2",
+            "/todo-operations/v2",
             content=data,
             headers={"Authorization": "Bearer " + FAKE_CREDENTIAL, "Idempotency-Key": KEY},
         ).status_code

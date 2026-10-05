@@ -108,7 +108,7 @@ def register_named_work(app: FastAPI, services: ApiServices) -> None:
     async def execute(request: Request, response: Response):
         return await submit(request, response, arena=False)
 
-    @app.post("/work-operations/v2")
+    @app.post("/todo-operations/v2")
     async def execute_v2(request: Request, response: Response):
         return await submit(request, response, arena=False, version=2)
 

@@ -5,7 +5,7 @@
     "repository": "https://github.com/ZenithResearch/devgraph",
     "source_path": "ontology/"
   },
-  "bundle_digest": "403f4bc99495a2a7cf90bf70343ae406c6afa044ccd4b64aad875cc618787364",
+  "bundle_digest": "756fe78e49cd2e84baa100d61b0d448efdcd6ea6ce58244bf44021940d413006",
   "bundle_digest_algorithm": "sha256-file-list-v1",
   "canonical_base_url": "https://zenith-research.ca/ontology/v0.8.0",
   "compatibility": {
@@ -131,7 +131,7 @@
       "bytes": 3691,
       "media_type": "text/markdown",
       "path": "todo-progress.md",
-      "sha256": "3cc89a9c21377663be58e48603e7f1a5d5ac7fb3e958b2ed1f678a514ef7438d",
+      "sha256": "33f016cb5e1d83eed086a6b8a948e13e281eb9b0575a13d6750daf052d646c9d",
       "url": "https://zenith-research.ca/ontology/v0.8.0/todo-progress.md"
     },
     {

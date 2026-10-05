@@ -7,9 +7,9 @@
   },
   "compatibility_policy": "Consumers pin version and bundle_digest; additive changes require a new versioned release.",
   "current": {
-    "bundle_digest": "403f4bc99495a2a7cf90bf70343ae406c6afa044ccd4b64aad875cc618787364",
+    "bundle_digest": "756fe78e49cd2e84baa100d61b0d448efdcd6ea6ce58244bf44021940d413006",
     "context_url": "https://zenith-research.ca/ontology/v0.8.0/context.jsonld",
-    "manifest_sha256": "2dab881c2384dc9ff54bb3881556ffabd9a7267a36cc7361c91f2482de8201ee",
+    "manifest_sha256": "0f8e8eebc3e6c3eac45cd2be5e9d181d1174b250987fd855fec9138b277fca8d",
     "manifest_url": "https://zenith-research.ca/ontology/v0.8.0/manifest.json",
     "ontology_url": "https://zenith-research.ca/ontology/v0.8.0/ontology.jsonld",
     "operations_url": "https://zenith-research.ca/ontology/v0.8.0/operations.json",

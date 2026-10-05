@@ -323,3 +323,22 @@ def test_workflow_grants_are_explicit_and_all_new_resources_are_bound(arenas):
     broken["rules"].pop()
     with pytest.raises(grants.WorkGrantError):
         grants._validate_policy(broken, PUBLIC)
+
+
+@pytest.mark.parametrize("arenas", [False, True])
+def test_progress_grants_are_explicit_versioned_and_preserved_on_validation(arenas):
+    old = grants._policy(PUBLIC, 1, 99, 999, include_arenas=arenas)
+    assert not grants._has_progress(old)
+    new = grants._policy(PUBLIC, 1, 99, 999, include_arenas=arenas, include_progress=True)
+    assert grants._validate_policy(new, PUBLIC) == (99, 999, 1)
+    assert not grants._has_workflows(new)
+    rules = {(r["operation"], r["resource"]) for r in new["rules"]}
+    assert ("devgraph.work.progress.set.v2", "Todo/") in rules
+    assert ("devgraph.work.progress.set.v2", "ReviewPacket/") in rules
+    assert ("devgraph.work.restore.v2", "Task/") in rules
+    assert not any(op == "devgraph.work.status.v2" for op, _ in rules)
+    assert not any(op.endswith(".v1") and resource == "Todo/" for op, resource in rules)
+    assert ("devgraph.work.workflow.transition.v2", "Task/") in rules
+    broken = {**new, "rules": new["rules"][:-1]}
+    with pytest.raises(grants.WorkGrantError):
+        grants._validate_policy(broken, PUBLIC)

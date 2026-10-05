@@ -37,19 +37,25 @@ only the proposal; linked delivery work remains independent.
 - `GET /monitor/kanban/v2` adds the same progress filter and six-kind support.
   Detailed columns subdivide In progress. “Needs classification” is a diagnostic
   column for absent progress, not a fourth state.
-- `POST /work-operations/v2` consumes `devgraph.work-request.v2`. The signing
+- `POST /todo-operations/v2` consumes `devgraph.work-request.v2`. The signing
   domain is `devgraph.work-request.v2\0`; authority names end in `.v2` and results
   use `devgraph.work-result.v2`. The new operations are `progress.set`, `restore`
   and `proposal.reject`; legacy `status` is excluded. Common operations retain
   their existing payload rules. Base Todo admits create, patch, archive, restore
   and progress.set. The canonical Rust parser and Python parser share v2 vectors.
 
+The Todo route is separate from the generic credential transport's existing
+`/work-operations/v2` proposal. Contract version and credential transport version
+are distinct; neither endpoint silently downgrades authority.
+
 Historical v1 request bytes, digest domains and response envelopes remain pinned.
 A v1 archive still reads as Archived to old clients; it does not erase canonical
 progress. The additive topology fields are `todo_progress` and `child_progress`;
 legacy rollup fields remain for compatibility. The new reader uses canonical
 fields. Wallet and secS must admit the exact new operation/resource scopes;
-read credentials never authorize writes.
+read credentials never authorize writes. Grant planning/renewal requires the explicit
+`--include-progress` flag to add v2 authority; ordinary renewal preserves the saved
+scope. No installed grant is expanded by this source change.
 
 ## Forward migration 28
 
@@ -95,3 +101,37 @@ Activation still requires a backup, schema 27/28 migration, review of the result
 classification report, and matched installed Chrome Wallet → native host → secS →
 Devgraph qualification with disposable data. An upgraded source fixture or a green
 WASM test alone does not qualify the installed signing chain.
+
+The generic Wallet/credential client is a separate existing integration stack
+(private Devgraph #66/#67, Wallet #28, secS #297). Its authority does not yet admit
+the new progress operations. The older Wallet #25 is superseded and stays closed;
+its pinned native/WASM signing tests are compatibility evidence only. Do not merge
+or reactivate that application-specific browser bridge to bypass the generic
+transport gate. The private SDK source has a guarded Todo route, canonical reads
+and v2 request/result validation; generic browser transport composition and matched
+installed qualification remain explicit follow-up gates.
+
+## Verification recorded on 2026-10-05
+
+The public repository verification script passed with 2,418 Python tests and five
+skips; all 216 frontend tests passed. Ruff (including integrations), generated
+ontology/token checks and whitespace checks passed. Tests cover the three states,
+no-workflow Todo completion, subtype entry gates and rework, proposal dispositions,
+archive/restore, contradictory and ambiguous legacy records, transaction rollback,
+stale evidence, six-kind filtering, priority ordering, complete counts and bounded
+250/1,500-item pagination. Existing v1 signing vectors remain unchanged.
+
+The private SDK composition passed its repository checks (2,503 Python tests,
+five skips), 220 frontend tests, 64 Rust tests, WASM build, 19 SDK JavaScript tests
+and TypeScript checks. The final guarded-route/authority checks passed separately
+(89 tests). secS source passed 808 Rust tests; the Wallet compatibility source
+passed 32 Rust tests and its npm/typecheck suites. Python-produced v2 results are
+consumed by Rust tests, including mismatched versions, progress, identity and
+missing fields. Synthetic identities and data were used for mutation tests.
+
+The browser preview was checked against live read-only data in Light, Dark, Aqua
+and System modes, including a 390-pixel viewport and refresh behavior. Credentials
+clear on refresh; ordinary filters remain. That preview is a schema-26 adapter
+with explicitly incomplete coverage, not a migrated runtime or installed signing
+qualification. The Neo4j migration transaction tests use a simulated driver;
+an actual production migration was not run.

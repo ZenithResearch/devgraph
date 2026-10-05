@@ -643,6 +643,12 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="explicitly add workflow moves and evidence attestations",
     )
+    plan.add_argument(
+        "--include-progress",
+        action="store_true",
+        default=None,
+        help="explicitly add Todo v2 progress operations",
+    )
     apply = grant_commands.add_parser("apply", help="activate a reviewed private plan file")
     apply.add_argument("--plan-file", type=Path, required=True)
     grant_commands.add_parser("status", help="verify current producer and receiver authority")
@@ -651,6 +657,7 @@ def _parser() -> argparse.ArgumentParser:
         command = grant_commands.add_parser(action)
         command.add_argument("--ttl-hours", type=int, default=24 * 30)
         if action == "renew":
+            command.add_argument("--include-progress", action="store_true", default=None)
             command.add_argument("--include-arenas", action="store_true", default=None)
             command.add_argument("--include-workflows", action="store_true", default=None)
 
@@ -873,6 +880,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                             renew=args.renew,
                             include_arenas=args.include_arenas,
                             include_workflows=args.include_workflows,
+                            include_progress=args.include_progress,
                         )
                         if args.output_file is not None:
                             work_grants.write_plan(result, args.output_file)
@@ -883,6 +891,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                             ttl_hours=args.ttl_hours,
                             include_arenas=args.include_arenas,
                             include_workflows=args.include_workflows,
+                            include_progress=args.include_progress,
                         )
                     elif args.auth_work_command == "rotate-verifier":
                         result = work_grants.rotate_verifier(ttl_hours=args.ttl_hours)

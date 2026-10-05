@@ -414,7 +414,7 @@ class DevgraphHttpClient:
         result = self._request(
             TodoMutationResult if request.version == 2 else MutationResult,
             "POST",
-            f"/work-operations/v{request.version}",
+            "/todo-operations/v2" if request.version == 2 else "/work-operations/v1",
             context=context,
             idempotency_key=idempotency_key,
             json=json_codec.loads(request.canonical),
@@ -1068,7 +1068,7 @@ class DevgraphHttpClient:
         if isinstance(context, DevgraphWorkContext):
             if method != "POST" or path not in (
                 "/work-operations/v1",
-                "/work-operations/v2",
+                "/todo-operations/v2",
                 "/arena-operations/v1",
             ):
                 raise ValueError("named Work proof has an invalid transport target")
