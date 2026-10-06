@@ -8,16 +8,18 @@ qualified for installed Chrome editing** until the final gate below passes.
 
 ## Contract and source boundaries
 
-The shared public protocol revision is
-`1003cc3c7ab55ab34d66fbff8832a3ac18aa8ae2`. Existing Work vectors are unchanged;
-additive workflow and flexible-parent vectors are in
-`crates/devgraph-work-protocol/tests/fixtures/workflow-v1/requests.json`.
-Wallet revision `d6f2b5579bce88058b1887a07a348453a522105e` signs those requests,
-admits only the exact canonical Kanban document in addition to SDK preview,
-and revokes a connection on navigation between them. secS and the private SDK
-follow-up branches pin the same protocol and Wallet commits. The private SDK,
-native host and companion implementation remain in their existing repositories.
-Review the companion lockfiles for exact resolved revisions.
+The canonical Todo protocol is pinned at
+`3454db330ec4a1b42352367652b2a0ceb5a066c4`. Historical Work/Arena request bytes remain
+unchanged. The replacement browser path is Kanban/web SDK → generic Wallet
+credential approval → Devgraph-owned HTTP transport → native secS → guarded
+receiver. It does not use `provider.devgraph` or Wallet native messaging.
+
+Matched generic Wallet #28 is `2c53e9b66dabb7e4a1aefd875892be5064c59691`; secS #298
+adds Todo/workflow authority at `c5d81bab74820b0cd127759c5b367be471ff0d82`, depending on
+#297. Private Devgraph composes #66/#67 and owns the SDK/native implementation,
+release evidence harness and application transport. Browser SDK 0.2 reads take an
+explicit in-memory read credential; native reads retain owner-private access.
+Wallet remains optional for reading. No grant acquires new authority implicitly.
 
 The persisted workflow is independent of lifecycle and parentage. Forward
 migration 27 validates optional metadata and journals admission atomically; it
@@ -51,12 +53,14 @@ resource authorization. These establish source-level compatibility only.
 
 ## Required installed-native gate
 
-Use a disposable macOS account/runner with disposable identity, data, read key,
+Use a clean disposable macOS VM with its own OS account, identity, data, read key,
 explicit workflow grants and a receiver at the canonical loopback port 8080.
 Build all matched candidates and record immutable revisions and binary hashes.
-Install the matching Wallet extension and native host in that disposable account.
-Exercise the actual `/monitor/kanban/` page through Chrome, Wallet confirmation,
-native host, secS and receiver. Verify:
+Install exact packaged candidates in that guest. Environment-variable overrides
+are not isolation for secS's OS-derived paths. Exercise actual `/monitor/kanban/`
+and web SDK through Chrome → generic Wallet → Devgraph HTTP → native secS → guarded
+receiver, and terminal/native SDK through generic Wallet's interactive terminal
+approval → native secS → receiver. Verify:
 
 - Assign, review and transition, including an evidence link and exact resource grants.
 - Denied or cancelled confirmation leaves the card and record unchanged.
@@ -72,8 +76,18 @@ separate live-data preview uses authenticated reads from the installed API,
 without database access or migrations. No production
 identity, grants, native installation or data were changed for qualification.
 A fixture bridge or successful WASM test must never be reported as this gate.
-Until the installed test passes, keep the PR a draft and the browser-editing
-release claim unqualified. Read-only preview is independently usable.
+A disposable VM is not configured for the current integration task, so installed
+qualification is blocked. Also cover independent archive/restore, all six Todo
+kinds, proposal decisions, locked Wallet, worker restart, changed/revoked grants,
+wrong caller, denied read-credential writes, actual persistence migrations and
+rollback, and SDK read credential disposal. Recovery requires fresh approval and
+status only; missing receipts stay unknown. Preserve Wallet custody, registration,
+membership, Files and generic-presentation regressions.
+
+Full legacy removal is a separate dependent change after replacement qualification.
+Repeat installed acceptance after removal using final package hashes; an earlier
+pass is insufficient. Until the installed test passes, keep browser-editing release
+claims unqualified. Read-only preview is independently usable.
 
 ## Recorded source checks
 

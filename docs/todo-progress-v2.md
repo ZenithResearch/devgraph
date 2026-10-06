@@ -98,18 +98,18 @@ inventory base Todo, so this is explicitly a partial inventory. The per-record
 report is kept locally, not in the public repository.
 
 Activation still requires a backup, schema 27/28 migration, review of the resulting
-classification report, and matched installed Chrome Wallet → native host → secS →
+classification report, and matched installed Chrome Wallet → Devgraph HTTP → native secS →
 Devgraph qualification with disposable data. An upgraded source fixture or a green
 WASM test alone does not qualify the installed signing chain.
 
 The generic Wallet/credential client is a separate existing integration stack
-(private Devgraph #66/#67, Wallet #28, secS #297). Its authority does not yet admit
-the new progress operations. The older Wallet #25 is superseded and stays closed;
+(private Devgraph #66/#67, Wallet #28, secS #297). Its composed source now admits canonical Todo/progress/workflow authority with
+explicit grants; installed qualification remains blocked pending a disposable macOS VM. The older Wallet #25 is superseded and stays closed;
 its pinned native/WASM signing tests are compatibility evidence only. Do not merge
 or reactivate that application-specific browser bridge to bypass the generic
 transport gate. The private SDK source has a guarded Todo route, canonical reads
-and v2 request/result validation; generic browser transport composition and matched
-installed qualification remain explicit follow-up gates.
+and v2 request/result validation; generic browser transport is composed in source. Matched installed qualification
+and dependent legacy retirement remain explicit gates.
 
 ## Verification recorded on 2026-10-05
 
