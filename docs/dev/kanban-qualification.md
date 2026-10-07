@@ -14,12 +14,21 @@ unchanged. The replacement browser path is Kanban/web SDK → generic Wallet
 credential approval → Devgraph-owned HTTP transport → native secS → guarded
 receiver. It does not use `provider.devgraph` or Wallet native messaging.
 
-Matched generic Wallet #28 is `2c53e9b66dabb7e4a1aefd875892be5064c59691`; secS #298
+Merged generic Wallet #28 is `ff8de6ddc04ac2fb6b39408274276bc4ce984d42`; secS #298
 adds Todo/workflow authority at `c5d81bab74820b0cd127759c5b367be471ff0d82`, depending on
 #297. Private Devgraph composes #66/#67 and owns the SDK/native implementation,
 release evidence harness and application transport. Browser SDK 0.2 reads take an
 explicit in-memory read credential; native reads retain owner-private access.
 Wallet remains optional for reading. No grant acquires new authority implicitly.
+
+Merged Wallet starts with zero trusted browser providers. Private Devgraph's SDK
+0.2.0-preview.2 and Kanban load operator-configured public pins from the same-origin
+`/credential-work/v2/provider-profile` endpoint, then use separate fresh clicks to
+review the provider and connect. No build-time pin injection or Wallet read bridge
+is needed. Terminal issuer trust remains independently configured. Wallet's own
+adapter removal and package qualification are merged; Devgraph/secS application
+qualification and retirement still require the complete installed VM gate.
+
 
 The persisted workflow is independent of lifecycle and parentage. Forward
 migration 27 validates optional metadata and journals admission atomically; it

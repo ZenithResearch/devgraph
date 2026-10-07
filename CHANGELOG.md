@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+- Reconcile the generic integration guidance with merged Wallet and its runtime provider approvals — the old build-time pins and Devgraph-specific bridge are no longer the supported Wallet setup.
+
 - Update the target Kanban/SDK architecture to generic Wallet approval with Devgraph-owned transport and a disposable macOS VM release gate — this prevents the superseded native bridge and source-only checks from being mistaken for installed qualification.
 
 - Move project scope controls into one compact Filter popover with an active-filter count, freeing the project list from two permanent dropdowns.
