@@ -1,5 +1,12 @@
 # Beta setup
 
+For the merged generic Wallet candidate, use
+[public integration](../dev/public-wallet-integration.md) and
+[generic setup](../dev/merged-wallet-provider-setup.md). The application-specific
+signing binaries described below are historical compatibility prerequisites;
+merged Wallet no longer provides them. They are not a fallback for generic setup.
+
+
 Devgraph's beta offers a synthetic monitor demo, a persistent local read-only
 host, and signed Work/Arena operations when native prerequisites are installed.
 Choose the level you need; agent packages do not create identities or grants.

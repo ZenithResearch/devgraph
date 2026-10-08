@@ -1,0 +1,36 @@
+{
+  "schema": "devgraph.sdk-receiver-profile-vectors.v1",
+  "domain": "devgraph.sdk-receiver-profile.v1\u0000",
+  "vectors": [
+    {
+      "profile": {
+        "schema": "devgraph.sdk-receiver-profile.v1",
+        "origin": "http://127.0.0.1:8080",
+        "audience": "devgraph://receiver-local",
+        "stable_issuer": "secs:test-work"
+      },
+      "canonical": "{\"audience\":\"devgraph://receiver-local\",\"origin\":\"http://127.0.0.1:8080\",\"schema\":\"devgraph.sdk-receiver-profile.v1\",\"stable_issuer\":\"secs:test-work\"}",
+      "digest_sha256": "302680d9f3a263a4897bc855abcebc6fa9abbca00d08c69af76757da88b07e5a"
+    },
+    {
+      "profile": {
+        "schema": "devgraph.sdk-receiver-profile.v1",
+        "origin": "http://127.0.0.1:8080",
+        "audience": "devgraph://receiver-local",
+        "stable_issuer": "secs:test-local"
+      },
+      "canonical": "{\"audience\":\"devgraph://receiver-local\",\"origin\":\"http://127.0.0.1:8080\",\"schema\":\"devgraph.sdk-receiver-profile.v1\",\"stable_issuer\":\"secs:test-local\"}",
+      "digest_sha256": "9ebd5312a6d658c92aedb6208eddf9930cce7074386b43510e4bf61239297689"
+    },
+    {
+      "profile": {
+        "schema": "devgraph.sdk-receiver-profile.v1",
+        "origin": "http://127.0.0.1:8080",
+        "audience": "devgraph://receiver-local",
+        "stable_issuer": "secs:replaced"
+      },
+      "canonical": "{\"audience\":\"devgraph://receiver-local\",\"origin\":\"http://127.0.0.1:8080\",\"schema\":\"devgraph.sdk-receiver-profile.v1\",\"stable_issuer\":\"secs:replaced\"}",
+      "digest_sha256": "a8c31c3656d2dd25595922add80867ecfe1187b114b709cfd0c56b5bd4f17d32"
+    }
+  ]
+}

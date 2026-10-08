@@ -62,3 +62,11 @@ The frontend packages Zenith UI's `public/tokens.css` as `zenith-tokens.css`.
 Its exact source revision and SHA-256 are recorded in `docs/dev/zenith-tokens.json`;
 `scripts/sync_zenith_tokens.py` verifies the imported bytes. The import includes
 token definitions only, with no Zenith React components or font files.
+
+## SDK packages and companion boundaries
+
+The web SDK builder includes Devgraph's LICENSE/NOTICE and generates third-party
+notices from the exact WASM runtime dependency closure. Native crates refer to
+separately maintained Wallet/secS sources by immutable revisions; their sources
+and licenses are not vendored or relicensed by Devgraph. Those native dependencies
+are outside the anonymous public web/protocol build.

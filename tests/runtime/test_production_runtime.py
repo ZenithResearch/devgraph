@@ -48,6 +48,35 @@ def test_production_runtime_rejects_local_dev_auth(monkeypatch: pytest.MonkeyPat
         build_production_services()
 
 
+def test_delegated_router_is_default_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    _production_environment(monkeypatch)
+    storage = StubNeo4jStorage()
+    monkeypatch.setattr("devgraph.runtime.Neo4jGraphStorage", Mock(return_value=storage))
+
+    services = build_production_services()
+
+    assert services.delegated_read is None
+
+
+def test_delegated_router_requires_data_root_and_valid_registry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _production_environment(monkeypatch)
+    monkeypatch.setenv("DEVGRAPH_DELEGATED_READ_ENABLED", "1")
+    storage = StubNeo4jStorage()
+    monkeypatch.setattr("devgraph.runtime.Neo4jGraphStorage", Mock(return_value=storage))
+
+    with pytest.raises(RuntimeConfigurationError, match="configured data root"):
+        build_production_services()
+
+    data_root = tmp_path / "data"
+    data_root.mkdir(mode=0o700)
+    monkeypatch.setenv("DEVGRAPH_DATA_ROOT", str(data_root))
+    with pytest.raises(RuntimeConfigurationError, match="credential configuration"):
+        build_production_services()
+
+
 def test_production_runtime_retains_legacy_fail_closed_spelling(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

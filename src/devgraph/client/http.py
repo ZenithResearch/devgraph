@@ -72,6 +72,10 @@ class DevgraphWorkContext(_StrictFrozenModel):
     projection_json: bytes = Field(min_length=1, max_length=16_384, repr=False, exclude=True)
 
 
+class DevgraphWorkV2Context(DevgraphWorkContext):
+    """Explicit v2 authority route; never negotiate or downgrade to v1."""
+
+
 class WorkObject(_StrictFrozenModel):
     id: str
     kind: WorkKind
@@ -198,6 +202,21 @@ class ArenaMutationResult(_StrictFrozenModel):
             self.receipt.duplicate == (result is not None)
         ):
             raise ValueError("inconsistent Arena mutation result")
+        return self
+
+
+class CredentialWorkStatus(_StrictFrozenModel):
+    """V2 status only; an absent receipt never establishes nonexecution."""
+
+    state: Literal["committed", "unknown"]
+    receipt: MutationReceipt | TodoMutationReceipt | ArenaMutationReceipt | None = None
+
+    @model_validator(mode="after")
+    def consistent_status(self):
+        if (self.state == "committed") != (self.receipt is not None):
+            raise ValueError("inconsistent credential operation status")
+        if self.receipt is not None and not self.receipt.duplicate:
+            raise ValueError("status receipt must identify an existing result")
         return self
 
 
@@ -414,7 +433,13 @@ class DevgraphHttpClient:
         result = self._request(
             TodoMutationResult if request.version == 2 else MutationResult,
             "POST",
-            "/todo-operations/v2" if request.version == 2 else "/work-operations/v1",
+            "/todo-operations/v2"
+            if request.version == 2
+            else (
+                "/work-operations/v2"
+                if isinstance(context, DevgraphWorkV2Context)
+                else "/work-operations/v1"
+            ),
             context=context,
             idempotency_key=idempotency_key,
             json=json_codec.loads(request.canonical),
@@ -466,7 +491,9 @@ class DevgraphHttpClient:
         result = self._request(
             ArenaMutationResult,
             "POST",
-            "/arena-operations/v1",
+            "/arena-operations/v2"
+            if isinstance(context, DevgraphWorkV2Context)
+            else "/arena-operations/v1",
             context=context,
             idempotency_key=idempotency_key,
             json=json_codec.loads(request.canonical),
@@ -478,6 +505,48 @@ class DevgraphHttpClient:
             or result.receipt.subject_id != request.id
             or item is not None
             and (item.kind, item.id) != (request.kind, request.id)
+        ):
+            raise DevgraphInvalidSuccessEnvelope
+        return result
+
+    def reconcile_credential_work(
+        self, context: DevgraphWorkV2Context, *, request_json: bytes, idempotency_key: str
+    ) -> CredentialWorkStatus:
+        from devgraph.arena_requests import ArenaRequest
+        from devgraph.named_requests import parse_named_request
+
+        if not isinstance(context, DevgraphWorkV2Context):
+            raise TypeError("credential status requires an explicit v2 projection")
+        request = parse_named_request(request_json)
+        if (
+            not isinstance(idempotency_key, str)
+            or re.fullmatch(r"[A-Za-z0-9._~-]{16,128}", idempotency_key) is None
+        ):
+            raise ValueError("invalid credential status idempotency key")
+        arena = isinstance(request, ArenaRequest)
+        result = self._request(
+            CredentialWorkStatus,
+            "POST",
+            "/arena-operations/v2/status"
+            if arena
+            else (
+                "/todo-operations/v2/status"
+                if request.version == 2
+                else "/work-operations/v2/status"
+            ),
+            context=context,
+            idempotency_key=idempotency_key,
+            json=json_codec.loads(request.canonical),
+        )
+        kind, work_id = (
+            ("Issue", request.payload["issue_id"])
+            if not arena and request.operation == "convert"
+            else (request.kind, request.id)
+        )
+        if result.receipt is not None and (
+            result.receipt.operation != request.authority_operation
+            or result.receipt.subject_label != kind
+            or result.receipt.subject_id != work_id
         ):
             raise DevgraphInvalidSuccessEnvelope
         return result
@@ -1066,11 +1135,21 @@ class DevgraphHttpClient:
         json: dict[str, Any] | None = None,
     ) -> Any:
         if isinstance(context, DevgraphWorkContext):
-            if method != "POST" or path not in (
-                "/work-operations/v1",
+            version = 2 if isinstance(context, DevgraphWorkV2Context) else 1
+            targets = {
                 "/todo-operations/v2",
-                "/arena-operations/v1",
-            ):
+                f"/work-operations/v{version}",
+                f"/arena-operations/v{version}",
+            }
+            if version == 2:
+                targets.update(
+                    {
+                        "/todo-operations/v2/status",
+                        "/work-operations/v2/status",
+                        "/arena-operations/v2/status",
+                    }
+                )
+            if method != "POST" or path not in targets:
                 raise ValueError("named Work proof has an invalid transport target")
             headers = {
                 "X-Devgraph-Work-Authority": base64.urlsafe_b64encode(context.projection_json)

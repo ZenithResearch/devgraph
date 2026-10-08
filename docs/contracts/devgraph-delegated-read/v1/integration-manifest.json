@@ -1,0 +1,40 @@
+{
+  "schema": "devgraph.delegated-read-integration.v1",
+  "contract_digests_sha256": {
+    "credential-manifest.schema.json": "f20718a49274c54fbe22c388788cedf30ca0d5bc78d75d869c15375c59ee8800",
+    "denials/reason-codes.json": "21c2dea129fbe4d712c5f34f1fd1b725766b2d0f8dae23758991ff4d8c4c4453",
+    "examples/credential-manifest-castalia.json": "a2ec25310e59c5964053055f9cc533608f0744eecac72e9caf74f555e2f4daab",
+    "examples/request-profile-castalia.json": "9e9d049046c577931843bef227662ed60951cbc3454d8b3ced3c83dc07b6d62c",
+    "read-grant.schema.json": "d2c3cdacbf4970f836b3b195b7f9db5f9c0090265180c60347e4cc8c564d86eb",
+    "request-profile.schema.json": "b37a6f5a03ed690bd52f052d9b4392a02f2fae767e4cfd0ebd4504456a0a000f"
+  },
+  "dregg_sdk": {
+    "package": "@dregg/sdk",
+    "version": "0.3.0",
+    "registry": "https://registry.npmjs.org",
+    "tarball": "https://registry.npmjs.org/@dregg/sdk/-/sdk-0.3.0.tgz",
+    "integrity": "sha512-IfmjXGTrYk3tLmXV9DEfut4ZDCc069pcjxxm1lurpKsO/Y6PJ06KCir2IYz9Ba4Pmc8pmDzV/8AJzC8hjWMXiw==",
+    "shasum_sha1": "bdd39bb67f9ee607516a72791e2de49f65e5bb32",
+    "upstream_repository": "https://github.com/emberian/dregg.git",
+    "upstream_directory": "sdk-ts",
+    "published_at": "2026-06-28T18:01:56.823Z",
+    "runtime_dependency": false,
+    "capability_matrix": {
+      "root_module_import": "supported",
+      "root_signed_turn_verification": "broken_sig_v2_v3_protocol_mismatch",
+      "root_auth_request_export": "absent",
+      "root_auth_token_export": "absent",
+      "root_attenuation_export": "absent",
+      "wasm_subpath_import": "supported",
+      "structured_token_attenuation": "blocked_unpublished_dregg_wasm",
+      "receiver_token_verification": "blocked_unpublished_dregg_wasm",
+      "self_attenuating_child_capability": "deferred_until_official_release"
+    },
+    "policy": "No internal module, source path, unpublished package, vendor copy, or private patch may replace a missing released SDK capability."
+  },
+  "consumers": {
+    "castalia_wallet_auth": {"status": "pending_merged_commit"},
+    "castalia_wallet": {"status": "blocked_on_dregg_token_carrier_release"},
+    "zenith_work": {"status": "blocked_on_repository_creation_gate"}
+  }
+}

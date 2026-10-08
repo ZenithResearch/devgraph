@@ -22,6 +22,7 @@ from devgraph.storage.base import (
     WorkContainment,
 )
 from devgraph.storage.containment import validate_arena_page, validate_containment_subject
+from devgraph.storage.delegated import DelegatedWorkSelector, validate_work_filter
 from devgraph.storage.migrations import count_idempotent_application
 from devgraph.storage.supporting_material import (
     MAX_PROVENANCE,
@@ -112,6 +113,114 @@ class MemoryGraphStorage:
                     for edge in self._edges
                     if (edge.from_label, edge.from_id, edge.relationship)
                     == ("Arena", arena_id, "CONTAINS_WORK")
+                    and (after_resource is None or f"{edge.to_label}/{edge.to_id}" > after_resource)
+                }
+            )[:limit]
+
+            return self._work_containment(keys)
+
+    def delegated_arena_page(
+        self,
+        arena_ids: tuple[str, ...],
+        *,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        validate_page_limit(limit)
+        allowed = set(arena_ids)
+        if not arena_ids or len(allowed) != len(arena_ids):
+            raise ValueError("invalid delegated Arena selectors")
+        for arena_id in arena_ids:
+            validate_work_object_id(arena_id)
+        if after_id is not None:
+            validate_work_object_id(after_id)
+        return sorted(
+            (
+                node
+                for (label, node_id), node in self._nodes.items()
+                if label == "Arena"
+                and node_id in allowed
+                and not node.archived
+                and (after_id is None or node_id > after_id)
+            ),
+            key=lambda node: node.id,
+        )[:limit]
+
+    def _arena_descendant_keys(self, arenas: set[str]) -> set[tuple[str, str]]:
+        allowed: set[tuple[str, str]] = set()
+        pending = [
+            (edge.to_label, edge.to_id)
+            for edge in self._edges
+            if edge.relationship == "CONTAINS_WORK"
+            and edge.from_label == "Arena"
+            and edge.from_id in arenas
+        ]
+        while pending:
+            key = pending.pop()
+            if key in allowed:
+                continue
+            allowed.add(key)
+            pending.extend(
+                (edge.to_label, edge.to_id)
+                for edge in self._edges
+                if edge.relationship == "HAS_CHILD" and (edge.from_label, edge.from_id) == key
+            )
+        return allowed
+
+    def _delegated_selector_predicate(self, selectors: tuple[DelegatedWorkSelector, ...]):
+        groups = [
+            (
+                set(tuple(resource.split("/", 1)) for resource in selector.work_ids),
+                self._arena_descendant_keys(set(selector.arena_ids)),
+                selector,
+            )
+            for selector in selectors
+        ]
+
+        def admitted(key: tuple[str, str]) -> bool:
+            node = self._nodes.get(key)
+            if node is None:
+                return False
+            return any(
+                key[0] in selector.work_kinds
+                and (not node.archived or selector.include_archived)
+                and (not selector.work_ids or key in exact)
+                and (not selector.arena_ids or key in arena)
+                for exact, arena, selector in groups
+            )
+
+        return admitted
+
+    def delegated_arena_member_page(
+        self,
+        arena_id: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[WorkContainment]:
+        validate_arena_page(arena_id, after_resource, limit)
+        validate_work_filter(
+            label="Initiative",
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=None,
+            limit=limit,
+        )
+        with self._transaction_lock:
+            admitted = self._delegated_selector_predicate(selectors)
+            keys = sorted(
+                {
+                    (edge.to_label, edge.to_id)
+                    for edge in self._edges
+                    if (edge.from_label, edge.from_id, edge.relationship)
+                    == ("Arena", arena_id, "CONTAINS_WORK")
+                    and edge.to_label in work_kinds
+                    and (include_archived or not self._nodes[(edge.to_label, edge.to_id)].archived)
+                    and admitted((edge.to_label, edge.to_id))
                     and (after_resource is None or f"{edge.to_label}/{edge.to_id}" > after_resource)
                 }
             )[:limit]
@@ -309,6 +418,52 @@ class MemoryGraphStorage:
                         keys.add(target)
             return [self._nodes[key] for key in sorted(keys)[:limit] if key in self._nodes]
 
+    def delegated_related_work_nodes(
+        self,
+        label: str,
+        node_id: str,
+        relationship: str,
+        *,
+        incoming: bool,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        validate_work_filter(
+            label=label,
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=None,
+            limit=limit,
+        )
+        if relationship not in {"HAS_CHILD", "DEPENDS_ON", "BLOCKS"} or type(incoming) is not bool:
+            raise ValueError("invalid relationship read")
+        with self.transaction():
+            admitted = self._delegated_selector_predicate(selectors)
+            keys = set()
+            for edge in self._edges:
+                source = (
+                    (edge.to_label, edge.to_id) if incoming else (edge.from_label, edge.from_id)
+                )
+                target = (
+                    (edge.from_label, edge.from_id) if incoming else (edge.to_label, edge.to_id)
+                )
+                node = self._nodes.get(target)
+                if (
+                    edge.relationship == relationship
+                    and source == (label, node_id)
+                    and target[0] in work_kinds
+                    and node is not None
+                    and (include_archived or not node.archived)
+                    and admitted(target)
+                    and (after_resource is None or "/".join(target) > after_resource)
+                ):
+                    keys.add(target)
+            return [self._nodes[key] for key in sorted(keys)[:limit]]
+
     def supporting_material_references(
         self,
         label: str,
@@ -462,6 +617,41 @@ class MemoryGraphStorage:
         validate_work_object_id(todo_id)
         node = self._nodes.get(("Todo", todo_id))
         return node if node is not None and exact_todo(node) else None
+
+    def delegated_work_page(
+        self,
+        label: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        descending: bool = False,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        validate_work_filter(
+            label=label,
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=after_id,
+            limit=limit,
+        )
+        if not isinstance(descending, bool):
+            raise TypeError("descending must be boolean")
+        with self.transaction():
+            admitted = self._delegated_selector_predicate(selectors)
+            records = [
+                node
+                for key, node in self._nodes.items()
+                if node.label == label
+                and label in work_kinds
+                and (include_archived or not node.archived)
+                and admitted(key)
+                and (after_id is None or (node.id < after_id if descending else node.id > after_id))
+            ]
+            records.sort(key=lambda node: node.id, reverse=descending)
+            return records[:limit]
 
     def claim_event_receipt(
         self,

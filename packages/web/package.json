@@ -1,0 +1,40 @@
+{
+  "name": "@devgraph/web",
+  "version": "0.2.0-preview.2",
+  "private": true,
+  "description": "Rust/WASM Devgraph client with application-owned HTTP transport and generic Wallet approval",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./wasm": "./dist/internal/devgraph_web_bg.wasm",
+    "./sdk-build.json": "./sdk-build.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "sdk-build.json",
+    "THIRD-PARTY-NOTICES.txt",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node --test test/browser/*.test.mjs",
+    "test:wallet-browser": "node test/wallet-browser.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.3.5",
+    "playwright": "1.61.1"
+  },
+  "engines": {
+    "node": ">=24.18.0"
+  },
+  "license": "AGPL-3.0-only"
+}

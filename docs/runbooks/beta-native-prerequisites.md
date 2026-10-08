@@ -1,5 +1,12 @@
 # Native companions for the signed beta
 
+For the merged generic Wallet candidate, use
+[public integration](../dev/public-wallet-integration.md) and
+[generic setup](../dev/merged-wallet-provider-setup.md). The application-specific
+signing binaries described below are historical compatibility prerequisites;
+merged Wallet no longer provides them. They are not a fallback for generic setup.
+
+
 Devgraph's signed Work and Arena commands need the native Castalia Wallet signer
 and secS producer. The beta Python package and agent integrations do not replace
 these programs. This runbook packages the exact reviewed sources and reconstructs

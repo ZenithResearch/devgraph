@@ -53,6 +53,7 @@ from devgraph.model.repository import (
 )
 from devgraph.model.validation import validate_work_object_id
 from devgraph.ops.auth_setup import auth_status, provision_read
+from devgraph.ops.credential_work_agent import execute_local_credential_work
 from devgraph.ops.local_process import neo4j_process_snapshot, wait_for_neo4j_exit
 from devgraph.ops.named_work_agent import LocalNamedWorkAgentError, execute_local_named_work
 from devgraph.ops.secs_issue_create_agent import (
@@ -754,6 +755,10 @@ def _parser() -> argparse.ArgumentParser:
         command = work_commands.add_parser(operation, help=f"sign and execute {operation}")
         command.add_argument("--request-file", type=Path, required=True)
         command.add_argument("--idempotency-key-file", type=Path, required=True)
+        command.add_argument("--credential-v2", action="store_true",
+                             help="use the explicit generic credential path with terminal approval")
+        command.add_argument("--reconcile", action="store_true",
+                             help="with --credential-v2, approve a status-only receipt lookup")
 
     arena = subcommands.add_parser("arena", help="execute signed Arena mutations")
     arena_commands = arena.add_subparsers(dest="arena_operation", required=True)
@@ -761,6 +766,10 @@ def _parser() -> argparse.ArgumentParser:
         command = arena_commands.add_parser(operation, help=f"sign and execute Arena {operation}")
         command.add_argument("--request-file", type=Path, required=True)
         command.add_argument("--idempotency-key-file", type=Path, required=True)
+        command.add_argument("--credential-v2", action="store_true",
+                             help="use the explicit generic credential path with terminal approval")
+        command.add_argument("--reconcile", action="store_true",
+                             help="with --credential-v2, approve a status-only receipt lookup")
 
     secs_issue_create = subcommands.add_parser(
         "secs-issue-create-v1",
@@ -1030,25 +1039,33 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             )
             return 0
+        if args.command in {"arena", "work"} and args.reconcile and not args.credential_v2:
+            raise LocalNamedWorkAgentError("--reconcile requires --credential-v2")
         if args.command == "arena":
+            execute_signed = (execute_local_credential_work if args.credential_v2
+                              else execute_local_named_work)
             print(
                 _json(
-                    execute_local_named_work(
+                    execute_signed(
                         request_file=args.request_file,
                         idempotency_key_file=args.idempotency_key_file,
                         operation=args.arena_operation,
                         request_domain="arena",
+                        **({"reconcile": args.reconcile} if args.credential_v2 else {}),
                     )
                 )
             )
             return 0
         if args.command == "work":
+            execute_signed = (execute_local_credential_work if args.credential_v2
+                              else execute_local_named_work)
             print(
                 _json(
-                    execute_local_named_work(
+                    execute_signed(
                         request_file=args.request_file,
                         idempotency_key_file=args.idempotency_key_file,
                         operation=args.work_operation,
+                        **({"reconcile": args.reconcile} if args.credential_v2 else {}),
                     )
                 )
             )

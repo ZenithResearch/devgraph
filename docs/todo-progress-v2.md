@@ -107,7 +107,7 @@ The generic Wallet/credential client is a separate existing integration stack
 explicit grants; installed qualification remains blocked pending a disposable macOS VM. The older Wallet #25 is superseded and stays closed;
 its pinned native/WASM signing tests are compatibility evidence only. Do not merge
 or reactivate that application-specific browser bridge to bypass the generic
-transport gate. The private SDK source has a guarded Todo route, canonical reads
+transport gate. The public SDK source has a guarded Todo route, canonical reads
 and v2 request/result validation; generic browser transport is composed in source. Matched installed qualification
 and dependent legacy retirement remain explicit gates.
 
@@ -121,7 +121,7 @@ archive/restore, contradictory and ambiguous legacy records, transaction rollbac
 stale evidence, six-kind filtering, priority ordering, complete counts and bounded
 250/1,500-item pagination. Existing v1 signing vectors remain unchanged.
 
-The private SDK composition passed its repository checks (2,503 Python tests,
+The earlier archive SDK composition passed its repository checks (2,503 Python tests,
 five skips), 220 frontend tests, 64 Rust tests, WASM build, 19 SDK JavaScript tests
 and TypeScript checks. The final guarded-route/authority checks passed separately
 (89 tests). secS source passed 808 Rust tests; the Wallet compatibility source

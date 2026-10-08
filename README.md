@@ -1,5 +1,11 @@
 # Devgraph — local work graph, public beta
 
+Devgraph development, SDKs, and integration PRs belong in
+`ZenithResearch/devgraph`. `devgraph-private-history-20260915` is a deprecated
+historical archive, not a development or build dependency. See
+[public Wallet integration](docs/dev/public-wallet-integration.md).
+
+
 Devgraph is a local work graph for people and agents. It connects Proposals,
 Initiatives, Projects, Issues, and Tasks with their descriptions, dependencies,
 evidence, and plans. Arenas group ongoing areas of responsibility. The browser

@@ -32,6 +32,7 @@ from devgraph.storage.base import (
     WorkContainment,
 )
 from devgraph.storage.containment import validate_arena_page, validate_containment_subject
+from devgraph.storage.delegated import DelegatedWorkSelector
 from devgraph.storage.supporting_material import (
     MAX_PROVENANCE,
     SUPPORTING_KINDS,
@@ -622,6 +623,58 @@ class Neo4jGraphStorage:
         )
         return [self._node_from_row(row, row["labels"][0], expected_id=row["id"]) for row in rows]
 
+    def delegated_related_work_nodes(
+        self,
+        label: str,
+        node_id: str,
+        relationship: str,
+        *,
+        incoming: bool,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        from devgraph.storage.delegated import validate_work_filter
+
+        validate_work_filter(
+            label=label,
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=None,
+            limit=limit,
+        )
+        validate_work_object_id(node_id)
+        if relationship not in {"HAS_CHILD", "DEPENDS_ON", "BLOCKS"} or type(incoming) is not bool:
+            raise ValueError("invalid relationship read")
+        arrow = f"<-[:{relationship}]-" if incoming else f"-[:{relationship}]->"
+        rows = self._run_graph(
+            f"MATCH (source:`{label}` {{id: $node_id}}){arrow}(n) "
+            "WHERE size(labels(n)) = 1 AND labels(n)[0] IN $kinds "
+            "AND ($include_archived OR n.archived = false) "
+            "AND ($after_resource IS NULL OR labels(n)[0] + '/' + n.id > $after_resource) "
+            "AND any(selector IN $selectors WHERE "
+            "labels(n)[0] IN selector.work_kinds AND "
+            "(n.archived = false OR selector.include_archived) AND "
+            "(size(selector.work_ids) = 0 OR "
+            "labels(n)[0] + '/' + n.id IN selector.work_ids) AND "
+            "(size(selector.arena_ids) = 0 OR EXISTS { "
+            "MATCH (a:Arena)-[:CONTAINS_WORK]->(root)-[:HAS_CHILD*0..]->(n) "
+            "WHERE a.id IN selector.arena_ids })) "
+            "WITH DISTINCT n ORDER BY labels(n)[0], n.id LIMIT $limit "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            "properties(n) AS properties",
+            node_id=node_id,
+            kinds=list(work_kinds),
+            include_archived=include_archived,
+            after_resource=after_resource,
+            selectors=[selector.as_parameters() for selector in selectors],
+            limit=limit,
+        )
+        return [self._node_from_row(row, row["labels"][0], expected_id=row["id"]) for row in rows]
+
     @classmethod
     def _containment_from_row(cls, row: dict[str, Any]) -> WorkContainment:
         labels = row.get("labels")
@@ -690,6 +743,79 @@ class Neo4jGraphStorage:
             )
         ):
             raise StorageUnavailable("invalid containment page")
+        return result
+
+    def delegated_arena_page(
+        self,
+        arena_ids: tuple[str, ...],
+        *,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        validate_page_limit(limit)
+        if not arena_ids or len(set(arena_ids)) != len(arena_ids):
+            raise ValueError("invalid delegated Arena selectors")
+        for arena_id in arena_ids:
+            validate_work_object_id(arena_id)
+        if after_id is not None:
+            validate_work_object_id(after_id)
+        rows = self._run_graph(
+            "MATCH (n:Arena) WHERE n.id IN $arena_ids AND n.archived = false "
+            "AND ($after_id IS NULL OR n.id > $after_id) "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            "properties(n) AS properties ORDER BY n.id LIMIT $limit",
+            arena_ids=list(arena_ids),
+            after_id=after_id,
+            limit=limit,
+        )
+        return [self._node_from_row(row, "Arena") for row in rows]
+
+    def delegated_arena_member_page(
+        self,
+        arena_id: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[WorkContainment]:
+        from devgraph.storage.delegated import validate_work_filter
+
+        validate_arena_page(arena_id, after_resource, limit)
+        validate_work_filter(
+            label="Initiative",
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=None,
+            limit=limit,
+        )
+        rows = self._run_graph(
+            "MATCH (:Arena {id: $arena_id})-[:CONTAINS_WORK]->(n) "
+            "WHERE n.id IS NULL OR size(labels(n)) <> 1 OR ("
+            "labels(n)[0] IN $kinds AND ($include_archived OR n.archived = false) "
+            "AND ($after_resource IS NULL OR labels(n)[0] + '/' + n.id > $after_resource) "
+            "AND any(selector IN $selectors WHERE "
+            "labels(n)[0] IN selector.work_kinds AND "
+            "(n.archived = false OR selector.include_archived) AND "
+            "(size(selector.work_ids) = 0 OR "
+            "labels(n)[0] + '/' + n.id IN selector.work_ids) AND "
+            "(size(selector.arena_ids) = 0 OR EXISTS { "
+            "MATCH (a:Arena)-[:CONTAINS_WORK]->(root)-[:HAS_CHILD*0..]->(n) "
+            "WHERE a.id IN selector.arena_ids })) "
+            "WITH DISTINCT n ORDER BY labels(n)[0], n.id LIMIT $limit " + _containment_projection(),
+            arena_id=arena_id,
+            kinds=list(work_kinds),
+            include_archived=include_archived,
+            after_resource=after_resource,
+            selectors=[selector.as_parameters() for selector in selectors],
+            limit=limit,
+        )
+        result = [self._containment_from_row(row) for row in rows]
+        keys = [(item.node.label, item.node.id) for item in result]
+        if len(result) > limit or keys != sorted(set(keys)):
+            raise StorageUnavailable("invalid delegated containment page")
         return result
 
     def supporting_material_references(
@@ -1088,6 +1214,54 @@ class Neo4jGraphStorage:
         if len(rows) > 1:
             raise StorageUnavailable("ambiguous Todo identity")
         return self._node_from_row(rows[0], "Todo", expected_id=todo_id) if rows else None
+
+    def delegated_work_page(
+        self,
+        label: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        descending: bool = False,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        from devgraph.storage.delegated import validate_work_filter
+
+        validate_work_filter(
+            label=label,
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=after_id,
+            limit=limit,
+        )
+        if not isinstance(descending, bool):
+            raise ValueError("invalid delegated order")
+        if label not in work_kinds:
+            return []
+        node_label = self._node_label(label)
+        comparison = "<" if descending else ">"
+        direction = "DESC" if descending else "ASC"
+        cursor = "" if after_id is None else f" AND n.id {comparison} $after_id"
+        rows = self._run_graph(
+            f"MATCH (n:`{node_label}`) WHERE ($include_archived OR n.archived = false)"
+            f"{cursor} AND any(selector IN $selectors WHERE "
+            "labels(n)[0] IN selector.work_kinds AND "
+            "(n.archived = false OR selector.include_archived) AND "
+            "(size(selector.work_ids) = 0 OR "
+            "labels(n)[0] + '/' + n.id IN selector.work_ids) AND "
+            "(size(selector.arena_ids) = 0 OR EXISTS { "
+            "MATCH (a:Arena)-[:CONTAINS_WORK]->(root)-[:HAS_CHILD*0..]->(n) "
+            "WHERE a.id IN selector.arena_ids })) "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            f"properties(n) AS properties ORDER BY n.id {direction} LIMIT $limit",
+            include_archived=include_archived,
+            after_id=after_id,
+            selectors=[selector.as_parameters() for selector in selectors],
+            limit=limit,
+        )
+        return [self._node_from_row(row, node_label) for row in rows]
 
     def claim_event_receipt(
         self,

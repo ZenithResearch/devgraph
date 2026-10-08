@@ -1,0 +1,133 @@
+{
+  "schema": "devgraph.sdk-operation-response-fixtures.v1",
+  "vectors": [
+    {
+      "name": "create-Proposal",
+      "request": "{\"expected_version\":null,\"id\":\"proposal-one\",\"kind\":\"Proposal\",\"operation\":\"create\",\"payload\":{\"id\":\"proposal-one\",\"title\":\"test\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-000",
+      "status": 201,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"proposal-one\",\"kind\":\"Proposal\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-001\",\"operation\":\"devgraph.work.create.v1\",\"subject_label\":\"Proposal\",\"subject_id\":\"proposal-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:2988f5a7c1b673f79ee336105cff4494e82eea931583752e1a5d6206522595a9\"}}"
+    },
+    {
+      "name": "create-Initiative",
+      "request": "{\"expected_version\":null,\"id\":\"initiative-one\",\"kind\":\"Initiative\",\"operation\":\"create\",\"payload\":{\"id\":\"initiative-one\",\"title\":\"test\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-001",
+      "status": 201,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"initiative-one\",\"kind\":\"Initiative\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-002\",\"operation\":\"devgraph.work.create.v1\",\"subject_label\":\"Initiative\",\"subject_id\":\"initiative-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:fc81f697a4109832633d5ba3371edb7d5750693403f01b7fe3595abcf3a95531\"}}"
+    },
+    {
+      "name": "create-Project",
+      "request": "{\"expected_version\":null,\"id\":\"project-one\",\"kind\":\"Project\",\"operation\":\"create\",\"payload\":{\"id\":\"project-one\",\"title\":\"test\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-002",
+      "status": 201,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"project-one\",\"kind\":\"Project\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-003\",\"operation\":\"devgraph.work.create.v1\",\"subject_label\":\"Project\",\"subject_id\":\"project-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:bf526c551de45ab88df641e943d0d575d4da8d024502e2bfde1ceabb4efe1689\"}}"
+    },
+    {
+      "name": "create-Issue",
+      "request": "{\"expected_version\":null,\"id\":\"issue-one\",\"kind\":\"Issue\",\"operation\":\"create\",\"payload\":{\"id\":\"issue-one\",\"title\":\"test\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-003",
+      "status": 201,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"issue-one\",\"kind\":\"Issue\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-004\",\"operation\":\"devgraph.work.create.v1\",\"subject_label\":\"Issue\",\"subject_id\":\"issue-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:9f5d13a2f0b0cb8d71be39b786fc6e9e63c8703a53b5b6d26c0d01e36a999662\"}}"
+    },
+    {
+      "name": "create-Task",
+      "request": "{\"expected_version\":null,\"id\":\"task-one\",\"kind\":\"Task\",\"operation\":\"create\",\"payload\":{\"id\":\"task-one\",\"title\":\"test\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-004",
+      "status": 201,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"task-one\",\"kind\":\"Task\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-005\",\"operation\":\"devgraph.work.create.v1\",\"subject_label\":\"Task\",\"subject_id\":\"task-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:01bb51c1dc461de84aa4fefd55dd271bcd4ea6aad3e05502cc01c4130953f393\"}}"
+    },
+    {
+      "name": "create-other-task",
+      "request": "{\"expected_version\":null,\"id\":\"task-other\",\"kind\":\"Task\",\"operation\":\"create\",\"payload\":{\"id\":\"task-other\",\"title\":\"test\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-005",
+      "status": 201,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"task-other\",\"kind\":\"Task\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-006\",\"operation\":\"devgraph.work.create.v1\",\"subject_label\":\"Task\",\"subject_id\":\"task-other\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:b92af222822216ebad9876c5a6a783ab91dd794c2ab8763663f7cbbc870fe23c\"}}"
+    },
+    {
+      "name": "patch",
+      "request": "{\"expected_version\":1,\"id\":\"issue-one\",\"kind\":\"Issue\",\"operation\":\"patch\",\"payload\":{\"title\":\"Patched\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-006",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"issue-one\",\"kind\":\"Issue\",\"title\":\"Patched\",\"description\":\"\",\"status\":\"draft\",\"version\":2,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-007\",\"operation\":\"devgraph.work.patch.v1\",\"subject_label\":\"Issue\",\"subject_id\":\"issue-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:e1a6788651e72b7539d9e9a4ef834864ee89f5c5cb06475a04ad3ba036240f19\"}}"
+    },
+    {
+      "name": "status",
+      "request": "{\"expected_version\":2,\"id\":\"issue-one\",\"kind\":\"Issue\",\"operation\":\"status\",\"payload\":{\"status\":\"review\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-007",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"issue-one\",\"kind\":\"Issue\",\"title\":\"Patched\",\"description\":\"\",\"status\":\"review\",\"version\":3,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-008\",\"operation\":\"devgraph.work.status.v1\",\"subject_label\":\"Issue\",\"subject_id\":\"issue-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:6333786b58bd80d151c62ddb5f0c5edc88720679a3234b3cd767ffbda4e062d2\"}}"
+    },
+    {
+      "name": "accept",
+      "request": "{\"expected_version\":1,\"id\":\"proposal-one\",\"kind\":\"Proposal\",\"operation\":\"accept\",\"payload\":{\"decision_id\":\"decision-one\",\"decision_title\":\"Accepted\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-008",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"proposal-one\",\"kind\":\"Proposal\",\"title\":\"test\",\"description\":\"\",\"status\":\"accepted\",\"version\":2,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-009\",\"operation\":\"devgraph.work.accept.v1\",\"subject_label\":\"Proposal\",\"subject_id\":\"proposal-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:61fac021eabfc3c03f4d6b6d71818a94ab00a8be0af90339722305255f822390\"}}"
+    },
+    {
+      "name": "convert",
+      "request": "{\"expected_version\":2,\"id\":\"proposal-one\",\"kind\":\"Proposal\",\"operation\":\"convert\",\"payload\":{\"decision_id\":\"decision-one\",\"issue_id\":\"converted-one\"},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-009",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"converted-one\",\"kind\":\"Issue\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-010\",\"operation\":\"devgraph.work.convert.v1\",\"subject_label\":\"Issue\",\"subject_id\":\"converted-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:7382ae6bc88267baa973d7e6ded244c9cc0f3be96e4c1868774ef46d860567f2\"}}"
+    },
+    {
+      "name": "parent.set",
+      "request": "{\"expected_version\":1,\"id\":\"task-one\",\"kind\":\"Task\",\"operation\":\"parent.set\",\"payload\":{\"parent\":{\"expected_version\":3,\"id\":\"issue-one\",\"kind\":\"Issue\"},\"previous_parent\":null},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-010",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"task-one\",\"kind\":\"Task\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":2,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-011\",\"operation\":\"devgraph.work.parent.set.v1\",\"subject_label\":\"Task\",\"subject_id\":\"task-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:838702c0d2b2a9ea4056ec21216607c09ee41638a317c4eb0bdf871c5484184e\"}}"
+    },
+    {
+      "name": "dependency.add",
+      "request": "{\"expected_version\":4,\"id\":\"issue-one\",\"kind\":\"Issue\",\"operation\":\"dependency.add\",\"payload\":{\"target\":{\"expected_version\":1,\"id\":\"project-one\",\"kind\":\"Project\"}},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-011",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"issue-one\",\"kind\":\"Issue\",\"title\":\"Patched\",\"description\":\"\",\"status\":\"review\",\"version\":5,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-012\",\"operation\":\"devgraph.work.dependency.add.v1\",\"subject_label\":\"Issue\",\"subject_id\":\"issue-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:75ae8fd0370299a9cee590dd9e9a0fd01f7f2f95ff52fac256e5012d3a7b1470\"}}"
+    },
+    {
+      "name": "dependency.remove",
+      "request": "{\"expected_version\":5,\"id\":\"issue-one\",\"kind\":\"Issue\",\"operation\":\"dependency.remove\",\"payload\":{\"target\":{\"expected_version\":2,\"id\":\"project-one\",\"kind\":\"Project\"}},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-012",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"issue-one\",\"kind\":\"Issue\",\"title\":\"Patched\",\"description\":\"\",\"status\":\"review\",\"version\":6,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-013\",\"operation\":\"devgraph.work.dependency.remove.v1\",\"subject_label\":\"Issue\",\"subject_id\":\"issue-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:c9add6e9110aea6b42ea299723f91f0a6f1b039c4601f6754b3e65117114aef4\"}}"
+    },
+    {
+      "name": "blocker.add",
+      "request": "{\"expected_version\":2,\"id\":\"task-one\",\"kind\":\"Task\",\"operation\":\"blocker.add\",\"payload\":{\"target\":{\"expected_version\":1,\"id\":\"task-other\",\"kind\":\"Task\"}},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-013",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"task-one\",\"kind\":\"Task\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":3,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-014\",\"operation\":\"devgraph.work.blocker.add.v1\",\"subject_label\":\"Task\",\"subject_id\":\"task-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:c102dbd8873cbe7c365c3e02259dfabe060114333d06cfabacbebc85644a9f27\"}}"
+    },
+    {
+      "name": "blocker.remove",
+      "request": "{\"expected_version\":3,\"id\":\"task-one\",\"kind\":\"Task\",\"operation\":\"blocker.remove\",\"payload\":{\"target\":{\"expected_version\":2,\"id\":\"task-other\",\"kind\":\"Task\"}},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-014",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"task-one\",\"kind\":\"Task\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":4,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-015\",\"operation\":\"devgraph.work.blocker.remove.v1\",\"subject_label\":\"Task\",\"subject_id\":\"task-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:2fe081cdc542c4c48ed7b403803162e6e7dae0d08338ccefef5a4819906016d9\"}}"
+    },
+    {
+      "name": "archive",
+      "request": "{\"expected_version\":1,\"id\":\"initiative-one\",\"kind\":\"Initiative\",\"operation\":\"archive\",\"payload\":{},\"schema\":\"devgraph.work-request.v1\"}",
+      "idempotency_key": "sdk-operation-fixture-015",
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"initiative-one\",\"kind\":\"Initiative\",\"title\":\"test\",\"description\":\"\",\"status\":\"archived\",\"version\":2,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-016\",\"operation\":\"devgraph.work.archive.v1\",\"subject_label\":\"Initiative\",\"subject_id\":\"initiative-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:f1e84ee6f9062ef3c3fd805278ecc05de16306d4bd9746cbae0eae4019a3a142\"}}"
+    }
+  ]
+}

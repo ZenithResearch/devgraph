@@ -1,0 +1,16 @@
+[package]
+name = "devgraph-web"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "AGPL-3.0-only"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+devgraph-client-core = { path = "../devgraph-client-core" }
+serde_json = "1"
+wasm-bindgen = "=0.2.127"
+js-sys = "=0.3.104"

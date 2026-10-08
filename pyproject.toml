@@ -38,6 +38,7 @@ devgraph = [
   "frontend/static/selection/core/*",
   "frontend/static/topology/*",
   "frontend/static/kanban/*",
+  "frontend/static/credential-v2/*",
   "frontend/static/selection/page/*",
   "resources/migrations/*.cypher",
   "resources/migrations/*.json",

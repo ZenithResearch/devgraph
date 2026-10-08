@@ -19,7 +19,7 @@ protocol documentation from #7. CI explicitly runs the Kanban frontend tests
 alongside the monitor tests.
 
 The separate Dependabot #5 branch is not an authored local feature branch and
-is outside this consolidation. Wallet, secS, and private SDK follow-ups remain
+is outside this consolidation. Wallet, secS, and public SDK follow-ups remain
 in their own repositories and retain their immutable protocol pins. Their
 runtime code cannot be folded into one public Devgraph PR.
 

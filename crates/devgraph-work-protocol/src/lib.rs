@@ -126,7 +126,7 @@ fn validate_integer_tokens(raw: &[u8]) -> Result<()> {
             let value = std::str::from_utf8(token)
                 .ok()
                 .and_then(|s| s.parse::<i64>().ok());
-            if !value.is_some_and(|n| n.unsigned_abs() <= MAX_SAFE) {
+            if value.is_none_or(|n| n.unsigned_abs() > MAX_SAFE) {
                 return Err("invalid_json");
             }
         } else {

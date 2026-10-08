@@ -1,0 +1,52 @@
+name: installed-generic-wallet-gate
+
+# Evidence is produced by an actual disposable macOS guest, not this Linux job.
+on:
+  workflow_dispatch:
+    inputs:
+      evidence_run_id:
+        description: Run in this repository containing the guest's evidence artifact
+        required: true
+        type: string
+      evidence_artifact:
+        description: Artifact containing candidate/ and evidence/report.json
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  exact-artifact-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ inputs.evidence_artifact }}
+          run-id: ${{ inputs.evidence_run_id }}
+          github-token: ${{ github.token }}
+          path: qualification
+      - name: Bind evidence to this exact source revision
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          candidate = json.loads(Path('qualification/candidate/candidate.json').read_text())
+          sources = json.loads(Path('docs/dev/generic-wallet-source-set.json').read_text())
+          if candidate['sources']['wallet'] != sources['sources']['wallet_generic']['revision']:
+              raise SystemExit('Qualification must use the pinned merged Wallet')
+          if candidate['sources']['secs'] != sources['sources']['secs_generic_todo']['revision']:
+              raise SystemExit('Qualification must use the pinned secS candidate')
+          if candidate['sources']['devgraph_public'] != os.environ['GITHUB_SHA']:
+              raise SystemExit('Qualification belongs to another source revision; rerun the guest gate')
+          PY
+      - name: Require every installed case and unchanged artifact/evidence hashes
+        run: >-
+          python3 scripts/qualification/macos_gate.py verify
+          --bundle qualification/candidate
+          --report qualification/evidence/report.json
