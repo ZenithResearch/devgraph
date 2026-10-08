@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { topologySource } from './monitor_test_helpers.mjs';
 
 const frontend = readFileSync(new URL('../../src/devgraph/frontend/app.py', import.meta.url), 'utf8');
 const names = [
   'graphLane', 'stableGraphDepth', 'baseGraphCoordinates', 'syncGraphPhysics',
   'filterGraph', 'filterGraphByArena', 'neighborhoodKeys', 'updateGraphVisibility', 'render', 'refresh',
-  'synchronizeCredential', 'applySnapshot',
+  'synchronizeCredential', 'applySnapshot', 'setGraphAttention',
 ];
 const source = names.map(name => {
   const declaration = new RegExp(`^    (?:async )?function ${name}\\(`, 'm').exec(frontend);
@@ -43,11 +44,11 @@ function snapshot(graphNodes = nodes, graphEdges = edges) {
 function monitor() {
   const elements = new Map();
   const c = vm.createContext({
-    AbortController,
+    AbortController, refreshCheckIn() {}, checkIn: { reset() {} },
     state: { snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshQueued: false },
     detailState: { credential: 'synthetic-test-credential' },
     graphView: {
-      visibleCategories: new Set(categories), nodes: [], edges: [],
+      preferenceKey: 'fixture', filters: {}, filterSerial: 0, visibleCategories: new Set(categories), nodes: [], edges: [],
       nodePositions: new Map(), nodeVelocities: new Map(), pointers: new Map(), pinnedKey: null, fitted: false,
     },
     tokenInput: { value: 'synthetic-test-credential' },
@@ -55,13 +56,14 @@ function monitor() {
       if (!elements.has(id)) elements.set(id, { className: '', textContent: '' });
       return elements.get(id);
     } },
-    text() {}, relativeTime() { return 'now'; }, pauseGraphOrbit() {},
+    topologyPath: () => '/monitor/topology/v1', renderTopologyControls() {}, text() {}, relativeTime() { return 'now'; }, pauseGraphOrbit() {}, invalidateLayout() {}, requestGraphRender() {},
     renderPipeline() {}, renderBars() {}, renderActivity() {}, renderObservations() {},
-    renderForceControls() {}, renderArenaFilter() {}, relaxGraph() {}, fitGraph() {},
+    renderForceControls() {}, renderArenaFilter() {}, relaxGraph() {}, settleRevealedChildren() {}, fitGraph() {},
     renderGraph() {}, renderGraphSelection() {}, renderGraphSearch() {}, loadSelectedDetail() {}, queueMicrotask,
   });
   c.relaxations = 0;
   c.relaxGraph = () => { c.relaxations += 1; };
+  vm.runInContext(topologySource, c); c.Topology = c.DevgraphTopology;
   vm.runInContext(source, c);
   return c;
 }
@@ -131,7 +133,7 @@ test('hidden selections and positions survive until the record leaves the snapsh
 test('all-hidden refresh keeps choices and restoring a category reveals fresh records', async () => {
   const c = monitor();
   let next = snapshot();
-  c.getJson = async path => path === '/monitor/snapshot' ? next : { items: [] };
+  c.getJson = async path => path === '/monitor/topology/v1' ? next : { items: [] };
   await c.refresh();
   c.graphView.visibleCategories.clear();
   c.updateGraphVisibility();
@@ -146,8 +148,118 @@ test('all-hidden refresh keeps choices and restoring a category reveals fresh re
   assert.equal(c.graphView.edges.length, 0);
   c.graphView.visibleCategories.add('work');
   c.updateGraphVisibility();
-  assert.deepEqual(Array.from(c.graphView.nodes, node => node.key), ['work-a', 'work-b', 'new-work']);
-  assert.deepEqual(Array.from(c.graphView.edges, edge => [edge.source, edge.target]), [
-    ['work-a', 'work-b'], ['work-b', 'new-work'],
-  ]);
+  assert.deepEqual(Array.from(c.graphView.nodes, node => node.key), ['work-a']);
+  assert.deepEqual(Array.from(c.graphView.edges, edge => [edge.source, edge.target]), []);
+});
+
+test('hover reveal anchors the parent, preserves the camera, and collapse restores the overview',()=>{
+  const c=monitor(); c.state.snapshot=snapshot(); c.updateGraphVisibility();
+  const position={x:317,y:-54,z:106}; c.graphView.nodePositions.set('work-a',position);
+  c.graphView.panX=73; c.graphView.zoom=1.7;
+  c.fitGraph=()=>assert.fail('hover must not refit the camera');
+  c.setGraphAttention('hoveredKey','work-a');
+  assert.deepEqual(Array.from(c.graphView.nodes,n=>n.key),['work-a','work-b']);
+  assert.deepEqual({...c.graphView.nodePositions.get('work-a')},position);
+  const child={...c.graphView.nodePositions.get('work-b')};
+  c.updateGraphVisibility();
+  assert.deepEqual({...c.graphView.nodePositions.get('work-b')},child,'refresh preserves the expanded arrangement');
+  assert.deepEqual({...c.graphView.layoutPlan.positions.get('work-a')},position,'refresh keeps layout anchors aligned');
+  c.graphView.projected=new Map([['work-a',{x:100,y:100}],['work-b',{x:200,y:200}]]);
+  c.setGraphAttention('hoveredKey',null,{x:150,y:150});
+  assert.equal(c.graphView.hoverRoot,'work-a','crossing the space between parent and child keeps the family open');
+  c.setGraphAttention('hoveredKey','work-b');
+  assert.equal(c.graphView.hoverRoot,'work-a');
+  c.setGraphAttention('hoveredKey',null);
+  assert.deepEqual(Array.from(c.graphView.nodes,n=>n.key),['work-a']);
+  assert.deepEqual({...c.graphView.nodePositions.get('work-a')},position);
+  assert.equal(c.graphView.panX,73); assert.equal(c.graphView.zoom,1.7);
+});
+
+test('keyboard and selected families survive pointer exit and ignore internal focus transfers',()=>{
+  const c=monitor(); c.state.snapshot=snapshot(); c.updateGraphVisibility();
+  c.setGraphAttention('focusedKey','work-a');
+  c.setGraphAttention('hoveredKey','work-a'); c.setGraphAttention('hoveredKey',null);
+  assert.equal(c.graphView.nodes.length,2);
+  c.graphView.movingFocus=true; c.setGraphAttention('focusedKey',null); c.graphView.movingFocus=false;
+  assert.equal(c.graphView.focusRoot,'work-a');
+  c.graphView.selectedRoot='work-a'; c.setGraphAttention('focusedKey',null);
+  assert.equal(c.graphView.nodes.length,2,'reading in the sidebar retains the selected family');
+  c.graphView.selectedRoot=null; c.updateGraphVisibility(true);
+  assert.equal(c.graphView.nodes.length,1);
+});
+
+test('refresh classifies changed parentage without restoring a stale collapsed layout',()=>{
+  const c=monitor(); c.state.snapshot=snapshot(); c.updateGraphVisibility();
+  c.setGraphAttention('hoveredKey','work-a');
+  c.state.snapshot=snapshot(nodes,[]); c.updateGraphVisibility();
+  const refreshed=new Map([...c.graphView.nodePositions].map(([key,p])=>[key,{...p}]));
+  c.setGraphAttention('hoveredKey',null);
+  assert.deepEqual(Array.from(c.graphView.nodes,n=>n.key),['work-a','work-b'],'newly standalone Issue remains visible after collapse');
+  for(const node of c.graphView.nodes) assert.deepEqual({...c.graphView.nodePositions.get(node.key)},refreshed.get(node.key),'collapse must not restore obsolete parentage positions');
+});
+
+test('revealing, switching, refreshing, and collapsing families keeps every existing node and the camera still',()=>{
+  const c=monitor();
+  const work=(kind,id)=>({key:`${kind}:${id}`,id,kind,category:kind==='Arena'?'arena':'work'});
+  const a=work('Arena','a'),b=work('Arena','b'),i=work('Initiative','i'),p=work('Project','p'),q=work('Project','q');
+  const issue=work('Issue','child'),task=work('Task','nested'),other=work('Task','other'),standalone=work('Issue','standalone');
+  const link=(source,target,relationship='HAS_CHILD')=>({source:source.key,target:target.key,relationship});
+  c.state.snapshot=snapshot([a,b,i,p,q,issue,task,other,standalone],[link(a,i,'CONTAINS_WORK'),link(b,q,'CONTAINS_WORK'),link(i,p),link(p,issue),link(issue,task),link(q,other)]);
+  c.updateGraphVisibility();
+  const camera={panX:73,panY:-48,zoom:1.7,yaw:-.32,pitch:.24,cameraDistance:5000,fitted:true};
+  Object.assign(c.graphView,camera);
+  const original=new Map([...c.graphView.nodePositions].map(([k,p])=>[k,{...p}]));
+  c.fitGraph=()=>assert.fail('attention must not refit');
+  c.relaxGraph=()=>assert.fail('attention must not run global physics');
+  const still=action=>{
+    const before=new Map(c.graphView.nodes.map(n=>[n.key,{...c.graphView.nodePositions.get(n.key)}]));
+    action();
+    for(const n of c.graphView.nodes)if(before.has(n.key))assert.deepEqual({...c.graphView.nodePositions.get(n.key)},before.get(n.key),`${n.key} must not move`);
+    for(const [k,v] of Object.entries(camera))assert.equal(c.graphView[k],v,`camera ${k} must not move`);
+  };
+  for(let cycle=0;cycle<3;cycle++){
+    still(()=>c.setGraphAttention('hoveredKey',i.key));
+    assert.ok(!c.graphView.nodes.some(n=>n.key===issue.key||n.key===task.key),'initiative hover keeps deeper work hidden');
+    still(()=>c.setGraphAttention('hoveredKey',p.key));
+    assert.ok(c.graphView.nodes.some(n=>n.key===issue.key));
+    assert.ok(!c.graphView.nodes.some(n=>n.key===task.key));
+    still(()=>c.setGraphAttention('hoveredKey',issue.key));
+    assert.ok(c.graphView.nodes.some(n=>n.key===task.key),'hovering the Issue opens the next level');
+    still(()=>c.setGraphAttention('focusedKey',q.key));
+    assert.ok(c.graphView.nodes.some(n=>n.key===other.key),'two independently anchored families can be open');
+    still(()=>c.setGraphAttention('hoveredKey',q.key));
+    still(()=>c.updateGraphVisibility());
+    still(()=>c.setGraphAttention('hoveredKey',null));
+    still(()=>c.setGraphAttention('focusedKey',null));
+    for(const [key,position] of original)assert.deepEqual({...c.graphView.nodePositions.get(key)},position);
+  }
+});
+
+test('collapsing does not undo manual positioning and reopened children follow a moved parent',()=>{
+  const c=monitor();c.state.snapshot=snapshot();c.updateGraphVisibility();
+  c.setGraphAttention('hoveredKey','work-a');
+  c.graphView.nodePositions.set('work-a',{x:900,y:30,z:120});
+  c.setGraphAttention('hoveredKey',null);
+  assert.deepEqual({...c.graphView.nodePositions.get('work-a')},{x:900,y:30,z:120});
+  c.setGraphAttention('hoveredKey','work-a');
+  const first={...c.graphView.nodePositions.get('work-b')};
+  c.setGraphAttention('hoveredKey',null);
+  c.graphView.nodePositions.set('work-a',{x:1080,y:80,z:180});
+  c.setGraphAttention('hoveredKey','work-a');
+  assert.deepEqual({...c.graphView.nodePositions.get('work-b')},{x:first.x+180,y:first.y+50,z:first.z+60});
+});
+
+test('revisiting a settled branch reuses positions until the parent or camera changes',()=>{
+  const c=monitor(),calls=[];c.settleRevealedChildren=keys=>calls.push([...keys]);
+  c.state.snapshot=snapshot();c.updateGraphVisibility();c.setGraphAttention('hoveredKey','work-a');
+  assert.deepEqual(calls,[['work-b']]);
+  const position={x:400,y:280,z:140};
+  c.graphView.revealCache.set('work-b',{parentKey:'work-a',parent:{...c.graphView.nodePositions.get('work-a')},position});
+  c.setGraphAttention('hoveredKey',null);c.setGraphAttention('hoveredKey','work-a');
+  assert.deepEqual({...c.graphView.nodePositions.get('work-b')},position);
+  assert.equal(calls.length,1,'unchanged reopen skips the worker and animation');
+  c.setGraphAttention('hoveredKey',null);c.graphView.nodePositions.get('work-a').x+=200;c.setGraphAttention('hoveredKey','work-a');
+  assert.equal(calls.length,2,'moving the parent rechecks child spacing');
+  c.setGraphAttention('hoveredKey',null);c.graphView.zoom=.6;c.setGraphAttention('hoveredKey','work-a');
+  assert.equal(calls.length,3,'changed projection rechecks screen-space spacing');
 });

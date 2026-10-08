@@ -6,7 +6,9 @@ import threading
 import time
 from typing import Any
 
+from devgraph.auth.delegated_contract import SCOPE_QUERY_READ
 from devgraph.auth.enforcement import AuditLog, require_scope
+from devgraph.auth.errors import ForbiddenError
 from devgraph.auth.scopes import CATEGORY_READ
 from devgraph.auth.verifier import CredentialVerifier
 from devgraph.cypher_read import (
@@ -47,7 +49,9 @@ class Neo4jCypherReadRunner:
         session = transaction = None
         try:
             session = self._driver.session(
-                database=self._database, default_access_mode="READ", fetch_size=1,
+                database=self._database,
+                default_access_mode="READ",
+                fetch_size=1,
             )
             transaction = session.begin_transaction(
                 timeout=QUERY_TIMEOUT_SECONDS,
@@ -64,8 +68,11 @@ class Neo4jCypherReadRunner:
             if tuple(result.keys()) != compiled.physical_columns:
                 raise CypherReadError("invalid_cypher_read_result", 503)
             response = {
-                "schema": RESULT_SCHEMA, "columns": list(compiled.columns),
-                "rows": [], "row_count": 0, "limit": compiled.limit,
+                "schema": RESULT_SCHEMA,
+                "columns": list(compiled.columns),
+                "rows": [],
+                "row_count": 0,
+                "limit": compiled.limit,
             }
             for record in result:
                 if time.monotonic() - started >= QUERY_TIMEOUT_SECONDS:
@@ -74,9 +81,7 @@ class Neo4jCypherReadRunner:
                     raise CypherReadError("cypher_result_too_large", 413)
                 if record["_dg_invalid"] is not False:
                     raise CypherReadError("invalid_cypher_read_result", 503)
-                response["rows"].append([
-                    record[f"_dg_c{i}"] for i in range(len(compiled.columns))
-                ])
+                response["rows"].append([record[f"_dg_c{i}"] for i in range(len(compiled.columns))])
                 response["row_count"] += 1
                 validate_cypher_result(response, compiled)
             self._check_summary(result.consume())
@@ -112,8 +117,12 @@ class Neo4jCypherReadRunner:
 
 class CypherReadService:
     def __init__(
-        self, runner: Neo4jCypherReadRunner, *, verifier: CredentialVerifier,
-        audience: str, audit_log: AuditLog,
+        self,
+        runner: Neo4jCypherReadRunner,
+        *,
+        verifier: CredentialVerifier,
+        audience: str,
+        audit_log: AuditLog,
     ):
         self._runner = runner
         self._verifier, self._audience, self._audit_log = verifier, audience, audit_log
@@ -124,11 +133,34 @@ class CypherReadService:
         compiled = parse_cypher_request(request_json)
         response = validate_cypher_result(self._runner.execute(compiled), compiled)
         self._audit_log.record(
-            actor_id=context.actor_id, session_id=context.session_id,
-            correlation_id=context.correlation_id, category=CATEGORY_READ,
-            operation="cypher_read_v1", safe_summary={"row_count": response["row_count"]},
+            actor_id=context.actor_id,
+            session_id=context.session_id,
+            correlation_id=context.correlation_id,
+            category=CATEGORY_READ,
+            operation="cypher_read_v1",
+            safe_summary={"row_count": response["row_count"]},
         )
         return response
+
+    def execute_delegated(
+        self,
+        *,
+        credential: str | None,
+        request_json: bytes,
+        verifier: CredentialVerifier,
+    ) -> dict[str, Any]:
+        """Execute through the fixed granular query scope.
+
+        The caller may authenticate before reading the HTTP body; this method
+        deliberately verifies again immediately before execution so expiry or
+        revocation during upload remains fail closed.
+        """
+
+        context = verifier.verify(credential, audience=self._audience)
+        if not context.envelope.has_scope(SCOPE_QUERY_READ):
+            raise ForbiddenError("scope_not_granted", correlation_id=context.correlation_id)
+        compiled = parse_cypher_request(request_json)
+        return validate_cypher_result(self._runner.execute(compiled), compiled)
 
     def close(self) -> None:
         self._runner.close()

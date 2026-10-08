@@ -46,3 +46,27 @@ Devgraph’s license. Neither agent package includes Hermes or Codex itself.
 
 The project-selection page uses the repository’s dependency-free JavaScript
 modules. It does not require or redistribute the separate preview browser SDK.
+
+## Rust request protocol
+
+The source-only `devgraph-work-protocol` crate depends on `serde` (MIT OR Apache-2.0),
+`serde_json` (MIT OR Apache-2.0), and `sha2` (MIT OR Apache-2.0). Cargo resolves their
+transitive dependencies from the registry under the versions/checksums in
+`Cargo.lock`; their respective notices remain authoritative. This repository does
+not vendor those dependencies. The Devgraph crate itself follows the repository's
+AGPL-3.0-only license and does not change the licenses of separate native companions.
+
+## Zenith UI tokens
+
+The frontend packages Zenith UI's `public/tokens.css` as `zenith-tokens.css`.
+Its exact source revision and SHA-256 are recorded in `docs/dev/zenith-tokens.json`;
+`scripts/sync_zenith_tokens.py` verifies the imported bytes. The import includes
+token definitions only, with no Zenith React components or font files.
+
+## SDK packages and companion boundaries
+
+The web SDK builder includes Devgraph's LICENSE/NOTICE and generates third-party
+notices from the exact WASM runtime dependency closure. Native crates refer to
+separately maintained Wallet/secS sources by immutable revisions; their sources
+and licenses are not vendored or relicensed by Devgraph. Those native dependencies
+are outside the anonymous public web/protocol build.

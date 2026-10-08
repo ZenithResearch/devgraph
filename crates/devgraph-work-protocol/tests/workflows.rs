@@ -1,0 +1,27 @@
+use devgraph_work_protocol::WorkRequest;
+use serde_json::{json, Value};
+#[test]
+fn workflow_python_rust_parity() {
+    let cases: Vec<Value> =
+        serde_json::from_str(include_str!("fixtures/workflow-v1/requests.json")).unwrap();
+    for v in cases {
+        let r = WorkRequest::parse(v["raw"].as_str().unwrap().as_bytes())
+            .unwrap_or_else(|_| panic!("{}", v["name"].as_str().unwrap()));
+        assert_eq!(r.canonical(), v["canonical"].as_str().unwrap().as_bytes());
+        assert_eq!(r.request_digest(), v["digest"]);
+        assert_eq!(r.operation(), v["operation"]);
+        assert_eq!(json!(r.resources()), v["resources"]);
+    }
+}
+#[test]
+fn workflow_denials_match_python() {
+    let cases: Vec<Value> =
+        serde_json::from_str(include_str!("fixtures/workflow-v1/invalid-requests.json")).unwrap();
+    for v in cases {
+        assert!(
+            WorkRequest::parse(v["raw"].as_str().unwrap().as_bytes()).is_err(),
+            "{}",
+            v["name"]
+        );
+    }
+}

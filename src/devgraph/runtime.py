@@ -21,17 +21,22 @@ from devgraph.auth import (
     AUTH_MODE_LOCAL_READ,
     AuditLog,
     AuthorizedWorkGraph,
+    DelegatedReadCredentialVerifier,
+    DelegatedRegistryConfigurationError,
     LocalDevVerifier,
     LocalReadCredentialConfigurationError,
     LocalReadCredentialVerifier,
 )
+from devgraph.auth.delegated_read import DelegatedReadService
 from devgraph.events.outbox import EventOutbox
 from devgraph.model.initiative_observations import InitiativeObservationRepository
 from devgraph.model.lifecycle import ProposalLifecycle
 from devgraph.model.repository import WorkObjectRepository
+from devgraph.ops.browser_credential_work import BrowserCredentialWorkHost
 from devgraph.ops.local_path_integrity import OWNERSHIP_DISABLED_DIAGNOSTIC
 from devgraph.ops.migrate import load_manifest
 from devgraph.ops.named_work_receiver import LocalNamedWorkReceiver
+from devgraph.ops.named_work_v2_receiver import LocalNamedWorkV2Receiver
 from devgraph.ops.retained_audit import RetainedAuditLog
 from devgraph.ops.secs_monitor_view_read_receiver import (
     LocalSecSMonitorViewReadError,
@@ -47,6 +52,7 @@ ENVIRONMENT_VARIABLE = "DEVGRAPH_ENVIRONMENT"
 AUDIENCE_VARIABLE = "DEVGRAPH_AUDIENCE"
 AUTH_MODE_VARIABLE = "DEVGRAPH_AUTH_MODE"
 DATA_ROOT_VARIABLE = "DEVGRAPH_DATA_ROOT"
+DELEGATED_READ_ENABLED_VARIABLE = "DEVGRAPH_DELEGATED_READ_ENABLED"
 PRODUCTION_ENVIRONMENT = "production"
 FAIL_CLOSED_AUTH_MODE = "fail-closed"
 LEGACY_DISABLED_AUTH_MODE = "disabled"
@@ -100,6 +106,9 @@ def build_production_services() -> ApiServices:
             ) from None
     else:
         verifier = LocalDevVerifier(auth_mode=auth_mode)
+    delegated_enabled = os.environ.get(DELEGATED_READ_ENABLED_VARIABLE, "0")
+    if delegated_enabled not in {"0", "1"}:
+        raise RuntimeConfigurationError("invalid delegated read enablement")
     audit_log = RetainedAuditLog(data_root) if data_root is not None else AuditLog()
     repository = WorkObjectRepository(storage)
     initiative_observations = InitiativeObservationRepository(storage)
@@ -114,6 +123,7 @@ def build_production_services() -> ApiServices:
         monitor_storage=storage,
     )
     monitor_view_read = None
+    monitor_topology_read = None
     if data_root is not None:
         try:
             monitor_view_read = load_local_secs_monitor_view_read_adapter(
@@ -121,10 +131,42 @@ def build_production_services() -> ApiServices:
                 storage=storage,
                 audit_log=audit_log,
             )
+            monitor_topology_read = load_local_secs_monitor_view_read_adapter(
+                data_root=data_root, storage=storage, audit_log=audit_log, version=2,
+            )
         except LocalSecSMonitorViewReadError as error:
             if str(error) == OWNERSHIP_DISABLED_DIAGNOSTIC:
                 raise RuntimeConfigurationError(OWNERSHIP_DISABLED_DIAGNOSTIC) from None
             raise RuntimeConfigurationError("monitor receiver configuration is invalid") from None
+    cypher_read = (
+        CypherReadService(
+            storage.create_cypher_read_runner(),
+            verifier=verifier,
+            audience=audience,
+            audit_log=audit_log,
+        )
+        if callable(getattr(storage, "create_cypher_read_runner", None))
+        else None
+    )
+    delegated_read = None
+    if delegated_enabled == "1":
+        if data_root is None:
+            raise RuntimeConfigurationError("delegated read requires a configured data root")
+        try:
+            delegated_verifier = DelegatedReadCredentialVerifier(
+                data_root=data_root, audience=audience
+            )
+        except DelegatedRegistryConfigurationError:
+            raise RuntimeConfigurationError(
+                "delegated read credential configuration is invalid"
+            ) from None
+        delegated_read = DelegatedReadService(
+            storage=storage,
+            verifier=delegated_verifier,
+            audience=audience,
+            audit_log=audit_log,
+            cypher_read=cypher_read,
+        )
     return ApiServices(
         authorized_graph=authorized_graph,
         outbox=EventOutbox(storage),
@@ -134,20 +176,24 @@ def build_production_services() -> ApiServices:
         migration_manifest=load_manifest(MANIFEST_PATH),
         migration_store=Neo4jMigrationStore(storage),
         monitor_view_read=monitor_view_read,
+        monitor_topology_read=monitor_topology_read,
         named_work=(
             LocalNamedWorkReceiver(data_root=data_root, storage=storage, audit_log=audit_log)
             if data_root is not None
             else None
         ),
-        retained_audit=audit_log if isinstance(audit_log, RetainedAuditLog) else None,
-        cypher_read=(
-            CypherReadService(
-                storage.create_cypher_read_runner(), verifier=verifier,
-                audience=audience, audit_log=audit_log,
-            )
-            if callable(getattr(storage, "create_cypher_read_runner", None))
-            else None
+        named_work_v2=(
+            LocalNamedWorkV2Receiver(data_root=data_root, storage=storage, audit_log=audit_log)
+            if data_root is not None else None
         ),
+        credential_work_host=(
+            BrowserCredentialWorkHost(data_root=data_root, receiver=LocalNamedWorkV2Receiver(
+                data_root=data_root, storage=storage, audit_log=audit_log))
+            if data_root is not None else None
+        ),
+        retained_audit=audit_log if isinstance(audit_log, RetainedAuditLog) else None,
+        cypher_read=cypher_read,
+        delegated_read=delegated_read,
     )
 
 

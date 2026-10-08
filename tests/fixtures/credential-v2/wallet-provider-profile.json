@@ -1,0 +1,22 @@
+{
+  "schema": "castalia.provider-profile.v1",
+  "display_name": "Devgraph local authority",
+  "origins": [
+    "http://127.0.0.1:8080"
+  ],
+  "membership": null,
+  "presentations": [
+    {
+      "issuer": "secs://devgraph-work",
+      "key_id": "test-secs",
+      "public_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+      "audience": "devgraph://receiver-local",
+      "callers": [
+        {
+          "kind": "browser",
+          "id": "http://127.0.0.1:8080"
+        }
+      ]
+    }
+  ]
+}

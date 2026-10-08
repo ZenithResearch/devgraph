@@ -1,0 +1,5 @@
+[workspace]
+resolver = "2"
+members = ["crates/devgraph-work-protocol", "crates/devgraph-client-core", "crates/devgraph-web"]
+# Native compatibility dependencies require separately authorized Wallet source access.
+exclude = ["crates/devgraph-client-native", "crates/devgraph-browser-host"]

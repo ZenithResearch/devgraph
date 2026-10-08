@@ -55,6 +55,11 @@ class WorkObject:
     artifact_ids: tuple[str, ...] = ()
     external_link_ids: tuple[str, ...] = ()
     priority: int = 0
+    workflow_json: str | None = None
+    progress: str | None = None
+    archived: bool = False
+    progress_record_id: str | None = None
+    progress_migration_json: str | None = None
 
     def __post_init__(self) -> None:
         validate_work_object_id(self.id)
@@ -71,7 +76,7 @@ class WorkObject:
         return type(self).__name__
 
     def to_node_properties(self) -> dict[str, Any]:
-        return {
+        properties = {
             "title": self.title,
             "description": self.description,
             "status": self.status.value,
@@ -84,10 +89,25 @@ class WorkObject:
             "priority": self.priority,
         }
 
+        from devgraph.progress import TODO_KINDS
+
+        if self.kind in TODO_KINDS:
+            properties["progress_schema"] = 1
+            if self.progress is not None:
+                properties["progress"] = self.progress
+            if self.progress_migration_json is not None:
+                properties["progress_migration_json"] = self.progress_migration_json
+            if self.progress_record_id is not None:
+                properties["progress_record_id"] = self.progress_record_id
+        if self.workflow_json is not None:
+            properties["workflow_json"] = self.workflow_json
+        return properties
+
     def with_status(self: WorkObjectT, status: WorkStatus) -> WorkObjectT:
         return replace(
             self,
             status=status,
+            archived=True if status == WorkStatus.ARCHIVED else self.archived,
             updated_at=utc_now(),
             version=self.version + 1,
         )

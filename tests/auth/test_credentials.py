@@ -103,11 +103,11 @@ def test_authority_context_is_frozen():
         context.envelope = _envelope()  # type: ignore[misc]
 
 
-def test_envelope_and_context_have_no_field_that_could_hold_a_credential_string():
+def test_envelope_and_context_have_no_field_that_could_hold_bearer_material():
     envelope_fields = {f.name for f in dataclasses.fields(CredentialEnvelope)}
     context_fields = {f.name for f in dataclasses.fields(AuthorityContext)}
 
-    for forbidden in ("token", "credential", "secret"):
+    for forbidden in ("token", "secret", "bearer"):
         assert forbidden not in envelope_fields
         assert forbidden not in context_fields
         assert not hasattr(_envelope(), forbidden)

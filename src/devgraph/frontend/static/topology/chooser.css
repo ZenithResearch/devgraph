@@ -1,0 +1,35 @@
+.dg-chooser-container { position:relative; }
+#node-chooser.dg-chooser, .dg-chooser {
+  position:absolute; z-index:6; box-sizing:border-box; min-width:0; min-height:0;
+  overflow:auto; overscroll-behavior:contain; padding:8px; border:1px solid var(--line);
+  border-radius:12px; color:var(--ink); font:14px/1.45 var(--sans,system-ui);
+  /* Aqua's surface is translucent: retain an opaque themed backing. */
+  background:linear-gradient(var(--panel),var(--panel)),var(--canvas);
+  box-shadow:var(--shadow-elevated); touch-action:pan-y; user-select:text;
+}
+.dg-chooser[hidden] { display:none; }
+.dg-chooser__header { display:flex; gap:12px; justify-content:space-between; align-items:center; padding:2px 4px; }
+.dg-chooser__title { margin:0; font:600 15px/1.4 var(--sans,system-ui); overflow-wrap:anywhere; }
+.dg-chooser__hint, .dg-chooser__limit { margin:4px 4px 10px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.dg-chooser__limit { margin:10px 4px 4px; }
+.dg-chooser__list { list-style:none; margin:0; padding:0; }
+.dg-chooser__row + .dg-chooser__row { border-top:1px solid var(--line-soft); }
+#node-chooser.dg-chooser button, .dg-chooser button {
+  display:flex; align-items:center; gap:10px; width:100%; min-width:0; min-height:48px;
+  padding:10px; border:1px solid transparent; border-radius:8px; background:transparent;
+  color:var(--ink); font:inherit; text-align:left; cursor:pointer; white-space:normal;
+}
+#node-chooser.dg-chooser .dg-chooser__close, .dg-chooser .dg-chooser__close {
+  width:auto; min-height:40px; padding:6px 10px; flex-shrink:0;
+  border-color:var(--line); color:var(--muted); font-size:12px;
+}
+#node-chooser.dg-chooser button:hover, .dg-chooser button:hover { background:var(--aqua-soft); }
+#node-chooser.dg-chooser button:focus-visible, .dg-chooser button:focus-visible {
+  outline:2px solid var(--dg-focus); outline-offset:-2px; background:var(--aqua-soft);
+}
+.dg-chooser__icon { width:28px; height:28px; display:grid; place-items:center; flex-shrink:0; pointer-events:none; }
+.dg-chooser__icon > svg { display:block; width:28px; height:28px; }
+.dg-chooser__copy { display:grid; gap:3px; min-width:0; }
+.dg-chooser__name { font-weight:600; overflow-wrap:anywhere; }
+.dg-chooser__meta { color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.dg-chooser__id { color:var(--muted); font:11px/1.5 var(--mono,monospace); overflow-wrap:anywhere; }

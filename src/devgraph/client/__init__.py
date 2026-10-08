@@ -3,6 +3,7 @@
 from devgraph.client.http import (
     ArenaMutationReceipt,
     ArenaMutationResult,
+    CredentialWorkStatus,
     DevgraphClientError,
     DevgraphHttpClient,
     DevgraphInvalidSuccessEnvelope,
@@ -14,6 +15,7 @@ from devgraph.client.http import (
     DevgraphTransportError,
     DevgraphUnexpectedContentType,
     DevgraphWorkContext,
+    DevgraphWorkV2Context,
     MutationOperation,
     MutationReceipt,
     MutationResult,
@@ -30,6 +32,7 @@ from devgraph.client.http import (
 __all__ = [
     "ArenaMutationReceipt",
     "ArenaMutationResult",
+    "CredentialWorkStatus",
     "DevgraphClientError",
     "DevgraphHttpClient",
     "DevgraphInvalidSuccessEnvelope",
@@ -41,6 +44,7 @@ __all__ = [
     "DevgraphTransportError",
     "DevgraphUnexpectedContentType",
     "DevgraphWorkContext",
+    "DevgraphWorkV2Context",
     "MutationOperation",
     "MutationReceipt",
     "MutationResult",

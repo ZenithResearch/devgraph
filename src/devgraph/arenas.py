@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from devgraph.arena_contract import Arena, ArenaMembership
 from devgraph.arena_requests import ArenaRequest
-from devgraph.model.base import WorkStatus, utc_now
+from devgraph.model.base import utc_now
 from devgraph.model.repository import (
     MissingWorkObjectError,
     WorkObjectAlreadyExistsError,
@@ -14,10 +14,12 @@ from devgraph.model.repository import (
 from devgraph.model.validation import validate_page_limit, validate_work_object_id
 from devgraph.storage.base import GraphStorage, StorageUnavailable, WorkContainment
 from devgraph.storage.containment import validate_arena_page
+from devgraph.workflow_contract import PARENTS
 
 WORK_KINDS = frozenset({"Proposal", "Initiative", "Project", "Issue", "Task"})
 DIRECT_KINDS = frozenset({"Initiative", "Task"})
-PARENT_KINDS = {"Project": "Initiative", "Issue": "Project", "Task": "Issue"}
+
+PARENT_KINDS = PARENTS
 
 
 class ArenaConflict(ValueError):
@@ -116,7 +118,7 @@ class ArenaRepository:
                     inherited=arena_id is not None and current != original,
                 )
             edge = incoming[0]
-            if arena_id is not None or edge.from_label != PARENT_KINDS.get(current[0]):
+            if arena_id is not None or edge.from_label not in PARENT_KINDS.get(current[0], ()):
                 raise ArenaConflict("invalid Arena membership or Work parentage")
             current = (edge.from_label, edge.from_id)
 
@@ -214,7 +216,7 @@ class ArenaMutations:
                 expected_version=request.expected_version,
                 actual_version=member.version,
             )
-        if member.status == WorkStatus.ARCHIVED:
+        if member.archived:
             raise ArenaConflict("archived Work cannot change membership")
         membership = self.repository.membership(member.kind, member.id)
         if (membership.root_kind, membership.root_id) != (member.kind, member.id):

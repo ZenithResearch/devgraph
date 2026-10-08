@@ -140,15 +140,13 @@ def test_packaged_ontology_releases_match_every_canonical_release() -> None:
 
 
 def test_ontology_snapshot_defaults_to_the_latest_packaged_release() -> None:
-    assert ontology_snapshot()["version"] == "0.6.0"
+    assert ontology_snapshot()["version"] == "0.8.0"
 
 
 def test_cli_packaged_arena_contract_and_legacy_actor_remain_available() -> None:
     manifest_path = Path(ontology_snapshot()["manifest_path"])
     manifest = json.loads(manifest_path.read_text())
-    assert {entry["path"] for entry in manifest["files"]} >= {
-        "arenas.md", "arena-contract.json"
-    }
+    assert {entry["path"] for entry in manifest["files"]} >= {"arenas.md", "arena-contract.json"}
     profile = json.loads((manifest_path.parent / "arena-contract.json").read_text())
     assert profile["direct_membership"]["allowed_kinds"] == ["Initiative", "Task"]
     assert profile["runtime_binding"] is True
@@ -347,9 +345,7 @@ def test_cli_read_credential_status_does_not_reveal_the_capability(
     provision_local_read_credential(config)
     credential = read_local_read_credential(config)
 
-    assert main(
-        ["local", "read-credential", "status", "--config", str(config_path)]
-    ) == 0
+    assert main(["local", "read-credential", "status", "--config", str(config_path)]) == 0
     output = capsys.readouterr().out
     assert json.loads(output)["scope"] == "devgraph.read"
     assert credential not in output

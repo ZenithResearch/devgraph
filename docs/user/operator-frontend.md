@@ -10,7 +10,7 @@ external client copy.
 The frontend shell is served at `GET /`. `GET /monitor` remains a compatibility
 alias so existing bookmarks continue to work. The shell contains no embedded
 graph data or credential. After an operator supplies a `devgraph.read`
-credential, the browser calls the same scoped `/monitor/snapshot` and
+credential, the browser calls the same scoped `/monitor/topology/v1` and
 `/initiative-observations` API routes available to other authorized clients.
 
 Credentials are held only in the current tab's `sessionStorage`. Closing the
@@ -22,19 +22,46 @@ Castalia authentication design. Production integration must replace it with a
 wallet/secS Magik signing flow; root keys and `.castaway` contents must never be
 loaded into this page.
 
-The API now also contains a separate exact PoP receiver for
-`devgraph.monitor.view.read.v1`, documented in
-[monitor proof of possession](../monitor-proof-of-possession.md). This receiver
-slice does not yet change the frontend: it does not mint an ephemeral page key,
-request Wallet approval, sign refreshes, remove the bearer field, or replace
-the separate observation-list request. The snapshot already contains the
-topology, observation nodes, and Project/Issue progress needed for the graph
-inspector, so those frontend changes are a bounded next slice rather than a
-generic read authorization expansion.
+The existing exact signed v1 snapshot receiver remains available. The new
+filtered topology route also supports an independently provisioned signed v2
+profile, with a packaged ephemeral page-proof producer. Native Wallet sign-in
+is not activated by this change. See [filtered topology](../monitor-topology-v1.md)
+for the query contract, signed profile, limits, and compatibility details.
 
 ## Current capabilities
 
-The frontend presents safe work, initiative-observation, and receipt summaries;
+The opening **Daily check-in** is a Todo list of **not-started work**, highest
+priority first. It prefers exact base Todo records, excluding every subtype.
+If the server has no base Todo read capability (404/501), it instead reads only
+Tasks with **no parent Issue, Project, or Initiative**. A successful empty Todo
+response stays empty; authorization failures and transient outages never trigger
+fallback. The source is labelled above the list. No records are created or changed.
+
+Older records qualify only with Draft lifecycle status. Where a workflow is
+recorded, only its explicit Backlog stage qualifies; archived records are always
+excluded. A compact **At a glance** total counts the entire matching list, not
+just the six visible rows. Larger priority numbers sort first, with ID as the
+tie-breaker, without rounding signed 64-bit values.
+
+Search persists within the read context; credentials and source detection do not.
+Six items render per page. Refresh keeps the focused list stable and offers
+**Show updates** when content changes during keyboard reading. Click opens the
+shared side reader, and right-click or Shift+F10 opens its modal. Graph-wide
+inventory remains in a disclosure. The list spans the available width and wraps
+on narrow screens; the graph/reader retain their golden-ratio layout.
+
+The [Todo API](../monitor-todos-v1.md) and [Work board API](kanban.md) apply queue,
+priority and parentage filters before counting and pagination. The live preview
+can use the installed older host through its read-only Work projection without
+migrating that host or inventing workflow stages.
+
+An unselected reader offers **Find an item** and **Browse visible items**.
+Overlapping map targets open a bounded, counted item chooser with
+object shape/type, wrapped titles, lifecycle text, and distinguishing IDs for
+duplicate titles. Arrow keys, Home/End, Escape, normal Tab navigation, and
+right-click/Shift+F10 work there; dismissal restores focus where appropriate.
+
+The frontend presents safe work, initiative-observation, and Record summaries;
 recent graph activity; and an interactive 3D topology of monitor-visible stored
 relationships. Operators can orbit the scene, drag nodes, settle or reset the
 layout, tune node separation, and tune attraction independently for each
@@ -60,15 +87,73 @@ for missing graph links.
 Category and neighborhood filters apply after reachability. Hiding an Arena or
 intermediate Work node therefore does not hide its otherwise reachable records.
 Search and category counts use the selected Arena scope. Selecting a new Arena
-exits neighborhood mode and fits the resulting graph; automatic refresh retains
+exits connected-items mode; automatic refresh retains
 the Arena choice. Details remain readable when their node is filtered out, with
 an explicit **Show in all nodes** action to clear an incompatible Arena filter.
 
 If the selected Arena disappears from the loaded snapshot, the filter remains
 selected and shows an explanation instead of silently broadening the view.
-Changing credentials clears the selection. This filter uses only the existing
-monitor projection; it cannot follow paths through object types absent from
-that projection. It changes no stored relationships, authorization or API shape.
+Changing credentials clears the inspected item and loads preferences scoped to
+that read context. Reachability uses only the safe monitor projection; it cannot
+follow paths through object types absent from it. Stored relationships and
+authority remain unchanged.
+
+### View controls
+
+Use **Theme** in the page header to choose Zenith UI's **Light**, **Dark**, or
+**Aqua** appearance. **System** follows your device's light/dark setting. The
+choice is remembered in this browser and shared with Project selection. A
+second selector stays available when the graph canvas is fullscreen. Changing
+appearance preserves your graph filters, positions, selection, and local inputs.
+
+The canvas renders Proposals, Initiatives, Projects, and top-level Issues and
+Tasks (no Work parent, regardless of Arena membership). Hover or keyboard-focus
+a parent to reveal only its direct children. Move into a Project or Issue to
+open the next level; siblings do not recursively expand. The ancestor path stays
+open while exploring a deeper branch, and selection keeps it open while reading.
+**Collapse child work** returns to the overview without undoing manual positioning.
+New children settle with local spring and screen-space collision forces; parents,
+existing nodes, and the camera remain fixed. Settled positions are reused while
+the graph and view remain unchanged. Reduced-motion preferences skip the animation.
+Arenas appear as labeled
+volumes, with separate space for work outside an Arena. Containment places each
+parent above and in front of its child groups, with siblings sharing a depth
+range. Bounded 3D worker physics relaxes collisions without letting dependencies
+pull families across Arena boundaries. The angled camera shows the depth on
+arrival. Drag the background to pan; hold Command (⌘) and drag to rotate, or
+enable Orbit. Command-drag rotates even when starting over a node. Ordinary
+node dragging still repositions that item. Reset layout restores
+the initial angle and depth. Nearer nodes draw in front in both renderers.
+
+Use **Filters** for all five Work types, lifecycle status, archived items,
+text and connection lines. Hiding a parent type or its line does not remove its
+layout context. The API continues supporting every original category and Work
+subtype. Existing broad overview preferences gain Issues and Tasks; explicit
+subsets and empty selections are preserved. Expansion respects these filters
+and the API result limit, and uses only containment, never dependencies.
+**Clear filters** restores the overview. **Hide Observer** reclaims
+space without changing the graph. Details stack on narrow windows; wide views
+start with a golden-ratio graph/details split and support reader resizing.
+
+Hover an item for its type, status and connected labels. Click to read details
+beside the graph; narrow screens stack the reader below the interactive canvas.
+On narrow screens, **Expand reader** fills the canvas area with the current
+reader. **Back to graph** or Escape returns to the map, preserving its selection,
+positions and camera, and the reader's scroll position. Closing the reader also
+restores the map. Widening the canvas returns to the desktop split automatically.
+Right-click or Shift+F10 opens the overlay reader at any width; **Open modal** is
+also available in the wide sidebar. Closing the modal restores focus.
+Related work in the reader and the Work board also provide access to Issues
+and Tasks, including records hidden by current graph filters. For keyboard selection,
+use **Browse visible items** or search when the map is dense. Overlapping
+picking targets open a chooser. Move items with drag or arrow keys, then use
+**Undo positioning** to revert. Escape cancels a move. **Reset layout** is also
+undoable; **Fit view** only changes framing. Feedback confirms local actions
+and distinguishes failed saves or reads from successful ones.
+
+Large maps use a canvas renderer and worker layout. No items are silently
+sampled away: result limits are disclosed as a partial map. A connection failure
+keeps the last successful view and labels it as saved data.
 
 When an operator highlights a `Project` or `Issue`, the node inspector renders
 its `devgraph.work-progress.v0` progress projection. This is a local,

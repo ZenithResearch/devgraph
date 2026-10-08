@@ -1,0 +1,21 @@
+{
+  "schema": "devgraph.credential-request-profile.v1",
+  "issuer": "devgraph-owner-local-v1",
+  "audience": "devgraph",
+  "resource": "https://work.zenith-research.ca/devgraph",
+  "requested_scopes": ["devgraph.work.read", "devgraph.arena.read", "devgraph.material.read", "devgraph.document.read"],
+  "requested_grants": [
+    {
+      "scope": "devgraph.work.read",
+      "operations": ["list", "get", "relationships", "children", "blockers"],
+      "relationship_types": ["children", "parent", "dependencies", "dependents", "blockers", "blocked"],
+      "work_kinds": ["Proposal", "Initiative", "Project", "Issue", "Task"],
+      "arena_ids": ["castalia"],
+      "include_archived": false
+    },
+    {"scope": "devgraph.arena.read", "arena_ids": ["castalia"]},
+    {"scope": "devgraph.material.read"},
+    {"scope": "devgraph.document.read"}
+  ],
+  "reason": "Read delegated Devgraph Work data"
+}

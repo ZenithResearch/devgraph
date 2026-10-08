@@ -7,7 +7,7 @@ function refreshMonitor() {
   const document = textDocument();
   const requests = [], rendered = [];
   const c = contextWithFunctions([
-    'synchronizeCredential', 'resetDetailState', 'applySnapshot', 'flushPendingSnapshot', 'refresh',
+    'synchronizeCredential', 'resetDetailState', 'applySnapshot', 'flushPendingSnapshot', 'refresh', 'topologyPath',
   ], {
     AbortController, queueMicrotask, document,
     tokenInput: { value: 'synthetic-credential-one' },
@@ -19,11 +19,13 @@ function refreshMonitor() {
       credential: 'synthetic-credential-one', serial: 0, node: null, data: null,
       relations: new Map(), documents: new Map(), controller: null,
     },
-    graphView: { pointers: new Map(), nodePositions: new Map(), nodeVelocities: new Map() },
+    graphView: { preferenceKey: 'fixture', filters: {}, filterSerial: 0, pointers: new Map(), nodePositions: new Map(), nodeVelocities: new Map() },
     text(id, value) { document.getElementById(id).textContent = value; },
     render(snapshot, observations) { rendered.push({ snapshot, observations }); },
+    invalidateLayout() {}, announceGraph() {}, refreshCheckIn() {}, checkIn: { reset() {} }, projectFilters: { reset() {} },
+    prepareGraphPreferences() { c.graphView.preferenceKey = 'fixture'; },
     updateGraphVisibility() {}, loadSelectedDetail() {},
-    renderActivity() {}, renderObservations() {}, renderPipeline() {}, renderBars() {},
+    renderManagerOverview() {}, renderActivity() {}, renderObservations() {}, renderPipeline() {}, renderBars() {},
     getJson(path, options) { const task = deferred(); requests.push({ path, options, ...task }); return task.promise; },
   });
   return { c, requests, rendered };
@@ -68,7 +70,7 @@ test('old-auth responses cannot overwrite a newer credential’s snapshot or cle
   const { c, requests } = refreshMonitor();
   const old = c.refresh();
   c.tokenInput.value = 'synthetic-credential-two';
-  const current = c.refresh();
+  const current = c.refresh(); await flushPromises();
   const currentFlight = c.state.refreshPromise;
   const stale = { generated_at: '2026-09-13T01:00:00Z', graph_nodes: [{ id: 'private-old' }] };
   resolveRefresh(requests, 0, stale); await old;
@@ -186,7 +188,7 @@ test('a timed-out snapshot request releases the refresh flight so the next updat
   assert.equal(clock.timers.size, 0);
   assert.equal(c.document.getElementById('connection-label').textContent, 'Connection interrupted');
   const fresh = { generated_at: '2026-09-13T03:00:00Z', graph_nodes: [{ id: 'recovered' }] };
-  c.fetch = async url => ({ ok: true, status: 200, json: async () => url === '/monitor/snapshot' ? fresh : { items: [] } });
+  c.fetch = async url => ({ ok: true, status: 200, json: async () => url === '/monitor/topology/v1' ? fresh : { items: [] } });
   await c.refresh();
   assert.equal(c.state.snapshot, fresh);
   assert.equal(c.state.refreshPromise, null);
@@ -194,7 +196,7 @@ test('a timed-out snapshot request releases the refresh flight so the next updat
 });
 
 test('a failed refresh member aborts its sibling and drops queued immediate retries', async () => {
-  for (const failingPath of ['/monitor/snapshot', '/initiative-observations?descending=true&limit=100']) {
+  for (const failingPath of ['/monitor/topology/v1', '/initiative-observations?descending=true&limit=100']) {
     const { c } = refreshMonitor();
     const failed = deferred(), transport = [];
     const clock = boundedTransport(c, (path, { signal }) => {
@@ -221,11 +223,11 @@ test('changing credentials aborts both old network reads while allowing the new 
   const clock = boundedTransport(c, (path, { signal, headers }) => {
     transport.push({ path, signal, headers });
     if (transport.length <= 2) return pendingUntilAbort(signal);
-    return Promise.resolve({ ok: true, status: 200, json: async () => path === '/monitor/snapshot' ? snapshot : { items: [] } });
+    return Promise.resolve({ ok: true, status: 200, json: async () => path === '/monitor/topology/v1' ? snapshot : { items: [] } });
   });
   const old = c.refresh();
   c.tokenInput.value = 'synthetic-credential-two';
-  const current = c.refresh();
+  const current = c.refresh(); await flushPromises();
   assert.equal(transport[0].signal.aborted, true);
   assert.equal(transport[1].signal.aborted, true);
   assert.equal(transport[2].signal.aborted, false);
@@ -236,4 +238,20 @@ test('changing credentials aborts both old network reads while allowing the new 
   assert.equal(clock.timers.size, 0);
   assert.equal(c.state.refreshPromise, null);
   assert.equal(c.state.refreshController, null);
+});
+
+test('a superseded filter response cannot flash stale nodes before the queued filter completes',async()=>{
+  const {c,requests}=refreshMonitor();
+  const initial={generated_at:'2026-09-13T00:00:00Z',graph_nodes:[{id:'current'}]};
+  const load=c.refresh();resolveRefresh(requests,0,initial);await load;
+  const old=c.refresh();
+  c.graphView.filters={work_kind:['Task']};c.graphView.filterSerial++;
+  c.state.refreshQueued=true;c.state.refreshController.abort();
+  resolveRefresh(requests,2,{generated_at:'2026-09-13T00:01:00Z',graph_nodes:[{id:'stale'}]});
+  await old;await flushPromises();
+  assert.equal(c.state.snapshot,initial);
+  assert.equal(requests[4].path,'/monitor/topology/v1?work_kind=Task');
+  const latest={generated_at:'2026-09-13T00:02:00Z',graph_nodes:[{id:'filtered'}]};
+  const queued=c.state.refreshPromise;resolveRefresh(requests,4,latest);await queued;
+  assert.equal(c.state.snapshot,latest);
 });

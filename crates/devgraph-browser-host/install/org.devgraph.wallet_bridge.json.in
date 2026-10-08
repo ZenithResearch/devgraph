@@ -1,0 +1,7 @@
+{
+  "name": "org.devgraph.wallet_bridge",
+  "description": "Devgraph Wallet developer preview bridge",
+  "path": "/ABSOLUTE/PRIVATE/INSTALL/devgraph-browser-host",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://REPLACE_WITH_APPROVED_EXTENSION_ID/"]
+}

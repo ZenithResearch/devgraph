@@ -1,0 +1,32 @@
+{
+  "schema": "devgraph.sdk-response-fixtures.v1",
+  "request": "{\"expected_version\":null,\"id\":\"test-one\",\"kind\":\"Issue\",\"operation\":\"create\",\"payload\":{\"id\":\"test-one\",\"title\":\"test\"},\"schema\":\"devgraph.work-request.v1\"}",
+  "idempotency_key": "named-work-test-idempotency-0001",
+  "responses": {
+    "create": {
+      "status": 201,
+      "content_type": "application/json",
+      "body": "{\"work\":{\"id\":\"test-one\",\"kind\":\"Issue\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]},\"receipt\":{\"receipt_id\":\"fixture-receipt-001\",\"operation\":\"devgraph.work.create.v1\",\"subject_label\":\"Issue\",\"subject_id\":\"test-one\",\"receipt_status\":\"pending\",\"duplicate\":false,\"correlation_id\":\"dg:sha256:76547e38806d1f20d39df9157e885fd3e3b0978919174b6793a119cab8e3c84a\"}}"
+    },
+    "duplicate": {
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"work\":null,\"receipt\":{\"receipt_id\":\"fixture-receipt-001\",\"operation\":\"devgraph.work.create.v1\",\"subject_label\":\"Issue\",\"subject_id\":\"test-one\",\"receipt_status\":\"pending\",\"duplicate\":true,\"correlation_id\":\"dg:sha256:76547e38806d1f20d39df9157e885fd3e3b0978919174b6793a119cab8e3c84a\"}}"
+    },
+    "get": {
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"id\":\"test-one\",\"kind\":\"Issue\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]}"
+    },
+    "list": {
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"items\":[{\"id\":\"test-one\",\"kind\":\"Issue\",\"title\":\"test\",\"description\":\"\",\"status\":\"draft\",\"version\":1,\"priority\":0,\"artifact_ids\":[],\"external_link_ids\":[]}]}"
+    },
+    "relations": {
+      "status": 200,
+      "content_type": "application/json",
+      "body": "{\"items\":[]}"
+    }
+  }
+}

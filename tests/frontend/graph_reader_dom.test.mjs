@@ -8,7 +8,7 @@ function readerTree() {
   const node = { key: 'Task:read-plan', id: 'read-plan', kind: 'Task', category: 'work', title: 'Read plan', status: 'draft' };
   const c = contextWithFunctions([
     'safeSourceUrl', 'readPath', 'readerButton', 'readerSection', 'appendSource',
-    'reconcileChildren', 'renderGraphSelection', 'documentStateMessage', 'relationshipLabel',
+    'reconcileChildren', 'progressLabel','renderGraphSelection', 'documentStateMessage', 'relationshipLabel',
   ], {
     URL, document,
     state: { snapshot: { graph_nodes: [node], graph_edges: [] }, selectedGraphKey: node.key },
@@ -76,6 +76,8 @@ test('a filtered reader distinguishes visible connections from all snapshot conn
 
 test('an inspected node outside the Arena filter offers an explicit return to all nodes', () => {
   const c = readerTree();
+  c.detailState.node = {...c.detailState.node,kind:'Project'};
+  c.state.snapshot.graph_nodes = [c.detailState.node];
   c.graphView.arenaKey = 'Arena:other';
   c.graphView.arenaNodes = [];
   c.graphView.nodes = [];
@@ -116,4 +118,20 @@ test('linked document previews render text safely and unresolved references rema
   assert.equal(preview.children.length, 0);
   assert.match(support.textContent, /could not be fully resolved/);
   assert.match(support.textContent, /not an empty document/);
+});
+
+
+test('loading supporting material retains the focused action as new cards appear', () => {
+  const c = readerTree();
+  c.renderGraphSelection();
+  const support = c.document.getElementById('reader-content').children.find(node => node.dataset.uiKey === 'support');
+  const button = support.children.find(node => node.dataset.action === 'support');
+  button.focus();
+  const insert = support.insertBefore.bind(support);
+  support.insertBefore = (node, next) => { if (node === button) c.document.activeElement = null; return insert(node, next); };
+  c.detailState.support = { items: [{kind: 'Artifact', id: 'plan', resolution: 'missing', metadata: {title: 'Plan'}}] };
+  c.renderGraphSelection();
+  assert.equal(support.children.find(node => node.dataset.action === 'support'), button);
+  assert.equal(c.document.activeElement, button);
+  assert.equal(button.textContent, 'Refresh material');
 });

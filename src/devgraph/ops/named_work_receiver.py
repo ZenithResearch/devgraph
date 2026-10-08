@@ -32,10 +32,13 @@ class _CurrentReceiverVerifier:
     def __init__(self, load: Callable[[], SecSWorkVerifier]):
         self._load = load
 
-    def verify(self, *, request_json: bytes, projection_json: bytes, idempotency_key: str):
+    def verify(
+        self, *, request_json: bytes, projection_json: bytes, idempotency_key: str,
+        receiver_profile: str | None = None,
+    ):
         return self._load().verify(
             request_json=request_json, projection_json=projection_json,
-            idempotency_key=idempotency_key,
+            idempotency_key=idempotency_key, receiver_profile=receiver_profile,
         )
 
 
@@ -94,7 +97,10 @@ class LocalNamedWorkReceiver:
             raise SecSWorkDenied("named_work_receiver_unavailable") from None
         return SecSWorkVerifier(config)
 
-    def execute(self, *, request_json: bytes, projection_json: bytes, idempotency_key: str):
+    def execute(
+        self, *, request_json: bytes, projection_json: bytes, idempotency_key: str,
+        receiver_profile: str | None = None,
+    ):
         return SecSWorkAdapter(
             storage=self.storage, audit_log=self.audit_log,
             verifier=_CurrentReceiverVerifier(self._load_verifier),
@@ -102,4 +108,5 @@ class LocalNamedWorkReceiver:
             request_json=request_json,
             projection_json=projection_json,
             idempotency_key=idempotency_key,
+            receiver_profile=receiver_profile,
         )

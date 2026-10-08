@@ -12,8 +12,10 @@ test('Arena details use their independent read route', () => {
 });
 
 function reader() {
-  const document = textDocument();
+  const document = textDocument(); document.querySelector = () => ({inert:false});
   document.getElementById('graph-details').classList = { remove() {} };
+  document.getElementById('graph-details').scrollIntoView = () => {};
+  document.getElementById('graph-surface').classList = { contains() { return false; } };
   const openRelationships = [];
   document.getElementById('reader-content').querySelectorAll = () => openRelationships.map(relationship => ({ dataset: { relationship } }));
   const requests = [];
@@ -30,7 +32,7 @@ function reader() {
       supportLoading: false, supportError: null, documents: new Map(), rendered: null,
     },
     graphView: { nodes: [first, second], edges: [] },
-    document, pauseGraphOrbit() {}, renderGraph() {}, renderGraphSelection() {},
+    document, setReaderCollapsed() {}, pauseGraphOrbit() {}, renderGraph() {}, renderGraphSelection() {},
     text(id, value) { document.getElementById(id).textContent = value; },
     make(tag, className, textContent) { return { tag, className, textContent }; },
   });
@@ -181,7 +183,7 @@ test('read failures distinguish missing, denied, and unavailable records while r
 
 test('category-specific reads encode IDs and never send observations or receipts to Work endpoints', () => {
   const { c } = reader();
-  assert.equal(c.readPath({ ...first, id: 'path/with ? punctuation' }), '/work/Task/path%2Fwith%20%3F%20punctuation');
+  assert.equal(c.readPath({ ...first, id: 'path/with ? punctuation' }), '/todos/v2/Task/path%2Fwith%20%3F%20punctuation');
   assert.equal(c.readPath({ category: 'observation', kind: 'InitiativeObservation', id: 'obs/1' }), '/initiative-observations/obs%2F1');
   assert.equal(c.readPath({ category: 'receipt', kind: 'EventReceipt', id: 'r' }), null);
   assert.equal(c.readPath({ category: 'work', kind: 'Artifact', id: 'a' }), null);

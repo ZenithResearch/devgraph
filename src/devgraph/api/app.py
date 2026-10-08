@@ -8,7 +8,7 @@ no configuration or enforcement logic of its own.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -23,9 +23,23 @@ from devgraph.ops.retained_audit import AuditUnavailable, RetainedAuditLog
 from devgraph.storage.base import GraphStorage, MigrationStore
 from devgraph.storage.cypher_read import CypherReadService
 
+if TYPE_CHECKING:
+    from devgraph.auth.delegated_read import DelegatedReadService
+
 
 class NamedWorkReceiver(Protocol):
-    def execute(self, *, request_json: bytes, projection_json: bytes, idempotency_key: str): ...
+    def execute(
+        self,
+        *,
+        request_json: bytes,
+        projection_json: bytes,
+        idempotency_key: str,
+        receiver_profile: str | None = None,
+    ): ...
+
+
+class NamedWorkV2Receiver(NamedWorkReceiver, Protocol):
+    def status(self, *, request_json: bytes, projection_json: bytes, idempotency_key: str): ...
 
 
 @dataclass(frozen=True)
@@ -44,9 +58,15 @@ class ApiServices:
     migration_manifest: Manifest | None = None
     migration_store: MigrationStore | None = None
     monitor_view_read: SecSMonitorViewReadAdapter | None = None
+    monitor_topology_read: SecSMonitorViewReadAdapter | None = None
     named_work: NamedWorkReceiver | None = None
+    named_work_v2: NamedWorkV2Receiver | None = None
+    credential_work_host: object | None = None
     retained_audit: RetainedAuditLog | None = None
     cypher_read: CypherReadService | None = None
+    sdk_preview_dir: str | None = None
+
+    delegated_read: DelegatedReadService | None = None
 
 
 def create_app(services: ApiServices, *, lifespan: Lifespan[FastAPI] | None = None) -> FastAPI:
@@ -72,9 +92,14 @@ def create_app(services: ApiServices, *, lifespan: Lifespan[FastAPI] | None = No
             try:
                 services.retained_audit.check()
             except AuditUnavailable:
-                return JSONResponse(status_code=503, content={
-                    **status.safe_output(), "ready": False, "reason": "audit_unavailable",
-                })
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        **status.safe_output(),
+                        "ready": False,
+                        "reason": "audit_unavailable",
+                    },
+                )
         return JSONResponse(
             status_code=200 if status.ready else 503,
             content=status.safe_output(),
@@ -88,10 +113,31 @@ def create_app(services: ApiServices, *, lifespan: Lifespan[FastAPI] | None = No
 
     register_error_handlers(app)
     register_routes(app, services)
+    from devgraph.api.topology import register_topology
+
+    register_topology(app, services)
+    from devgraph.api.todos import register_todos
+
+    register_todos(app, services)
+    from devgraph.api.kanban import register_kanban
+
+    register_kanban(app, services)
     from devgraph.frontend.selection import register_selection
 
     register_selection(app)
     register_named_work(app, services)
+    from devgraph.api.credential_work import register_credential_work
+
+    register_credential_work(app, services)
     register_arenas(app, services)
     register_cypher_read(app, services)
+    if services.sdk_preview_dir is not None:
+        from devgraph.frontend.sdk_preview import register_sdk_preview
+
+        register_sdk_preview(app, services.sdk_preview_dir)
+
+    if services.delegated_read is not None:
+        from devgraph.api.delegated_read import register_delegated_read
+
+        register_delegated_read(app, services.delegated_read)
     return app

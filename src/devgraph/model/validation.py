@@ -98,14 +98,56 @@ def validate_canonical_work_object_properties(
     if not isinstance(properties, dict):
         raise ValueError("invalid_work_object_properties")
     property_names = set(properties)
+    optional = {
+        "workflow_json",
+        "progress_schema",
+        "progress",
+        "progress_record_id",
+        "progress_migration_json",
+    }
     valid_property_names = (
         CANONICAL_MODEL_PROPERTIES.issubset(property_names)
         if allow_unknown
-        else property_names == set(CANONICAL_MODEL_PROPERTIES)
+        else CANONICAL_MODEL_PROPERTIES.issubset(property_names)
+        and property_names <= CANONICAL_MODEL_PROPERTIES | optional
     )
     if not valid_property_names:
         raise ValueError("invalid_work_object_properties")
     canonical = {key: properties[key] for key in CANONICAL_MODEL_PROPERTIES}
+    if "workflow_json" in properties:
+        from devgraph.workflow_contract import decode_state
+
+        decode_state(properties["workflow_json"])
+        canonical["workflow_json"] = properties["workflow_json"]
+    from devgraph.progress import TODO_KINDS, validate_progress
+
+    if any(key in properties for key in ("progress", "progress_schema", "progress_record_id")):
+        if (
+            label not in TODO_KINDS
+            or type(properties.get("progress_schema")) is not int
+            or properties["progress_schema"] != 1
+        ):
+            raise ValueError("invalid_progress_schema")
+        canonical["progress_schema"] = 1
+        if "progress" in properties:
+            if properties["progress"] is None:
+                raise ValueError("invalid_progress")
+            validate_progress(properties["progress"], properties.get("workflow_json"))
+            canonical["progress"] = properties["progress"]
+        if "progress_record_id" in properties:
+            validate_work_object_id(properties["progress_record_id"])
+            canonical["progress_record_id"] = properties["progress_record_id"]
+    if "progress_migration_json" in properties:
+        import json
+
+        value = properties["progress_migration_json"]
+        if (
+            not isinstance(value, str)
+            or len(value) > 65536
+            or not isinstance(json.loads(value), dict)
+        ):
+            raise ValueError("invalid_progress_migration")
+        canonical["progress_migration_json"] = value
     if canonical.get("kind") != label:
         raise ValueError("invalid_work_object_kind")
     if not isinstance(canonical.get("title"), str) or not isinstance(
@@ -126,6 +168,8 @@ def validate_canonical_work_object_properties(
     validate_priority(canonical.get("priority"))
     for field_name in ("artifact_ids", "external_link_ids"):
         validate_work_object_id_collection(canonical.get(field_name), expected_type=list)
-    if not isinstance(archived, bool) or archived is not (status == "archived"):
+    if not isinstance(archived, bool) or (
+        "progress_schema" not in canonical and archived is not (status == "archived")
+    ):
         raise ValueError("invalid_work_object_archive_state")
     return canonical

@@ -22,6 +22,7 @@ from devgraph.storage.base import (
     WorkContainment,
 )
 from devgraph.storage.containment import validate_arena_page, validate_containment_subject
+from devgraph.storage.delegated import DelegatedWorkSelector, validate_work_filter
 from devgraph.storage.migrations import count_idempotent_application
 from devgraph.storage.supporting_material import (
     MAX_PROVENANCE,
@@ -87,9 +88,11 @@ class MemoryGraphStorage:
             node = self._nodes.get(key)
             if node is None:
                 raise StorageUnavailable("missing containment target")
-            result.append(WorkContainment(
-                node, tuple(incoming[key]["HAS_CHILD"]), tuple(incoming[key]["CONTAINS_WORK"])
-            ))
+            result.append(
+                WorkContainment(
+                    node, tuple(incoming[key]["HAS_CHILD"]), tuple(incoming[key]["CONTAINS_WORK"])
+                )
+            )
         return result
 
     def work_containment(self, label: str, node_id: str) -> WorkContainment | None:
@@ -104,12 +107,123 @@ class MemoryGraphStorage:
         validate_arena_page(arena_id, after_resource, limit)
         with self._transaction_lock:
             # Select unique targets; their incoming duplicate edges remain visible above.
-            keys = sorted({
-                (edge.to_label, edge.to_id) for edge in self._edges
-                if (edge.from_label, edge.from_id, edge.relationship)
-                == ("Arena", arena_id, "CONTAINS_WORK")
-                and (after_resource is None or f"{edge.to_label}/{edge.to_id}" > after_resource)
-            })[:limit]
+            keys = sorted(
+                {
+                    (edge.to_label, edge.to_id)
+                    for edge in self._edges
+                    if (edge.from_label, edge.from_id, edge.relationship)
+                    == ("Arena", arena_id, "CONTAINS_WORK")
+                    and (after_resource is None or f"{edge.to_label}/{edge.to_id}" > after_resource)
+                }
+            )[:limit]
+
+            return self._work_containment(keys)
+
+    def delegated_arena_page(
+        self,
+        arena_ids: tuple[str, ...],
+        *,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        validate_page_limit(limit)
+        allowed = set(arena_ids)
+        if not arena_ids or len(allowed) != len(arena_ids):
+            raise ValueError("invalid delegated Arena selectors")
+        for arena_id in arena_ids:
+            validate_work_object_id(arena_id)
+        if after_id is not None:
+            validate_work_object_id(after_id)
+        return sorted(
+            (
+                node
+                for (label, node_id), node in self._nodes.items()
+                if label == "Arena"
+                and node_id in allowed
+                and not node.archived
+                and (after_id is None or node_id > after_id)
+            ),
+            key=lambda node: node.id,
+        )[:limit]
+
+    def _arena_descendant_keys(self, arenas: set[str]) -> set[tuple[str, str]]:
+        allowed: set[tuple[str, str]] = set()
+        pending = [
+            (edge.to_label, edge.to_id)
+            for edge in self._edges
+            if edge.relationship == "CONTAINS_WORK"
+            and edge.from_label == "Arena"
+            and edge.from_id in arenas
+        ]
+        while pending:
+            key = pending.pop()
+            if key in allowed:
+                continue
+            allowed.add(key)
+            pending.extend(
+                (edge.to_label, edge.to_id)
+                for edge in self._edges
+                if edge.relationship == "HAS_CHILD" and (edge.from_label, edge.from_id) == key
+            )
+        return allowed
+
+    def _delegated_selector_predicate(self, selectors: tuple[DelegatedWorkSelector, ...]):
+        groups = [
+            (
+                set(tuple(resource.split("/", 1)) for resource in selector.work_ids),
+                self._arena_descendant_keys(set(selector.arena_ids)),
+                selector,
+            )
+            for selector in selectors
+        ]
+
+        def admitted(key: tuple[str, str]) -> bool:
+            node = self._nodes.get(key)
+            if node is None:
+                return False
+            return any(
+                key[0] in selector.work_kinds
+                and (not node.archived or selector.include_archived)
+                and (not selector.work_ids or key in exact)
+                and (not selector.arena_ids or key in arena)
+                for exact, arena, selector in groups
+            )
+
+        return admitted
+
+    def delegated_arena_member_page(
+        self,
+        arena_id: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[WorkContainment]:
+        validate_arena_page(arena_id, after_resource, limit)
+        validate_work_filter(
+            label="Initiative",
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=None,
+            limit=limit,
+        )
+        with self._transaction_lock:
+            admitted = self._delegated_selector_predicate(selectors)
+            keys = sorted(
+                {
+                    (edge.to_label, edge.to_id)
+                    for edge in self._edges
+                    if (edge.from_label, edge.from_id, edge.relationship)
+                    == ("Arena", arena_id, "CONTAINS_WORK")
+                    and edge.to_label in work_kinds
+                    and (include_archived or not self._nodes[(edge.to_label, edge.to_id)].archived)
+                    and admitted((edge.to_label, edge.to_id))
+                    and (after_resource is None or f"{edge.to_label}/{edge.to_id}" > after_resource)
+                }
+            )[:limit]
             return self._work_containment(keys)
 
     def update_node(self, label: str, node_id: str, properties: dict[str, Any]) -> NodeRecord:
@@ -118,7 +232,13 @@ class MemoryGraphStorage:
         canonical = self._is_canonical_payload(
             label, existing.properties
         ) or self._is_canonical_payload(label, properties)
-        if canonical and (existing.archived or existing.properties.get("status") == "archived"):
+        if canonical and (
+            existing.archived
+            or (
+                existing.properties.get("status") == "archived"
+                and not existing.properties.get("progress_schema")
+            )
+        ):
             raise KeyError(f"archived {label}: {node_id}")
         node_properties = properties
         if canonical:
@@ -134,7 +254,9 @@ class MemoryGraphStorage:
                     label,
                     node_id,
                     properties,
-                    archived=properties.get("status") == "archived",
+                    archived=existing.archived
+                    if properties.get("progress_schema")
+                    else properties.get("status") == "archived",
                 )
             except (TypeError, ValueError) as exc:
                 raise StorageUnavailable("malformed canonical work object") from exc
@@ -148,7 +270,12 @@ class MemoryGraphStorage:
             id=existing.id,
             properties={**existing.properties, **node_properties},
             archived=(
-                existing.archived or (canonical and node_properties.get("status") == "archived")
+                existing.archived
+                or (
+                    canonical
+                    and node_properties.get("status") == "archived"
+                    and existing.properties.get("status") != "archived"
+                )
             ),
         )
         self._nodes[(label, node_id)] = updated
@@ -166,12 +293,14 @@ class MemoryGraphStorage:
             label, existing.properties
         ) or self._is_canonical_payload(label, properties)
         if canonical_payload and existing.archived:
-            if properties is None and existing.properties.get("status") == "archived":
+            if properties is None:
                 return existing
             raise KeyError(f"already archived {label}: {node_id}")
         if not canonical_payload:
             archived_properties = {**existing.properties, **(properties or {})}
         elif properties is None:
+            if existing.properties.get("status") != "archived":
+                raise StorageUnavailable("malformed canonical work object")
             try:
                 validate_canonical_work_object_properties(
                     label,
@@ -200,7 +329,7 @@ class MemoryGraphStorage:
                 or new_version != current_version + 1
                 or canonical.get("created_at") != existing.properties.get("created_at")
                 or canonical.get("kind") != label
-                or canonical.get("status") != "archived"
+                or (not canonical.get("progress_schema") and canonical.get("status") != "archived")
             ):
                 raise KeyError(f"missing, stale, or inconsistent {label}: {node_id}")
             archived_properties = dict(canonical)
@@ -212,6 +341,22 @@ class MemoryGraphStorage:
         )
         self._nodes[(label, node_id)] = archived
         return archived
+
+    def restore_node(self, label, node_id, properties):
+        existing = self._require_node(label, node_id)
+        canonical = validate_canonical_work_object_properties(
+            label, node_id, properties, archived=False
+        )
+        if (
+            not existing.archived
+            or canonical.get("progress_schema") != 1
+            or canonical["version"] != existing.properties["version"] + 1
+            or canonical["created_at"] != existing.properties["created_at"]
+        ):
+            raise KeyError("missing, stale, or inconsistent restore")
+        node = NodeRecord(label, node_id, {**existing.properties, **canonical}, archived=False)
+        self._nodes[(label, node_id)] = node
+        return node
 
     def create_edge(
         self,
@@ -273,6 +418,52 @@ class MemoryGraphStorage:
                         keys.add(target)
             return [self._nodes[key] for key in sorted(keys)[:limit] if key in self._nodes]
 
+    def delegated_related_work_nodes(
+        self,
+        label: str,
+        node_id: str,
+        relationship: str,
+        *,
+        incoming: bool,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        validate_work_filter(
+            label=label,
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=None,
+            limit=limit,
+        )
+        if relationship not in {"HAS_CHILD", "DEPENDS_ON", "BLOCKS"} or type(incoming) is not bool:
+            raise ValueError("invalid relationship read")
+        with self.transaction():
+            admitted = self._delegated_selector_predicate(selectors)
+            keys = set()
+            for edge in self._edges:
+                source = (
+                    (edge.to_label, edge.to_id) if incoming else (edge.from_label, edge.from_id)
+                )
+                target = (
+                    (edge.from_label, edge.from_id) if incoming else (edge.to_label, edge.to_id)
+                )
+                node = self._nodes.get(target)
+                if (
+                    edge.relationship == relationship
+                    and source == (label, node_id)
+                    and target[0] in work_kinds
+                    and node is not None
+                    and (include_archived or not node.archived)
+                    and admitted(target)
+                    and (after_resource is None or "/".join(target) > after_resource)
+                ):
+                    keys.add(target)
+            return [self._nodes[key] for key in sorted(keys)[:limit]]
+
     def supporting_material_references(
         self,
         label: str,
@@ -325,7 +516,6 @@ class MemoryGraphStorage:
                 for (kind, item_id), via in sorted(paths.items())[:limit]
             ]
 
-
     def supporting_material_nodes(self, keys: list[tuple[str, str]]) -> list[NodeRecord]:
         validate_supporting_keys(keys)
         with self.transaction():
@@ -343,6 +533,23 @@ class MemoryGraphStorage:
                 for key in keys
                 if (node := self._nodes.get(key)) is not None
             ]
+
+    def monitor_records(self):
+        """Capture the public topology under the same lock as Work mutations."""
+        from devgraph.topology import PUBLIC_LABELS, SOURCE_EDGE_LIMIT, SOURCE_NODE_LIMIT
+
+        with self._transaction_lock:
+            nodes = [n for n in self._nodes.values() if n.label in PUBLIC_LABELS]
+            nodes.sort(key=lambda n: (n.label, n.id))
+            nodes = deepcopy(nodes[: SOURCE_NODE_LIMIT + 1])
+            keys = {(n.label, n.id) for n in nodes}
+            edges = [
+                e
+                for e in self._edges
+                if (e.from_label, e.from_id) in keys and (e.to_label, e.to_id) in keys
+            ]
+            edges.sort(key=lambda e: (e.from_label, e.from_id, e.relationship, e.to_label, e.to_id))
+            return nodes, deepcopy(edges[: SOURCE_EDGE_LIMIT + 1])
 
     def list_edges(
         self, relationship: str | None = None, *, limit: int | None = None
@@ -397,6 +604,54 @@ class MemoryGraphStorage:
             else:
                 records = [node for node in records if node.id > after_id]
         return records if limit is None else records[:limit]
+
+    def todo_page(self, query):
+        from devgraph.storage.todos import select_todo_page
+
+        with self._transaction_lock:
+            return select_todo_page(self._nodes.values(), query)
+
+    def todo_detail(self, todo_id):
+        from devgraph.storage.todos import exact_todo
+
+        validate_work_object_id(todo_id)
+        node = self._nodes.get(("Todo", todo_id))
+        return node if node is not None and exact_todo(node) else None
+
+    def delegated_work_page(
+        self,
+        label: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        descending: bool = False,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        validate_work_filter(
+            label=label,
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=after_id,
+            limit=limit,
+        )
+        if not isinstance(descending, bool):
+            raise TypeError("descending must be boolean")
+        with self.transaction():
+            admitted = self._delegated_selector_predicate(selectors)
+            records = [
+                node
+                for key, node in self._nodes.items()
+                if node.label == label
+                and label in work_kinds
+                and (include_archived or not node.archived)
+                and admitted(key)
+                and (after_id is None or (node.id < after_id if descending else node.id > after_id))
+            ]
+            records.sort(key=lambda node: node.id, reverse=descending)
+            return records[:limit]
 
     def claim_event_receipt(
         self,

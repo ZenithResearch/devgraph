@@ -1,0 +1,181 @@
+[
+  {
+    "request": {
+      "schema": "devgraph.work-request.v2",
+      "operation": "create",
+      "kind": "Todo",
+      "id": "example",
+      "expected_version": null,
+      "payload": {
+        "id": "example",
+        "title": "Daily Todo"
+      }
+    },
+    "status": 201,
+    "result": {
+      "schema": "devgraph.work-result.v2",
+      "work": {
+        "key": "Todo/example",
+        "kind": "Todo",
+        "id": "example",
+        "title": "Daily Todo",
+        "priority": "0",
+        "version": "1",
+        "progress": "not_started",
+        "progress_label": "Not started",
+        "archived": false,
+        "classification_required": false,
+        "workflow_id": null,
+        "stage": null,
+        "parent": null,
+        "created_at": "2026-10-05T16:59:43.222396+00:00",
+        "updated_at": "2026-10-05T16:59:43.222397+00:00",
+        "description": "",
+        "artifact_ids": [],
+        "external_link_ids": []
+      },
+      "receipt": {
+        "receipt_id": "event-receipt-4ae39e4e-5b18-4d5c-8ede-a025a518f2ed",
+        "operation": "devgraph.work.create.v2",
+        "subject_label": "Todo",
+        "subject_id": "example",
+        "receipt_status": "pending",
+        "duplicate": false,
+        "correlation_id": "dg:sha256:d846adb6c2c6f5c17ab3005ef156642e704da227a1c843e3b294ef39920c6f92"
+      }
+    }
+  },
+  {
+    "request": {
+      "schema": "devgraph.work-request.v2",
+      "operation": "progress.set",
+      "kind": "Todo",
+      "id": "example",
+      "expected_version": 1,
+      "payload": {
+        "progress": "done",
+        "record_id": "complete",
+        "reason": "Called supplier"
+      }
+    },
+    "status": 200,
+    "result": {
+      "schema": "devgraph.work-result.v2",
+      "work": {
+        "key": "Todo/example",
+        "kind": "Todo",
+        "id": "example",
+        "title": "Daily Todo",
+        "priority": "0",
+        "version": "2",
+        "progress": "done",
+        "progress_label": "Done",
+        "archived": false,
+        "classification_required": false,
+        "workflow_id": null,
+        "stage": null,
+        "parent": null,
+        "created_at": "2026-10-05T16:59:43.222396+00:00",
+        "updated_at": "2026-10-05T16:59:43.225609+00:00",
+        "description": "",
+        "artifact_ids": [],
+        "external_link_ids": []
+      },
+      "receipt": {
+        "receipt_id": "event-receipt-218c906c-3eaf-4048-b274-0a24013a2f63",
+        "operation": "devgraph.work.progress.set.v2",
+        "subject_label": "Todo",
+        "subject_id": "example",
+        "receipt_status": "pending",
+        "duplicate": false,
+        "correlation_id": "dg:sha256:39c3b007dde9234b37113551b49871ab8fc763b2e09621152cfe6f8e08147bec"
+      }
+    }
+  },
+  {
+    "request": {
+      "schema": "devgraph.work-request.v2",
+      "operation": "archive",
+      "kind": "Todo",
+      "id": "example",
+      "expected_version": 2,
+      "payload": {}
+    },
+    "status": 200,
+    "result": {
+      "schema": "devgraph.work-result.v2",
+      "work": {
+        "key": "Todo/example",
+        "kind": "Todo",
+        "id": "example",
+        "title": "Daily Todo",
+        "priority": "0",
+        "version": "3",
+        "progress": "done",
+        "progress_label": "Done",
+        "archived": true,
+        "classification_required": false,
+        "workflow_id": null,
+        "stage": null,
+        "parent": null,
+        "created_at": "2026-10-05T16:59:43.222396+00:00",
+        "updated_at": "2026-10-05T16:59:43.227671+00:00",
+        "description": "",
+        "artifact_ids": [],
+        "external_link_ids": []
+      },
+      "receipt": {
+        "receipt_id": "event-receipt-f27c37d8-ee2a-4602-8f82-99a3da1ffed7",
+        "operation": "devgraph.work.archive.v2",
+        "subject_label": "Todo",
+        "subject_id": "example",
+        "receipt_status": "pending",
+        "duplicate": false,
+        "correlation_id": "dg:sha256:174620026ba03bf67f98ade4c7c8abaa8fa01fefb211d4889eabd2399116d25d"
+      }
+    }
+  },
+  {
+    "request": {
+      "schema": "devgraph.work-request.v2",
+      "operation": "restore",
+      "kind": "Todo",
+      "id": "example",
+      "expected_version": 3,
+      "payload": {}
+    },
+    "status": 200,
+    "result": {
+      "schema": "devgraph.work-result.v2",
+      "work": {
+        "key": "Todo/example",
+        "kind": "Todo",
+        "id": "example",
+        "title": "Daily Todo",
+        "priority": "0",
+        "version": "4",
+        "progress": "done",
+        "progress_label": "Done",
+        "archived": false,
+        "classification_required": false,
+        "workflow_id": null,
+        "stage": null,
+        "parent": null,
+        "created_at": "2026-10-05T16:59:43.222396+00:00",
+        "updated_at": "2026-10-05T16:59:43.229753+00:00",
+        "description": "",
+        "artifact_ids": [],
+        "external_link_ids": []
+      },
+      "receipt": {
+        "receipt_id": "event-receipt-24f9073c-702c-4191-afe8-67064fd6de3b",
+        "operation": "devgraph.work.restore.v2",
+        "subject_label": "Todo",
+        "subject_id": "example",
+        "receipt_status": "pending",
+        "duplicate": false,
+        "correlation_id": "dg:sha256:3271b7bc78ba5b97b616e8b20c5591ae916152d6d4854788dca70096e8cb6091"
+      }
+    }
+  }
+]

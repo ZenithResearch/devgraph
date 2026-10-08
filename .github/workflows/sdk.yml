@@ -1,0 +1,151 @@
+---
+name: Devgraph SDK verification
+
+# Public SDK checks need no private source access. Companion checks are explicit
+# and do not establish installed native authority.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-sdk:
+    name: Public SDK and browser package
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUSTUP_TOOLCHAIN: "1.96.0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.18.0"
+      - name: Install pinned Rust and WASM CLI
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
+          cargo +1.96.0 install wasm-bindgen-cli --version 0.2.127 --locked
+      - name: Public contracts and SDK
+        run: |
+          cargo test --locked --workspace --all-features
+          cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+          cargo check --locked -p devgraph-web --target wasm32-unknown-unknown
+      - name: SDK and browser fixtures
+        working-directory: packages/web
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          npm test
+          npx playwright install --with-deps chromium firefox webkit
+          npm run test:browser
+          npm run build
+          npm pack --ignore-scripts
+      - name: External installed package
+        run: |
+          consumer_dir=$(mktemp -d)
+          cp packages/web/devgraph-web-0.2.0-preview.2.tgz "$consumer_dir/"
+          npm install --prefix "$consumer_dir" --ignore-scripts "$consumer_dir/devgraph-web-0.2.0-preview.2.tgz" typescript@5.9.3 vite@7.3.5
+          node packages/web/test/installed-consumer.mjs "$consumer_dir"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-devgraph-sdk
+          path: |
+            packages/web/*.tgz
+            .sdk-validation/browser-core.json
+            .sdk-validation/installed-consumers.json
+
+  companion:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      RUSTUP_TOOLCHAIN: "1.96.0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Read-only Wallet source token
+        id: wallet
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.SDK_SOURCE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SDK_SOURCE_APP_PRIVATE_KEY }}
+          owner: bananawalnut
+          repositories: castalia-wallet
+          permission-contents: read
+      - name: Configure scoped Git credential helper
+        run: |
+          git config --global credential.useHttpPath true
+          git config --global credential.helper "$GITHUB_WORKSPACE/scripts/sdk/git-credential-source"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.18.0"
+      - name: Install matched Rust toolchain and WASM CLI
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
+          cargo +1.96.0 install wasm-bindgen-cli --version 0.2.127 --locked
+          cargo +1.96.0 install wasm-pack --version 0.14.0 --locked
+      - name: Fetch pinned companion sources
+        env:
+          SDK_WALLET_SOURCE_TOKEN: ${{ steps.wallet.outputs.token }}
+        run: |
+          cargo fetch --locked
+          cargo fetch --locked --manifest-path crates/devgraph-client-native/Cargo.toml
+          cargo fetch --locked --manifest-path crates/devgraph-browser-host/Cargo.toml
+      - name: Check out the explicitly paired Wallet revision
+        env:
+          SDK_WALLET_SOURCE_TOKEN: ${{ steps.wallet.outputs.token }}
+        run: |
+          WALLET_REVISION=$(python3 -c 'import json; print(json.load(open("docs/dev/generic-wallet-source-set.json"))["sources"]["wallet_generic"]["revision"])')
+          [[ "$WALLET_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          git init "$RUNNER_TEMP/paired-wallet"
+          git -C "$RUNNER_TEMP/paired-wallet" remote add origin https://github.com/bananawalnut/castalia-wallet.git
+          git -C "$RUNNER_TEMP/paired-wallet" fetch --depth=1 origin "$WALLET_REVISION"
+          git -C "$RUNNER_TEMP/paired-wallet" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/paired-wallet" rev-parse HEAD)" = "$WALLET_REVISION"
+      - name: Native and WASM checks
+        run: |
+          cargo test --locked --offline --workspace --all-features
+          cargo test --locked --offline --manifest-path crates/devgraph-client-native/Cargo.toml
+          cargo test --locked --offline --manifest-path crates/devgraph-browser-host/Cargo.toml
+          cargo check --locked --offline -p devgraph-web --target wasm32-unknown-unknown
+          cargo clippy --locked --offline --workspace --all-targets --all-features -- -D warnings
+          cargo clippy --locked --offline --manifest-path crates/devgraph-client-native/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --locked --offline --manifest-path crates/devgraph-browser-host/Cargo.toml --all-targets -- -D warnings
+      - name: Build and test package
+        working-directory: packages/web
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          npm test
+          npx playwright install chromium firefox webkit
+          npm run test:browser
+          npm run build
+          npm pack --ignore-scripts
+      - name: Verify external installed package
+        run: |
+          consumer_dir=$(mktemp -d)
+          cp packages/web/devgraph-web-0.2.0-preview.2.tgz "$consumer_dir/"
+          npm install --prefix "$consumer_dir" --ignore-scripts "$consumer_dir/devgraph-web-0.2.0-preview.2.tgz" typescript@5.9.3 vite@7.3.5
+          node packages/web/test/installed-consumer.mjs "$consumer_dir"
+      - name: Verify merged Wallet's provider contract against Devgraph setup
+        run: node scripts/qualification/wallet_provider_contract.mjs "$RUNNER_TEMP/paired-wallet"
+      # Actual extension + native secS + receiver acceptance belongs to the
+      # installed-generic-wallet-gate. Removed Wallet adapters cannot qualify it.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: devgraph-web-core-preview
+          path: |
+            packages/web/*.tgz
+            .sdk-validation/browser-core.json
+            .sdk-validation/installed-consumers.json
+            .sdk-validation/wallet-provider-contract.json

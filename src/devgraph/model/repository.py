@@ -246,7 +246,7 @@ class WorkObjectRepository:
         validate_version(expected_version)
         with self._storage.transaction():
             current = self.get_by_id(work_object.kind, work_object.id)
-            if current.status == WorkStatus.ARCHIVED:
+            if current.archived:
                 raise InvalidStatusTransitionError(
                     f"cannot update archived {work_object.kind}: {work_object.id}"
                 )
@@ -260,6 +260,13 @@ class WorkObjectRepository:
             if work_object.status != current.status:
                 raise InvalidStatusTransitionError(
                     f"update cannot change status for {work_object.kind}: {work_object.id}"
+                )
+            if current.progress == "done" and any(
+                getattr(current, name) != getattr(work_object, name)
+                for name in ("title", "description", "artifact_ids", "external_link_ids")
+            ):
+                raise InvalidStatusTransitionError(
+                    "Reopen completed work before changing its evidence basis."
                 )
             updated = replace(
                 current,
@@ -297,7 +304,7 @@ class WorkObjectRepository:
             if node is None:
                 raise MissingWorkObjectError(f"missing {kind}: {work_object_id}")
             current = self._from_node(node)
-            if current.status == WorkStatus.ARCHIVED:
+            if current.archived:
                 raise InvalidStatusTransitionError(
                     f"cannot update archived {kind}: {work_object_id}"
                 )
@@ -307,6 +314,13 @@ class WorkObjectRepository:
                     work_object_id,
                     expected_version=expected_version,
                     actual_version=current.version,
+                )
+            if current.progress == "done" and any(
+                name != "priority" and getattr(current, name) != value
+                for name, value in values.items()
+            ):
+                raise InvalidStatusTransitionError(
+                    "Reopen completed work before changing its evidence basis."
                 )
             updated = replace(
                 current,
@@ -322,12 +336,16 @@ class WorkObjectRepository:
         validate_work_object_id(work_object_id)
         with self._storage.transaction():
             current = self.get_by_id(kind, work_object_id)
-            if current.status == WorkStatus.ARCHIVED:
+            if current.archived:
                 raise InvalidStatusTransitionError(f"already archived {kind}: {work_object_id}")
-            archived = current.with_status(WorkStatus.ARCHIVED)
-            self._storage.archive_node(
-                kind, work_object_id, archived.to_node_properties()
+            from devgraph.progress import TODO_KINDS
+
+            archived = (
+                replace(current, archived=True, updated_at=utc_now(), version=current.version + 1)
+                if kind in TODO_KINDS
+                else current.with_status(WorkStatus.ARCHIVED)
             )
+            self._storage.archive_node(kind, work_object_id, archived.to_node_properties())
         return archived
 
     def transition_status(
@@ -337,7 +355,7 @@ class WorkObjectRepository:
         validate_work_object_id(work_object_id)
         with self._storage.transaction():
             current = self.get_by_id(kind, work_object_id)
-            if (current.status, new_status) not in GENERIC_STATUS_TRANSITIONS:
+            if current.archived or (current.status, new_status) not in GENERIC_STATUS_TRANSITIONS:
                 raise InvalidStatusTransitionError(
                     f"invalid transition {current.status.value} -> {new_status.value} "
                     f"for {kind}: {work_object_id}"
@@ -358,7 +376,7 @@ class WorkObjectRepository:
 
     @staticmethod
     def _reject_creation_status_side_doors(work_object: WorkObject) -> None:
-        if work_object.status == WorkStatus.ARCHIVED:
+        if work_object.archived or work_object.status == WorkStatus.ARCHIVED:
             raise InvalidStatusTransitionError(
                 f"create cannot bypass archive semantics for {work_object.kind}: {work_object.id}"
             )
@@ -376,9 +394,7 @@ class WorkObjectRepository:
                 f"unknown persisted kind for node {node.label}:{node.id}"
             )
         if persisted_kind != node.label:
-            raise UnknownWorkObjectKindError(
-                f"kind/label mismatch for node {node.label}:{node.id}"
-            )
+            raise UnknownWorkObjectKindError(f"kind/label mismatch for node {node.label}:{node.id}")
         try:
             properties = validate_canonical_work_object_properties(
                 node.label,
@@ -402,6 +418,11 @@ class WorkObjectRepository:
                 artifact_ids=tuple(properties["artifact_ids"]),
                 external_link_ids=tuple(properties["external_link_ids"]),
                 priority=properties["priority"],
+                workflow_json=properties.get("workflow_json"),
+                progress=properties.get("progress"),
+                archived=node.archived,
+                progress_record_id=properties.get("progress_record_id"),
+                progress_migration_json=properties.get("progress_migration_json"),
             )
         except WorkObjectRepositoryError:
             raise

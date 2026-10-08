@@ -53,6 +53,7 @@ from devgraph.model.repository import (
 )
 from devgraph.model.validation import validate_work_object_id
 from devgraph.ops.auth_setup import auth_status, provision_read
+from devgraph.ops.credential_work_agent import execute_local_credential_work
 from devgraph.ops.local_process import neo4j_process_snapshot, wait_for_neo4j_exit
 from devgraph.ops.named_work_agent import LocalNamedWorkAgentError, execute_local_named_work
 from devgraph.ops.secs_issue_create_agent import (
@@ -75,7 +76,7 @@ from devgraph.ops.signer_profile import (
     inspect_signer_key,
 )
 from devgraph.storage.base import StorageUnavailable
-from devgraph.work_requests import WORK_OPERATIONS, InvalidWorkRequest
+from devgraph.work_requests import WORK_OPERATIONS, WORK_OPERATIONS_V2, InvalidWorkRequest
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8080"
 HOST_ROOT = DEFAULT_HOST_ROOT
@@ -637,6 +638,18 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="explicitly add Arena and membership permissions",
     )
+    plan.add_argument(
+        "--include-workflows",
+        action="store_true",
+        default=None,
+        help="explicitly add workflow moves and evidence attestations",
+    )
+    plan.add_argument(
+        "--include-progress",
+        action="store_true",
+        default=None,
+        help="explicitly add Todo v2 progress operations",
+    )
     apply = grant_commands.add_parser("apply", help="activate a reviewed private plan file")
     apply.add_argument("--plan-file", type=Path, required=True)
     grant_commands.add_parser("status", help="verify current producer and receiver authority")
@@ -645,7 +658,9 @@ def _parser() -> argparse.ArgumentParser:
         command = grant_commands.add_parser(action)
         command.add_argument("--ttl-hours", type=int, default=24 * 30)
         if action == "renew":
+            command.add_argument("--include-progress", action="store_true", default=None)
             command.add_argument("--include-arenas", action="store_true", default=None)
+            command.add_argument("--include-workflows", action="store_true", default=None)
 
     status = subcommands.add_parser("status", help="prove API and authorization posture")
     status.add_argument("--base-url", default=DEFAULT_BASE_URL)
@@ -666,6 +681,14 @@ def _parser() -> argparse.ArgumentParser:
         help="run bounded read-only Devgraph queries with the local credential",
     )
     query_commands = query.add_subparsers(dest="query_command", required=True)
+    for operation in ("board", "board-v2", "todos", "progress-report", "workflows", "workflow"):
+        workflow_read = query_commands.add_parser(operation, help="read workflow stages or board")
+        workflow_read.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+        if operation in ("board", "board-v2", "todos"):
+            workflow_read.add_argument("--filter", default="", help="bounded API filter query")
+        if operation == "workflow":
+            workflow_read.add_argument("kind", choices=WORK_KINDS)
+            workflow_read.add_argument("work_id")
     query_cypher = query_commands.add_parser(
         "cypher", help="execute the bounded read-only Work Cypher language"
     )
@@ -728,10 +751,14 @@ def _parser() -> argparse.ArgumentParser:
 
     work = subcommands.add_parser("work", help="execute signed named Work mutations")
     work_commands = work.add_subparsers(dest="work_operation", required=True)
-    for operation in WORK_OPERATIONS:
+    for operation in dict.fromkeys((*WORK_OPERATIONS, *WORK_OPERATIONS_V2)):
         command = work_commands.add_parser(operation, help=f"sign and execute {operation}")
         command.add_argument("--request-file", type=Path, required=True)
         command.add_argument("--idempotency-key-file", type=Path, required=True)
+        command.add_argument("--credential-v2", action="store_true",
+                             help="use the explicit generic credential path with terminal approval")
+        command.add_argument("--reconcile", action="store_true",
+                             help="with --credential-v2, approve a status-only receipt lookup")
 
     arena = subcommands.add_parser("arena", help="execute signed Arena mutations")
     arena_commands = arena.add_subparsers(dest="arena_operation", required=True)
@@ -739,6 +766,10 @@ def _parser() -> argparse.ArgumentParser:
         command = arena_commands.add_parser(operation, help=f"sign and execute Arena {operation}")
         command.add_argument("--request-file", type=Path, required=True)
         command.add_argument("--idempotency-key-file", type=Path, required=True)
+        command.add_argument("--credential-v2", action="store_true",
+                             help="use the explicit generic credential path with terminal approval")
+        command.add_argument("--reconcile", action="store_true",
+                             help="with --credential-v2, approve a status-only receipt lookup")
 
     secs_issue_create = subcommands.add_parser(
         "secs-issue-create-v1",
@@ -857,6 +888,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                             ttl_hours=args.ttl_hours,
                             renew=args.renew,
                             include_arenas=args.include_arenas,
+                            include_workflows=args.include_workflows,
+                            include_progress=args.include_progress,
                         )
                         if args.output_file is not None:
                             work_grants.write_plan(result, args.output_file)
@@ -864,7 +897,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                         result = work_grants.apply_grant(plan_file=args.plan_file)
                     elif args.auth_work_command == "renew":
                         result = work_grants.renew_grant(
-                            ttl_hours=args.ttl_hours, include_arenas=args.include_arenas
+                            ttl_hours=args.ttl_hours,
+                            include_arenas=args.include_arenas,
+                            include_workflows=args.include_workflows,
+                            include_progress=args.include_progress,
                         )
                     elif args.auth_work_command == "rotate-verifier":
                         result = work_grants.rotate_verifier(ttl_hours=args.ttl_hours)
@@ -935,6 +971,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(_json(read_logs(args.service, args.stream, args.lines, log_root=log_root)))
             return 0
         if args.command == "query":
+            if args.query_command in (
+                "board",
+                "board-v2",
+                "todos",
+                "progress-report",
+                "workflow",
+                "workflows",
+            ):
+                from devgraph.ops.workflow_client import query_workflow_snapshot
+
+                result = query_workflow_snapshot(
+                    operation=args.query_command,
+                    query=getattr(args, "filter", ""),
+                    kind=getattr(args, "kind", None),
+                    work_id=getattr(args, "work_id", None),
+                    config_path=args.config,
+                )
+                print(json.dumps(result, indent=2, sort_keys=True))
+                return 0
+
             if args.query_command in ("arena", "arena-members", "arena-of"):
                 from devgraph.ops.arena_client import query_arena_snapshot
 
@@ -983,25 +1039,33 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             )
             return 0
+        if args.command in {"arena", "work"} and args.reconcile and not args.credential_v2:
+            raise LocalNamedWorkAgentError("--reconcile requires --credential-v2")
         if args.command == "arena":
+            execute_signed = (execute_local_credential_work if args.credential_v2
+                              else execute_local_named_work)
             print(
                 _json(
-                    execute_local_named_work(
+                    execute_signed(
                         request_file=args.request_file,
                         idempotency_key_file=args.idempotency_key_file,
                         operation=args.arena_operation,
                         request_domain="arena",
+                        **({"reconcile": args.reconcile} if args.credential_v2 else {}),
                     )
                 )
             )
             return 0
         if args.command == "work":
+            execute_signed = (execute_local_credential_work if args.credential_v2
+                              else execute_local_named_work)
             print(
                 _json(
-                    execute_local_named_work(
+                    execute_signed(
                         request_file=args.request_file,
                         idempotency_key_file=args.idempotency_key_file,
                         operation=args.work_operation,
+                        **({"reconcile": args.reconcile} if args.credential_v2 else {}),
                     )
                 )
             )

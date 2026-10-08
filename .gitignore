@@ -29,3 +29,12 @@ dist/
 htmlcov/
 node_modules/
 target/
+
+# Generated SDK bundles and disposable source validation.
+packages/web/*.tgz
+packages/web/src/internal/
+packages/web/sdk-build.json
+packages/web/THIRD-PARTY-NOTICES.txt
+.sdk-validation/
+packages/web/LICENSE
+packages/web/NOTICE

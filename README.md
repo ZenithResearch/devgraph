@@ -1,5 +1,11 @@
 # Devgraph — local work graph, public beta
 
+Devgraph development, SDKs, and integration PRs belong in
+`ZenithResearch/devgraph`. `devgraph-private-history-20260915` is a deprecated
+historical archive, not a development or build dependency. See
+[public Wallet integration](docs/dev/public-wallet-integration.md).
+
+
 Devgraph is a local work graph for people and agents. It connects Proposals,
 Initiatives, Projects, Issues, and Tasks with their descriptions, dependencies,
 evidence, and plans. Arenas group ongoing areas of responsibility. The browser
@@ -47,8 +53,9 @@ with Ctrl-C.
 
 Select a node to open its details. **Description / plan** contains authored
 text; **Load supporting material** resolves attached documents, links,
-requirements, and criteria. Use **Fit**, zoom, **Expand view**, and the resize
-handles to make room. The category checkboxes hide or show node classes.
+requirements, and criteria. The separate **Graph canvas** panel has zoom,
+**Fit view**, and **Full screen** controls. Press Escape or **Exit full screen**
+to return to the page. The category checkboxes hide or show node classes.
 **From Arena** follows outgoing connections, so it may include dependencies
 belonging to another Arena; it does not move work between Arenas.
 
@@ -98,7 +105,7 @@ dependency-aware scenario. Its inputs and saved drafts are local to the browser
 tab; exports are local files. It does not update canonical Work or promise a
 schedule or hard-budget solution. See [project selection](docs/user/project-selection.md).
 
-Ontology bundles through `v0.6.0` are packaged with the application.
+Ontology bundles through `v0.7.0` are packaged with the application.
 `devgraph ontology` identifies the canonical release. `Entity`, `Person`,
 `Agent`, and `Organization` are directory vocabulary with no admitted runtime
 CRUD; `Actor` remains a compatibility alias.
@@ -149,6 +156,13 @@ creation, restore-preflight checks, and disposable database verification. These
 operations require the appropriate operator-selected target and evidence; their
 presence in the package does not verify another installation's recovery posture.
 
+## Shared Rust request protocol
+
+The public `devgraph-work-protocol` crate provides the closed Work/Arena request
+parser, canonical bytes, complete resource inventory and domain-separated request
+digests for native and WASM consumers. It does not hold keys, issue grants or run
+operations. See [protocol source and verification](docs/dev/shared-work-protocol.md).
+
 ## Development checks
 
 ```sh
@@ -179,3 +193,10 @@ Devgraph's code, ontology, and bundled skills/plugins are licensed under
 **AGPL-3.0-only**. See [LICENSE](LICENSE) for the terms and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party material.
 Separately installed dependencies and native companions retain their own terms.
+
+## Work board
+
+The separate [Kanban page](docs/user/kanban.md) shows all five Work types, saved
+filters, optional child scopes and guarded workflow stages. It is readable in all
+supported browsers. Signed Chrome moves require matched companion candidates and
+separate installed-native qualification; no bearer credential grants write access.

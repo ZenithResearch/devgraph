@@ -1,0 +1,46 @@
+{
+  "schema": "devgraph.generic-wallet-source-set.v2",
+  "sources": {
+    "secs_generic_todo": {
+      "revision": "c5d81bab74820b0cd127759c5b367be471ff0d82",
+      "depends_on": "https://github.com/ZenithResearch/secS-magik/pull/297",
+      "pr": "https://github.com/ZenithResearch/secS-magik/pull/298"
+    },
+    "wallet_generic": {
+      "revision": "ff8de6ddc04ac2fb6b39408274276bc4ce984d42",
+      "pr": "https://github.com/bananawalnut/castalia-wallet/pull/28",
+      "tree": "379645255f3fec1b6359c25bfaa312fb38a703e7",
+      "status": "merged",
+      "wallet_qualification": "https://buildkite.com/bananawalnut/castalia-wallet/builds/28"
+    },
+    "wallet_legacy_decoder": {
+      "revision": "3216144e8df04582e921810462845efc8c2cf390",
+      "scope": "Frozen compatibility decoder dependency, not a supported Wallet install or fallback signer. Removal remains gated by Devgraph installed qualification."
+    }
+  },
+  "scope": "Source integration; this file is not an installed qualification manifest.",
+  "installed_macos_vm": {
+    "status": "blocked",
+    "reason": "No disposable macOS VM configured"
+  },
+  "legacy_removal": {
+    "status": "Wallet merged; Devgraph and secS gated",
+    "requires": "replacement installed pass, dependent removal, final artifact rerun"
+  },
+  "live_activation": "out_of_scope",
+  "implementation": {
+    "repository": "https://github.com/ZenithResearch/devgraph",
+    "pr": "https://github.com/ZenithResearch/devgraph/pull/10",
+    "revision": "Exact public commit recorded by each package manifest and installed candidate; no archive build dependency."
+  },
+  "historical_import": {
+    "repository": "https://github.com/ZenithResearch/devgraph-private-history-20260915",
+    "revision": "331331a312727489e58579ffd3de13abe11efeb1",
+    "status": "deprecated archive; selected Devgraph-owned files transferred without Git history"
+  },
+  "compatibility_baseline": {
+    "revision": "3454db330ec4a1b42352367652b2a0ceb5a066c4",
+    "pr": "https://github.com/ZenithResearch/devgraph/pull/10",
+    "scope": "Historical compatibility baseline; local canonical crate is now built from the same public revision as SDK."
+  }
+}

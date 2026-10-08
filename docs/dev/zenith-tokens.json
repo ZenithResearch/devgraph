@@ -1,0 +1,11 @@
+{
+  "source": "zenith-ui",
+  "path": "public/tokens.css",
+  "revision": "46c7fbf09de23a54ac04ede705e8a98623056dc3",
+  "sha256": "f870bfb61d805b0057ee9f68a68ecd386f6f5b7b9ed9e561fc3efc038e1e00ba",
+  "themes": [
+    "dark",
+    "light",
+    "aqua"
+  ]
+}

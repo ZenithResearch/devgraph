@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { contextWithFunctions, frontend, treeDocument } from './monitor_test_helpers.mjs';
 
 const arena = { key: 'Arena:devgraph', category: 'arena', kind: 'Arena', id: 'devgraph', title: 'Devgraph' };
-const task = { key: 'Task:records', category: 'work', kind: 'Task', id: 'records', title: 'Rename records' };
+const task = { key: 'Project:records', category: 'work', kind: 'Project', id: 'records', title: 'Rename records' };
 const outside = { ...task, key: 'Task:outside', id: 'outside', title: 'Outside records' };
 const edges = [{ source: arena.key, target: task.key, relationship: 'CONTAINS_WORK' }];
 
@@ -14,7 +14,7 @@ function controls() {
     'renderArenaFilter', 'reconcileChildren', 'filterGraphByArena', 'renderGraphSearch', 'setGraphArena',
   ], {
     document,
-    graphView: { arenaKey: arena.key, neighborhood: 'Task:previous', visibleCategories: new Set(['arena', 'work']) },
+    graphView: { nodes: [task], filters: {}, arenaKey: arena.key, neighborhood: 'Task:previous', visibleCategories: new Set(['arena', 'work']) },
     state: { snapshot: { graph_nodes: [arena, task, outside], graph_edges: edges } },
     pauseGraphOrbit() {}, updateGraphVisibility() {}, fitGraph() {},
   });
@@ -54,7 +54,7 @@ test('Arena titles are inert text and archived Arenas remain identifiable', () =
   assert.equal(option.children.length, 0);
 });
 
-test('graph search is constrained by Arena reachability but still finds hidden categories', () => {
+test('graph search stays inside the displayed overview', () => {
   const c = controls();
   c.graphView.visibleCategories.clear();
   c.document.getElementById('graph-search').value = 'records';
@@ -66,13 +66,23 @@ test('graph search is constrained by Arena reachability but still finds hidden c
   assert.doesNotMatch(results.textContent, /Outside records/);
 });
 
-test('changing Arena clears neighborhood, updates visibility and fits the scoped view', () => {
+test('changing Arena clears neighborhood and requests the new server scope', () => {
   const c = controls(), calls = [];
-  c.pauseGraphOrbit = () => calls.push('pause');
+  c.applyGraphFilters = () => calls.push('request');
   c.updateGraphVisibility = () => calls.push('update');
   c.fitGraph = () => calls.push('fit');
   c.setGraphArena('*');
   assert.equal(c.graphView.arenaKey, '*');
   assert.equal(c.graphView.neighborhood, null);
-  assert.deepEqual(calls, ['pause', 'update', 'fit']);
+  assert.equal(c.graphView.filters.arena, '*');
+  assert.equal(c.graphView.filters.anchor, '');
+  assert.deepEqual(calls, ['request']);
+});
+
+test('server-filtered Arena search does not require the hidden Arena root to be returned',()=>{
+  const c=controls();
+  c.state.snapshot={schema:'devgraph.topology.v1',graph_nodes:[task],graph_edges:[]};
+  c.document.getElementById('graph-search').value='records';
+  c.renderGraphSearch();
+  assert.match(c.document.getElementById('graph-search-results').textContent,/Rename records/);
 });

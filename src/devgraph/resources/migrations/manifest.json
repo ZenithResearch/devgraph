@@ -208,6 +208,22 @@
       "checksum": "70774d449a1b7a47286ff28dfb80f299f3e10cac83c4fb593bcf5c0ecb158d19",
       "posture": "forward_only",
       "kind": "schema_ddl"
+    },
+    {
+      "version": 27,
+      "name": "workflow_metadata_v1",
+      "payload_path": "migrations/0027_workflow_metadata_v1.cypher",
+      "checksum": "254fd8fa7d18dddedf40df14f9a0b95a3a59cde60458bb97da0599c058cc9e3e",
+      "posture": "forward_only",
+      "kind": "transactional_data"
+    },
+    {
+      "version": 28,
+      "name": "todo_progress_v1",
+      "payload_path": "migrations/0028_todo_progress_v1.cypher",
+      "checksum": "08a37e1d8029b4070452266c394113649e09d23222b0f3dc62eb4eb5f81620d7",
+      "posture": "forward_only",
+      "kind": "transactional_data"
     }
   ]
 }

@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: "24"
       - name: Frontend tests
-        run: node --test tests/frontend/*.test.mjs
+        run: node --test tests/frontend/*.test.mjs tests/frontend_kanban.mjs
       - name: Repository verification
         run: bash docs/dev/verification.md
       - name: Lint
@@ -52,3 +52,27 @@ jobs:
         run: |
           uv build --out-dir "$RUNNER_TEMP/devgraph-python"
           uv run python scripts/build_beta.py --output-dir "$RUNNER_TEMP/devgraph-beta"
+
+  rust-protocol:
+    name: Shared Work and Arena protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt --target wasm32-unknown-unknown
+      - name: Native protocol and immutable vectors
+        run: cargo test --locked -p devgraph-work-protocol
+      - name: Hostile serde feature conformance
+        run: cargo test --locked -p devgraph-work-protocol --features hostile-map-order,hostile-number-repr
+      - name: WebAssembly compilation
+        run: cargo check --locked -p devgraph-work-protocol --target wasm32-unknown-unknown
+      - name: Minimum supported Rust
+        run: |
+          rustup toolchain install 1.85.1 --profile minimal
+          cargo +1.85.1 test --locked -p devgraph-work-protocol --features hostile-map-order,hostile-number-repr
+      - name: Formatting
+        run: cargo fmt --all --check
