@@ -19,6 +19,20 @@ const [todoFixture]=JSON.parse(await readFile(resolve(root,'crates/devgraph-clie
 assert.equal(packageJson.name,'@devgraph/web');
 for(const hook of ['preinstall','install','postinstall','prepare'])assert.equal(packageJson.scripts?.[hook],undefined);
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+const tarballName=`devgraph-web-${packageJson.version}.tgz`;
+const tarball=await readFile(resolve(consumer,tarballName));
+assert.equal(hash(tarball),hash(await readFile(resolve(root,'packages/web',tarballName))),
+  'consumer evidence must name the current packed artifact');
+const lock=JSON.parse(await readFile(resolve(consumer,'package-lock.json')));
+assert.equal(lock.packages['node_modules/@devgraph/web'].integrity,
+  'sha512-'+createHash('sha512').update(tarball).digest('base64'),
+  'npm must install the exact evidence artifact');
+const installedManifest=await readFile(resolve(installed,'sdk-build.json'),'utf8');
+assert.equal(installedManifest,await readFile(resolve(root,'packages/web/sdk-build.json'),'utf8'),
+  'installed provenance must match the public candidate');
+const sourceManifest=JSON.parse(installedManifest);
+assert.equal(sourceManifest.source_dirty,false,'qualification requires committed source');
+
 const installedWasm=await readFile(resolve(installed,'dist/internal/devgraph_web_bg.wasm'));
 const installedJs=await readFile(resolve(installed,'dist/index.js'));
 const installedFactory=await readFile(resolve(installed,'dist/internal/devgraph_web_factory.js'));
@@ -178,9 +192,8 @@ try{
   }
 }finally{await new Promise(resolve=>server.close(resolve))}
 assert.deepEqual(violations,[],'browser console errors/CSP violations');
-const tarball=await readFile(resolve(consumer,`devgraph-web-${packageJson.version}.tgz`));
 const evidence={scope:'External installed tarball; fixture transport only, no native/provider authority claim',
-  consumer_directory:consumer,node:process.version,typescript:'5.9.3',vite:'7.3.5',playwright:'1.61.1',
+  source_commit:sourceManifest.source_commit,consumer_directory:consumer,node:process.version,typescript:'5.9.3',vite:'7.3.5',playwright:'1.61.1',
   package:packageJson.name,version:packageJson.version,tarball_sha256:hash(tarball),
   wasm_sha256:hash(installedWasm),runtime_js_sha256:hash(Buffer.concat(await Promise.all(runtimeFiles.map(file=>readFile(resolve(installed,'dist',file)))))),
   installation:'npm install --ignore-scripts; only SDK tarball plus pinned TypeScript/Vite dependencies',

@@ -50,7 +50,8 @@ jobs:
       - name: External installed package
         run: |
           consumer_dir=$(mktemp -d)
-          npm install --prefix "$consumer_dir" --ignore-scripts "$GITHUB_WORKSPACE/packages/web/devgraph-web-0.2.0-preview.2.tgz" typescript@5.9.3 vite@7.3.5
+          cp packages/web/devgraph-web-0.2.0-preview.2.tgz "$consumer_dir/"
+          npm install --prefix "$consumer_dir" --ignore-scripts "$consumer_dir/devgraph-web-0.2.0-preview.2.tgz" typescript@5.9.3 vite@7.3.5
           node packages/web/test/installed-consumer.mjs "$consumer_dir"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
