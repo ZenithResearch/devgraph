@@ -78,6 +78,11 @@ user launch agents. `start` admits Neo4j, applies packaged migrations, and then
 admits the API. The ordinary directory example does not require a mounted disk.
 Use `--require-mounted-volume` only when deliberately storing data on a separate
 mounted filesystem. Reconfiguration does not copy or migrate existing data.
+For an internal-SSD database, also select the existing external backup storage
+with `--recovery-external-root /absolute/external/root`. Recovery sets then use
+that root's `devgraph/recovery` directory plus the fixed internal recovery
+directory. Both copies must pass physical-disk independence checks; see the
+[maintenance runbook](../runbooks/local-production-maintenance.md).
 
 `local status` must show service liveness, clean migration readiness, and denial
 of protected reads without a credential. A status result is evidence for this

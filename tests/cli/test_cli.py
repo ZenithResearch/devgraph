@@ -208,6 +208,25 @@ def test_cli_local_config_emits_only_persisted_paths(tmp_path: Path, capsys) -> 
     assert "credential" not in json.dumps(output).lower()
 
 
+def test_configure_passes_explicit_external_recovery_root(tmp_path, monkeypatch, capsys):
+    data = tmp_path / "data"
+    data.mkdir()
+    external = tmp_path / "external"
+    observed = []
+
+    def configure(config, **kwargs):
+        observed.append(config)
+        return {"ready_to_start": True}
+
+    monkeypatch.setattr("devgraph.cli.configure_local_host", configure)
+    assert main([
+        "local", "configure", "--data-root", str(data),
+        "--recovery-external-root", str(external),
+    ]) == 0
+    assert observed[0].recovery_external_root == external
+    assert json.loads(capsys.readouterr().out)["ready_to_start"] is True
+
+
 def test_query_work_uses_the_private_read_credential_without_projecting_it(
     tmp_path: Path,
 ) -> None:

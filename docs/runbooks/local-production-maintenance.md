@@ -79,10 +79,21 @@ needs at least 5 GiB or twice the measured store size free, whichever is larger.
 
 The managed database artifacts remain on the configured data volume and are
 not application-encrypted. After verifying each artifact, the backup now creates
-complete private recovery sets at both fixed destinations:
+complete private recovery sets at both destinations:
 
 - `~/Library/Application Support/Zenith/Devgraph/recovery`
-- `<data-root>/devgraph/recovery`
+- `<recovery-external-root>/devgraph/recovery`, defaulting to
+  `<data-root>/devgraph/recovery` for existing configurations.
+
+For an internal-SSD database, select a separate existing external storage root
+with `local configure --recovery-external-root /absolute/external/root` (and
+the other intended host settings). Configuration never copies database files.
+The optional `recovery_external_root` field keeps schema-1 configurations and
+existing recovery manifests readable; omitting it preserves the legacy layout.
+Do not use an older configuration writer to rewrite this setting: older releases
+ignore the optional field and cannot create a valid pair for an internal database.
+Missing, linked, unsafe, or physically overlapping destinations fail closed;
+there is no internal-disk fallback when the external disk is disconnected.
 
 Each set includes a separately verified copy of the managed database artifact,
 the existing signer exported by native Wallet, and the secS verifier key,
@@ -94,9 +105,11 @@ lock. Maintenance takes its lock before invoking secS, never in the reverse
 order. Policy/registry pins must match the included receiver, both copies must
 have the same authority generation, and the saved signer must match the policy.
 
-The internal copy must be on a different filesystem and physical disk from the
-database. The external copy must be on a different filesystem and physical disk
-from both the original signer and secS producer state. Verification uses macOS
+The two copies must be on different filesystems and physical disks. For each
+protected source (database, original signer, and secS producer state), at least
+one copy must be on an independent filesystem and physical disk. Thus the live
+database may reside on either disk without weakening single-disk-loss coverage.
+Verification uses macOS
 mount metadata and physical-device identifiers; separate APFS volumes alone are
 insufficient. These two local copies address loss of either attached disk,
 not loss of both disks, theft of the whole setup, or a shared-account compromise.

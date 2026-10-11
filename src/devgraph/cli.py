@@ -838,6 +838,10 @@ def _parser() -> argparse.ArgumentParser:
     configure.add_argument("--java-home", type=Path, default=DEFAULT_JAVA_HOME)
     configure.add_argument("--python-executable", type=Path)
     configure.add_argument("--require-mounted-volume", action="store_true")
+    configure.add_argument(
+        "--recovery-external-root", type=Path,
+        help="existing recovery storage root; defaults to the data root",
+    )
     configure.add_argument("--replace", action="store_true")
 
     local_config = local_commands.add_parser(
@@ -1132,6 +1136,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     java_home=args.java_home,
                     python_executable=args.python_executable,
                     require_mounted_volume=args.require_mounted_volume,
+                    recovery_external_root=args.recovery_external_root,
                 )
                 print(
                     _json(

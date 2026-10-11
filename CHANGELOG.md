@@ -11,6 +11,7 @@
 
 ### Added
 - Add the shared holder-bound read issuer/secS/receiver path and native-v2 composition — enforce approved Work/Arena scope before pagination without an owner bearer fallback.
+- Allow an explicit external recovery destination with an internal-SSD database — preserves two-physical-disk recovery coverage without depending on the live data root being external.
 
 - Reconcile the generic integration guidance with merged Wallet and its runtime provider approvals — the old build-time pins and Devgraph-specific bridge are no longer the supported Wallet setup.
 

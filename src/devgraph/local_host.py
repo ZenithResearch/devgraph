@@ -166,6 +166,7 @@ class LocalHostConfig:
     java_home: Path
     python_executable: Path
     schema_version: int = CONFIG_SCHEMA_VERSION
+    recovery_external_root: Path | None = None
 
     @classmethod
     def build(
@@ -180,6 +181,7 @@ class LocalHostConfig:
         python_executable: Path | None = None,
         require_mounted_volume: bool = False,
         validate_data_root: bool = True,
+        recovery_external_root: Path | None = None,
     ) -> LocalHostConfig:
         normalized_data_root = _absolute(data_root)
         if validate_data_root:
@@ -205,6 +207,10 @@ class LocalHostConfig:
             neo4j_home=_absolute(neo4j_home or default_neo4j_home),
             java_home=_absolute(java_home),
             python_executable=_lexical_absolute(python_executable or Path(sys.executable)),
+            recovery_external_root=(
+                _lexical_absolute(recovery_external_root)
+                if recovery_external_root is not None else None
+            ),
         )
 
     @classmethod
@@ -239,10 +245,14 @@ class LocalHostConfig:
                 "python_executable",
                 preserve_symlink=True,
             ),
+            recovery_external_root=(
+                _path_field(mapping, "recovery_external_root", preserve_symlink=True)
+                if "recovery_external_root" in mapping else None
+            ),
         )
 
     def to_mapping(self) -> dict[str, Any]:
-        return {
+        mapping = {
             "schema_version": self.schema_version,
             "storage_mode": self.storage_mode,
             "data_root": str(self.data_root),
@@ -254,6 +264,9 @@ class LocalHostConfig:
             "java_home": str(self.java_home),
             "python_executable": str(self.python_executable),
         }
+        if self.recovery_external_root is not None:
+            mapping["recovery_external_root"] = str(self.recovery_external_root)
+        return mapping
 
 
 def _read_regular_file(path: Path, *, description: str) -> bytes:

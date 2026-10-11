@@ -103,6 +103,29 @@ def test_local_config_preserves_the_isolated_python_entrypoint(tmp_path: Path) -
     assert config.python_executable == venv_python
 
 
+def test_optional_recovery_root_round_trips_without_changing_legacy_config(tmp_path):
+    config = _config(tmp_path)
+    legacy = config.to_mapping()
+    assert "recovery_external_root" not in legacy
+    assert LocalHostConfig.from_mapping(legacy) == config
+    external = tmp_path / "external"
+    configured = LocalHostConfig.build(
+        data_root=config.data_root, recovery_external_root=external,
+    )
+    path = tmp_path / "local.json"
+    write_local_config(configured, path)
+    assert load_local_config(path) == configured
+    assert load_local_config(path).recovery_external_root == external
+
+
+@pytest.mark.parametrize("value", [None, "", "relative/path", 1, []])
+def test_recovery_root_rejects_invalid_persisted_paths(tmp_path, value):
+    mapping = _config(tmp_path).to_mapping()
+    mapping["recovery_external_root"] = value
+    with pytest.raises(ConfigurationError):
+        LocalHostConfig.from_mapping(mapping)
+
+
 def test_local_config_rejects_broad_or_overexposed_configuration(
     tmp_path: Path,
 ) -> None:
