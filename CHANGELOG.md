@@ -9,6 +9,9 @@
 
 ## [Unreleased]
 
+### Added
+- Add the shared holder-bound read issuer/secS/receiver path and native-v2 composition — enforce approved Work/Arena scope before pagination without an owner bearer fallback.
+
 - Reconcile the generic integration guidance with merged Wallet and its runtime provider approvals — the old build-time pins and Devgraph-specific bridge are no longer the supported Wallet setup.
 
 - Update the target Kanban/SDK architecture to generic Wallet approval with Devgraph-owned transport and a disposable macOS VM release gate — this prevents the superseded native bridge and source-only checks from being mistaken for installed qualification.
@@ -19,7 +22,8 @@
 
 - Make the daily Todo queue a compact vertical panel and give the main check-in area to scoped project progress, reviews and dependency follow-up. Preserve exact Todo counts and keep unclassified history explicit.
 
-### Added
+
+- Add explicit native Wallet read enrollment with independent membership trust, scoped grants, replay protection and guarded read projections — support Zenith iOS without distributing owner keys or adding mutation authority.
 
 - Add the separately signed Work v2 protocol with base Todo, progress attestations, restoration and proposal rejection — shared consumers can adopt progress without changing historical v1 bytes.
 

@@ -1,0 +1,126 @@
+"""Opt-in read receiver using canonical storage and reviewed local authority.
+
+Run with uvicorn's --factory. This creates no trust, issuer key, or policy and
+never loads or forwards the machine owner's read credential.
+"""
+
+import hashlib
+import json
+import os
+import stat
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from devgraph.api.native_read import _unique
+from devgraph.api.signed_read import create_signed_read_app
+from devgraph.auth.native_membership import ZenithMembershipValidator
+from devgraph.auth.native_read import EnrollmentPolicy
+from devgraph.auth.signed_read import SecsReadAuthority, SignedReadEnrollment
+from devgraph.ops.retained_audit import RetainedAuditLog
+from devgraph.storage.neo4j import Neo4jConfig, Neo4jGraphStorage
+
+
+def private_json(path: Path) -> dict:
+    if not path.is_absolute():
+        raise ValueError("absolute owner-private configuration required")
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, "rb") as file:
+        info = os.fstat(file.fileno())
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.geteuid()
+            or info.st_mode & 0o077
+            or info.st_nlink != 1
+            or info.st_size > 65536
+        ):
+            raise ValueError("owner-private configuration required")
+        raw = file.read(65537)
+        if len(raw) > 65536:
+            raise ValueError("configuration too large")
+    value = json.loads(raw, object_pairs_hook=_unique)
+    if not isinstance(value, dict):
+        raise ValueError("configuration object required")
+    return value
+
+
+class ReadRuntimeConfiguration(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    schema_: Literal["devgraph.signed-read-runtime.v1"] = Field(alias="schema")
+    enrollment_policy_file: Path
+    authority_policy_file: Path
+    membership_trust_file: Path
+    revoked_memberships_file: Path
+    enrollment_database_file: Path
+    secs_binary: Path
+    secs_binary_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    issuer_key_file: Path
+
+    @model_validator(mode="after")
+    def paths(self):
+        for value in self.__dict__.values():
+            if isinstance(value, Path) and not value.is_absolute():
+                raise ValueError("absolute configuration paths required")
+        return self
+
+
+def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
+    if hashlib.sha256(config.secs_binary.read_bytes()).hexdigest() != config.secs_binary_sha256:
+        raise ValueError("secS artifact mismatch")
+
+    def revoked(identifier):
+        state = private_json(config.revoked_memberships_file)
+        if (
+            set(state) != {"schema", "membership_ids"}
+            or state["schema"] != "devgraph.revoked-memberships.v1"
+            or not isinstance(state["membership_ids"], list)
+            or any(not isinstance(v, str) for v in state["membership_ids"])
+        ):
+            raise ValueError("invalid revocation registry")
+        return identifier in state["membership_ids"]
+
+    membership = ZenithMembershipValidator(
+        lambda: private_json(config.membership_trust_file), revoked
+    )
+    # Require all configured trust/status files at setup; do not turn an absent
+    # revocation source into an empty revocation set.
+    private_json(config.membership_trust_file)
+    revoked("")
+    return SignedReadEnrollment(
+        path=config.enrollment_database_file,
+        policy=lambda: EnrollmentPolicy.model_validate(private_json(config.enrollment_policy_file)),
+        membership_check=membership,
+        authority=SecsReadAuthority(
+            binary=config.secs_binary,
+            policy_file=config.authority_policy_file,
+            issuer_key_file=config.issuer_key_file,
+        ),
+    )
+
+
+def create_app():
+    path = os.environ.get("DEVGRAPH_SIGNED_READ_CONFIG")
+    if not path:
+        raise RuntimeError("signed read receiver requires explicit reviewed configuration")
+    data_root = os.environ.get("DEVGRAPH_DATA_ROOT")
+    if not data_root or not Path(data_root).is_absolute():
+        raise RuntimeError("signed read receiver requires a retained audit data root")
+    config = ReadRuntimeConfiguration.model_validate(private_json(Path(path)))
+    audit = RetainedAuditLog(Path(data_root))
+    enrollment = load_enrollment(config)
+    # Same storage implementation/configuration as the production composition
+    # root; no database migrations or direct ad-hoc queries are performed here.
+    storage = Neo4jGraphStorage(Neo4jConfig.from_env())
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        try:
+            yield
+        finally:
+            storage.close()
+
+    return create_signed_read_app(
+        storage=storage, enrollment=enrollment, audit_log=audit, lifespan=lifespan
+    )
