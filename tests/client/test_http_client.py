@@ -275,3 +275,21 @@ def test_real_httpx_timeout_is_safe_timeout_without_retry() -> None:
     rendered = f"{captured.value!s} {captured.value!r}"
     assert "private locked timeout" not in rendered
     assert "opaque-secret" not in rendered
+
+
+def test_problem_message_includes_redacted_detail_when_present():
+    from devgraph.client import DevgraphProblem
+
+    gated = DevgraphProblem(
+        status=409,
+        title="Invalid status transition",
+        type="about:blank",
+        detail="Use a legal workflow transition to change this subtype's progress.",
+    )
+    assert str(gated) == (
+        "Devgraph problem 409: Invalid status transition "
+        "(Use a legal workflow transition to change this subtype's progress.)"
+    )
+    assert str(DevgraphProblem(status=404, title="Work object not found", type="about:blank")) == (
+        "Devgraph problem 404: Work object not found"
+    )
