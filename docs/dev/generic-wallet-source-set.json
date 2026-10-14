@@ -2,7 +2,7 @@
   "schema": "devgraph.generic-wallet-source-set.v2",
   "sources": {
     "secs_generic_todo": {
-      "revision": "f5f2ece57659ea0a2e8c5063acd37828e98dbfbd",
+      "revision": "a1b09ab78442bb64936ea8de9d40a095b489ea28",
       "depends_on": "https://github.com/ZenithResearch/secS-magik/pull/297",
       "pr": "https://github.com/ZenithResearch/secS-magik/pull/298"
     },
