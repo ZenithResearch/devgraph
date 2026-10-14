@@ -3,6 +3,19 @@
 14 October 2026. Source implementation and disposable fixture evidence only.
 These checkpoints do not qualify or activate the installed mutation chain.
 
+## Candidate HTTP/process dependency floor
+
+The candidate previously locked AnyIO 4.14.1, affected by GitHub advisories
+`GHSA-82r6-8w77-94w6` (TLS hostname validation), `GHSA-3w57-8xmc-8v26`
+(subprocess supplementary groups) and `GHSA-5p39-cfhj-2xmp` (worker stderr
+blocking). The lockfile now selects the published 4.14.2 fixes. Package metadata
+also requires `anyio>=4.14.2,<5`, so an external wheel installation cannot resolve
+the older vulnerable dependency. No other dependency version changed. This
+updates only the source candidate and its isolated test environment; live service
+dependency activation remains separate. Repository verification under AnyIO
+4.14.2 passed 2,699 tests with the same 10 opt-in skips and passed generated-file
+and static checks.
+
 ## Installed native inventory follow-up
 
 Qualification report v3 now binds the actual fixed-path Wallet/secS mutation
