@@ -46,6 +46,9 @@ MutationOperation: TypeAlias = Literal[
     "devgraph.work.dependency.remove.v1",
     "devgraph.work.blocker.add.v1",
     "devgraph.work.blocker.remove.v1",
+    "devgraph.work.workflow.assign.v1",
+    "devgraph.work.workflow.review.v1",
+    "devgraph.work.workflow.transition.v1",
 ]
 ReceiptStatus: TypeAlias = Literal["pending", "dispatched_dry_run", "retry_scheduled", "failed"]
 

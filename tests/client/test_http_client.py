@@ -293,3 +293,14 @@ def test_problem_message_includes_redacted_detail_when_present():
     assert str(DevgraphProblem(status=404, title="Work object not found", type="about:blank")) == (
         "Devgraph problem 404: Work object not found"
     )
+
+
+def test_every_v1_work_operation_receipt_is_accepted():
+    """A receipt the server can issue must not be rejected as an invalid envelope."""
+    from typing import get_args
+
+    from devgraph.client.http import MutationOperation
+    from devgraph.work_requests import WORK_OPERATIONS
+
+    missing = {f"devgraph.work.{op}.v1" for op in WORK_OPERATIONS} - set(get_args(MutationOperation))
+    assert not missing
