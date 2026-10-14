@@ -3,6 +3,13 @@ export const byId = id => document.getElementById(id);
 export const format = value => Number.isFinite(value) ? new Intl.NumberFormat('en', {maximumFractionDigits: 3}).format(value) : '—';
 export function el(tag, text, className) { const n = document.createElement(tag); if (text !== undefined) n.textContent = String(text); if (className) n.className = className; return n; }
 export function setText(id, text) { byId(id).textContent = text; }
+export function runPresentation(run, {stale = false, refreshing = false, refreshError = ''} = {}) {
+  if (!run) return {label: 'Not run', warning: false, exportable: !refreshing, explanation: ''};
+  if (refreshing) return {label: 'Refreshing snapshot', warning: true, exportable: false, explanation: 'Refreshing the network. This result uses the last captured snapshot. '};
+  if (refreshError) return {label: stale ? 'Previous snapshot · inputs changed' : 'Previous snapshot', warning: true, exportable: true, explanation: 'The network refresh failed. This result uses the previous snapshot. ' + (stale ? 'These results use previous inputs. Run again to update. ' : '')};
+  if (stale) return {label: 'Out of date', warning: true, exportable: true, explanation: 'These results use previous inputs. Run again to update. '};
+  return {label: 'Current run', warning: false, exportable: true, explanation: ''};
+}
 export function candidateRow(node, score, problem, options) {
   const row = el('tr'), checkCell = el('td'), checkbox = el('input'); checkbox.type = 'checkbox'; checkbox.dataset.scopeKey = node.key; checkbox.checked = options.seed || options.required; checkbox.disabled = options.required; checkbox.setAttribute('aria-label', options.required ? 'Required prerequisite in scope: ' + node.title : 'Include ' + node.title + ' in candidate scope'); checkbox.onchange = () => options.onSeed(node.key, checkbox.checked); checkCell.append(checkbox);
   const workCell = el('td'), title = el('button', node.title, 'work-button'); title.dataset.editKey = node.key; title.onclick = () => options.onEdit(node.key); workCell.append(title);
@@ -42,15 +49,15 @@ export function readEditor(node, profile, previous) {
   }
   return {work_version: node.version, context: {baseline: profile.baseline, horizon: profile.horizon}, values};
 }
-export function renderResult(run, stale) {
-  byId('results').hidden = !run; setText('result-state', run ? stale ? 'Out of date' : 'Current run' : 'Not run'); byId('result-state').className = 'tag' + (stale ? ' warning' : '');
+export function renderResult(run, presentation = runPresentation(run)) {
+  byId('results').hidden = !run; setText('result-state', presentation.label); byId('result-state').className = 'tag' + (presentation.warning ? ' warning' : '');
   if (!run) return;
   const custom = run.input.profile.model.mode === 'custom_net_v1', totals = byId('totals'); totals.replaceChildren();
   const effort = run.totals.costs.map(c => format(c.amount) + ' ' + c.unit).join(' · ');
   for (const [label, value, note] of [['NET UTILITY · u(A)', format(run.totals.utility), 'Quantized objective ' + format(run.solution.quantized_utility)], [custom ? 'BASE BENEFIT CONTEXT' : 'GOAL CONTRIBUTION', format(run.totals.benefit), custom ? 'Direct net function defines u(i)' : 'Across weighted goals'], [custom ? 'BASE COST CONTEXT' : 'RESOURCE BURDEN', format(run.totals.burden), effort || 'No cost channels'], ['SELECTED WORK', run.solution.selected.length, run.rows.filter(r => r.selected && r.required_by.length).length + ' required by selected work']]) {
     const card = el('div', undefined, 'total'); card.append(el('span', label, 'total-label'), el('span', value, 'total-value'), el('span', note, 'total-note')); totals.append(card);
   }
-  setText('result-explanation', (stale ? 'These results use previous inputs. Run again to update. ' : '') + (custom ? 'The custom function defines net utility directly; displayed base cost context is not subtracted again. ' : 'Net utility is weighted benefit minus resource burden. ') + 'Each prerequisite is charged once. Search changes highlighting and the table view; it does not change this result.');
+  setText('result-explanation', presentation.explanation + (custom ? 'The custom function defines net utility directly; displayed base cost context is not subtracted again. ' : 'Net utility is weighted benefit minus resource burden. ') + 'Each prerequisite is charged once. Search changes highlighting and the table view; it does not change this result.');
   const names = new Map(run.input.snapshot.nodes.map(n => [n.key, n.title])); const list = byId('selected-list'); list.replaceChildren();
   const chosen = run.rows.filter(r => r.selected);
   if (!chosen.length) list.append(el('p', 'The empty set is optimal for the quantized objective. No bundle improves that objective above zero.', 'hint'));

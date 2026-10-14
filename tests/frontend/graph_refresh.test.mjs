@@ -5,6 +5,13 @@ import { contextWithFunctions, deferred, fakeClock, flushPromises, functionsSour
 
 function refreshMonitor() {
   const document = textDocument();
+  const surface = document.getElementById('graph-surface');
+  surface.classList = {
+    names: new Set(),
+    add(name) { this.names.add(name); },
+    remove(name) { this.names.delete(name); },
+    contains(name) { return this.names.has(name); },
+  };
   const requests = [], rendered = [];
   const c = contextWithFunctions([
     'synchronizeCredential', 'resetDetailState', 'applySnapshot', 'flushPendingSnapshot', 'refresh', 'topologyPath',
@@ -24,7 +31,7 @@ function refreshMonitor() {
     render(snapshot, observations) { rendered.push({ snapshot, observations }); },
     invalidateLayout() {}, announceGraph() {}, refreshCheckIn() {}, checkIn: { reset() {} }, projectFilters: { reset() {} },
     prepareGraphPreferences() { c.graphView.preferenceKey = 'fixture'; },
-    updateGraphVisibility() {}, loadSelectedDetail() {},
+    updateGraphVisibility() {}, loadSelectedDetail() {}, readerSyncs: 0, syncReaderPresentation() { c.readerSyncs += 1; },
     renderManagerOverview() {}, renderActivity() {}, renderObservations() {}, renderPipeline() {}, renderBars() {},
     getJson(path, options) { const task = deferred(); requests.push({ path, options, ...task }); return task.promise; },
   });
@@ -84,6 +91,8 @@ test('old-auth responses cannot overwrite a newer credential’s snapshot or cle
 
 test('changing or clearing the credential removes prior graph, reader, and document content immediately', () => {
   const { c } = refreshMonitor();
+  c.document.getElementById('connection-label').textContent = 'Graph ready';
+  c.document.getElementById('connection-dot').className = 'dot ready';
   c.state.snapshot = { graph_nodes: [{ id: 'private-work' }] };
   c.state.selectedGraphKey = 'private-work';
   c.state.pendingSnapshot = { snapshot: { graph_nodes: [{ id: 'queued-private' }] } };
@@ -102,6 +111,20 @@ test('changing or clearing the credential removes prior graph, reader, and docum
   assert.equal(c.detailState.relations.size, 0);
   assert.equal(c.graphView.nodePositions.size, 0);
   assert.equal(c.graphView.arenaKey, '');
+  assert.equal(c.document.getElementById('connection-label').textContent, 'Disconnected');
+  assert.equal(c.document.getElementById('connection-dot').className, 'dot');
+});
+
+test('changing credentials exits reading view so the newly authenticated graph controls are available', () => {
+  const { c } = refreshMonitor();
+  const surface = c.document.getElementById('graph-surface');
+  surface.classList.add('reading-view');
+  c.tokenInput.value = 'synthetic-credential-two';
+
+  c.synchronizeCredential();
+
+  assert.equal(surface.classList.contains('reading-view'), false);
+  assert.equal(c.readerSyncs, 1);
 });
 
 test('a failed refresh retains the latest successful snapshot and reports staleness rather than empty data', async () => {

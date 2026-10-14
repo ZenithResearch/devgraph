@@ -1411,10 +1411,13 @@ FRONTEND_HTML = r"""<!doctype html>
       state.refreshController?.abort(); state.refreshController = null;
       detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null; state.connected = false;
       resetDetailState(); state.snapshot = null; state.observations = []; state.selectedGraphKey = null; graphView.neighborhood = null; graphView.arenaKey = '';
+      document.getElementById('graph-surface').classList.remove('reading-view'); syncReaderPresentation();
       checkIn.reset(); projectFilters.reset(); renderManagerOverview(null);
       invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.hoverRoot=graphView.focusRoot=graphView.selectedRoot=null; graphView.revealSignature=''; graphView.revealCache=null; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
       ['total-work', 'active-initiatives', 'observation-count', 'pending-receipts'].forEach(id => text(id, '—'));
       renderActivity([]); renderObservations([]); renderPipeline({}); renderBars({});
+      document.getElementById('connection-dot').className = 'dot';
+      text('connection-label', 'Disconnected');
     }
 
     function applySnapshot(snapshot, observations) {
