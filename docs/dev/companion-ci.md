@@ -65,3 +65,10 @@ explicitly recorded as `devgraph_dirty`; only a clean pushed head and its remote
 checks can support the merge packet. Read `companion-source.json` in the CI
 artifact for the actual result. Installed Chrome/native approval qualification
 remains a separate exact-artifact gate.
+
+Keep the build cache exclusive to these paired checkouts. Reusing a Cargo target
+directory between different source worktrees can retain the older test binary.
+Use separate build roots, or clean the affected source packages before switching
+checkouts. The runner requires the named workflow/Todo grant and rejection tests
+as well as fresh vectors; a foundation-only test binary cannot certify the Todo
+candidate.

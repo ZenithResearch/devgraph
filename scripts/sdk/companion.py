@@ -24,6 +24,11 @@ PARITY_FILES = {
     "src/read_authority.rs",
     "tests/read_authority.rs",
 }
+SECS_REQUIRED_CASES = (
+    "optional_independent_wallet_fixture_matches_generic_signature_bytes",
+    "workflow_and_todo_contracts_require_exact_new_grants",
+    "rejected_workflow_and_todo_contract_vectors_remain_rejected",
+)
 
 
 def digest(path):
@@ -267,7 +272,7 @@ def main():
                     "SECS_TEST_PROGRESS_FIXTURE_OUTPUT": str(progress_vectors),
                 },
                 tests=True,
-                required=("optional_independent_wallet_fixture_matches_generic_signature_bytes",),
+                required=SECS_REQUIRED_CASES,
             )
             for generated, retained in [
                 (work_vectors, "authority-vectors.json"),

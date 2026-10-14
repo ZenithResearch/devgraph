@@ -21,13 +21,13 @@ before issuance when the source App is not configured. See
 
 | Follow-up check | Result |
 | --- | --- |
-| Full Devgraph Python suite | 2,694 passed, 10 existing opt-in skips |
+| Full Devgraph Python suite | 2,695 passed, 10 existing opt-in skips |
 | Repository verification, Ruff and workflow lint | Passed |
 | Matched Wallet + secS Rust checks | 25 passed, no skips; includes the independently supplied signature fixture, native v2 CLI, standalone read binary and vendored contract |
 | Matched Devgraph native read and Todo checks | 85 passed, no skips, using newly built disposable Wallet/secS drivers |
 | Source parity and request vectors | All five retained read files match the paired Wallet; fresh Work/Todo vectors equal retained bytes |
 | secS #297 foundation | 811 workspace tests passed, 1 existing ignored; build, formatting and strict Clippy passed; all five authority tests rerun with the independent Wallet fixture supplied |
-| secS #298 source CI | Build/test, audit, WASM and standalone read lanes passed on `f5f2ece`; `a1b09ab` composes the same source bytes with #297 and changes only the changelog relative to that head |
+| Current secS source CI | #297 `d8148f8` passed build/test, audit and WASM; #298 `a1b09ab` passed those checks plus the standalone read lane |
 | Devgraph hosted checks at `5ee5539` | Repository and public SDK/package checks passed; companion lane failed before tests because both source App settings are absent |
 
 The complete matched runner records the actual clean Devgraph head, source-set
@@ -35,6 +35,12 @@ hash, tool versions, commands, executed counts and disposable binary hashes in
 `companion-source.json`. Local source success does not replace the blocked
 remote companion lane. Final head checks must be read from the PRs; a later
 source or pin change requires affected checks again.
+
+A local shared-cache rerun reused #297's earlier test binary and failed when the
+Todo vectors were absent. The runner now explicitly requires the named Todo
+grant/rejection cases as well as fresh vectors. Its regression test rejects a
+foundation-only binary. The affected source-package cache was cleared before
+the clean rerun; no failed result was reported as passing.
 
 Wallet Buildkite #30's existing package evidence has been reviewed against
 `f654017`: five Chrome scenarios, two upgrade journeys, independent issuer TLS

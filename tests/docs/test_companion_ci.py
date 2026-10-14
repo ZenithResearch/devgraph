@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from scripts.sdk.companion import (
     PARITY_FILES,
+    SECS_REQUIRED_CASES,
     compare_vectors,
     digest,
     pinned_source,
@@ -159,6 +160,17 @@ def test_required_rust_case_must_execute():
     assert rust_results(output, ["fixture"])["passed"] == 1
     with pytest.raises(ValueError, match="did not pass"):
         rust_results(output, ["absent"])
+
+
+def test_foundation_only_binary_cannot_certify_todo_authority():
+    # A shared Cargo cache reused the earlier foundation's binary. That binary
+    # passes its Wallet fixture but does not exercise the new Todo operations.
+    output = (
+        "test optional_independent_wallet_fixture_matches_generic_signature_bytes ... ok\n"
+        "test result: ok. 5 passed; 0 failed; 0 ignored;"
+    )
+    with pytest.raises(ValueError, match="workflow_and_todo_contracts_require_exact_new_grants"):
+        rust_results(output, SECS_REQUIRED_CASES)
 
 
 @pytest.mark.parametrize("child", ["<skipped/>", "<failure/>", "<error/>"])
