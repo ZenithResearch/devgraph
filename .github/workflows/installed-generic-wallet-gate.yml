@@ -39,7 +39,7 @@ jobs:
           candidate = json.loads(Path('qualification/candidate/candidate.json').read_text())
           sources = json.loads(Path('docs/dev/generic-wallet-source-set.json').read_text())
           if candidate['sources']['wallet'] != sources['sources']['wallet_generic']['revision']:
-              raise SystemExit('Qualification must use the pinned merged Wallet')
+              raise SystemExit('Qualification must use the pinned Wallet candidate')
           if candidate['sources']['secs'] != sources['sources']['secs_generic_todo']['revision']:
               raise SystemExit('Qualification must use the pinned secS candidate')
           if candidate['sources']['devgraph_public'] != os.environ['GITHUB_SHA']:

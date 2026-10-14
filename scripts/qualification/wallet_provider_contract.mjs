@@ -8,7 +8,7 @@ import {resolve,join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {prepareProviderSetup} from '../../src/devgraph/frontend/static/credential-v2/provider-setup.mjs';
 const root=resolve(fileURLToPath(new URL('../../',import.meta.url)));
-if(!process.argv[2])throw Error('Pass a Wallet Git repository containing the pinned merged revision');
+if(!process.argv[2])throw Error('Pass a Wallet Git repository containing the pinned candidate revision');
 const repo=resolve(process.argv[2]);
 const sources=JSON.parse(await readFile(join(root,'docs/dev/generic-wallet-source-set.json'),'utf8'));
 const revision=sources.sources.wallet_generic.revision;
@@ -39,5 +39,5 @@ try{
     installed_qualification:'not_run',cases:['exact_profile','separate_synchronous_ceremonies','invalid_profile_rejection']};
   await mkdir(join(root,'.sdk-validation'),{recursive:true});
   await writeFile(join(root,'.sdk-validation/wallet-provider-contract.json'),JSON.stringify(report,null,2)+'\n');
-  console.log('Merged Wallet provider contract passed (source only).');
+  console.log('Pinned Wallet provider contract passed (source only).');
 }finally{await rm(scratch,{recursive:true,force:true});}

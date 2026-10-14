@@ -2,21 +2,31 @@
   "schema": "devgraph.generic-wallet-source-set.v2",
   "sources": {
     "secs_generic_todo": {
-      "revision": "c5d81bab74820b0cd127759c5b367be471ff0d82",
+      "revision": "109c0befadc047fa53c95743043d543897cd18a2",
       "depends_on": "https://github.com/ZenithResearch/secS-magik/pull/297",
       "pr": "https://github.com/ZenithResearch/secS-magik/pull/298"
     },
     "wallet_generic": {
-      "revision": "ff8de6ddc04ac2fb6b39408274276bc4ce984d42",
-      "pr": "https://github.com/bananawalnut/castalia-wallet/pull/28",
-      "tree": "379645255f3fec1b6359c25bfaa312fb38a703e7",
-      "status": "merged",
-      "wallet_qualification": "https://buildkite.com/bananawalnut/castalia-wallet/builds/28"
+      "revision": "f65401704acf60dcd461527f495afaa6def0bfb3",
+      "pr": "https://github.com/bananawalnut/castalia-wallet/pull/32",
+      "tree": "2619a60e0ec4393642d92e7082e925bdffba0834",
+      "status": "candidate; review and exact-artifact qualification required",
+      "generic_baseline": "ff8de6ddc04ac2fb6b39408274276bc4ce984d42"
     },
     "wallet_legacy_decoder": {
       "revision": "3216144e8df04582e921810462845efc8c2cf390",
       "scope": "Frozen compatibility decoder dependency, not a supported Wallet install or fallback signer. Removal remains gated by Devgraph installed qualification."
+    },
+    "secs_legacy_contracts": {
+      "revision": "11e7128e49c6df57f53e4c8b05e72d4bc78d798c",
+      "scope": "Historical secs-devgraph-work-contract and secs-native-private-files dependencies; not the current secS candidate. Retain until targeted extraction and installed retirement qualification."
     }
+  },
+  "read_authority": {
+    "secs_workspace": "tools/read-authority",
+    "wallet_revision": "f65401704acf60dcd461527f495afaa6def0bfb3",
+    "provenance": "tools/read-authority/SOURCE.json in the pinned secS candidate",
+    "requires": "Standalone workspace tests, checksum/source parity, and separate native-read artifact inventory; root secS tests do not include this workspace."
   },
   "scope": "Source integration; this file is not an installed qualification manifest.",
   "installed_macos_vm": {

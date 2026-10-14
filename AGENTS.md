@@ -109,6 +109,14 @@ demo and must never be treated as persistent-host authority.
 
 ## Native signed Work/Arena prerequisites
 
+For the coordinated generic candidate, use
+`docs/dev/merged-wallet-provider-setup.md` and the pinned source set. Generic
+terminal approval requires a real person; unattended agents stop at
+`approval_required`. Unknown outcomes use the original files with
+`--credential-v2 --reconcile`. Never synthesize approval or automatically select
+the older signer. The binary/setup instructions below document the retained
+named-v1 compatibility installation, not the target generic Wallet package.
+
 Signed writes require fixed native binaries under the actual operating-system
 account home:
 

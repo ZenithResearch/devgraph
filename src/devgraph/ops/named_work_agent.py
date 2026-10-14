@@ -18,6 +18,11 @@ from typing import Any
 
 import httpx
 
+from devgraph.ops.native_adapter_diagnostics import (
+    NativeAdapterError,
+    diagnostic_code,
+    run_adapter,
+)
 from devgraph.ops.secs_issue_create_receiver import (
     IDEMPOTENCY_KEY_FILE_MAX_BYTES,
     REQUEST_FILE_MAX_BYTES,
@@ -47,18 +52,64 @@ def _run_adapter(
     command: Sequence[str], *, env: Mapping[str, str]
 ) -> subprocess.CompletedProcess[bytes]:
     try:
-        return subprocess.run(
-            command,
-            check=False,
-            env=dict(env),
-            cwd="/",
-            timeout=30,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+        return run_adapter(command, env=env)
+    except NativeAdapterError as error:
+        raise LocalNamedWorkAgentError(str(error) + ": no Work request was submitted") from None
+
+
+def _adapter_failure(component: str, stderr: bytes | None) -> str:
+    code = diagnostic_code(stderr)
+    if code in {"invalid_work_request", "invalid_arena_request", "request_too_large"}:
+        return (
+            f"{component}_request_incompatible: the installed {component} rejected a request "
+            "validated by Devgraph; check matched companion versions and operation support. "
+            "A grant renewal or key reset does not repair request compatibility"
         )
-    except (OSError, subprocess.TimeoutExpired):
-        raise LocalNamedWorkAgentError("the fixed local adapter could not complete") from None
+    if code in {"invalid_arguments", "invalid_work_input"}:
+        return (
+            f"{component}_installation_incompatible: check the matched native companion "
+            "interface; do not substitute another signer automatically"
+        )
+    if component == "wallet" and code in {
+        "signing_key_reference_required", "expected_public_key_required",
+        "invalid_expected_public_key", "unsafe_signing_key_file",
+        "invalid_signing_key_file", "signing_identity_mismatch",
+    }:
+        return (
+            "wallet_custody_unavailable: check the existing key-file reference, public-key "
+            "pin and private file permissions with devgraph auth status --check"
+        )
+    if component == "secs" and code in {
+        "work_permission_denied", "work_authority_expired_before_output",
+        "invalid_work_presentation", "invalid_wallet_signature", "replay_conflict",
+    }:
+        return (
+            "secs_authority_denied: check current operation/resource grants, validity and "
+            "presentation bindings; retain the original request and idempotency key"
+        )
+    if component == "secs" and code in {
+        "unsafe_work_authority", "invalid_work_manifest", "invalid_work_policy",
+        "work_manifest_binding_mismatch", "invalid_secs_registry",
+        "untrusted_secs_verifier_key", "unsafe_verifier_key", "invalid_secs_identity",
+        "unsafe_replay_database", "replay_storage_failed", "invalid_clock",
+    }:
+        return (
+            "secs_authority_unavailable: check the installed authority, receiver bindings "
+            "and replay storage with devgraph auth work status; do not reset authority"
+        )
+    if code in {
+        "unsafe_request_file", "unsafe_input", "unsafe_idempotency_file",
+        "invalid_idempotency_file", "unsafe_output", "output_failed",
+    }:
+        return (
+            f"{component}_private_files_unavailable: the native adapter could not use its "
+            "private request/output files; check installation and file permissions"
+        )
+    return (
+        f"{component}_signing_failed: the native adapter did not complete; "
+        "no recognized public diagnostic is available. Check companion compatibility "
+        "and setup before retrying"
+    )
 
 
 def _snapshot(path: Path, raw: bytes) -> None:
@@ -143,8 +194,7 @@ def execute_local_named_work(
         )
         if signed.returncode != 0:
             raise LocalNamedWorkAgentError(
-                "Wallet signing failed; run devgraph auth setup or check the key-file reference, "
-                "public-key pin, and private file permissions"
+                _adapter_failure("wallet", signed.stderr) + "; no Work request was submitted"
             )
         authorized = _run_adapter(
             [
@@ -160,8 +210,7 @@ def execute_local_named_work(
         )
         if authorized.returncode != 0:
             raise LocalNamedWorkAgentError(
-                "secS did not authorize the Work request; check its installed identity, "
-                "operation and resource grants, and validity window"
+                _adapter_failure("secs", authorized.stderr) + "; no Work request was submitted"
             )
         proof = _read_private_bounded_file(
             projection, label="signed Work authority", maximum_bytes=16_384

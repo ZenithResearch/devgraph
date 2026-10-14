@@ -137,3 +137,73 @@ def test_mismatched_command_is_rejected_before_signing(monkeypatch, tmp_path):
         agent.execute_local_named_work(
             request_file=request_file, idempotency_key_file=key_file, operation="archive"
         )
+
+
+@pytest.mark.parametrize("failure,code,category", [
+    (1, "invalid_work_request", "wallet_request_incompatible"),
+    (1, "unsafe_signing_key_file", "wallet_custody_unavailable"),
+    (1, "signing_identity_mismatch", "wallet_custody_unavailable"),
+    (1, "invalid_arguments", "wallet_installation_incompatible"),
+    (2, "invalid_work_request", "secs_request_incompatible"),
+    (2, "work_permission_denied", "secs_authority_denied"),
+    (2, "work_manifest_binding_mismatch", "secs_authority_unavailable"),
+    (2, "work_authority_expired_before_output", "secs_authority_denied"),
+])
+def test_valid_workflow_failure_is_classified_without_http_or_request_changes(
+    monkeypatch, tmp_path, failure, code, category,
+):
+    request_file, key_file = setup(monkeypatch, tmp_path)
+    # This is accepted by today's request contract, but older native parsers
+    # reject workflow.transition before touching custody or dispatching HTTP.
+    raw = json.dumps({
+        "schema": "devgraph.work-request.v1", "operation": "workflow.transition",
+        "kind": "Initiative", "id": "example-initiative", "expected_version": 6,
+        "payload": {"stage": "planning"},
+    }).encode()
+    request_file.write_bytes(raw)
+    canonical = WorkRequest.from_json(raw).canonical
+    original_key = key_file.read_bytes()
+    monkeypatch.setattr(agent, "signer_environment", lambda: {})
+    calls = []
+
+    def run(command, *, env):
+        calls.append(command)
+        if len(calls) == 1:
+            assert Path(command[2]).read_bytes() == canonical
+        if len(calls) == failure:
+            return subprocess.CompletedProcess(
+                command, 2, stderr=json.dumps({"error": code}).encode(),
+            )
+        private(Path(command[-1]), b"wallet-envelope")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(agent, "_run_adapter", run)
+
+    class NoTransport:
+        def request(self, *args, **kwargs):
+            pytest.fail("native rejection reached HTTP")
+
+    with pytest.raises(agent.LocalNamedWorkAgentError, match=category):
+        agent.execute_local_named_work(
+            request_file=request_file, idempotency_key_file=key_file,
+            operation="workflow.transition", transport=NoTransport(),
+        )
+    assert len(calls) == failure
+    assert request_file.read_bytes() == raw
+    assert key_file.read_bytes() == original_key
+    assert not Path(calls[0][2]).parent.exists()
+
+
+def test_cli_does_not_disclose_unrecognized_adapter_stderr(monkeypatch, tmp_path, capsys):
+    request_file, key_file = setup(monkeypatch, tmp_path)
+    monkeypatch.setattr(agent, "signer_environment", lambda: {})
+    monkeypatch.setattr(agent, "_run_adapter", lambda *a, **kw: subprocess.CompletedProcess(
+        a[0], 2, stderr=b'{"error":"invalid_work_request","secret":"private-marker"}',
+    ))
+    assert cli.main([
+        "work", "create", "--request-file", str(request_file),
+        "--idempotency-key-file", str(key_file),
+    ]) != 0
+    output = capsys.readouterr()
+    assert "private-marker" not in output.err + output.out
+    assert "wallet_signing_failed" in output.err + output.out

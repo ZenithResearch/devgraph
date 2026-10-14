@@ -63,6 +63,31 @@ is not authorized by the local read bearer or a named Work grant.
 
 ## Signed Work
 
+### Generic credential migration
+
+The generic candidate uses `devgraph work OPERATION --credential-v2` (or
+`devgraph arena OPERATION --credential-v2`) with the same private request/key
+files. It requires matched native companions and independently approved issuer
+trust; consult `docs/dev/merged-wallet-provider-setup.md`. Installing a CLI or
+renewing an old grant does not qualify that chain.
+
+The generic terminal signer requires real human interactive approval.
+`approval_required` means the agent must retain the prepared files and hand off
+the exact command for approval. Do not manufacture TTY input, substitute an old
+signer or mark the operation complete. After unknown dispatch, retain the
+original request/key and use `--credential-v2 --reconcile` with fresh approval.
+This is status-only recovery; a missing receipt remains unknown.
+
+On retained named-v1 installations, `wallet_request_incompatible` and
+`secs_request_incompatible` mean native parsing rejected locally validated
+content. Verify compatible versions and operation support before changing any
+custody or authority configuration. `wallet_custody_unavailable` and
+`secs_authority_denied` distinguish those setup/authorization failures. Native
+diagnostics are bounded and allowlisted; raw stderr must never be disclosed.
+Pre-dispatch rejection does not resolve an earlier uncertain dispatch.
+
+### Existing named-v1 setup
+
 Check `devgraph auth status --check` for the selected identity and
 `devgraph auth work status` for actual grant validity. Bundle presence alone
 does not prove current authority. Read current subject and related-record

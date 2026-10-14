@@ -68,7 +68,7 @@ dependencies = [
 [[package]]
 name = "castalia-wallet-presentation"
 version = "0.1.0"
-source = "git+https://github.com/bananawalnut/castalia-wallet.git?rev=ff8de6ddc04ac2fb6b39408274276bc4ce984d42#ff8de6ddc04ac2fb6b39408274276bc4ce984d42"
+source = "git+https://github.com/bananawalnut/castalia-wallet.git?rev=f65401704acf60dcd461527f495afaa6def0bfb3#f65401704acf60dcd461527f495afaa6def0bfb3"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",

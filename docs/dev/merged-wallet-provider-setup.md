@@ -1,12 +1,24 @@
-# Merged Wallet reconciliation
+# Generic Wallet candidate reconciliation
 
-The generic native dependency and candidate source set pin Wallet main
-`ff8de6ddc04ac2fb6b39408274276bc4ce984d42`. Its tree is
-`379645255f3fec1b6359c25bfaa312fb38a703e7`, identical to the candidate qualified in
-[Wallet Buildkite #28](https://buildkite.com/bananawalnut/castalia-wallet/builds/28).
-The generic presentation crate is unchanged from the previous `2c53e9b` pin.
-Request bytes, credential/presentation domains, native trust schema, and canonical
-Todo/Work/Arena results are unchanged. Browser setup changes deliberately.
+The generic native dependency and candidate source set pin Wallet #32
+`f65401704acf60dcd461527f495afaa6def0bfb3` and secS #298
+`109c0befadc047fa53c95743043d543897cd18a2`. This preserves the holder-bound read
+contract used by native readers as well as generic human signing. These are
+candidate revisions requiring review and exact-artifact qualification.
+
+Wallet's generic baseline is merged main `ff8de6ddc04ac2fb6b39408274276bc4ce984d42`.
+The candidate adds the separate `read_authority` module and license metadata to
+the shared presentation crate. Existing generic signing implementation, request
+bytes, credential/presentation domains, terminal trust schema and provider-profile
+parser remain unchanged. The prior [Wallet Buildkite #28](https://buildkite.com/bananawalnut/castalia-wallet/builds/28)
+pass belongs to the earlier package, not this candidate or the full Devgraph chain.
+
+secS's `tools/read-authority` is a standalone workspace. Check its tests and
+`SOURCE.json` against this same Wallet revision separately from root workspace
+tests. Preserve its native artifact when packaging the mutation companions.
+The historical native SDK secS pin `11e7128` and Wallet decoder pin `3216144`
+serve compatibility dependencies; they must not be mechanically repinned to
+repositories where those crates no longer exist.
 
 Wallet's Devgraph-specific adapter removal is merged. The remaining old decoder
 dependency in Devgraph is frozen compatibility code, not a candidate Wallet or
@@ -83,7 +95,7 @@ Approval still requires `/dev/tty`. No unattended or old-signer fallback is adde
 
 Source checks use the merged Wallet's actual TypeScript profile parser via
 `node scripts/qualification/wallet_provider_contract.mjs /path/to/wallet-repository`.
-The script extracts the pinned Git blob without trusting checkout modifications,
+The script extracts the candidate's pinned Git blob without trusting checkout modifications,
 compares the receiver's synthetic public fixture, and records a source-only report.
 The SDK CI no longer attempts to build removed Devgraph-specific Wallet modules.
 
