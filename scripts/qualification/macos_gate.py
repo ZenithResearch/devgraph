@@ -47,6 +47,7 @@ NATIVE = {
     "wallet_signer": "CastaliaWallet/bin/castalia-wallet-present-credential-v2",
     "secs_authority": "secS/bin/secs-devgraph-work-v2",
 }
+REPORT_SCHEMA = "devgraph.installed-qualification.v3"
 
 
 class GateError(ValueError):
@@ -154,19 +155,66 @@ def guest():
     home = Path(account.pw_dir)
     if not home.is_absolute() or home != Path.home():
         raise GateError("OS identity and home disagree")
-    return home, {"platform": platform.platform(), "model": model, "uid": account.pw_uid}
+    return home, {
+        "system": platform.system(),
+        "platform": platform.platform(),
+        "model": model,
+        "uid": account.pw_uid,
+    }
+
+
+def expected_native(manifest):
+    """Public paths and candidate digests, never private guest configuration."""
+    return {
+        role: {"path": relative, "sha256": next(iter(manifest["artifacts"][role].values()))}
+        for role, relative in NATIVE.items()
+    }
+
+
+def installed_native(home, manifest):
+    """Check the actual fixed paths used by the native signing clients."""
+    expected = expected_native(manifest)
+    for role, entry in expected.items():
+        target = home / "Library/Application Support/Zenith" / entry["path"]
+        for parent in [target.parent, *target.parent.parents]:
+            if parent == home.parent:
+                break
+            metadata = parent.lstat()
+            if (
+                not stat.S_ISDIR(metadata.st_mode)
+                or metadata.st_uid != os.geteuid()
+                or stat.S_IMODE(metadata.st_mode) & 0o022
+            ):
+                raise GateError("unsafe installed native directory")
+        metadata = target.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o077
+            or not metadata.st_mode & stat.S_IXUSR
+        ):
+            raise GateError("unsafe installed native binary")
+        if digest(target) != entry["sha256"]:
+            raise GateError(f"installed native binary differs from candidate: {role}")
+    return expected
 
 
 def verify(report, manifest, hashes):
-    if (
-        report.get("schema") != "devgraph.installed-qualification.v2"
-        or report.get("candidate") != manifest
-    ):
+    if report.get("schema") != REPORT_SCHEMA or report.get("candidate") != manifest:
         raise GateError("candidate/report mismatch")
     if report.get("before") != hashes or report.get("after") != hashes:
         raise GateError("exact artifacts changed or final inventory missing")
+    native = expected_native(manifest)
+    if report.get("installed_before") != native or report.get("installed_after") != native:
+        raise GateError("installed native inventories missing or differ from candidate")
     environment = report.get("environment", {})
-    if not environment.get("model", "").startswith("VirtualMac") or not report.get("guest_id"):
+    if (
+        environment.get("system") != "Darwin"
+        or type(environment.get("uid")) is not int
+        or environment["uid"] <= 0
+        or not environment.get("model", "").startswith("VirtualMac")
+        or not report.get("guest_id")
+    ):
         raise GateError("isolated macOS evidence missing")
     results = report.get("cases", {})
     if set(results) != set(CASES):
@@ -183,6 +231,12 @@ def verify(report, manifest, hashes):
         ):
             raise GateError("scenario evidence missing")
     return True
+
+
+def verify_evidence(report, evidence_root):
+    for result in report["cases"].values():
+        if digest(member(evidence_root, result["evidence_file"])) != result["evidence_sha256"]:
+            raise GateError("scenario evidence changed")
 
 
 def main():
@@ -208,12 +262,7 @@ def main():
         manifest = read(bundle / "candidate.json")
         report = read(args.report)
         verify(report, manifest, inventory(bundle, manifest))
-        for result in report["cases"].values():
-            if (
-                digest(member(args.report.parent, result["evidence_file"]))
-                != result["evidence_sha256"]
-            ):
-                raise GateError("scenario evidence changed")
+        verify_evidence(report, args.report.parent)
         print("Installed qualification gate passed (recorded operator observations).")
         return
     home, environment = guest()
@@ -257,24 +306,28 @@ def main():
                 shutil.copyfileobj(source, out)
         print("Matched native candidates installed in disposable guest.")
         return
+    native = installed_native(home, manifest)
     if args.action == "begin":
         write_new(
             args.report,
             {
-                "schema": "devgraph.installed-qualification.v2",
+                "schema": REPORT_SCHEMA,
                 "candidate": manifest,
                 "environment": environment,
                 "guest_id": identity["id"],
                 "before": hashes,
+                "installed_before": native,
                 "cases": {},
             },
         )
         return
     report = read(args.report)
     if (
-        report["guest_id"] != identity["id"]
+        report.get("schema") != REPORT_SCHEMA
+        or report["guest_id"] != identity["id"]
         or report["candidate"] != manifest
         or report["before"] != hashes
+        or report.get("installed_before") != native
     ):
         raise GateError("run, guest, or candidate changed")
     if args.action == "record":
@@ -295,9 +348,14 @@ def main():
             "evidence_sha256": digest(evidence),
             "note": args.note,
         }
+        # Recording another observation invalidates any prior completed inventory.
+        report.pop("after", None)
+        report.pop("installed_after", None)
     else:
         report["after"] = hashes
+        report["installed_after"] = native
         verify(report, manifest, hashes)
+        verify_evidence(report, args.report.parent)
     temporary = args.report.with_name(args.report.name + ".new")
     write_new(temporary, report)
     temporary.replace(args.report)

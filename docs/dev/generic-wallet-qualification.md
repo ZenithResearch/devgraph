@@ -25,7 +25,10 @@ workflow/progress operation and resource. Register exact browser and terminal
 callers and pin the disposable issuer in Devgraph and Wallet. Do not expand a
 preexisting grant. Keep all private setup files owner-only and outside evidence.
 
-Use the canonical, unchanged Wallet package from merged `ff8de6ddc04ac2fb6b39408274276bc4ce984d42`.
+Use the canonical, unchanged Wallet package from the exact `wallet_generic`
+revision in [the candidate source set](generic-wallet-source-set.json), currently
+`f65401704acf60dcd461527f495afaa6def0bfb3`. The earlier merged `ff8de6d`
+package is historical baseline evidence, not this candidate's package.
 Its fresh browser installation has **zero trusted providers**. Do not rebuild it
 with `CASTALIA_PRESENTATION_TRUST_PINS_JSON` or inject a trust asset. Inside the
 guest, explicitly approve the disposable issuer through Wallet's runtime provider
@@ -38,8 +41,11 @@ purpose, exact origin, and the separate approvals in the scenario evidence. Do n
 record custody, read credentials, or private grant files. A package change requires
 a new candidate; trust changes require repeating affected setup/revocation cases.
 Record the Wallet build toolchain and preserve custody, registration, membership,
-Files and generic-presentation regression coverage. Wallet Buildkite #28's generic
-application pass is companion evidence, not a Devgraph installed-chain pass.
+Files and generic-presentation regression coverage. Wallet
+[Buildkite #30](https://buildkite.com/bananawalnut/castalia-wallet/builds/30)
+passed at this revision after exact-package evidence review and explicit human
+acceptance. Its Linux/Chrome, upgrade, reproduction and test-issuer evidence is
+companion evidence, not a macOS Devgraph installed-chain pass.
 
 ## Bundle and guided run
 
@@ -59,11 +65,11 @@ Python, Chrome and package manager versions; lockfile hashes; build commands;
 package/binary hashes) in redacted evidence beside the report, outside the bundle.
 Do not substitute a developer checkout for a declared installed artifact.
 
-In the guest:
+In the guest, install the native candidates before starting the recorded run:
 
 ```text
-python3 scripts/qualification/macos_gate.py begin --bundle /absolute/candidate --report /absolute/evidence/report.json
 python3 scripts/qualification/macos_gate.py install-native --bundle /absolute/candidate
+python3 scripts/qualification/macos_gate.py begin --bundle /absolute/candidate --report /absolute/evidence/report.json
 ```
 
 Native installation refuses existing destinations and copies only the exact
@@ -73,6 +79,21 @@ extension directory in a fresh Chrome profile. Record installed file inventories
 not just archive hashes; compare them before/after the run and include those
 comparisons in evidence. Keep the receiver and persistence entirely disposable.
 The native installer is not a full application/provisioning installer.
+
+The report schema is `devgraph.installed-qualification.v3`. `begin`, `record` and
+`finish` read the actual Wallet and secS mutation binaries at the fixed guest
+paths and require their hashes to match the candidate. They reject symlinks,
+foreign ownership, group/world-writable ancestor directories, non-executable
+binaries and group/world permission bits on binaries. The report stores
+`installed_before` and `installed_after` with public relative paths and SHA256 hashes. CI checks both
+inventories against the declared candidate. This does not automatically inventory
+the installed Python package, SDK, extension or standalone read authority; their
+installed-file comparisons remain mandatory scenario evidence and peer review.
+
+Earlier v2 reports remain historical evidence but cannot pass this gate: they
+lack the installed native inventories. Produce a fresh guest run rather than
+relabeling a v2 report. This version change affects qualification evidence only,
+not candidate v2, Work/Todo requests or credential transport.
 
 Run both actual paths with fresh interactive consent:
 
@@ -120,9 +141,12 @@ Record each subcase individually inside the relevant scenario evidence.
 
 ## Release and retirement gate
 
-`finish` requires every installed case to pass and unchanged bundle hashes.
-`verify` additionally checks every evidence-file hash and can run on CI without
-VM access. Neither command manufactures evidence or verifies human observations
+`finish` requires every installed case to pass, unchanged bundle and installed
+native hashes, and intact evidence-file hashes. `verify` checks the recorded
+inventories and every evidence-file hash and can run on CI without VM access.
+Recording a later observation removes the completed inventories; `finish` must
+run again. Failed checks leave the prior report unchanged.
+Neither command manufactures evidence or verifies human observations
 cryptographically. This is a required recorded manual acceptance gate, not a
 substitute for running the scenarios. Peer review must confirm installed-file
 comparisons, receipts and full subcase coverage before admitting a release.

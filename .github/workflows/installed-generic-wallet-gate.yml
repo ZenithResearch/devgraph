@@ -45,7 +45,7 @@ jobs:
           if candidate['sources']['devgraph_public'] != os.environ['GITHUB_SHA']:
               raise SystemExit('Qualification belongs to another source revision; rerun the guest gate')
           PY
-      - name: Require every installed case and unchanged artifact/evidence hashes
+      - name: Require every installed case and matching native/artifact/evidence hashes
         run: >-
           python3 scripts/qualification/macos_gate.py verify
           --bundle qualification/candidate

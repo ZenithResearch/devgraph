@@ -3,6 +3,22 @@
 14 October 2026. Source implementation and disposable fixture evidence only.
 These checkpoints do not qualify or activate the installed mutation chain.
 
+## Installed native inventory follow-up
+
+Qualification report v3 now binds the actual fixed-path Wallet/secS mutation
+binaries to the candidate. The guest checks hashes, ownership, symlinks and
+POSIX permissions before beginning, recording or finishing a run. `finish`
+also rechecks evidence-file hashes; a later observation invalidates completion.
+Offline CI requires both installed inventories and rejects old v2 reports.
+Candidate v2 and application/signing contracts are unchanged. The nine admission
+tests use disposable files and a mocked guest; they are not installed signing
+qualification. Package, SDK, extension and standalone-read installed-file checks
+remain mandatory operator evidence. See [the gate guide](generic-wallet-qualification.md).
+Repository verification after this change passed **2,699 tests with 10 existing
+opt-in skips**; generated artifact checks, Ruff (including integrations), formatting
+of the changed Python files and whitespace checks passed. The prior matched
+companion run below belongs to `c2d5b52`; its runtime pins and contracts are unchanged.
+
 ## Companion CI and review follow-up
 
 The current candidate pins Wallet #32 `f654017` and secS #298 `a1b09ab`, which
@@ -29,6 +45,7 @@ before issuance when the source App is not configured. See
 | secS #297 foundation | 811 workspace tests passed, 1 existing ignored; build, formatting and strict Clippy passed; all five authority tests rerun with the independent Wallet fixture supplied |
 | Current secS source CI | #297 `d8148f8` passed build/test, audit and WASM; #298 `a1b09ab` passed those checks plus the standalone read lane |
 | Devgraph hosted checks at `5ee5539` | Repository and public SDK/package checks passed; companion lane failed before tests because both source App settings are absent |
+| Devgraph hosted checks at `c2d5b52` | Repository/protocol and public SDK/package checks passed; companion is intentionally skipped on PR events and still requires configured trusted dispatch |
 
 The complete matched runner records the actual clean Devgraph head, source-set
 hash, tool versions, commands, executed counts and disposable binary hashes in
@@ -48,8 +65,10 @@ and reproducible packaging. The content-tree digest is
 `29a846e679f5887723e92868efc7a228acfe3bfa990bcbae0b968b37639115cf`.
 These are Linux headed-Chrome tests with disposable profiles; the TLS suite uses
 a test CA and the generic presentation suite does not exercise installed secS.
-Recording the manual acceptance is pending explicit authorization. No acceptance
-submission, merge, grant, trust or live runtime change is implied by this review.
+The human explicitly authorized recording this evidence. All five acceptance
+fields were submitted, Buildkite #30 passed, and Wallet #32's GitHub status
+confirmed success at the unchanged source revision. This clears only Wallet's
+manual CI acceptance; no merge, grant, trust or live runtime change followed.
 
 ## Initial source composition at `aa3626f`
 
@@ -105,7 +124,6 @@ used the live identity, grants or graph.
   policy, replay or private-file issue in #297; it is not maintainer approval.
 - The approved read-only private-source App configuration and a successful
   remote Devgraph companion run at the final pinned head.
-- Authorized recording of Wallet #32's reviewed Buildkite acceptance evidence.
 - After foundation merges, retarget #298, refresh resulting consumer pins and
   rerun affected checks; current candidate IDs are not merged release IDs.
 - Matched packaged artifacts, including the independent read service and its

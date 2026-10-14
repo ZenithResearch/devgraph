@@ -21,8 +21,9 @@ qualification against final removal artifacts before release. Do not alter live
 registration, grants or installations as part of preparing these PRs.
 
 The merged Wallet release contains no old Issue/Work signing binaries or Devgraph
-browser adapter. Devgraph's `castalia-wallet-presentation` pin now points at
-`ff8de6ddc04ac2fb6b39408274276bc4ce984d42`. Its remaining
+browser adapter. Devgraph's `castalia-wallet-presentation` pin follows
+`wallet_generic` in [the candidate source set](generic-wallet-source-set.json),
+currently `f65401704acf60dcd461527f495afaa6def0bfb3`. Its remaining
 `castalia-wallet-devgraph-presentation` pin at `3216144e8df04582e921810462845efc8c2cf390`
 is a frozen compatibility dependency for the gated old host/client code. It must
 not be repinned to merged Wallet (the crate is removed there), packaged as the new
