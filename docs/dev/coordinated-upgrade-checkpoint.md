@@ -1,7 +1,27 @@
 # Coordinated upgrade: source checkpoints
 
-14 October 2026. Source implementation and disposable fixture evidence only.
+15 October 2026. Source implementation and disposable fixture evidence only.
 These checkpoints do not qualify or activate the installed mutation chain.
+
+## Buildkite migration — current checkpoint
+
+The current source-set pins are Wallet #32 `6c9c2e5` and secS #298 `254f744`,
+including the secS #297 foundation `d8148f8`. Full revisions are recorded in
+`generic-wallet-source-set.json`. Earlier sections below are historical checkpoints.
+
+Buildkite [Devgraph #2](https://buildkite.com/bananawalnut/devgraph/builds/2)
+passed repository/package, protocol/MSRV, SDK/WASM/browser and CodeQL checks at
+`4489e0be2df382daabbff38f12d331e43b3cbdf3`. The first migration run exposed root
+bypassing a filesystem-denial fixture; the repository lane now runs unprivileged,
+without weakening or skipping that test. Local verification passed 2,694 tests
+with 10 opt-in skips, and Ruff including integrations passed. Removed test cases
+belonged to the retired custom GitHub App credential helper.
+
+Remote companion tests now use the existing Buildkite Wallet repository
+connection. No new source App, App private key or Actions secret is needed.
+See [Buildkite setup and separation](buildkite-ci.md) and
+[companion checks](companion-ci.md). Source checks remain distinct from installed
+qualification, which still needs actual disposable macOS evidence.
 
 ## Candidate HTTP/process dependency floor
 
@@ -34,7 +54,7 @@ companion run below belongs to `c2d5b52`; its runtime pins and contracts are unc
 
 ## Companion CI and review follow-up
 
-The current candidate pins Wallet #32 `f654017` and secS #298 `a1b09ab`, which
+That earlier candidate pinned Wallet #32 `f654017` and secS #298 `a1b09ab`, which
 includes the #297 foundation at `d8148f8`. The source-set manifest is authoritative
 for full revisions. The secS changes add stacked-branch CI, a standalone native
 read lane and five actual-process tests. A method-scoped allowance handles an

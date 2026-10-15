@@ -2,6 +2,7 @@
 
 Buildkite owns repository, Python/package, frontend, Rust/protocol/MSRV, WASM,
 SDK/browser, CodeQL, companion source and installed-evidence admission jobs.
+Repository tests run as an unprivileged user so Linux root cannot bypass permission tests.
 GitHub remains the source/review host. These pipelines never deploy Devgraph,
 install live signing binaries, provision grants, or approve Wallet requests.
 
@@ -86,9 +87,11 @@ Uploading SARIF into GitHub needs a separately authorized reporting permission;
 ordinary source checkout access is not that permission. No token is requested
 implicitly and no protection is disabled by these scripts.
 
-Remove the three Actions workflow files only after Buildkite parity is confirmed.
-Then replace required checks with the verified Buildkite statuses; never leave a
-merge window with neither set required. Preserve historical Actions results as
+Buildkite [build #2](https://buildkite.com/bananawalnut/devgraph/builds/2) passed
+all four public lanes at `4489e0be2df382daabbff38f12d331e43b3cbdf3`. The three
+Actions workflow files are retired in this candidate. Require `buildkite/devgraph`
+with strict up-to-date checking before removing the former `Repository verification`
+requirement; never leave a merge window with neither set required. Preserve historical Actions results as
 evidence. CodeQL Actions-language analysis becomes inapplicable once executable
 Actions workflows are retired; Python/JavaScript scanning remains.
 

@@ -29,8 +29,9 @@ Use the canonical, unchanged Wallet package from the exact `wallet_generic`
 revision in [the candidate source set](generic-wallet-source-set.json), currently
 `6c9c2e5819547ed6a2170c129ca6dc1d6c501516`. The earlier merged `ff8de6d`
 package is historical baseline evidence, not this candidate's package.
-The prior Buildkite #30 acceptance at `f654017` does not cover these new bytes;
-repeat package-level browser acceptance before claiming this candidate accepted.
+Wallet [Buildkite #31](https://buildkite.com/bananawalnut/castalia-wallet/builds/31)
+passed exact-package browser, upgrade, reproduction and TLS checks at `6c9c2e5`
+after explicit human acceptance. This does not qualify the installed Devgraph chain.
 Install the matching web SDK package and set `DEVGRAPH_WEB_SDK_DIR` in the guest
 receiver so Kanban uses the shared Rust/WASM result decoder.
 Its fresh browser installation has **zero trusted providers**. Do not rebuild it
@@ -161,8 +162,9 @@ python3 scripts/qualification/macos_gate.py finish --bundle /absolute/candidate 
 python3 scripts/qualification/macos_gate.py verify --bundle /absolute/candidate --report /absolute/evidence/report.json
 ```
 
-The manually invoked `installed-generic-wallet-gate` CI workflow verifies an
-uploaded exact-artifact evidence bundle. Repository branch protection must require
+The manually invoked Buildkite `devgraph-installed` pipeline verifies an
+uploaded exact-artifact evidence bundle, selected by exact evidence build and job
+UUIDs. See [Buildkite admission](buildkite-ci.md). Repository branch protection must require
 that gate for release; configuring remote protection is outside this source change.
 Do not release the SDK or merge Devgraph/secS retirement while the gate is blocked.
 Wallet has independently merged its adapter removal; only its generic package is

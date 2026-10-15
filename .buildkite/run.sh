@@ -84,6 +84,8 @@ case "$lane" in
     git config --global credential.helper ''
     wallet_git=$(git -C "$DEVGRAPH_WALLET_CHECKOUT" rev-parse --absolute-git-dir)
     git config --global "url.file://$wallet_git.insteadOf" https://github.com/bananawalnut/castalia-wallet
+    # Git replaces a prefix: match the .git form too or it appends .git twice.
+    git config --global --add "url.file://$wallet_git.insteadOf" https://github.com/bananawalnut/castalia-wallet.git
     cargo +1.96.0 install wasm-pack --version 0.14.0 --locked
     uv sync --locked
     for manifest in Cargo.toml crates/devgraph-client-native/Cargo.toml crates/devgraph-browser-host/Cargo.toml \
