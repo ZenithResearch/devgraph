@@ -6,6 +6,8 @@ root=$(git rev-parse --show-toplevel)
 cd "$root"
 export DG_CI_TMP
 DG_CI_TMP=$(mktemp -d)
+# npm lockfile paths must use the physical macOS path, not the /var alias.
+DG_CI_TMP=$(cd "$DG_CI_TMP" && pwd -P)
 trap 'rm -rf "$DG_CI_TMP"' EXIT
 mkdir -p "build/buildkite/$lane"
 source .buildkite/bootstrap.sh
