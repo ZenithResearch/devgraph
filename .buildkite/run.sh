@@ -39,15 +39,15 @@ sdk_checks() {
 
 case "$lane" in
   repository)
-    uv sync --locked
-    # verification.md runs pytest and repository checks together; do not run twice.
-    bash docs/dev/verification.md
-    node --test tests/frontend/*.test.mjs tests/frontend_kanban.mjs
-    uv run ruff check src tests scripts integrations
-    git diff --check
-    uv build --out-dir build/buildkite/packages
-    uv run python scripts/build_beta.py --output-dir "$DG_CI_TMP/beta"
-    cp "$DG_CI_TMP/beta/"* build/buildkite/packages/
+    if [[ $(id -u) == 0 ]]; then
+      # Hosted Linux defaults to root, which bypasses filesystem denial tests.
+      useradd --create-home --shell /bin/bash devgraph-ci
+      chown -R devgraph-ci:devgraph-ci "$root" "$DG_CI_TMP"
+      runuser --user devgraph-ci -- bash .buildkite/repository.sh
+      chown -R root:root "$root"
+    else
+      bash .buildkite/repository.sh
+    fi
     ;;
   protocol)
     cargo test --locked -p devgraph-work-protocol

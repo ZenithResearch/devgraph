@@ -11,7 +11,8 @@ USAGE = ROOT / "docs" / "usage.md"
 
 
 def test_buildkite_preserves_all_public_lanes_without_private_credentials():
-    pipeline, runner = PIPELINE.read_text(), RUNNER.read_text()
+    pipeline = PIPELINE.read_text()
+    runner = RUNNER.read_text() + (ROOT / ".buildkite/repository.sh").read_text()
     for lane in ("repository", "protocol", "sdk", "codeql"):
         assert f"key: {lane}" in pipeline
         assert f"bash .buildkite/run.sh {lane}" in pipeline
