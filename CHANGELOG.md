@@ -9,6 +9,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- Validate Kanban and SDK credential results through the same Rust/WASM decoder — partial receipts cannot announce success and failed status lookups cannot release an uncertain mutation.
+- Recognize bounded receiver rejections on initial execution — unmet workflow requirements no longer trap corrected requests behind reconciliation.
+- Audit all tracked Rust lockfiles and consume the coordinated patched Wallet parser — native and standalone packages participate in the dependency gate.
+
+
 ### Added
 - Distinguish native request compatibility, custody and authority failures using bounded public diagnostics — valid workflow requests rejected by older companions no longer suggest resetting signing keys.
 - Reconcile the generic native dependency and release candidate with Wallet's holder-bound read contract and secS's standalone read authority — preserve phone reads when qualifying the coordinated signing upgrade.

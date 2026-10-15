@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DevgraphCredentialClient} from '../../src/devgraph/frontend/static/credential-v2/coordinator.mjs';
+const validateResult = response => response; // Test transport already returns admitted results.
 const key = 'generic-v2-test-idempotency';
 function fixture(overrides = {}) {
   const calls = [];
@@ -21,7 +22,7 @@ test('only generic provider used; each use requires approval and owns its transp
   const {client, calls} = fixture({provider: {presentCredential: async () => {
     approvals++; return {state: 'approved', presentation: {schema: 'castalia.credential-presentation.v2'}};
   }}});
-  await client.execute('{}', key); await client.execute('{}', key + '-2');
+  await client.execute('{}', key, {validateResult}); await client.execute('{}', key + '-2', {validateResult});
   assert.equal(approvals, 2); assert.deepEqual(calls.map(c => c[0]), ['prepare','execute','prepare','execute']);
   assert.equal(calls[0][1].caller.id, 'http://127.0.0.1:8080');
 });
@@ -30,7 +31,7 @@ test('provider mutation cannot replace saved credential during consent', async (
     value.credential.claims.nonce = 'substituted';
     return {state: 'approved', presentation: {schema: 'castalia.credential-presentation.v2'}};
   }}});
-  await client.execute('{}', key);
+  await client.execute('{}', key, {validateResult});
   assert.equal(calls[1][1].credential.claims.nonce, 'original');
 });
 test('denial and unavailable capability never reach execution', async () => {
@@ -43,7 +44,7 @@ test('denial and unavailable capability never reach execution', async () => {
 test('disposal while consent is pending rejects late approval without dispatch', async () => {
   let approve; const waiting = new Promise(resolve => {approve = resolve;});
   const {client, calls} = fixture({provider: {presentCredential: () => waiting}});
-  const pending = client.execute('{}', key);
+  const pending = client.execute('{}', key, {validateResult});
   await new Promise(resolve => setTimeout(resolve, 0));
   client.dispose(); approve({state: 'approved', presentation: {schema: 'castalia.credential-presentation.v2'}});
   await assert.rejects(pending, {code: 'disposed', dispatched: false});
@@ -51,13 +52,23 @@ test('disposal while consent is pending rejects late approval without dispatch',
 });
 test('lost response blocks fresh mutation until operation-status reconciliation', async () => {
   const {client, calls} = fixture({transport: {executeCredential: async () => {throw Error('lost');}}});
-  await assert.rejects(client.execute('{}', key), {code: 'outcome_unknown', dispatched: true});
-  await assert.rejects(client.execute('{}', key + '-new'), {code: 'reconciliation_required'});
-  await client.reconcile();
-  assert.equal(calls.at(-1)[0], 'reconcile'); assert.equal(calls.at(-1)[1].idempotency_key, key);
+  await assert.rejects(client.execute('{}', key, {validateResult}), {code: 'outcome_unknown', dispatched: true});
+  await assert.rejects(client.execute('{}', key + '-new', {validateResult}), {code: 'reconciliation_required'});
+  await client.reconcile({validateResult});
+  assert.equal(calls.at(-1)[0], 'reconcile'); assert.equal(calls.at(-1)[1].idempotency_key, key, {validateResult});
   assert.equal(calls.filter(c => c[0] === 'prepare').length, 2, 'recovery obtains a fresh credential and approval');
 });
 test('no insecure remote origin or missing transport accepted', () => {
   assert.throws(() => new DevgraphCredentialClient({provider: {}, transport: {},
     holderPublicKey: 'ab'.repeat(32), origin: 'http://remote.example'}));
+});
+
+test('missing validator cannot dispatch; malformed commit and failed reconciliation retain pending', async () => {
+  const {client,calls}=fixture();
+  await assert.rejects(client.execute('{}',key),{code:'result_validator_required'});
+  assert.equal(calls.length,0);
+  await assert.rejects(client.execute('{}',key,{validateResult:()=>{throw Error('invalid');}}),{code:'outcome_unknown'});
+  await assert.rejects(client.reconcile({validateResult:()=>({state:'rejected'})}),{code:'outcome_unknown'});
+  await assert.rejects(client.execute('{}',key+'-new',{validateResult}),{code:'reconciliation_required'});
+  await client.reconcile({validateResult});
 });

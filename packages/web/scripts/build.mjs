@@ -36,6 +36,7 @@ writeFileSync(resolve(dist,'internal/devgraph_web_factory.d.ts'),'export declare
 cpSync(resolve(here,'src/index.js'),resolve(dist,'index.js'));
 let genericSource=readFileSync(resolve(here,'src/generic.js'),'utf8');
 for(const [source,target] of [
+  ['credential-v2/result.mjs','credential-result.mjs'],
   ['credential-v2/coordinator.mjs','credential-coordinator.mjs'],
   ['credential-v2/transport.mjs','credential-transport.mjs'],
   ['credential-v2/subject.mjs','credential-subject.mjs'],

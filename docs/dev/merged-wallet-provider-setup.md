@@ -1,8 +1,8 @@
 # Generic Wallet candidate reconciliation
 
 The generic native dependency and candidate source set pin Wallet #32
-`f65401704acf60dcd461527f495afaa6def0bfb3` and secS #298
-`a1b09ab78442bb64936ea8de9d40a095b489ea28`, including the #297 foundation
+`6c9c2e5819547ed6a2170c129ca6dc1d6c501516` and secS #298
+`254f744d3151f234e6cc58db239c694937a0838e`, including the #297 foundation
 `d8148f82dd7eb2bb3b1664409d7c7776366f0421`. The
 [source-set manifest](generic-wallet-source-set.json) is authoritative when pins
 advance. This preserves the holder-bound read

@@ -17,10 +17,12 @@ async function fixture({provider=true}={}) {
     if(url.endsWith('/execute')){
       if(state.mode==='lost')throw Error('network lost');
       if(state.mode==='duplicate')return new Response('{"state":"unknown",'+JSON.stringify({state:'committed',...vector.result}).slice(1),{headers:{'content-type':'application/json'}});
-      if(state.mode==='conflict')return json({type:'about:blank',status:412,title:'Version precondition failed'},412);
+      if(state.mode==='rejected')return json({type:'about:blank',status:409,title:'Invalid status transition',detail:'Requirements not met'},409);
+      if(state.mode==='conflict')return json({type:'about:blank',status:412,title:'Version precondition failed',detail:'Version mismatch'},412);
       const result=structuredClone(vector.result);if(state.mode==='invalid')result.work.progress='done';
       return json({state:'committed',...result});
     }
+    if(url.endsWith('/status') && state.mode==='status-rejected')return json({type:'about:blank',status:403,title:'Forbidden',detail:'Denied'},403);
     if(url.endsWith('/status'))return json({state:'committed',receipt:{...vector.result.receipt,duplicate:true}});
     if(url.endsWith('/todos/v2/Todo/example'))return json(vector.result.work);
     if(url.includes('/work/Issue'))return json({items:[]});
@@ -82,5 +84,18 @@ test('packed SDK preloads provider setup and keeps trust and connection ceremoni
     const connection=setup.connect();assert.equal(f.state.connections,1);await connection;
     assert.equal(f.state.approvals,0);
     f.client.dispose();assert.throws(()=>setup.approve(),{code:'disposed'});
+  }finally{f.runtime.dispose();}
+});
+
+test('definitive execute rejection permits a corrected request, rejected status never does', async()=>{
+  const f=await fixture();try{
+    const prepared=f.prepare(); f.state.mode='rejected';
+    assert.equal((await prepared.execute()).kind,'rejected');
+    f.state.mode='normal';assert.equal((await prepared.execute()).kind,'committed');
+    f.state.mode='lost';assert.equal((await prepared.execute()).kind,'outcome_unknown');
+    f.state.mode='status-rejected';assert.equal((await prepared.reconcile()).kind,'outcome_unknown');
+    await assert.rejects(prepared.execute(),{code:'reconciliation_required'});
+    f.state.mode='normal';assert.equal((await prepared.reconcile()).kind,'committed');
+    assert.equal(f.state.calls.filter(c=>c.url.endsWith('/execute')).length,3);
   }finally{f.runtime.dispose();}
 });

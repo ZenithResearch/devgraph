@@ -262,3 +262,15 @@ def test_unified_monitor_uses_current_assets_authenticated_cache_and_same_origin
     state["valid"] = False
     for path in ("/monitor/snapshot", "/monitor/topology/v1", "/initiative-observations"):
         assert client.get(path).status_code == 401
+
+
+def test_preview_serves_canonical_kanban_and_shared_module_paths():
+    client, _, _ = fixture()
+    for path in (
+        "/assets/kanban/app.mjs",
+        "/assets/kanban/wallet.mjs",
+        "/assets/credential-v2/result.mjs",
+        "/assets/credential-v2/subject.mjs",
+    ):
+        assert client.get(path).status_code == 200
+    assert client.get("/assets/credential-v2/private-file").status_code == 404

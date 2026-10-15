@@ -140,3 +140,44 @@ fn credential_transport_preserves_raw_json_and_requires_status_only_receipt() {
             .is_err());
     }
 }
+
+#[test]
+fn rejected_status_lookup_never_proves_the_original_mutation_was_rejected() {
+    use devgraph_client_core::{ErrorKind, ResponseMetadata};
+    use serde_json::json;
+    let cases: Vec<Value> =
+        serde_json::from_str(include_str!("fixtures/progress-results.json")).unwrap();
+    let prepared =
+        PreparedMutation::from_value(&cases[0]["request"], "status-rejection-test-001").unwrap();
+    for (status, title) in [
+        (409, "Invalid status transition"),
+        (412, "Version precondition failed"),
+        (403, "Forbidden"),
+        (422, "Validation failed"),
+    ] {
+        let raw = serde_json::to_vec(
+            &json!({"type":"about:blank", "status":status, "title":title, "detail":"Rejected"}),
+        )
+        .unwrap();
+        let metadata = ResponseMetadata {
+            status,
+            content_type: "application/problem+json".into(),
+            content_encoding: None,
+            max_bytes: None,
+        };
+        assert_eq!(
+            prepared
+                .decode_credential_response(&raw, &metadata, false)
+                .unwrap_err()
+                .kind,
+            ErrorKind::Rejected
+        );
+        assert_ne!(
+            prepared
+                .decode_credential_response(&raw, &metadata, true)
+                .unwrap_err()
+                .kind,
+            ErrorKind::Rejected
+        );
+    }
+}

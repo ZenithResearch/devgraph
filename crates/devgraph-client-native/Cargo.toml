@@ -6,7 +6,7 @@ license = "AGPL-3.0-only"
 publish = false
 
 [dependencies]
-castalia-wallet-presentation = { git = "https://github.com/bananawalnut/castalia-wallet.git", rev = "f65401704acf60dcd461527f495afaa6def0bfb3" }
+castalia-wallet-presentation = { git = "https://github.com/bananawalnut/castalia-wallet.git", rev = "6c9c2e5819547ed6a2170c129ca6dc1d6c501516" }
 devgraph-client-core = { path = "../devgraph-client-core" }
 devgraph-work-protocol = { path = "../devgraph-work-protocol" }
 castalia-wallet-devgraph-presentation = { git = "https://github.com/bananawalnut/castalia-wallet.git", rev = "3216144e8df04582e921810462845efc8c2cf390" }

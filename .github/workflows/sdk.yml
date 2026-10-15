@@ -32,6 +32,10 @@ jobs:
         run: |
           rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
           cargo +1.96.0 install wasm-bindgen-cli --version 0.2.127 --locked
+      - name: Audit every Rust workspace lockfile
+        run: |
+          cargo install cargo-audit --version 0.22.1 --locked
+          python3 scripts/audit-rust-locks.py
       - name: Public contracts and SDK
         run: |
           cargo test --locked --workspace --all-features

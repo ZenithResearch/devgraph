@@ -168,6 +168,7 @@ def build_production_services() -> ApiServices:
             cypher_read=cypher_read,
         )
     return ApiServices(
+        web_sdk_dir=os.environ.get("DEVGRAPH_WEB_SDK_DIR"),
         authorized_graph=authorized_graph,
         outbox=EventOutbox(storage),
         storage=storage,

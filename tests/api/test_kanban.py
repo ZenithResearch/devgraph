@@ -211,3 +211,20 @@ def test_queue_cursor_scope_and_redacted_search(fixture):
         ).status_code
         == 400
     )
+
+
+def test_kanban_module_paths_and_wasm_policy(fixture):
+    api, _ = fixture
+    page = api.get("/monitor/kanban/")
+    assert 'src="/assets/kanban/app.mjs"' in page.text
+    assert "'wasm-unsafe-eval'" in page.headers["content-security-policy"]
+    for name in ("app.mjs", "wallet.mjs", "core.mjs"):
+        assert api.get("/assets/kanban/" + name).status_code == 200
+    for name in (
+        "coordinator.mjs",
+        "transport.mjs",
+        "result.mjs",
+        "provider-setup.mjs",
+        "subject.mjs",
+    ):
+        assert api.get("/assets/credential-v2/" + name).status_code == 200

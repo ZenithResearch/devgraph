@@ -10,9 +10,9 @@ export function createDevgraphHttpTransport({origin = globalThis.location?.origi
       headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
     });
     if (response.url && new URL(response.url).origin !== origin) throw new Error('invalid_origin');
-    const conflict = action === 'execute' && response.status === 412;
-    if (!response.ok && !conflict) throw new Error('credential_transport_denied');
-    if (response.headers.get('content-type')?.split(';')[0] !== (conflict ? 'application/problem+json' : 'application/json'))
+    const mutation = action === 'execute' || action === 'status';
+    if (!mutation && !response.ok) throw new Error('credential_transport_denied');
+    if (!mutation && response.headers.get('content-type')?.split(';')[0] !== 'application/json')
       throw new Error('invalid_content_type');
     const reader = response.body?.getReader();
     if (!reader) throw new Error('missing_response_body');
@@ -28,18 +28,13 @@ export function createDevgraphHttpTransport({origin = globalThis.location?.origi
     finally { reader.releaseLock(); }
     const bytes = new Uint8Array(size); let offset = 0;
     for (const part of chunks) {bytes.set(part, offset); offset += part.byteLength;}
-    const result = JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes));
-    if (conflict) {
-      if (result.type !== 'about:blank' || result.status !== 412 || result.title !== 'Version precondition failed')
-        throw new Error('invalid_problem');
-      return {state: 'rejected', code: 'version_conflict', status: 412};
-    }
-    if (action === 'execute' || action === 'status') {
-      if (!result || typeof result !== 'object' || Array.isArray(result)
-        || Object.hasOwn(result, 'transport_response_bytes')) throw new Error('invalid_response');
-      return {...result, transport_response_bytes: bytes};
-    }
-    return result;
+    // Keep HTTP metadata and original bytes intact for the shared Rust decoder.
+    // JSON.parse here would hide duplicate keys and cannot establish a commit.
+    if (mutation) return {transport_response_bytes: bytes, transport_response_metadata: {
+      status: response.status, content_type: response.headers.get('content-type'),
+      content_encoding: response.headers.get('content-encoding'), max_bytes: 262144,
+    }};
+    return JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes));
   }
   return Object.freeze({getCapabilities: () => call('capabilities', {}),
     getProviderProfile: () => call('provider-profile', {}),

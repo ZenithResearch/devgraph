@@ -377,7 +377,11 @@ mod tests {
     async fn launched(pidfile: &std::path::Path) -> i32 {
         for _ in 0..200 {
             if let Ok(raw) = std::fs::read_to_string(pidfile) {
-                return raw.trim().parse().unwrap();
+                // The shell creates the file before writing its PID. Wait for
+                // the complete value instead of racing an empty file.
+                if let Ok(pid) = raw.trim().parse() {
+                    return pid;
+                }
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }

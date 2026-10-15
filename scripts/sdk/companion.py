@@ -23,6 +23,7 @@ PARITY_FILES = {
     "src/lib.rs",
     "src/read_authority.rs",
     "tests/read_authority.rs",
+    "tests/origin_security.rs",
 }
 SECS_REQUIRED_CASES = (
     "optional_independent_wallet_fixture_matches_generic_signature_bytes",

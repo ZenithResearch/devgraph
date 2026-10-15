@@ -1,3 +1,4 @@
+import {decodeCredentialResult} from '../../../src/devgraph/frontend/static/credential-v2/result.mjs';
 /** Devgraph-owned browser transport. Reads do not depend on Wallet authority. */
 import {DevgraphCredentialClient} from '../../../src/devgraph/frontend/static/credential-v2/coordinator.mjs';
 import {createDevgraphHttpTransport} from '../../../src/devgraph/frontend/static/credential-v2/transport.mjs';
@@ -124,13 +125,12 @@ export class GenericClient {
         const holderPublicKey=subjectPublicKey(await this.#provider?.getSubject());this.#current();
         this.#signer=new DevgraphCredentialClient({provider:this.#provider,transport:this.#transport,holderPublicKey,origin:this.#origin});
       }
-      const result=await this.#signer.execute(raw,key,{signal:this.#signal(signal),reconcile});received=true;
+      const result=await this.#signer.execute(raw,key,{signal:this.#signal(signal),reconcile,
+        validateResult:(response,statusOnly)=>decodeCredentialResult(prepared,response,statusOnly)});received=true;
       this.#current();
-      if(result.state==='rejected'&&result.code==='version_conflict'){this.#pending=null;return {kind:'rejected',error:failure('version_conflict')};}
+      if(result.state==='rejected'){this.#pending=null;return {kind:'rejected',error:failure(result.code)};}
       if(result.state!=='committed')throw failure('invalid_response',true);
-      if(!(result.transport_response_bytes instanceof Uint8Array))throw failure('invalid_response',true);
-      const decoded=prepared.decode_credential_mutation(result.transport_response_bytes,
-        {status:200,content_type:'application/json',content_encoding:null,max_bytes:262144},reconcile);
+      const {state: _, ...decoded}=result;
       this.#pending=null;return {kind:'committed',...decoded};
     } catch(error) {
       const uncertain=received || /** @type {any} */(error)?.dispatched===true;

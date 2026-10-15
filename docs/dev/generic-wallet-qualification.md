@@ -27,8 +27,12 @@ preexisting grant. Keep all private setup files owner-only and outside evidence.
 
 Use the canonical, unchanged Wallet package from the exact `wallet_generic`
 revision in [the candidate source set](generic-wallet-source-set.json), currently
-`f65401704acf60dcd461527f495afaa6def0bfb3`. The earlier merged `ff8de6d`
+`6c9c2e5819547ed6a2170c129ca6dc1d6c501516`. The earlier merged `ff8de6d`
 package is historical baseline evidence, not this candidate's package.
+The prior Buildkite #30 acceptance at `f654017` does not cover these new bytes;
+repeat package-level browser acceptance before claiming this candidate accepted.
+Install the matching web SDK package and set `DEVGRAPH_WEB_SDK_DIR` in the guest
+receiver so Kanban uses the shared Rust/WASM result decoder.
 Its fresh browser installation has **zero trusted providers**. Do not rebuild it
 with `CASTALIA_PRESENTATION_TRUST_PINS_JSON` or inject a trust asset. Inside the
 guest, explicitly approve the disposable issuer through Wallet's runtime provider

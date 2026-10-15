@@ -2,5 +2,5 @@
 export const runtimeFiles = Object.freeze([
   'index.js', 'internal/devgraph_web_factory.js', 'generic.js',
   'internal/credential-coordinator.mjs', 'internal/credential-transport.mjs',
-  'internal/credential-subject.mjs', 'internal/credential-provider-setup.mjs',
+  'internal/credential-result.mjs', 'internal/credential-subject.mjs', 'internal/credential-provider-setup.mjs',
 ]);

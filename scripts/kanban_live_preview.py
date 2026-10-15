@@ -376,6 +376,7 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
         )
         return Response(html, media_type="text/html", headers=_HEADERS)
 
+    @app.get("/assets/{group}/{name}")
     @app.get("/monitor/{group}-assets/{name}")
     async def asset(group: str, name: str):
         allowed = (
@@ -388,6 +389,11 @@ def create_preview(ticket, credential_reader, *, clock=time.monotonic, transport
                 "wallet.mjs": "text/javascript",
             }
             if group == "kanban"
+            else {
+                f"{module}.mjs": "text/javascript"
+                for module in ("coordinator", "transport", "result", "provider-setup", "subject")
+            }
+            if group == "credential-v2"
             else {}
         )
         if name not in allowed:

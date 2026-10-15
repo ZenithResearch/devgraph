@@ -64,6 +64,7 @@ class ApiServices:
     credential_work_host: object | None = None
     retained_audit: RetainedAuditLog | None = None
     cypher_read: CypherReadService | None = None
+    web_sdk_dir: str | None = None
     sdk_preview_dir: str | None = None
 
     delegated_read: DelegatedReadService | None = None
@@ -131,6 +132,10 @@ def create_app(services: ApiServices, *, lifespan: Lifespan[FastAPI] | None = No
     register_credential_work(app, services)
     register_arenas(app, services)
     register_cypher_read(app, services)
+    if services.web_sdk_dir is not None:
+        from devgraph.frontend.sdk_assets import register_sdk_assets
+
+        register_sdk_assets(app, services.web_sdk_dir)
     if services.sdk_preview_dir is not None:
         from devgraph.frontend.sdk_preview import register_sdk_preview
 

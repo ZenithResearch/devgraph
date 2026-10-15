@@ -15,22 +15,17 @@ test('transport uses same-origin JSON without bearer cookies or redirects', asyn
     assert.equal(options.credentials, 'omit'); assert.deepEqual(options.headers, {'Content-Type': 'application/json'});
   }
 });
-test('bounded responses and wrong content types never become a committed result', async () => {
-  for (const response of [new Response('a'.repeat(262145), {headers: {'Content-Type': 'application/json'}}),
-    new Response('{}', {headers: {'Content-Type': 'text/html'}}), new Response('{}', {status: 403})]) {
-    const transport = createDevgraphHttpTransport({origin: 'https://application.example', fetch: async () => response});
-    await assert.rejects(transport.executeCredential({}));
+test('bounded response bytes and HTTP metadata reach the strict decoder unchanged', async () => {
+  const raw = '{"state":"unknown","state":"committed"}';
+  for (const status of [200, 409, 412, 503]) {
+    const transport=createDevgraphHttpTransport({origin:'https://application.example',fetch:async()=>
+      new Response(raw,{status,headers:{'content-type':'application/problem+json'}})});
+    const result=await transport.executeCredential({});
+    assert.equal(new TextDecoder().decode(result.transport_response_bytes),raw);
+    assert.equal(result.transport_response_metadata.status,status);
+    assert.equal(result.state,undefined);
   }
-});
-test('only the exact execute-version conflict is a known rejection', async () => {
-  for (const [action,problem,expected] of [
-    ['executeCredential',{type:'about:blank',status:412,title:'Version precondition failed'},true],
-    ['executeCredential',{type:'about:blank',status:412,title:'Unknown'},false],
-    ['reconcileOperation',{type:'about:blank',status:412,title:'Version precondition failed'},false],
-  ]) {
-    const transport=createDevgraphHttpTransport({origin:'http://127.0.0.1:8080',fetch:async()=>
-      new Response(JSON.stringify(problem),{status:412,headers:{'content-type':'application/problem+json'}})});
-    if(expected)assert.deepEqual(await transport[action]({}),{state:'rejected',code:'version_conflict',status:412});
-    else await assert.rejects(transport[action]({}));
-  }
+  const transport=createDevgraphHttpTransport({origin:'https://application.example',fetch:async()=>
+    new Response('a'.repeat(262145))});
+  await assert.rejects(transport.executeCredential({}),/response_too_large/);
 });

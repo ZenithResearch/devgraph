@@ -7,7 +7,14 @@ from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 
 from devgraph.api.routes import _credential
-from devgraph.frontend.selection import _HEADERS
+from devgraph.frontend.selection import _HEADERS as _BASE_HEADERS
+
+_HEADERS = {
+    **_BASE_HEADERS,
+    "Content-Security-Policy": _BASE_HEADERS["Content-Security-Policy"].replace(
+        "script-src 'self'", "script-src 'self' 'wasm-unsafe-eval'"
+    ),
+}
 
 
 def register_kanban(app: FastAPI, services):
@@ -37,6 +44,7 @@ def register_kanban(app: FastAPI, services):
     def page():
         return asset("index.html")
 
+    @app.get("/assets/kanban/{name}", include_in_schema=False)
     @app.get("/monitor/kanban-assets/{name}", include_in_schema=False)
     def static(name: str):
         return asset(name)

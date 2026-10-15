@@ -24,8 +24,9 @@ export class DevgraphCredentialClient {
     this.#provider = provider; this.#transport = transport; this.#holder = holderPublicKey;
     this.#caller = Object.freeze({kind: 'browser', id: origin});
   }
-  async execute(request, idempotencyKey, {signal, reconcile = false} = {}) {
+  async execute(request, idempotencyKey, {signal, reconcile = false, validateResult} = {}) {
     if (this.#disposed) fail('disposed');
+    if (typeof validateResult !== 'function') fail('result_validator_required');
     if (this.#busy) fail('operation_in_progress');
     if (this.#pending && (!reconcile || request !== this.#pending.request
       || idempotencyKey !== this.#pending.idempotency_key)) fail('reconciliation_required', true);
@@ -71,10 +72,11 @@ export class DevgraphCredentialClient {
       // Preserve reconciliation ownership before crossing the dispatch boundary.
       this.#pending = {...operation, credential: snapshot.credential,
         disclosure: snapshot.disclosure, presentation}; dispatched = true;
-      const result = await (reconcile ? this.#transport.reconcileOperation : this.#transport.executeCredential)
+      const response = await (reconcile ? this.#transport.reconcileOperation : this.#transport.executeCredential)
         .call(this.#transport, clone(this.#pending), {signal: controller.signal});
       current();
-      if (!['committed', 'rejected', 'not_dispatched'].includes(result?.state))
+      const result = validateResult(response, reconcile);
+      if (result?.state !== 'committed' && (reconcile || result?.state !== 'rejected'))
         fail('outcome_unknown', true);
       this.#pending = null;
       return clone(result);

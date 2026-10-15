@@ -355,7 +355,7 @@ impl PreparedMutation {
         metadata: &ResponseMetadata,
         reconcile: bool,
     ) -> Result<Value> {
-        let mut value = response_value(raw, metadata, WORK_LIMIT, true)?;
+        let mut value = response_value(raw, metadata, WORK_LIMIT, !reconcile)?;
         let object = value
             .as_object_mut()
             .ok_or(Error::protocol("invalid_mutation_result"))?;
