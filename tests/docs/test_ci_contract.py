@@ -1,46 +1,33 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / ".github" / "workflows" / "verify.yml"
+PIPELINE = ROOT / ".buildkite" / "pipeline.yml"
+RUNNER = ROOT / ".buildkite" / "run.sh"
 PYPROJECT = ROOT / "pyproject.toml"
 VERIFICATION = ROOT / "docs" / "dev" / "verification.md"
 README = ROOT / "README.md"
 CURRENT_STATE = ROOT / "docs" / "current-state.md"
 USAGE = ROOT / "docs" / "usage.md"
 
-REQUIRED_GATES = (
-    ("Test suite", "uv run pytest -q"),
-    ("Repository verification", "bash docs/dev/verification.md"),
-    ("Lint", "uv run ruff check src tests"),
-    ("Whitespace", "git diff --check"),
-)
 
-
-def workflow_text() -> str:
-    return WORKFLOW.read_text()
-
-
-def test_workflow_pins_the_supported_python_and_locked_uv_environment() -> None:
-    text = workflow_text()
-
-    assert "pull_request:" in text
-    assert "push:" in text
-    assert "branches: [main]" in text
-    assert 'python-version: "3.10"' in text
-    assert "uv sync --locked" in text
-    assert (ROOT / ".python-version").read_text().strip() == "3.10"
+def test_buildkite_preserves_all_public_lanes_without_private_credentials():
+    pipeline, runner = PIPELINE.read_text(), RUNNER.read_text()
+    for lane in ("repository", "protocol", "sdk", "codeql"):
+        assert f"key: {lane}" in pipeline
+        assert f"bash .buildkite/run.sh {lane}" in pipeline
+    for command in (
+        "bash docs/dev/verification.md", "uv sync --locked",
+        "uv run ruff check src tests scripts integrations", "git diff --check",
+        "cargo +1.85.1 test --locked", "--target wasm32-unknown-unknown",
+        "hostile-map-order,hostile-number-repr", "npm run test:browser",
+        "installed-consumer.mjs", "scripts/audit-rust-locks.py", "scripts/build_beta.py",
+    ):
+        assert command in runner
+    assert "soft_fail" not in pipeline and "secrets:" not in pipeline
+    assert "companion-pipeline" not in pipeline
     assert 'requires-python = ">=3.10"' in PYPROJECT.read_text()
-    assert (ROOT / "uv.lock").is_file()
-    assert "secrets." not in text
-    assert "continue-on-error" not in text
-
-
-def test_workflow_runs_each_required_gate_as_a_separate_named_step() -> None:
-    text = workflow_text()
-
-    for name, command in REQUIRED_GATES:
-        assert f"- name: {name}" in text
-        assert f"run: {command}" in text
+    assert (ROOT / ".python-version").read_text().strip() == "3.10"
+    assert "uv python install 3.10" in (ROOT / ".buildkite/bootstrap.sh").read_text()
 
 
 def test_repository_verification_accepts_linked_git_worktrees() -> None:

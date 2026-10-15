@@ -1,0 +1,22 @@
+# Separate manual evidence-admission pipeline. No synthetic run clears it.
+steps:
+  - block: 'Review installed macOS evidence'
+    key: installed-evidence-review
+    prompt: >-
+      Select an exact Buildkite evidence build UUID and job UUID from the
+      disposable macOS qualification run. The archive must contain candidate/
+      and evidence/. This step does not provision or run the guest scenarios.
+    fields:
+      - text: Evidence build UUID
+        key: evidence-build
+        required: true
+      - text: Evidence job UUID
+        key: evidence-job
+        required: true
+  - label: ':lock: Admit exact installed artifacts and observations'
+    key: installed-admission
+    depends_on: installed-evidence-review
+    agents: {queue: linux-small}
+    command: bash .buildkite/installed.sh
+    timeout_in_minutes: 15
+    artifact_paths: ['build/buildkite/installed/admission.json']

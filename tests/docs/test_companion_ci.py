@@ -1,7 +1,6 @@
 """Source access stays scoped; incomplete companion runs cannot report a pass."""
 
 import json
-import os
 import subprocess
 from pathlib import Path
 
@@ -18,76 +17,6 @@ from scripts.sdk.companion import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-SENTINEL = "synthetic-source-access-secret"
-
-
-@pytest.mark.parametrize("operation", ["get", "store", "erase"])
-@pytest.mark.parametrize(
-    "path", ["bananawalnut/castalia-wallet", "bananawalnut/castalia-wallet.git"]
-)
-def test_source_helper_only_gets_exact_wallet_repository(operation, path):
-    result = subprocess.run(
-        [str(ROOT / "scripts/sdk/git-credential-source"), operation],
-        input=f"protocol=https\nhost=github.com\npath={path}\n\n",
-        text=True,
-        env={**os.environ, "SDK_WALLET_SOURCE_TOKEN": SENTINEL},
-        capture_output=True,
-        check=True,
-    )
-    expected = f"username=x-access-token\npassword={SENTINEL}\n" if operation == "get" else ""
-    assert result.stdout == expected
-    assert not result.stderr
-
-
-@pytest.mark.parametrize(
-    "credential_input",
-    [
-        "protocol=http\nhost=github.com\npath=bananawalnut/castalia-wallet",
-        "protocol=https\nhost=github.com.attacker.test\npath=bananawalnut/castalia-wallet",
-        "protocol=https\nhost=github.com:443\npath=bananawalnut/castalia-wallet",
-        "protocol=https\nhost=github.com\npath=attacker/castalia-wallet",
-        "protocol=https\nhost=github.com\npath=bananawalnut/castalia-wallet/extra",
-        "protocol=https\nhost=github.com\npath=bananawalnut/castalia-wallet.git/../other",
-        "protocol=https\nhost=github.com\npath=ZenithResearch/secS-magik",
-        "protocol=https\nhost=github.com",
-    ],
-)
-def test_source_helper_denies_other_destinations(credential_input):
-    result = subprocess.run(
-        [str(ROOT / "scripts/sdk/git-credential-source"), "get"],
-        input=credential_input + "\n\n",
-        text=True,
-        env={**os.environ, "SDK_WALLET_SOURCE_TOKEN": SENTINEL},
-        capture_output=True,
-        check=True,
-    )
-    assert not result.stdout and not result.stderr
-
-
-@pytest.mark.parametrize(
-    "configured",
-    [
-        (),
-        ("SDK_SOURCE_APP_CLIENT_ID",),
-        ("SDK_SOURCE_APP_PRIVATE_KEY",),
-        ("SDK_SOURCE_APP_CLIENT_ID", "SDK_SOURCE_APP_PRIVATE_KEY"),
-    ],
-)
-def test_missing_configuration_has_actionable_non_secret_diagnostic(configured):
-    env = {k: v for k, v in os.environ.items() if not k.startswith("SDK_SOURCE_APP_")}
-    env.update(dict.fromkeys(configured, SENTINEL))
-    result = subprocess.run(
-        ["python3", str(ROOT / "scripts/sdk/check_source_access.py")],
-        env=env,
-        text=True,
-        capture_output=True,
-    )
-    assert result.returncode == (0 if len(configured) == 2 else 1)
-    assert SENTINEL not in result.stdout + result.stderr
-    if result.returncode:
-        assert "docs/dev/companion-ci.md" in result.stderr
-
-
 def test_pins_reject_dirty_or_wrong_checkout(tmp_path):
     def git(*args):
         return subprocess.check_output(["git", "-C", str(tmp_path), *args], text=True).strip()

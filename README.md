@@ -179,9 +179,11 @@ bundle builds; native binaries are distributed separately.
 
 ## Continuous integration contract
 
-GitHub Actions runs on pull requests to `main` and pushes to `main`, using the
-locked Python environment for tests, repository verification, lint, whitespace,
-and Python/source/agent package builds. Build artifacts and passing tests do not
+Buildkite runs public checks for pull requests to `main` and pushes to `main`,
+using the locked Python environment for tests, repository verification, lint,
+whitespace, Python/source/agent packages, Rust/WASM, browsers and CodeQL.
+The private companion source lane and installed-evidence admission are separate
+manual pipelines. See [Buildkite setup and migration](docs/dev/buildkite-ci.md). Build artifacts and passing tests do not
 establish native-companion availability or acceptance on another machine.
 Passing CI proves repository behavior, not deployment, live Neo4j,
 Matrix, secS-magik, Dregg, Hermes runtime, or any other external integration.

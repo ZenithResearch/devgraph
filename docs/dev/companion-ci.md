@@ -4,29 +4,30 @@ The public SDK job has no private-source credential. The companion job is a
 trusted, manually dispatched macOS source check. It does not qualify installed
 Wallet approval, create grants, install trust, or activate a live receiver.
 
-## Source-access setup
+## Source access — use the existing Buildkite GitHub connection
 
-Reuse an operator-approved GitHub App installed on **only**
-`bananawalnut/castalia-wallet`, with repository **Contents: read-only** permission.
-In `ZenithResearch/devgraph` Actions settings (or an approved organization scope
-restricted to that repository), supply:
+No custom GitHub App, SDK App private key, Wallet key or Actions secret is
+required. The private companion pipeline connects to `bananawalnut/castalia-wallet`
+as its primary repository, using Buildkite's existing GitHub repository provider.
+The public Devgraph and secS sources are fetched over HTTPS at exact commits.
+The name “SDK” describes the client library under test, not an application to create.
 
-| Setting | Kind | Value |
-| --- | --- | --- |
-| `SDK_SOURCE_APP_CLIENT_ID` | Actions variable | Approved source App client ID |
-| `SDK_SOURCE_APP_PRIVATE_KEY` | Actions secret | That App's private key |
+Use `.buildkite/companion-pipeline.yml` and the reviewed bootstrap described in
+[Buildkite CI](buildkite-ci.md). Disable automatic branch/PR triggers for this
+private lane. A maintainer reviews the immutable Devgraph revision before
+unblocking. The preflight checks both the Wallet pipeline commit and actual
+checkout against Devgraph's source-set pin, rejects PR-triggered builds and dirty
+sources, and never treats a missing checkout as a skipped success.
 
-Do not create a broad personal token, expand an existing installation, put keys
-in Git, or paste them into logs/chat. An operator must approve any new App/access
-before provisioning. An absent setting fails before token issuance with this
-setup reference. Presence alone is not evidence the installation is authorized.
+Buildkite already fetches Wallet for this job. Historical private Cargo revisions
+are fetched into that same Git database, then Cargo resolves them locally through
+a temporary Git configuration. No private key is copied, no token is embedded in
+URLs, and no source-access secret is written to artifacts. Tests use the offline
+fetch cache. Do not export private Wallet source or raw fixture state as artifacts.
 
-Dispatch only a reviewed branch in the trusted repository. Do not convert this
-lane to `pull_request_target`, execute fork code with credentials, or add source
-tokens to ordinary PR jobs. The token action requests only Wallet contents read;
-the Git helper serves it only for that exact HTTPS GitHub repository and only
-during fetch. Git remotes and artifacts never contain the token. Tests run
-without it. secS source is public and is fetched separately at its exact pin.
+The old `SDK_SOURCE_APP_CLIENT_ID` / `SDK_SOURCE_APP_PRIVATE_KEY` proposal was
+specific to the retired Actions workflow. Do not configure those settings.
+This does not authorize broadening any Buildkite repository installation.
 
 ## Scope and evidence
 
@@ -45,7 +46,7 @@ provenance hashes against the paired Wallet. It runs:
   disposable identities, and the pinned Wallet provider parser.
 
 The existing native SDK, WASM, browser and external package checks remain in the
-workflow. Required source tests cannot be ignored/skipped. The manifest records
+pipeline. Required source tests cannot be ignored/skipped. The manifest records
 source and runner hashes, tools, executed test counts, fixture hashes and native
 test-binary hashes. A failure replaces any previous passing manifest. Uploads
 are restricted to the named summaries and package outputs, never temporary
