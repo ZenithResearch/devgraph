@@ -47,8 +47,9 @@ a new candidate; trust changes require repeating affected setup/revocation cases
 Record the Wallet build toolchain and preserve custody, registration, membership,
 Files and generic-presentation regression coverage. Wallet
 [Buildkite #30](https://buildkite.com/bananawalnut/castalia-wallet/builds/30)
-passed at this revision after exact-package evidence review and explicit human
-acceptance. Its Linux/Chrome, upgrade, reproduction and test-issuer evidence is
+passed for historical revision `f65401704acf60dcd461527f495afaa6def0bfb3` after
+exact-package evidence review and explicit human acceptance. It does not qualify
+the current candidate. Its Linux/Chrome, upgrade, reproduction and test-issuer evidence is
 companion evidence, not a macOS Devgraph installed-chain pass.
 
 ## Bundle and guided run
