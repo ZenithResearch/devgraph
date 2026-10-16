@@ -161,7 +161,11 @@ def test_hydration_rejects_missing_required_property(storage, repository):
 def test_hydration_rejects_archive_status_mismatch(storage, repository):
     task = Task(id="task-1", title="Strict")
     _inject_persisted_node(
-        storage, "Task", task.id, task.to_node_properties(), archived=True
+        storage,
+        "Task",
+        task.id,
+        {k: v for k, v in task.to_node_properties().items() if not k.startswith("progress")},
+        archived=True,
     )
 
     with pytest.raises(WorkObjectRepositoryError, match="archive status mismatch"):
@@ -421,11 +425,11 @@ def test_archive_bumps_version_and_sets_storage_archived_flag(storage, repositor
 
     archived = repository.archive("Task", "task-1")
 
-    assert archived.status == WorkStatus.ARCHIVED
+    assert archived.archived and archived.status == WorkStatus.DRAFT
     assert archived.version == 2
     node = storage.get_node("Task", "task-1")
     assert node is not None and node.archived is True
-    assert node.properties["status"] == WorkStatus.ARCHIVED.value
+    assert node.properties["status"] == WorkStatus.DRAFT.value
 
 
 def test_archive_twice_fails_closed(repository):

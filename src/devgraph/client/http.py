@@ -72,6 +72,10 @@ class DevgraphWorkContext(_StrictFrozenModel):
     projection_json: bytes = Field(min_length=1, max_length=16_384, repr=False, exclude=True)
 
 
+class DevgraphWorkV2Context(DevgraphWorkContext):
+    """Explicit v2 authority route; never negotiate or downgrade to v1."""
+
+
 class WorkObject(_StrictFrozenModel):
     id: str
     kind: WorkKind
@@ -110,10 +114,74 @@ class MutationResult(_StrictFrozenModel):
         return self
 
 
+class TodoObject(_StrictFrozenModel):
+    key: str
+    kind: Literal["Todo", "Proposal", "Initiative", "Project", "Issue", "Task"]
+    id: str
+    title: str
+    description: str
+    priority: str
+    version: str
+    progress: Literal["not_started", "in_progress", "done"] | None
+    progress_label: str
+    archived: bool
+    classification_required: bool
+    workflow_id: str | None
+    stage: str | None
+    parent: str | None
+    created_at: str
+    updated_at: str
+    artifact_ids: list[str]
+    external_link_ids: list[str]
+
+    @model_validator(mode="after")
+    def coherent_progress(self):
+        from devgraph.progress import progress_label, stage_progress
+
+        if (
+            self.key != f"{self.kind}/{self.id}"
+            or self.classification_required != (self.progress is None)
+            or self.progress_label != progress_label(self.progress)
+            or bool(self.workflow_id) != bool(self.stage)
+            or str(int(self.priority)) != self.priority
+            or str(int(self.version)) != self.version
+            or int(self.version) < 1
+        ):
+            raise ValueError("invalid canonical Todo result")
+        if (
+            self.workflow_id
+            and self.progress is not None
+            and self.progress != stage_progress(self.workflow_id, self.stage)
+        ):
+            raise ValueError("progress_stage_conflict")
+        return self
+
+
+class TodoMutationReceipt(MutationReceipt):
+    operation: str
+    subject_label: Literal["Todo", "Proposal", "Initiative", "Project", "Issue", "Task"]
+
+
+class TodoMutationResult(_StrictFrozenModel):
+    schema_name: Literal["devgraph.work-result.v2"] = Field(alias="schema")
+    work: TodoObject | None
+    receipt: TodoMutationReceipt
+
+    @model_validator(mode="after")
+    def duplicate_shape(self):
+        if self.receipt.duplicate == (self.work is not None):
+            raise ValueError("inconsistent result")
+        return self
+
+
 class ArenaMutationReceipt(_StrictFrozenModel):
     receipt_id: str
-    operation: Literal["devgraph.arena.create.v1", "devgraph.arena.patch.v1",
-                       "devgraph.arena.archive.v1", "devgraph.arena.member.set.v1"]
+    operation: Literal[
+        "devgraph.arena.create.v1",
+        "devgraph.arena.patch.v1",
+        "devgraph.arena.archive.v1",
+        "devgraph.arena.member.set.v1",
+    ]
     subject_label: Literal["Arena", "Initiative", "Task"]
     subject_id: str
     receipt_status: ReceiptStatus
@@ -134,6 +202,21 @@ class ArenaMutationResult(_StrictFrozenModel):
             self.receipt.duplicate == (result is not None)
         ):
             raise ValueError("inconsistent Arena mutation result")
+        return self
+
+
+class CredentialWorkStatus(_StrictFrozenModel):
+    """V2 status only; an absent receipt never establishes nonexecution."""
+
+    state: Literal["committed", "unknown"]
+    receipt: MutationReceipt | TodoMutationReceipt | ArenaMutationReceipt | None = None
+
+    @model_validator(mode="after")
+    def consistent_status(self):
+        if (self.state == "committed") != (self.receipt is not None):
+            raise ValueError("inconsistent credential operation status")
+        if self.receipt is not None and not self.receipt.duplicate:
+            raise ValueError("status receipt must identify an existing result")
         return self
 
 
@@ -259,7 +342,10 @@ class DevgraphHttpClient:
         self._timeout = timeout
 
     def query_cypher(
-        self, context: DevgraphRequestContext, *, request_json: bytes,
+        self,
+        context: DevgraphRequestContext,
+        *,
+        request_json: bytes,
     ) -> dict[str, Any]:
         from devgraph.cypher_read import (
             MAX_RESULT_BYTES,
@@ -273,7 +359,8 @@ class DevgraphHttpClient:
         compiled = parse_cypher_request(request_json)
         kwargs = {
             "headers": {"Authorization": f"Bearer {context.credential}"},
-            "timeout": self._timeout, "json": json_codec.loads(compiled.canonical_request),
+            "timeout": self._timeout,
+            "json": json_codec.loads(compiled.canonical_request),
         }
         try:
             stream = getattr(self._transport, "stream", None)
@@ -282,7 +369,10 @@ class DevgraphHttpClient:
                 # accumulating or decoding its JSON. Never follow redirects or
                 # decompress a caller-controlled compressed response.
                 with stream(
-                    "POST", f"{self._base_url}/query/cypher", follow_redirects=False, **kwargs,
+                    "POST",
+                    f"{self._base_url}/query/cypher",
+                    follow_redirects=False,
+                    **kwargs,
                 ) as incoming:
                     if incoming.headers.get("content-encoding", "identity") != "identity":
                         raise DevgraphInvalidSuccessEnvelope
@@ -292,13 +382,17 @@ class DevgraphHttpClient:
                             raise DevgraphInvalidSuccessEnvelope
                         raw.extend(chunk)
                     response = httpx.Response(
-                        incoming.status_code, headers=incoming.headers, content=bytes(raw),
+                        incoming.status_code,
+                        headers=incoming.headers,
+                        content=bytes(raw),
                     )
             else:
                 # The transport protocol also supports bounded in-process test
                 # adapters; the installed CLI always uses the streaming branch.
                 response = self._transport.request(
-                    "POST", f"{self._base_url}/query/cypher", **kwargs,
+                    "POST",
+                    f"{self._base_url}/query/cypher",
+                    **kwargs,
                 )
         except DevgraphClientError:
             raise
@@ -325,7 +419,7 @@ class DevgraphHttpClient:
 
     def execute_named_work(
         self, context: DevgraphWorkContext, *, request_json: bytes, idempotency_key: str
-    ) -> MutationResult:
+    ) -> MutationResult | TodoMutationResult:
         from devgraph.work_requests import WorkRequest
 
         if not isinstance(context, DevgraphWorkContext):
@@ -337,9 +431,15 @@ class DevgraphHttpClient:
         ):
             raise ValueError("invalid named Work idempotency key")
         result = self._request(
-            MutationResult,
+            TodoMutationResult if request.version == 2 else MutationResult,
             "POST",
-            "/work-operations/v1",
+            "/todo-operations/v2"
+            if request.version == 2
+            else (
+                "/work-operations/v2"
+                if isinstance(context, DevgraphWorkV2Context)
+                else "/work-operations/v1"
+            ),
             context=context,
             idempotency_key=idempotency_key,
             json=json_codec.loads(request.canonical),
@@ -349,6 +449,24 @@ class DevgraphHttpClient:
             if request.operation == "convert"
             else (request.kind, request.id)
         )
+        if request.version == 2:
+            if (
+                result.receipt.operation != request.authority_operation
+                or result.receipt.subject_label != kind
+                or result.receipt.subject_id != work_id
+                or result.work is not None
+                and (
+                    (result.work.kind, result.work.id) != (kind, work_id)
+                    or result.work.version
+                    != str(
+                        1
+                        if request.operation in ("create", "convert")
+                        else request.expected_version + 1
+                    )
+                )
+            ):
+                raise DevgraphInvalidSuccessEnvelope
+            return result
         return self._expect_mutation(
             result,
             operation=request.authority_operation,
@@ -357,25 +475,79 @@ class DevgraphHttpClient:
             work_kind=kind,
         )
 
-    def execute_arena(self, context: DevgraphWorkContext, *, request_json: bytes,
-                      idempotency_key: str) -> ArenaMutationResult:
+    def execute_arena(
+        self, context: DevgraphWorkContext, *, request_json: bytes, idempotency_key: str
+    ) -> ArenaMutationResult:
         from devgraph.arena_requests import ArenaRequest
 
         if not isinstance(context, DevgraphWorkContext):
             raise TypeError("Arena writes require a secS projection context")
         request = ArenaRequest.from_json(request_json)
-        if not isinstance(idempotency_key, str) or re.fullmatch(
-            r"[A-Za-z0-9._~-]{16,128}", idempotency_key
-        ) is None:
+        if (
+            not isinstance(idempotency_key, str)
+            or re.fullmatch(r"[A-Za-z0-9._~-]{16,128}", idempotency_key) is None
+        ):
             raise ValueError("invalid Arena idempotency key")
-        result = self._request(ArenaMutationResult, "POST", "/arena-operations/v1",
-            context=context, idempotency_key=idempotency_key,
-            json=json_codec.loads(request.canonical))
+        result = self._request(
+            ArenaMutationResult,
+            "POST",
+            "/arena-operations/v2"
+            if isinstance(context, DevgraphWorkV2Context)
+            else "/arena-operations/v1",
+            context=context,
+            idempotency_key=idempotency_key,
+            json=json_codec.loads(request.canonical),
+        )
         item = result.arena if request.kind == "Arena" else result.work
-        if (result.receipt.operation != request.authority_operation
+        if (
+            result.receipt.operation != request.authority_operation
             or result.receipt.subject_label != request.kind
             or result.receipt.subject_id != request.id
-            or item is not None and (item.kind, item.id) != (request.kind, request.id)):
+            or item is not None
+            and (item.kind, item.id) != (request.kind, request.id)
+        ):
+            raise DevgraphInvalidSuccessEnvelope
+        return result
+
+    def reconcile_credential_work(
+        self, context: DevgraphWorkV2Context, *, request_json: bytes, idempotency_key: str
+    ) -> CredentialWorkStatus:
+        from devgraph.arena_requests import ArenaRequest
+        from devgraph.named_requests import parse_named_request
+
+        if not isinstance(context, DevgraphWorkV2Context):
+            raise TypeError("credential status requires an explicit v2 projection")
+        request = parse_named_request(request_json)
+        if (
+            not isinstance(idempotency_key, str)
+            or re.fullmatch(r"[A-Za-z0-9._~-]{16,128}", idempotency_key) is None
+        ):
+            raise ValueError("invalid credential status idempotency key")
+        arena = isinstance(request, ArenaRequest)
+        result = self._request(
+            CredentialWorkStatus,
+            "POST",
+            "/arena-operations/v2/status"
+            if arena
+            else (
+                "/todo-operations/v2/status"
+                if request.version == 2
+                else "/work-operations/v2/status"
+            ),
+            context=context,
+            idempotency_key=idempotency_key,
+            json=json_codec.loads(request.canonical),
+        )
+        kind, work_id = (
+            ("Issue", request.payload["issue_id"])
+            if not arena and request.operation == "convert"
+            else (request.kind, request.id)
+        )
+        if result.receipt is not None and (
+            result.receipt.operation != request.authority_operation
+            or result.receipt.subject_label != kind
+            or result.receipt.subject_id != work_id
+        ):
             raise DevgraphInvalidSuccessEnvelope
         return result
 
@@ -386,8 +558,9 @@ class DevgraphHttpClient:
             raise DevgraphInvalidSuccessEnvelope
         return result
 
-    def list_arenas(self, context: DevgraphRequestContext, *, include_archived=False,
-                    after_id=None, limit=50) -> ArenaList:
+    def list_arenas(
+        self, context: DevgraphRequestContext, *, include_archived=False, after_id=None, limit=50
+    ) -> ArenaList:
         validate_page_limit(limit)
         if type(include_archived) is not bool:
             raise ValueError("invalid Arena archive filter")
@@ -397,14 +570,20 @@ class DevgraphHttpClient:
             query["after_id"] = after_id
         result = self._request(ArenaList, "GET", "/arenas?" + urlencode(query), context=context)
         ids = [item.id for item in result.items]
-        if (len(ids) > limit or ids != sorted(set(ids))
-            or after_id is not None and any(value <= after_id for value in ids)
-            or not include_archived and any(item.archived for item in result.items)):
+        if (
+            len(ids) > limit
+            or ids != sorted(set(ids))
+            or after_id is not None
+            and any(value <= after_id for value in ids)
+            or not include_archived
+            and any(item.archived for item in result.items)
+        ):
             raise DevgraphInvalidSuccessEnvelope
         return result
 
-    def get_arena_members(self, context: DevgraphRequestContext, *, arena_id: str,
-                          after_resource=None, limit=50) -> WorkObjectList:
+    def get_arena_members(
+        self, context: DevgraphRequestContext, *, arena_id: str, after_resource=None, limit=50
+    ) -> WorkObjectList:
         validate_work_object_id(arena_id)
         validate_page_limit(limit)
         query = {"limit": limit}
@@ -418,26 +597,41 @@ class DevgraphHttpClient:
             validate_work_object_id(work_id)
             after = (kind, work_id)
             query["after_resource"] = after_resource
-        result = self._request(WorkObjectList, "GET",
-            f"/arenas/{arena_id}/members?" + urlencode(query), context=context)
+        result = self._request(
+            WorkObjectList,
+            "GET",
+            f"/arenas/{arena_id}/members?" + urlencode(query),
+            context=context,
+        )
         keys = [(item.kind, item.id) for item in result.items]
-        if (len(keys) > limit or keys != sorted(set(keys))
+        if (
+            len(keys) > limit
+            or keys != sorted(set(keys))
             or any(kind not in ("Initiative", "Task") for kind, _ in keys)
-            or after is not None and any(key <= after for key in keys)):
+            or after is not None
+            and any(key <= after for key in keys)
+        ):
             raise DevgraphInvalidSuccessEnvelope
         return result
 
-    def get_work_arena(self, context: DevgraphRequestContext, *, kind: WorkKind,
-                       work_id: str) -> ArenaMembership:
+    def get_work_arena(
+        self, context: DevgraphRequestContext, *, kind: WorkKind, work_id: str
+    ) -> ArenaMembership:
         if kind not in _WORK_KINDS:
             raise ValueError("invalid Work kind")
         validate_work_object_id(work_id)
-        result = self._request(ArenaMembership, "GET", f"/work/{kind}/{work_id}/arena",
-                               context=context)
-        if result.arena is not None and (
-            result.root_kind not in ("Initiative", "Task")
-            or result.inherited != ((result.root_kind, result.root_id) != (kind, work_id))
-        ) or result.arena is None and result.inherited:
+        result = self._request(
+            ArenaMembership, "GET", f"/work/{kind}/{work_id}/arena", context=context
+        )
+        if (
+            result.arena is not None
+            and (
+                result.root_kind not in ("Initiative", "Task")
+                or result.inherited != ((result.root_kind, result.root_id) != (kind, work_id))
+            )
+            or result.arena is None
+            and result.inherited
+        ):
             raise DevgraphInvalidSuccessEnvelope
         return result
 
@@ -530,7 +724,6 @@ class DevgraphHttpClient:
         ):
             raise DevgraphInvalidSuccessEnvelope
         return result
-
 
     def get_work_document(
         self,
@@ -942,7 +1135,21 @@ class DevgraphHttpClient:
         json: dict[str, Any] | None = None,
     ) -> Any:
         if isinstance(context, DevgraphWorkContext):
-            if method != "POST" or path not in ("/work-operations/v1", "/arena-operations/v1"):
+            version = 2 if isinstance(context, DevgraphWorkV2Context) else 1
+            targets = {
+                "/todo-operations/v2",
+                f"/work-operations/v{version}",
+                f"/arena-operations/v{version}",
+            }
+            if version == 2:
+                targets.update(
+                    {
+                        "/todo-operations/v2/status",
+                        "/work-operations/v2/status",
+                        "/arena-operations/v2/status",
+                    }
+                )
+            if method != "POST" or path not in targets:
                 raise ValueError("named Work proof has an invalid transport target")
             headers = {
                 "X-Devgraph-Work-Authority": base64.urlsafe_b64encode(context.projection_json)

@@ -6,7 +6,7 @@ Specified by GitHub Issue #3 and extended by Issue #4.
 
 | Predicate | From | To | Meaning |
 |---|---|---|---|
-| `CONTAINS` | Initiative/Project/Issue | Project/Issue/Task | Hierarchical containment. |
+| `HAS_CHILD` | Initiative/Project/Issue | Project/Issue/Task | Optional containment. Exact permitted pairs are in workflows.json; one parent, no cycles. |
 | `DEPENDS_ON` | Todo-derived work | Todo-derived work | Source cannot complete before target. |
 | `BLOCKS` | Blocker/Task/Issue | Todo-derived work | Source prevents target progress. |
 | `HAS_REQUIREMENT` | Todo-derived work | Requirement | Work must satisfy requirement. |
@@ -28,6 +28,7 @@ are not stored as direct edges. See [`arenas.md`](arenas.md) and the normative
 
 | Predicate | From | To | Meaning |
 |---|---|---|---|
+| `REJECTED_BY_DECISION` | Proposal | Decision | Recorded rejection disposition; linked delivery work stays independent. |
 | `ACCEPTED_BY_DECISION` | Proposal | Decision | Proposal acceptance/conversion has Decision provenance. |
 | `HAS_DECISION` | Todo-derived work | Decision | Work is governed or affected by decision. |
 | `HAS_HANDOFF` | Todo-derived work | Handoff | Work has handoff context. |
@@ -85,3 +86,7 @@ The complete profile and runtime admission boundary are defined in
 ```bash
 rg "BLOCKS|DEPENDS_ON|HAS_REQUIREMENT|HAS_ACCEPTANCE_CRITERION|ACCEPTED_BY_DECISION|HAS_ARTIFACT|HAS_EXTERNAL_LINK|EMITTED_EVENT|ATTRIBUTED_TO_HERMES_SESSION|HAS_READINESS_ASSESSMENT|MEMBER_OF|OPERATED_BY|ASSIGNED_TO|OWNED_BY|ATTRIBUTED_TO" ontology/predicates.md
 ```
+
+| Workflow evidence predicate | Source | Target | Meaning |
+| --- | --- | --- | --- |
+| `HAS_WORKFLOW_DECISION` | Todo-derived work | Decision | Workflow approval or Waiting resolution; distinct from acceptance provenance. |

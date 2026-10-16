@@ -10,7 +10,7 @@ const storage = {get(key) { try { return sessionStorage.getItem(key); } catch { 
 const cookieReader = document.querySelector('meta[name=devgraph-selection-reader]')?.content === 'local-session';
 byId('connection-settings').hidden = cookieReader;
 if (cookieReader) for (const link of document.querySelectorAll('a[href="/monitor"]')) link.href = 'http://127.0.0.1:8080/monitor';
-byId('credential').value = cookieReader ? '' : storage.get('devgraph-monitor-token') || '';
+byId('credential').value = ''; storage.remove('devgraph-monitor-token');
 function message(text) { setText('message', text); }
 function fail(error) { message(error.message || String(error)); }
 function cancelRun() { state.worker?.terminate(); state.worker = null; byId('cancel-run').hidden = true; }
@@ -195,7 +195,7 @@ byId('connect-form').onsubmit = async event => {
     // Existing seeds and estimates survive refresh: removed work blocks the scope,
     // and changed Work versions require an explicit estimate review.
     state.decision = d; state.source = 'live'; if (first) state.run = null;
-    if (!cookieReader) storage.set('devgraph-monitor-token', token); byId('connection-settings').open = false; syncProfile(); changed();
+    byId('connection-settings').open = false; syncProfile(); changed();
     message('Network loaded. Work versions and dependencies are assembled during a read window; external gates and outcome attribution remain scenario assumptions.');
   } catch (e) { if (request === state.request) message(e.name === 'AbortError' ? 'Snapshot read timed out or was cancelled. Previous inputs remain unchanged.' : e.message); }
   finally { clearTimeout(timer); if (request === state.request) { state.loading = false; state.controller = null; render(); } }

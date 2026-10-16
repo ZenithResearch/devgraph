@@ -34,12 +34,14 @@ class ProposalLifecycle:
         if decision is None:
             raise ProposalLifecycleError("Decision provenance is required to accept Proposal")
         proposal = self.get_proposal(proposal_id)
-        if proposal.status == WorkStatus.ARCHIVED:
+        if proposal.archived:
             raise ProposalLifecycleError("Archived Proposal cannot be accepted")
+        from devgraph.workflows import Workflows
+
+        if Workflows(self._storage).related("REJECTED_BY_DECISION", proposal):
+            raise ProposalLifecycleError("Rejected Proposal already has Decision provenance")
         if self._acceptance_decision_edges(proposal_id):
-            raise ProposalLifecycleError(
-                "Accepted Proposal already has Decision provenance"
-            )
+            raise ProposalLifecycleError("Accepted Proposal already has Decision provenance")
         accepted = proposal.with_status(WorkStatus.ACCEPTED)
         with self._storage.transaction():
             self._upsert_decision(decision)
@@ -55,15 +57,13 @@ class ProposalLifecycle:
         return accepted
 
     def archive_proposal(self, proposal_id: str) -> Proposal:
-        proposal = self.get_proposal(proposal_id)
-        archived = proposal.with_status(WorkStatus.ARCHIVED)
-        self._storage.update_node("Proposal", proposal_id, archived.to_node_properties())
-        self._storage.archive_node("Proposal", proposal_id)
-        return archived
+        from devgraph.model.repository import WorkObjectRepository
+
+        return WorkObjectRepository(self._storage).archive("Proposal", proposal_id)
 
     def convert_accepted_proposal_to_issue(self, proposal_id: str, issue_id: str) -> Issue:
         proposal = self.get_proposal(proposal_id)
-        if proposal.status != WorkStatus.ACCEPTED:
+        if proposal.archived or proposal.status != WorkStatus.ACCEPTED:
             raise ProposalLifecycleError("Only accepted proposals can convert to Issue")
         decision_id = self._require_acceptance_decision_id(proposal_id)
         issue = Issue(
@@ -124,9 +124,7 @@ class ProposalLifecycle:
         self._validate_decision_node(existing, expected=decision)
 
     @staticmethod
-    def _validate_decision_node(
-        node: NodeRecord, *, expected: Decision | None = None
-    ) -> None:
+    def _validate_decision_node(node: NodeRecord, *, expected: Decision | None = None) -> None:
         try:
             if node.label != "Decision" or node.archived:
                 raise ValueError("invalid Decision provenance")
@@ -147,9 +145,7 @@ class ProposalLifecycle:
         if len(edges) > 10_000:
             raise StorageUnavailable("Decision provenance validation budget exceeded")
         return [
-            edge
-            for edge in edges
-            if edge.from_label == "Proposal" and edge.from_id == proposal_id
+            edge for edge in edges if edge.from_label == "Proposal" and edge.from_id == proposal_id
         ]
 
     def _require_acceptance_decision_id(self, proposal_id: str) -> str:
@@ -200,8 +196,11 @@ class ProposalLifecycle:
                 artifact_ids=tuple(properties["artifact_ids"]),
                 external_link_ids=tuple(properties["external_link_ids"]),
                 priority=properties["priority"],
+                workflow_json=properties.get("workflow_json"),
+                progress=properties.get("progress"),
+                archived=node.archived,
+                progress_record_id=properties.get("progress_record_id"),
+                progress_migration_json=properties.get("progress_migration_json"),
             )
         except (KeyError, TypeError, ValueError) as exc:
-            raise ProposalLifecycleError(
-                "Proposal has unreadable persisted properties"
-            ) from exc
+            raise ProposalLifecycleError("Proposal has unreadable persisted properties") from exc

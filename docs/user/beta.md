@@ -1,5 +1,12 @@
 # Beta setup
 
+For the merged generic Wallet candidate, use
+[public integration](../dev/public-wallet-integration.md) and
+[generic setup](../dev/merged-wallet-provider-setup.md). The application-specific
+signing binaries described below are historical compatibility prerequisites;
+merged Wallet no longer provides them. They are not a fallback for generic setup.
+
+
 Devgraph's beta offers a synthetic monitor demo, a persistent local read-only
 host, and signed Work/Arena operations when native prerequisites are installed.
 Choose the level you need; agent packages do not create identities or grants.
@@ -71,6 +78,11 @@ user launch agents. `start` admits Neo4j, applies packaged migrations, and then
 admits the API. The ordinary directory example does not require a mounted disk.
 Use `--require-mounted-volume` only when deliberately storing data on a separate
 mounted filesystem. Reconfiguration does not copy or migrate existing data.
+For an internal-SSD database, also select the existing external backup storage
+with `--recovery-external-root /absolute/external/root`. Recovery sets then use
+that root's `devgraph/recovery` directory plus the fixed internal recovery
+directory. Both copies must pass physical-disk independence checks; see the
+[maintenance runbook](../runbooks/local-production-maintenance.md).
 
 `local status` must show service liveness, clean migration readiness, and denial
 of protected reads without a credential. A status result is evidence for this

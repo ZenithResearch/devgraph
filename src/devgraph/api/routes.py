@@ -162,7 +162,7 @@ def _envelope(work: WorkObject) -> WorkObjectEnvelope:
         kind=work.kind,
         title=work.title,
         description=work.description,
-        status=work.status.value,
+        status="archived" if work.archived else work.status.value,
         version=work.version,
         priority=work.priority,
         artifact_ids=list(work.artifact_ids),
@@ -339,7 +339,6 @@ def register_routes(app: FastAPI, services: ApiServices) -> None:
         return graph.supporting_material(
             _credential(authorization), kind, work_id, limit=limit, after=after
         )
-
 
     @app.get(
         "/work/{kind}/{work_id}/supporting-material/Artifact/{artifact_id}/document",

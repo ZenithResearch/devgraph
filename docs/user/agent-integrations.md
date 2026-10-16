@@ -102,6 +102,27 @@ adapter uses the existing Devgraph CLI; it does not query Neo4j directly.
 
 ## Verify access in stages
 
+### Generic Wallet candidate and agent approval
+
+The supported replacement uses generic Wallet credentials. See
+[candidate setup](../dev/merged-wallet-provider-setup.md) for matched source,
+provider trust and the installed qualification gate. Use `--credential-v2`
+explicitly only with that matched setup. Transport v2 does not rewrite the
+Work/Arena v1 request or its signing domain; canonical Todo uses Work v2.
+
+Generic terminal signing requires the person's real interactive approval.
+An unattended agent receives `approval_required`: retain the private request
+and idempotency files and hand off that exact command to the person. Do not
+simulate a terminal confirmation, renew authority automatically, or fall back
+to a retired signer. Preparation is not a committed graph mutation.
+
+After unknown generic dispatch, use the original files with
+`--credential-v2 --reconcile` and fresh human approval. Reconciliation only
+checks receipt status; it does not resubmit the mutation. A missing receipt
+remains unknown. Report success only after a validated committed receipt.
+
+### Existing named-v1 compatibility installations
+
 1. Confirm the agent finds the CLI and can run `devgraph ontology`.
 2. Inspect `devgraph local status` and run a bounded `devgraph query work
    Initiative --limit 10` or `devgraph query arena --limit 10`.
@@ -112,8 +133,20 @@ adapter uses the existing Devgraph CLI; it does not query Neo4j directly.
    request with current versions and one stable idempotency key. Read the result.
 
 A “list initiatives” smoke check performs no mutations. If a write times out,
-its outcome is unknown; repeat the identical request and key using the same
-identity. Do not ask an agent to generate a fresh key and “try again.”
+its outcome is unknown; for the retained named-v1 compatibility path, repeat
+only the identical request and key using the same identity. Use status-only
+reconciliation for the generic path above. Never generate a fresh key to retry
+an unknown outcome.
+
+`wallet_request_incompatible` or `secs_request_incompatible` means a native
+component rejected a request already validated by Devgraph. Check the matched
+companion versions and operation support; changing keys or extending a grant
+does not fix a parser mismatch. `wallet_custody_unavailable` identifies a key
+reference/pin/permissions check, while `secs_authority_denied` identifies grant
+or presentation rejection. The CLI retains only a bounded, recognized public
+diagnostic and never prints arbitrary native stderr. These pre-dispatch errors
+mean this invocation made no HTTP mutation request; they say nothing about any
+earlier uncertain invocation.
 
 Read credentials are loaded by the CLI; never put them into agent configuration,
 a prompt, or a package. Codex and Hermes using the same signer profile act as

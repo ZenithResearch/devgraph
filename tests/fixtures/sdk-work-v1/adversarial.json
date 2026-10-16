@@ -1,0 +1,182 @@
+[
+  {
+    "name": "default-expanded-create",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\"}}",
+    "python_accept": true,
+    "rust_accept": true,
+    "canonical": "{\"expected_version\":null,\"id\":\"sdk-example\",\"kind\":\"Issue\",\"operation\":\"create\",\"payload\":{\"artifact_ids\":[],\"description\":\"\",\"external_link_ids\":[],\"id\":\"sdk-example\",\"priority\":0,\"title\":\"Example\"},\"schema\":\"devgraph.work-request.v1\"}",
+    "digest": "90e94ebdd84ea514be3c53948b8613133a9858138d2f9a76af6efd22ac0a466a",
+    "resources": [
+      "Issue/sdk-example"
+    ]
+  },
+  {
+    "name": "unicode-astral-and-decomposed",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"\ud83c\udf0d e\u0301 \u00e9\"}}",
+    "python_accept": true,
+    "rust_accept": true,
+    "canonical": "{\"expected_version\":null,\"id\":\"sdk-example\",\"kind\":\"Issue\",\"operation\":\"create\",\"payload\":{\"artifact_ids\":[],\"description\":\"\",\"external_link_ids\":[],\"id\":\"sdk-example\",\"priority\":0,\"title\":\"\ud83c\udf0d e\u0301 \u00e9\"},\"schema\":\"devgraph.work-request.v1\"}",
+    "digest": "6573f5e7720dca93ed26eb1c290d94158ff9bf8a4a1c1ee718c6410dd43c175f",
+    "resources": [
+      "Issue/sdk-example"
+    ]
+  },
+  {
+    "name": "empty-description",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"description\":\"\"}}",
+    "python_accept": true,
+    "rust_accept": true,
+    "canonical": "{\"expected_version\":null,\"id\":\"sdk-example\",\"kind\":\"Issue\",\"operation\":\"create\",\"payload\":{\"artifact_ids\":[],\"description\":\"\",\"external_link_ids\":[],\"id\":\"sdk-example\",\"priority\":0,\"title\":\"Example\"},\"schema\":\"devgraph.work-request.v1\"}",
+    "digest": "90e94ebdd84ea514be3c53948b8613133a9858138d2f9a76af6efd22ac0a466a",
+    "resources": [
+      "Issue/sdk-example"
+    ]
+  },
+  {
+    "name": "negative-zero",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":-0}}",
+    "python_accept": true,
+    "rust_accept": false,
+    "canonical": "{\"expected_version\":null,\"id\":\"sdk-example\",\"kind\":\"Issue\",\"operation\":\"create\",\"payload\":{\"artifact_ids\":[],\"description\":\"\",\"external_link_ids\":[],\"id\":\"sdk-example\",\"priority\":0,\"title\":\"Example\"},\"schema\":\"devgraph.work-request.v1\"}",
+    "digest": "90e94ebdd84ea514be3c53948b8613133a9858138d2f9a76af6efd22ac0a466a",
+    "resources": [
+      "Issue/sdk-example"
+    ]
+  },
+  {
+    "name": "negative-zero-float",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":-0.0}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "exponent",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":0e0}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "fraction",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":1.5}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "unsafe-positive",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":9007199254740992}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "unsafe-negative",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":-9007199254740992}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "boolean",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":true}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "null",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":null}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "safe-positive",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":9007199254740991}}",
+    "python_accept": true,
+    "rust_accept": true,
+    "canonical": "{\"expected_version\":null,\"id\":\"sdk-example\",\"kind\":\"Issue\",\"operation\":\"create\",\"payload\":{\"artifact_ids\":[],\"description\":\"\",\"external_link_ids\":[],\"id\":\"sdk-example\",\"priority\":9007199254740991,\"title\":\"Example\"},\"schema\":\"devgraph.work-request.v1\"}",
+    "digest": "37ea7f2c893bb2cbf471f86eb15cdea06bbf6603c8cab17c56ede3758a98324c",
+    "resources": [
+      "Issue/sdk-example"
+    ]
+  },
+  {
+    "name": "safe-negative",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"priority\":-9007199254740991}}",
+    "python_accept": true,
+    "rust_accept": true,
+    "canonical": "{\"expected_version\":null,\"id\":\"sdk-example\",\"kind\":\"Issue\",\"operation\":\"create\",\"payload\":{\"artifact_ids\":[],\"description\":\"\",\"external_link_ids\":[],\"id\":\"sdk-example\",\"priority\":-9007199254740991,\"title\":\"Example\"},\"schema\":\"devgraph.work-request.v1\"}",
+    "digest": "af31cf9bd3770d1a995434deaa59ac5235982ebdcb70cb8ee6502cce6ce36452",
+    "resources": [
+      "Issue/sdk-example"
+    ]
+  },
+  {
+    "name": "duplicate-root",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\"}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "duplicate-decoded-key",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"\\u0074itle\":\"Second\"}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "unknown-root",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\"},\"extra\":true}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "unknown-payload",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\",\"hidden\":true}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "bom",
+    "raw": "\ufeff{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\"}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "lone-high-surrogate",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"\\ud800\"}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "lone-low-surrogate",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":null,\"payload\":{\"id\":\"sdk-example\",\"title\":\"\\udc00\"}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "null-patch",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"patch\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":1,\"payload\":{\"title\":null}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "empty-patch",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"patch\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":1,\"payload\":{}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "null-create-version-required",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"create\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":1,\"payload\":{\"id\":\"sdk-example\",\"title\":\"Example\"}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "boolean-version",
+    "raw": "{\"schema\":\"devgraph.work-request.v1\",\"operation\":\"patch\",\"kind\":\"Issue\",\"id\":\"sdk-example\",\"expected_version\":true,\"payload\":{\"title\":\"Updated\"}}",
+    "python_accept": false,
+    "rust_accept": false
+  },
+  {
+    "name": "missing-schema",
+    "raw": "{\"operation\": \"create\", \"kind\": \"Issue\", \"id\": \"sdk-example\", \"expected_version\": null, \"payload\": {\"id\": \"sdk-example\", \"title\": \"Example\"}}",
+    "python_accept": false,
+    "rust_accept": false
+  }
+]

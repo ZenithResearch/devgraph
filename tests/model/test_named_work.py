@@ -47,7 +47,7 @@ def test_named_content_status_and_archive_lifecycle(kind):
     with pytest.raises(WorkObjectVersionConflictError):
         service.execute(command("archive", kind, "w-1", version=2))
     archived = service.execute(command("archive", kind, "w-1", version=3))
-    assert archived.status == WorkStatus.ARCHIVED and archived.version == 4
+    assert archived.archived and archived.status == WorkStatus.REVIEW and archived.version == 4
 
 
 def test_parent_attach_reparent_detach_and_stale_precondition():

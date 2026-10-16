@@ -651,3 +651,25 @@ def test_replay_lock_and_public_trust_files_reject_links(tmp_path: Path) -> None
             storage=MemoryGraphStorage(),
             audit_log=AuditLog(),
         )
+
+
+def test_topology_v2_bundle_is_separate_and_cannot_reuse_v1_authority(tmp_path):
+    from devgraph.auth.secs_monitor_topology import SecSMonitorTopologyAdapter
+
+    v1 = _write_bundle(tmp_path)
+    args = dict(data_root=tmp_path, storage=MemoryGraphStorage(), audit_log=AuditLog())
+    assert load_local_secs_monitor_view_read_adapter(**args, version=2) is None
+    v2 = v1.with_name('devgraph.monitor.view.read.v2')
+    v2.mkdir()
+    manifest = json.loads((v1 / 'receiver.json').read_text())
+    for name in ('receiver.json', 'secs-public-key-registry.json'):
+        (v2 / name).write_bytes((v1 / name).read_bytes())
+    with pytest.raises(LocalSecSMonitorViewReadError):
+        load_local_secs_monitor_view_read_adapter(**args, version=2)
+    manifest.update(operation='devgraph.monitor.view.read.v2',
+                    schema='devgraph-secs-monitor-view-read-receiver.v2', schema_version=2)
+    (v2 / 'receiver.json').write_text(json.dumps(manifest))
+    assert isinstance(load_local_secs_monitor_view_read_adapter(**args, version=2),
+                      SecSMonitorTopologyAdapter)
+    assert (v2 / REPLAY_DIRECTORY_NAME / REPLAY_STORE_NAME).exists()
+    assert not (v1 / REPLAY_DIRECTORY_NAME).exists()

@@ -1,0 +1,22 @@
+{
+  "schema": "devgraph.delegated-denial-reasons.v1",
+  "reasons": [
+    "invalid_credential",
+    "credential_not_yet_valid",
+    "credential_expired",
+    "credential_revoked",
+    "credential_superseded",
+    "scope_not_granted",
+    "resource_not_granted",
+    "invalid_request",
+    "unsupported_profile",
+    "unsupported_version",
+    "request_binding_mismatch",
+    "grant_amplification",
+    "issuer_mismatch",
+    "audience_mismatch",
+    "origin_not_allowed",
+    "version_rollback",
+    "replacement_chain_invalid"
+  ]
+}

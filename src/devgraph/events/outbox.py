@@ -148,13 +148,21 @@ class EventOutbox:
         on_result: Callable[[EventReceipt, bool], None],
     ) -> tuple[Any, EventReceipt]:
         from devgraph.arena_requests import ARENA_OPERATIONS
-        from devgraph.work_requests import WORK_OPERATIONS
+        from devgraph.work_requests import WORK_OPERATIONS, WORK_OPERATIONS_V2
 
         valid_work = operation in {f"devgraph.work.{op}.v1" for op in WORK_OPERATIONS} and (
-            subject_label in {"Proposal", "Initiative", "Project", "Issue", "Task"})
+            subject_label in {"Proposal", "Initiative", "Project", "Issue", "Task"}
+        )
+        valid_work = valid_work or (
+            operation in {f"devgraph.work.{op}.v2" for op in WORK_OPERATIONS_V2}
+            and subject_label in {"Todo", "Proposal", "Initiative", "Project", "Issue", "Task"}
+        )
         valid_arena = operation in {f"devgraph.arena.{op}.v1" for op in ARENA_OPERATIONS} and (
-            subject_label in ({"Initiative", "Task"} if operation == "devgraph.arena.member.set.v1"
-                              else {"Arena"}))
+            subject_label
+            in (
+                {"Initiative", "Task"} if operation == "devgraph.arena.member.set.v1" else {"Arena"}
+            )
+        )
         if not (valid_work or valid_arena):
             raise IdempotencyScopeConflict("invalid named Work operation")
         if (

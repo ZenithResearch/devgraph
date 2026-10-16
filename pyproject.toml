@@ -11,6 +11,7 @@ license = "AGPL-3.0-only"
 license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.10"
 dependencies = [
+  "anyio>=4.14.2,<5",
   "cryptography>=50.0.1,<51",
   "fastapi>=0.136.3,<0.137",
   "httpx>=0.28.0,<0.29",
@@ -36,6 +37,9 @@ where = ["src"]
 devgraph = [
   "resources/*.in",
   "frontend/static/selection/core/*",
+  "frontend/static/topology/*",
+  "frontend/static/kanban/*",
+  "frontend/static/credential-v2/*",
   "frontend/static/selection/page/*",
   "resources/migrations/*.cypher",
   "resources/migrations/*.json",

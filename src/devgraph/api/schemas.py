@@ -23,12 +23,8 @@ from devgraph.supporting_material_contract import (
 
 WorkKind = Literal["Proposal", "Initiative", "Project", "Issue", "Task"]
 WorkStatusValue = Literal["draft", "review", "accepted", "archived"]
-InitiativeObservationSubjectKindValue = Literal[
-    "github_repository", "github_organization"
-]
-InitiativeObservationClaimStatusValue = Literal[
-    "unclaimed", "claimed", "amended", "rejected"
-]
+InitiativeObservationSubjectKindValue = Literal["github_repository", "github_organization"]
+InitiativeObservationClaimStatusValue = Literal["unclaimed", "claimed", "amended", "rejected"]
 
 
 class _StrictRequest(BaseModel):
@@ -258,6 +254,8 @@ class MonitorGraphNodeEnvelope(BaseModel):
     category: Literal["work", "observation", "receipt", "arena"]
     archived: bool
     progress: MonitorWorkProgressEnvelope | None = None
+    todo_progress: Literal["not_started", "in_progress", "done"] | None = None
+    child_progress: dict[str, int] | None = None
     version: str | None = None
 
 

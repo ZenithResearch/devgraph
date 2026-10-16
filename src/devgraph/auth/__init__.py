@@ -2,6 +2,13 @@
 
 from devgraph.auth.context import AuthorityContext
 from devgraph.auth.credentials import CredentialEnvelope
+from devgraph.auth.delegated_registry import (
+    DELEGATED_CREDENTIAL_PREFIX_V1,
+    DELEGATED_REGISTRY_RELATIVE_PATH,
+    DELEGATED_REGISTRY_SCHEMA_V1,
+    DelegatedReadCredentialVerifier,
+    DelegatedRegistryConfigurationError,
+)
 from devgraph.auth.enforcement import (
     AuditLog,
     AuditRecord,
@@ -77,7 +84,12 @@ __all__ = [
     "CATEGORY_WRITE",
     "CredentialEnvelope",
     "CredentialVerifier",
+    "DELEGATED_CREDENTIAL_PREFIX_V1",
+    "DELEGATED_REGISTRY_RELATIVE_PATH",
+    "DELEGATED_REGISTRY_SCHEMA_V1",
     "DEVGRAPH_ISSUE_CREATE_OPERATION_V1",
+    "DelegatedReadCredentialVerifier",
+    "DelegatedRegistryConfigurationError",
     "ForbiddenError",
     "LocalDevVerifier",
     "LOCAL_READ_CREDENTIAL_PREFIX_V1",

@@ -1,7 +1,7 @@
 {
   "$schema": "https://zenith-research.ca/ontology/schemas/operation-catalog-v1",
   "schema_version": 1,
-  "ontology_version": "0.6.0",
+  "ontology_version": "0.8.0",
   "namespace": "urn:zenith:devgraph:operation:",
   "transport_policy": {
     "semantic_names_are_canonical": true,
@@ -205,6 +205,226 @@
       ],
       "request_schema_id": "urn:zenith:devgraph:schema:arena-request:v1",
       "response_schema_id": "urn:zenith:devgraph:schema:arena-mutation-result:v1"
+    },
+    {
+      "name": "devgraph.work.workflow.assign.v1",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.workflow.assign.v1",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "devgraph.work.workflow.review.v1",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.workflow.review.v1",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "devgraph.work.workflow.transition.v1",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.workflow.transition.v1",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:mutation-result:v1"
+    },
+    {
+      "name": "kanban",
+      "id": "urn:zenith:devgraph:operation:kanban:v1",
+      "mutation": false,
+      "required_scopes": [
+        "devgraph.read"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:kanban-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:kanban:v1"
+    },
+    {
+      "name": "workflows",
+      "id": "urn:zenith:devgraph:operation:workflows:v1",
+      "mutation": false,
+      "required_scopes": [
+        "devgraph.read"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:workflows-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:workflows:v1"
+    },
+    {
+      "name": "work_workflow",
+      "id": "urn:zenith:devgraph:operation:work_workflow:v1",
+      "mutation": false,
+      "required_scopes": [
+        "devgraph.read"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:work_workflow-request:v1",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-workflow:v1"
+    },
+    {
+      "name": "devgraph.work.create.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.create.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.patch.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.patch.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.archive.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.archive.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.accept.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.accept.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.convert.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.convert.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.parent.set.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.parent.set.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.dependency.add.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.dependency.add.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.dependency.remove.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.dependency.remove.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.blocker.add.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.blocker.add.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.blocker.remove.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.blocker.remove.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.workflow.assign.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.workflow.assign.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.workflow.review.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.workflow.review.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.workflow.transition.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.workflow.transition.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.progress.set.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.progress.set.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.restore.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.restore.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.proposal.reject.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.proposal.reject.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
     }
   ]
 }

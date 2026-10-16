@@ -1,5 +1,11 @@
 # Devgraph agent instructions
 
+Devgraph development, SDKs, and integration PRs belong in
+`ZenithResearch/devgraph`. `devgraph-private-history-20260915` is a deprecated
+historical archive, not a development or build dependency. See
+[public Wallet integration](docs/dev/public-wallet-integration.md).
+
+
 This repository is the local Devgraph work-graph source tree. Agents must use the
 repo-local CLI/API boundaries and preserve Devgraph's local-only beta claims.
 
@@ -102,6 +108,14 @@ The demo credential `fake-credential-monitor` is only for the in-memory monitor
 demo and must never be treated as persistent-host authority.
 
 ## Native signed Work/Arena prerequisites
+
+For the coordinated generic candidate, use
+`docs/dev/merged-wallet-provider-setup.md` and the pinned source set. Generic
+terminal approval requires a real person; unattended agents stop at
+`approval_required`. Unknown outcomes use the original files with
+`--credential-v2 --reconcile`. Never synthesize approval or automatically select
+the older signer. The binary/setup instructions below document the retained
+named-v1 compatibility installation, not the target generic Wallet package.
 
 Signed writes require fixed native binaries under the actual operating-system
 account home:

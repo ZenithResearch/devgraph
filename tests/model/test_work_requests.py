@@ -86,7 +86,7 @@ def test_reparent_requires_authority_for_both_parents():
         },
     )
     assert parse(body).resources == ("Issue/i-1", "Project/p-new", "Project/p-old")
-    body["payload"]["parent"]["kind"] = "Initiative"
+    body["payload"]["parent"]["kind"] = "Task"
     with pytest.raises(InvalidWorkRequest):
         parse(body)
 

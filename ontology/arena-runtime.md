@@ -61,7 +61,7 @@ then ID. Effective membership follows incoming `HAS_CHILD` to the Work root;
 the response contains `arena` (nullable), `root_kind`, `root_id`, and `inherited`.
 Archived parents still count. Multiple parents, cycles, or invalid direct
 membership fail closed. Validation queries only the requested Work's parent
-chain (at most Task → Issue → Project → Initiative) or the selected Arena page.
+chain (at most Task → Issue → Project → Initiative, with optional intermediate levels) or the selected Arena page.
 Each visited record returns at most two incoming edges of each containment
 type: a second edge proves ambiguity and is rejected, including duplicate edges.
 Page records and their validation edges are fetched together. There is no global

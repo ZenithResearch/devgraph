@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://work.zenith-research.ca/devgraph/contracts/v1/read-grant.schema.json",
+  "title": "Devgraph delegated read grant",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "operations", "relationship_types", "work_kinds", "include_archived"],
+      "properties": {
+        "scope": {"const": "devgraph.work.read"},
+        "operations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["list", "get", "relationships", "children", "blockers"]}},
+        "relationship_types": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["children", "parent", "dependencies", "dependents", "blockers", "blocked"]}},
+        "work_kinds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["Proposal", "Initiative", "Project", "Issue", "Task"]}},
+        "work_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^(Proposal|Initiative|Project|Issue|Task)/[a-z0-9][a-z0-9-]{0,127}$"}},
+        "arena_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"}},
+        "include_archived": {"type": "boolean"}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "arena_ids"],
+      "properties": {
+        "scope": {"const": "devgraph.arena.read"},
+        "arena_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"}}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope"],
+      "properties": {
+        "scope": {"enum": ["devgraph.graph.read", "devgraph.observation.read", "devgraph.material.read", "devgraph.document.read", "devgraph.query.read"]}
+      }
+    }
+  ]
+}

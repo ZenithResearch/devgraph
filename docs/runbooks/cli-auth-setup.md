@@ -1,5 +1,12 @@
 # CLI authentication setup
 
+For the merged generic Wallet candidate, use
+[public integration](../dev/public-wallet-integration.md) and
+[generic setup](../dev/merged-wallet-provider-setup.md). The application-specific
+signing binaries described below are historical compatibility prerequisites;
+merged Wallet no longer provides them. They are not a fallback for generic setup.
+
+
 ## Named Work grant administration
 
 Identity setup and permission grants are separate. After the signer is verified,

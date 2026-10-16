@@ -32,6 +32,7 @@ from devgraph.storage.base import (
     WorkContainment,
 )
 from devgraph.storage.containment import validate_arena_page, validate_containment_subject
+from devgraph.storage.delegated import DelegatedWorkSelector
 from devgraph.storage.supporting_material import (
     MAX_PROVENANCE,
     SUPPORTING_KINDS,
@@ -42,7 +43,7 @@ from devgraph.storage.supporting_material import (
 )
 
 try:  # Optional dependency: required only for canonical Neo4j runtime/smoke tests.
-    from neo4j import GraphDatabase
+    from neo4j import GraphDatabase, Query
     from neo4j.exceptions import Neo4jError, ServiceUnavailable
 except Exception:  # pragma: no cover - exercised by environments without neo4j installed.
     GraphDatabase = None  # type: ignore[assignment]
@@ -379,13 +380,17 @@ class Neo4jGraphStorage:
             if new_version == 1:
                 raise StorageUnavailable("canonical update requires version advancement")
             archive_assignment = (
-                ", n.archived = true" if node_properties["status"] == "archived" else ""
+                ", n.archived = CASE WHEN previous_status <> 'archived' "
+                "THEN true ELSE n.archived END"
+                if node_properties["status"] == "archived"
+                else ""
             )
             rows = self._run_graph(
                 f"MATCH (n:`{node_label}` {{id: $node_id}}) "
                 "WHERE n.kind = $properties.kind AND n.created_at = $properties.created_at "
-                "AND n.status <> 'archived' AND n.archived = false "
+                "AND (n.progress_schema = 1 OR n.status <> 'archived') AND n.archived = false "
                 "AND n.version = $expected_version "
+                "WITH n, n.status AS previous_status "
                 f"SET n += $properties{archive_assignment} "
                 "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
                 "properties(n) AS properties",
@@ -426,7 +431,7 @@ class Neo4jGraphStorage:
             rows = self._replace_generic_node(node_label, node_id, properties, archived=True)
         else:
             canonical = self._canonical_properties(node_label, node_id, properties)
-            if canonical["status"] != "archived":
+            if not canonical.get("progress_schema") and canonical["status"] != "archived":
                 raise StorageUnavailable("malformed canonical archive")
             new_version = validate_version(canonical["version"])
             if new_version == 1:
@@ -436,7 +441,7 @@ class Neo4jGraphStorage:
                 "WHERE n.kind = $properties.kind "
                 "AND n.created_at = $properties.created_at "
                 "AND n.version = $expected_version "
-                "AND n.status <> 'archived' AND n.archived = false "
+                "AND (n.progress_schema = 1 OR n.status <> 'archived') AND n.archived = false "
                 "SET n += $properties, n.archived = true "
                 "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
                 "properties(n) AS properties",
@@ -446,6 +451,27 @@ class Neo4jGraphStorage:
             )
         if len(rows) != 1:
             raise KeyError(f"missing, stale, or inconsistent {node_label}: {node_id}")
+        return self._node_from_row(rows[0], node_label, expected_id=node_id)
+
+    def restore_node(self, label, node_id, properties):
+        node_label = self._node_label(label)
+        validate_work_object_id(node_id)
+        canonical = self._canonical_properties(node_label, node_id, properties)
+        if canonical.get("progress_schema") != 1 or canonical["version"] <= 1:
+            raise StorageUnavailable("invalid restore")
+        rows = self._run_graph(
+            f"MATCH (n:`{node_label}` {{id: $node_id}}) "
+            "WHERE n.kind = $properties.kind AND n.created_at = $properties.created_at "
+            "AND n.archived = true AND n.version = $expected_version "
+            "SET n += $properties, n.archived = false "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            "properties(n) AS properties",
+            node_id=node_id,
+            properties=canonical,
+            expected_version=canonical["version"] - 1,
+        )
+        if len(rows) != 1:
+            raise KeyError("missing, stale, or inconsistent restore")
         return self._node_from_row(rows[0], node_label, expected_id=node_id)
 
     @staticmethod
@@ -597,11 +623,64 @@ class Neo4jGraphStorage:
         )
         return [self._node_from_row(row, row["labels"][0], expected_id=row["id"]) for row in rows]
 
+    def delegated_related_work_nodes(
+        self,
+        label: str,
+        node_id: str,
+        relationship: str,
+        *,
+        incoming: bool,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        from devgraph.storage.delegated import validate_work_filter
+
+        validate_work_filter(
+            label=label,
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=None,
+            limit=limit,
+        )
+        validate_work_object_id(node_id)
+        if relationship not in {"HAS_CHILD", "DEPENDS_ON", "BLOCKS"} or type(incoming) is not bool:
+            raise ValueError("invalid relationship read")
+        arrow = f"<-[:{relationship}]-" if incoming else f"-[:{relationship}]->"
+        rows = self._run_graph(
+            f"MATCH (source:`{label}` {{id: $node_id}}){arrow}(n) "
+            "WHERE size(labels(n)) = 1 AND labels(n)[0] IN $kinds "
+            "AND ($include_archived OR n.archived = false) "
+            "AND ($after_resource IS NULL OR labels(n)[0] + '/' + n.id > $after_resource) "
+            "AND any(selector IN $selectors WHERE "
+            "labels(n)[0] IN selector.work_kinds AND "
+            "(n.archived = false OR selector.include_archived) AND "
+            "(size(selector.work_ids) = 0 OR "
+            "labels(n)[0] + '/' + n.id IN selector.work_ids) AND "
+            "(size(selector.arena_ids) = 0 OR EXISTS { "
+            "MATCH (a:Arena)-[:CONTAINS_WORK]->(root)-[:HAS_CHILD*0..]->(n) "
+            "WHERE a.id IN selector.arena_ids })) "
+            "WITH DISTINCT n ORDER BY labels(n)[0], n.id LIMIT $limit "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            "properties(n) AS properties",
+            node_id=node_id,
+            kinds=list(work_kinds),
+            include_archived=include_archived,
+            after_resource=after_resource,
+            selectors=[selector.as_parameters() for selector in selectors],
+            limit=limit,
+        )
+        return [self._node_from_row(row, row["labels"][0], expected_id=row["id"]) for row in rows]
+
     @classmethod
     def _containment_from_row(cls, row: dict[str, Any]) -> WorkContainment:
         labels = row.get("labels")
         if (
-            not isinstance(labels, list) or len(labels) != 1
+            not isinstance(labels, list)
+            or len(labels) != 1
             or labels[0] not in CANONICAL_WORK_KINDS
         ):
             raise StorageUnavailable("malformed containment target")
@@ -610,14 +689,16 @@ class Neo4jGraphStorage:
         for field, relationship in (("parents", "HAS_CHILD"), ("memberships", "CONTAINS_WORK")):
             values = row.get(field)
             if (
-                not isinstance(values, list) or len(values) > 2
+                not isinstance(values, list)
+                or len(values) > 2
                 or any(not isinstance(value, dict) for value in values)
             ):
                 raise StorageUnavailable("malformed containment edges")
             edges = tuple(cls._edge_from_row(value) for value in values)
             if any(
                 (edge.to_label, edge.to_id, edge.relationship)
-                != (node.label, node.id, relationship) for edge in edges
+                != (node.label, node.id, relationship)
+                for edge in edges
             ):
                 raise StorageUnavailable("mismatched containment edges")
             groups.append(edges)
@@ -646,18 +727,95 @@ class Neo4jGraphStorage:
             "MATCH (:Arena {id: $arena_id})-[:CONTAINS_WORK]->(n) "
             "WHERE n.id IS NULL OR size(labels(n)) <> 1 OR $after_resource IS NULL "
             "OR labels(n)[0] + '/' + n.id > $after_resource "
-            "WITH DISTINCT n ORDER BY labels(n)[0], n.id LIMIT $limit "
-            + _containment_projection(),
-            arena_id=arena_id, after_resource=after_resource, limit=limit,
+            "WITH DISTINCT n ORDER BY labels(n)[0], n.id LIMIT $limit " + _containment_projection(),
+            arena_id=arena_id,
+            after_resource=after_resource,
+            limit=limit,
         )
         result = [self._containment_from_row(row) for row in rows]
         keys = [(item.node.label, item.node.id) for item in result]
         if (
-            len(result) > limit or keys != sorted(set(keys))
-            or any(after_resource is not None and f"{kind}/{work_id}" <= after_resource
-                   for kind, work_id in keys)
+            len(result) > limit
+            or keys != sorted(set(keys))
+            or any(
+                after_resource is not None and f"{kind}/{work_id}" <= after_resource
+                for kind, work_id in keys
+            )
         ):
             raise StorageUnavailable("invalid containment page")
+        return result
+
+    def delegated_arena_page(
+        self,
+        arena_ids: tuple[str, ...],
+        *,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        validate_page_limit(limit)
+        if not arena_ids or len(set(arena_ids)) != len(arena_ids):
+            raise ValueError("invalid delegated Arena selectors")
+        for arena_id in arena_ids:
+            validate_work_object_id(arena_id)
+        if after_id is not None:
+            validate_work_object_id(after_id)
+        rows = self._run_graph(
+            "MATCH (n:Arena) WHERE n.id IN $arena_ids AND n.archived = false "
+            "AND ($after_id IS NULL OR n.id > $after_id) "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            "properties(n) AS properties ORDER BY n.id LIMIT $limit",
+            arena_ids=list(arena_ids),
+            after_id=after_id,
+            limit=limit,
+        )
+        return [self._node_from_row(row, "Arena") for row in rows]
+
+    def delegated_arena_member_page(
+        self,
+        arena_id: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[WorkContainment]:
+        from devgraph.storage.delegated import validate_work_filter
+
+        validate_arena_page(arena_id, after_resource, limit)
+        validate_work_filter(
+            label="Initiative",
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=None,
+            limit=limit,
+        )
+        rows = self._run_graph(
+            "MATCH (:Arena {id: $arena_id})-[:CONTAINS_WORK]->(n) "
+            "WHERE n.id IS NULL OR size(labels(n)) <> 1 OR ("
+            "labels(n)[0] IN $kinds AND ($include_archived OR n.archived = false) "
+            "AND ($after_resource IS NULL OR labels(n)[0] + '/' + n.id > $after_resource) "
+            "AND any(selector IN $selectors WHERE "
+            "labels(n)[0] IN selector.work_kinds AND "
+            "(n.archived = false OR selector.include_archived) AND "
+            "(size(selector.work_ids) = 0 OR "
+            "labels(n)[0] + '/' + n.id IN selector.work_ids) AND "
+            "(size(selector.arena_ids) = 0 OR EXISTS { "
+            "MATCH (a:Arena)-[:CONTAINS_WORK]->(root)-[:HAS_CHILD*0..]->(n) "
+            "WHERE a.id IN selector.arena_ids })) "
+            "WITH DISTINCT n ORDER BY labels(n)[0], n.id LIMIT $limit " + _containment_projection(),
+            arena_id=arena_id,
+            kinds=list(work_kinds),
+            include_archived=include_archived,
+            after_resource=after_resource,
+            selectors=[selector.as_parameters() for selector in selectors],
+            limit=limit,
+        )
+        result = [self._containment_from_row(row) for row in rows]
+        keys = [(item.node.label, item.node.id) for item in result]
+        if len(result) > limit or keys != sorted(set(keys)):
+            raise StorageUnavailable("invalid delegated containment page")
         return result
 
     def supporting_material_references(
@@ -728,7 +886,6 @@ class Neo4jGraphStorage:
             raise StorageUnavailable("supporting reference bound exceeded")
         return references
 
-
     def supporting_material_nodes(self, keys: list[tuple[str, str]]) -> list[NodeRecord]:
         validate_supporting_keys(keys)
         if not keys:
@@ -782,6 +939,45 @@ class Neo4jGraphStorage:
         if len(rows) > len(keys):
             raise StorageUnavailable("ambiguous supporting identity")
         return list(found.values())
+
+    def monitor_records(self):
+        """One bounded statement materializes nodes and edges for all view facets."""
+        from devgraph.topology import PUBLIC_LABELS, SOURCE_EDGE_LIMIT, SOURCE_NODE_LIMIT
+
+        query = Query(
+            "CALL () { MATCH (n) WHERE size(labels(n)) = 1 AND labels(n)[0] IN $labels "
+            "WITH n ORDER BY labels(n)[0], n.id LIMIT $node_limit "
+            "RETURN collect({labels: labels(n), id: n.id, archived: n.archived, "
+            "properties: properties(n)}) AS nodes } "
+            "CALL () { MATCH (s)-[e]->(t) "
+            "WHERE size(labels(s)) = 1 AND size(labels(t)) = 1 "
+            "AND labels(s)[0] IN $labels AND labels(t)[0] IN $labels "
+            "WITH s, e, t ORDER BY labels(s)[0], s.id, type(e), labels(t)[0], t.id "
+            "LIMIT $edge_limit RETURN collect({from_labels: labels(s), from_id: s.id, "
+            "relationship: type(e), to_labels: labels(t), to_id: t.id, properties: {}}) "
+            "AS edges } RETURN nodes, edges",
+            timeout=5.0,
+        )
+        parameters = dict(
+            labels=list(PUBLIC_LABELS),
+            node_limit=SOURCE_NODE_LIMIT + 1,
+            edge_limit=SOURCE_EDGE_LIMIT + 1,
+        )
+        # Neo4j read-committed isolation is not a snapshot. Require two equal
+        # bounded materializations; one retry handles a concurrent graph change.
+        previous = self._run_graph(query, **parameters)
+        for _ in range(2):
+            rows = self._run_graph(query, **parameters)
+            if rows == previous:
+                break
+            previous = rows
+        else:
+            raise StorageUnavailable("topology changed during read; retry")
+        if len(rows) != 1:
+            raise StorageUnavailable("topology snapshot unavailable")
+        nodes = [self._node_from_row(row, row["labels"][0]) for row in rows[0]["nodes"]]
+        edges = [self._edge_from_row(row) for row in rows[0]["edges"]]
+        return nodes, edges
 
     def list_edges(
         self, relationship: str | None = None, *, limit: int | None = None
@@ -886,6 +1082,187 @@ class Neo4jGraphStorage:
             records.append(self._node_from_row(row, expected_label))
         return records
 
+    def todo_page(self, query):
+        from devgraph.storage.todos import STATUSES, TodoPage, validate_todo_page
+
+        if query.q or query.queue or query.order == "priority":
+            return self._todo_search_page(query)
+        # Todo is a canonical scalar-property label. Deliberately exclude generic
+        # legacy records with no kind, subclasses, and multiply labelled nodes.
+        scope = (
+            "MATCH (n:Todo) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
+            "AND ($archived = 'include' OR n.archived = ($archived = 'only')) "
+        )
+        statement = Query(
+            "CALL () { "
+            + scope
+            + "RETURN count(n) AS total, "
+            + ", ".join(
+                f"count(CASE WHEN n.status = '{status}' THEN 1 END) AS {status}"
+                for status in STATUSES
+            )
+            + ", count(CASE WHEN $status IS NULL OR n.status = $status THEN 1 END) "
+            "AS matching_count, "
+            "count(CASE WHEN ($status IS NULL OR n.status = $status) "
+            "AND ($after_id IS NULL OR n.id > $after_id) THEN 1 END) AS remaining_count } "
+            "CALL () { " + scope + "AND ($status IS NULL OR n.status = $status) "
+            "AND ($after_id IS NULL OR n.id > $after_id) "
+            "WITH n ORDER BY n.id LIMIT $limit "
+            "RETURN collect({labels: labels(n), id: n.id, archived: n.archived, "
+            "properties: properties(n)}) AS nodes } "
+            "RETURN total, draft, review, accepted, archived, matching_count, "
+            "remaining_count, nodes",
+            timeout=5.0,
+        )
+        rows = self._run_graph(
+            statement,
+            archived=query.archived,
+            status=query.status,
+            after_id=query.after_id,
+            limit=query.limit + 1,
+        )
+        if len(rows) != 1:
+            raise StorageUnavailable("Todo page unavailable")
+        try:
+            row = rows[0]
+            nodes = tuple(self._node_from_row(node, "Todo") for node in row["nodes"])
+            counts = {key: row[key] for key in ("total", *STATUSES)}
+            return validate_todo_page(
+                TodoPage(nodes, counts, row["matching_count"], row["remaining_count"]), query
+            )
+        except (KeyError, TypeError, ValueError):
+            raise StorageUnavailable("malformed Todo page") from None
+
+    def _todo_search_page(self, query):
+        from devgraph.storage.todos import (
+            SEARCH_SOURCE_LIMIT,
+            TodoPage,
+            order_key,
+            select_todo_page,
+            validate_todo_page,
+        )
+
+        # Search must run on redacted display titles. Materialize only bounded
+        # Todo metadata, never descriptions, relationships, or the whole graph.
+        extra_fields = (
+            ", .priority, .workflow_json, .progress"
+            if query.queue or query.order == "priority"
+            else ""
+        )
+        source = self._run_graph(
+            Query(
+                "MATCH (n:Todo) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
+                "AND ($archived = 'include' OR n.archived = ($archived = 'only')) "
+                "WITH n ORDER BY n.id LIMIT $source_limit "
+                "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+                "n{.id, .archived, .kind, .title, .status, .version"
+                + extra_fields
+                + "} AS properties",
+                timeout=5.0,
+            ),
+            archived=query.archived,
+            source_limit=SEARCH_SOURCE_LIMIT + 1,
+        )
+        if len(source) > SEARCH_SOURCE_LIMIT:
+            raise StorageUnavailable("Todo search capacity exceeded")
+        metadata = [self._node_from_row(row, "Todo", validate_canonical=False) for row in source]
+        selected = select_todo_page(metadata, query)
+        if not selected.nodes:
+            return selected
+        rows = self._run_graph(
+            Query(
+                "MATCH (n:Todo) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
+                "AND n.id IN $ids RETURN labels(n) AS labels, n.id AS id, "
+                "n.archived AS archived, properties(n) AS properties ORDER BY n.id LIMIT $limit",
+                timeout=5.0,
+            ),
+            ids=[node.id for node in selected.nodes],
+            limit=query.limit + 2,
+        )
+        nodes = tuple(
+            sorted(
+                (self._node_from_row(row, "Todo") for row in rows),
+                key=lambda node: order_key(node, query),
+            )
+        )
+        compared = ("kind", "title", "status", "version")
+        if extra_fields:
+            compared += ("priority", "workflow_json", "progress")
+        if len(nodes) != len(selected.nodes) or any(
+            node.id != prior.id
+            or node.archived != prior.archived
+            or any(node.properties.get(key) != prior.properties.get(key) for key in compared)
+            for node, prior in zip(nodes, selected.nodes, strict=True)
+        ):
+            raise StorageUnavailable("Todo search changed during read; retry")
+        return validate_todo_page(
+            TodoPage(nodes, selected.counts, selected.matching_count, selected.remaining_count),
+            query,
+        )
+
+    def todo_detail(self, todo_id):
+        validate_work_object_id(todo_id)
+        rows = self._run_graph(
+            Query(
+                "MATCH (n:Todo {id: $todo_id}) WHERE labels(n) = ['Todo'] AND n.kind = 'Todo' "
+                "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+                "properties(n) AS properties LIMIT 2",
+                timeout=5.0,
+            ),
+            todo_id=todo_id,
+        )
+        if len(rows) > 1:
+            raise StorageUnavailable("ambiguous Todo identity")
+        return self._node_from_row(rows[0], "Todo", expected_id=todo_id) if rows else None
+
+    def delegated_work_page(
+        self,
+        label: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        descending: bool = False,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]:
+        from devgraph.storage.delegated import validate_work_filter
+
+        validate_work_filter(
+            label=label,
+            selectors=selectors,
+            work_kinds=work_kinds,
+            include_archived=include_archived,
+            after_id=after_id,
+            limit=limit,
+        )
+        if not isinstance(descending, bool):
+            raise ValueError("invalid delegated order")
+        if label not in work_kinds:
+            return []
+        node_label = self._node_label(label)
+        comparison = "<" if descending else ">"
+        direction = "DESC" if descending else "ASC"
+        cursor = "" if after_id is None else f" AND n.id {comparison} $after_id"
+        rows = self._run_graph(
+            f"MATCH (n:`{node_label}`) WHERE ($include_archived OR n.archived = false)"
+            f"{cursor} AND any(selector IN $selectors WHERE "
+            "labels(n)[0] IN selector.work_kinds AND "
+            "(n.archived = false OR selector.include_archived) AND "
+            "(size(selector.work_ids) = 0 OR "
+            "labels(n)[0] + '/' + n.id IN selector.work_ids) AND "
+            "(size(selector.arena_ids) = 0 OR EXISTS { "
+            "MATCH (a:Arena)-[:CONTAINS_WORK]->(root)-[:HAS_CHILD*0..]->(n) "
+            "WHERE a.id IN selector.arena_ids })) "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            f"properties(n) AS properties ORDER BY n.id {direction} LIMIT $limit",
+            include_archived=include_archived,
+            after_id=after_id,
+            selectors=[selector.as_parameters() for selector in selectors],
+            limit=limit,
+        )
+        return [self._node_from_row(row, node_label) for row in rows]
+
     def claim_event_receipt(
         self,
         node_id: str,
@@ -959,7 +1336,11 @@ class Neo4jGraphStorage:
 
     @classmethod
     def _node_from_row(
-        cls, row: dict[str, Any], expected_label: str, *, expected_id: str | None = None,
+        cls,
+        row: dict[str, Any],
+        expected_label: str,
+        *,
+        expected_id: str | None = None,
         validate_canonical: bool = True,
     ) -> NodeRecord:
         canonical_payload = False
@@ -985,6 +1366,13 @@ class Neo4jGraphStorage:
                 properties = {
                     key: raw_properties[key]
                     for key in CANONICAL_MODEL_PROPERTIES
+                    | {
+                        "workflow_json",
+                        "progress",
+                        "progress_schema",
+                        "progress_record_id",
+                        "progress_migration_json",
+                    }
                     if key in raw_properties
                 }
                 properties = validate_canonical_work_object_properties(
@@ -1031,9 +1419,12 @@ class Neo4jGraphStorage:
         from devgraph.storage.cypher_read import Neo4jCypherReadRunner
 
         driver = GraphDatabase.driver(
-            self._config.uri, auth=(self._config.user, self._config.password),
-            max_connection_pool_size=2, connection_timeout=2.0,
-            connection_acquisition_timeout=2.0, max_transaction_retry_time=0.0,
+            self._config.uri,
+            auth=(self._config.user, self._config.password),
+            max_connection_pool_size=2,
+            connection_timeout=2.0,
+            connection_acquisition_timeout=2.0,
+            max_transaction_retry_time=0.0,
         )
         try:
             return Neo4jCypherReadRunner(driver, database=self._config.database or "neo4j")
@@ -1231,16 +1622,20 @@ class Neo4jMigrationStore:
     def apply_transactional_data(self, migration: Any, attempt_id: str, completed_at: str) -> bool:
         from dataclasses import asdict
 
-        if (
-            getattr(migration, "version", None) != 23
-            or getattr(migration, "name", None) != "canonical_work_object_persistence_v1"
-            or getattr(migration, "kind", None) != "transactional_data"
-        ):
+        from devgraph.progress import TODO_KINDS
+
+        if (getattr(migration, "version", None), getattr(migration, "name", None)) not in {
+            (23, "canonical_work_object_persistence_v1"),
+            (27, "workflow_metadata_v1"),
+            (28, "todo_progress_v1"),
+        } or getattr(migration, "kind", None) != "transactional_data":
             raise StorageUnavailable("unsupported transactional migration")
         journal = MigrationJournal.transactional_applied(migration, attempt_id, completed_at)
         backfills: list[tuple[str, str, bool]] = []
         try:
             with self._storage.transaction():
+                progress_plan = []
+                progress_records = []
                 for label in CANONICAL_WORK_KINDS:
                     rows = self._storage._run_graph(
                         f"MATCH (n:`{label}`) RETURN labels(n) AS labels, n.id AS id, "
@@ -1265,6 +1660,25 @@ class Neo4jMigrationStore:
                             "archived": archived,
                             "properties": {**raw_properties, "archived": archived},
                         }
+                        if migration.version == 28 and label in TODO_KINDS:
+                            # Check structural integrity independently of the progress
+                            # contradiction that this migration must report, not erase.
+                            props = dict(hydrated_row["properties"])
+                            props.pop("progress", None)
+                            props["progress_schema"] = 1
+                            hydrated_row["properties"] = props
+                            progress_records.append(
+                                NodeRecord(
+                                    label,
+                                    node_id,
+                                    {
+                                        k: v
+                                        for k, v in raw_properties.items()
+                                        if k not in {"id", "archived"}
+                                    },
+                                    archived,
+                                )
+                            )
                         try:
                             Neo4jGraphStorage._node_from_row(
                                 hydrated_row, label, expected_id=node_id
@@ -1276,8 +1690,14 @@ class Neo4jMigrationStore:
                         validated_id = validate_work_object_id(node_id)
                         if not isinstance(archived, bool):
                             raise ValueError("archived")
+                        if archived_missing and migration.version == 27:
+                            raise StorageUnavailable("canonical persistence preflight failed")
                         if archived_missing:
                             backfills.append((label, validated_id, archived))
+                if migration.version == 28:
+                    from devgraph.progress_migration import plan_progress_migration
+
+                    progress_plan = plan_progress_migration(self._storage, progress_records)
                 for label, node_id, archived in backfills:
                     changed = self._storage._run_graph(
                         f"MATCH (n:`{label}` {{id: $node_id}}) "
@@ -1288,18 +1708,36 @@ class Neo4jMigrationStore:
                     )
                     if not changed or changed[0].get("changed") != 1:
                         raise StorageUnavailable("canonical persistence backfill failed")
+                for item in progress_plan:
+                    changed = self._storage._run_graph(
+                        f"MATCH (n:`{item['kind']}` {{id: $node_id}}) "
+                        "WHERE n.version = $expected_version "
+                        "SET n.progress_schema = 1, n.progress = $progress, "
+                        "n.archived = $archived, "
+                        "n.progress_migration_json = $history RETURN count(n) AS changed",
+                        node_id=item["id"],
+                        expected_version=item["expected_version"],
+                        progress=item["progress"],
+                        archived=item["archived"],
+                        history=item["progress_migration_json"],
+                    )
+                    if len(changed) != 1 or changed[0].get("changed") != 1:
+                        raise StorageUnavailable("progress migration changed during read")
                 rows = self._storage._run_graph(
                     "MATCH (owner:DevgraphMigration {version: 0, owner_attempt_id: $attempt}) "
                     "WHERE owner.state = 'owned' AND owner.runner_schema_version = 1 "
                     "MATCH (prior:DevgraphMigration) "
-                    "WHERE prior.version >= 1 AND prior.version <= 22 AND prior.state = 'applied' "
+                    "WHERE prior.version >= 1 AND prior.version < $version "
+                    "AND prior.state = 'applied' "
                     "WITH owner, count(prior) AS prior_count "
-                    "WHERE prior_count = 22 AND NOT EXISTS { "
-                    "MATCH (:DevgraphMigration {version: 23}) } "
-                    "CREATE (journal:DevgraphMigration {version: 23}) SET journal = $data "
+                    "WHERE prior_count = $prior_count AND NOT EXISTS { "
+                    "MATCH (:DevgraphMigration {version: $version}) } "
+                    "CREATE (journal:DevgraphMigration {version: $version}) SET journal = $data "
                     "RETURN count(journal) AS applied",
                     attempt=attempt_id,
                     data=asdict(journal),
+                    version=migration.version,
+                    prior_count=migration.version - 1,
                 )
                 if len(rows) != 1 or rows[0].get("applied") != 1:
                     raise StorageUnavailable("canonical persistence journal marker failed")

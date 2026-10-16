@@ -1,0 +1,18 @@
+[package]
+name = "devgraph-work-protocol"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+publish = false
+license = "AGPL-3.0-only"
+description = "Shared strict Devgraph named Work protocol for native and WebAssembly callers"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[features]
+# Used by the external-feature conformance job, never needed for correctness.
+hostile-map-order = ["serde_json/preserve_order"]
+hostile-number-repr = ["serde_json/arbitrary_precision"]

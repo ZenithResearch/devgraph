@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from devgraph.arena_requests import ArenaRequest
 from devgraph.arenas import ArenaMutations
 from devgraph.auth.enforcement import AuditLog
+from devgraph.auth.sdk_receiver_profile import receiver_profile_digest
 from devgraph.auth.secs_issue_create import (
     _ACTOR_ID,
     _AUTHORITY_IDENTIFIER,
@@ -97,8 +98,22 @@ class SecSWorkVerifier:
             raise TypeError("invalid named Work verifier configuration")
         self.config = config
 
-    def verify(self, *, request_json: bytes, projection_json: bytes, idempotency_key: str):
+    def verify(
+        self, *, request_json: bytes, projection_json: bytes, idempotency_key: str,
+        receiver_profile: str | None = None,
+    ):
+        config = self.config
         try:
+            # The conditional pin and signature admission use this same captured
+            # configuration instance. A separately reloaded profile would race.
+            if receiver_profile is not None and (
+                not isinstance(receiver_profile, str)
+                or _LOWER_HEX_64.fullmatch(receiver_profile) is None
+                or not hmac.compare_digest(receiver_profile, receiver_profile_digest(
+                    stable_issuer=config.stable_issuer, audience=config.audience,
+                ))
+            ):
+                raise SecSWorkDenied("sdk_receiver_profile_mismatch")
             request = parse_named_request(request_json)
             projection = _strict_json_object(
                 projection_json, maximum_bytes=16_384, reason="invalid_work_projection"
@@ -111,14 +126,14 @@ class SecSWorkVerifier:
                 "actor_signature_suite": "Ed25519",
                 "secs_verifier_signature_suite": "Ed25519",
                 "replay_scope": "session:operation:nonce",
-                "audience": self.config.audience,
+                "audience": config.audience,
             }
             if any(projection[key] != value for key, value in exact.items()):
                 raise SecSWorkDenied()
             if type(projection["schema_version"]) is not int or projection["schema_version"] != 1:
                 raise SecSWorkDenied()
             try:
-                now = self.config.clock()
+                now = config.clock()
             except Exception:
                 raise SecSWorkDenied("clock_unavailable") from None
             _require_nonnegative_safe_integer(now, reason="clock_unavailable")
@@ -168,7 +183,7 @@ class SecSWorkVerifier:
                 int.from_bytes(signature[32:], "little") >= _ED25519_SCALAR_ORDER
             ):
                 raise SecSWorkDenied()
-            key = self.config.key_registry.require_production_key(
+            key = config.key_registry.require_production_key(
                 projection["secs_verifier_key_id"], now=now
             )
             unsigned = dict(projection)
@@ -176,7 +191,7 @@ class SecSWorkVerifier:
             Ed25519PublicKey.from_public_bytes(key.public_key).verify(
                 signature, SIGNATURE_DOMAIN + _canonical_json(unsigned)
             )
-            self.config.policy_registry.require_binding(
+            config.policy_registry.require_binding(
                 projection["receiver_policy_id"],
                 projection["receiver_policy_version"],
                 projection["receiver_policy_digest_sha256"],
@@ -194,8 +209,8 @@ class SecSWorkVerifier:
                 PROJECTION_DOMAIN + _canonical_json(projection)
             ).hexdigest()
             principal = _Principal(
-                issuer=self.config.stable_issuer,
-                audience=self.config.audience,
+                issuer=config.stable_issuer,
+                audience=config.audience,
                 actor_id=projection["actor_id"],
                 session_id=projection["session_id"],
                 correlation_id=f"dg:sha256:{projection_digest}",
@@ -242,41 +257,51 @@ class SecSWorkAdapter:
         self.arena_mutations = ArenaMutations(storage)
         self.outbox = EventOutbox(storage)
 
-    def execute(self, *, request_json: bytes, projection_json: bytes, idempotency_key: str):
-        verified = self.verifier.verify(
+    def execute(
+        self, *, request_json: bytes, projection_json: bytes, idempotency_key: str,
+        receiver_profile: str | None = None,
+    ):
+        arguments = dict(
             request_json=request_json,
             projection_json=projection_json,
             idempotency_key=idempotency_key,
         )
-        request = verified.request
-        subject_kind, subject_id = (
-            ("Issue", request.payload["issue_id"])
-            if request.operation == "convert"
-            else (request.kind, request.id)
-        )
-
-        def audit_result(receipt, duplicate):
-            self.audit_log.record(
-                actor_id=verified.principal.actor_id,
-                session_id=verified.principal.session_id,
-                correlation_id=verified.principal.correlation_id,
-                category="write",
-                operation=request.authority_operation,
-                safe_summary={
-                    **verified.safe_summary,
-                    "receipt_id": receipt.id,
-                    "duplicate": duplicate,
-                },
-            )
+        if receiver_profile is not None:
+            arguments["receiver_profile"] = receiver_profile
+        initial = self.verifier.verify(**arguments)
 
         with self.audit_log.transaction():
             with self.storage.work_mutation_transaction():
-                # Queueing for the database lock must not extend the proof lifetime.
-                self.verifier.verify(
-                    request_json=request_json,
-                    projection_json=projection_json,
-                    idempotency_key=idempotency_key,
+                # Queueing must not extend the proof lifetime or switch the
+                # admitted principal. Only the final checked result may commit.
+                verified = self.verifier.verify(**arguments)
+                if (
+                    verified.principal != initial.principal
+                    or verified.request != initial.request
+                    or verified.idempotency_digest != initial.idempotency_digest
+                ):
+                    raise SecSWorkDenied("named_work_admission_binding_changed")
+                request = verified.request
+                subject_kind, subject_id = (
+                    ("Issue", request.payload["issue_id"])
+                    if request.operation == "convert"
+                    else (request.kind, request.id)
                 )
+
+                def audit_result(receipt, duplicate):
+                    self.audit_log.record(
+                        actor_id=verified.principal.actor_id,
+                        session_id=verified.principal.session_id,
+                        correlation_id=verified.principal.correlation_id,
+                        category="write",
+                        operation=request.authority_operation,
+                        safe_summary={
+                            **verified.safe_summary,
+                            "receipt_id": receipt.id,
+                            "duplicate": duplicate,
+                        },
+                    )
+
                 work, receipt = self.outbox.record_named_work_v1_with_receipt(
                     principal=verified.principal,
                     operation=request.authority_operation,
@@ -287,9 +312,10 @@ class SecSWorkAdapter:
                     idempotency_key_digest_sha256=verified.idempotency_digest,
                     summary=verified.safe_summary,
                     mutation=lambda _: (
-                        self.arena_mutations
-                        if isinstance(request, ArenaRequest) else self.mutations
-                    ).execute(request),
+                        self.arena_mutations.execute(request)
+                        if isinstance(request, ArenaRequest) else
+                        self.mutations.execute(request, actor_id=verified.principal.actor_id)
+                    ),
                     on_result=audit_result,
                 )
         return work, receipt, work is None

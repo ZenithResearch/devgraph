@@ -40,8 +40,8 @@ def test_parentage_edges_reject_invalid_parent_child_pairs():
     graph.add_work_object(issue)
 
     try:
-        graph.add_parent(issue, initiative)
+        graph.add_parent(initiative, issue)
     except ValueError as exc:
         assert "invalid parentage" in str(exc)
     else:
-        raise AssertionError("Issue cannot be parented directly by Initiative in v0")
+        raise AssertionError("Initiative cannot be parented by Issue")

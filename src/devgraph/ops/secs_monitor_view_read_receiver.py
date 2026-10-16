@@ -424,7 +424,7 @@ def _fixed_replay_store_path(data_root: Path, bundle: Path) -> Path:
     try:
         validated = require_receiver_directory_path(
             data_root,
-            RECEIVER_BUNDLE_RELATIVE_PATH / REPLAY_DIRECTORY_NAME,
+            bundle.relative_to(data_root) / REPLAY_DIRECTORY_NAME,
             missing_ok=False,
         )
     except LocalPathIntegrityError as error:
@@ -465,14 +465,8 @@ def _read_public_bounded_file(
     try:
         info = os.fstat(descriptor)
         if not stat.S_ISREG(info.st_mode):
-            raise LocalSecSMonitorViewReadError(
-                f"{label} is not an available regular file"
-            )
-        if (
-            info.st_uid != os.geteuid()
-            or stat.S_IMODE(info.st_mode) & 0o022
-            or info.st_nlink != 1
-        ):
+            raise LocalSecSMonitorViewReadError(f"{label} is not an available regular file")
+        if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) & 0o022 or info.st_nlink != 1:
             raise LocalSecSMonitorViewReadError(f"{label} is not receiver-owned")
         try:
             require_file_descriptor_without_acl(descriptor)
@@ -533,14 +527,19 @@ def _canonical_json(value: dict[str, Any]) -> bytes:
         raise ValueError("invalid canonical replay store") from None
 
 
-def _parse_receiver_manifest(raw: bytes) -> _ReceiverManifest:
+def _parse_receiver_manifest(raw: bytes, *, version: int = 1) -> _ReceiverManifest:
     value = _strict_json_object(raw, label="monitor receiver manifest")
     if (
         set(value) != _RECEIVER_MANIFEST_FIELDS
-        or value.get("schema") != RECEIVER_MANIFEST_SCHEMA
+        or value.get("schema")
+        != (
+            RECEIVER_MANIFEST_SCHEMA
+            if version == 1
+            else "devgraph-secs-monitor-view-read-receiver.v2"
+        )
         or type(value.get("schema_version")) is not int
-        or value["schema_version"] != 1
-        or value.get("operation") != DEVGRAPH_MONITOR_VIEW_READ_OPERATION_V1
+        or value["schema_version"] != version
+        or value.get("operation") != f"devgraph.monitor.view.read.v{version}"
         or value.get("audience") != DEVGRAPH_MONITOR_VIEW_READ_AUDIENCE_V1
         or value.get("origin") != DEVGRAPH_MONITOR_VIEW_READ_ORIGIN_V1
         or not isinstance(value.get("stable_issuer"), str)
@@ -571,15 +570,18 @@ def load_local_secs_monitor_view_read_adapter(
     storage: GraphStorage,
     audit_log: AuditLog,
     clock: Callable[[], int] | None = None,
+    version: int = 1,
 ) -> SecSMonitorViewReadAdapter | None:
     """Load the fixed public receiver bundle, or leave the route closed."""
 
+    if type(version) is not int or version not in (1, 2):
+        raise LocalSecSMonitorViewReadError("unsupported monitor receiver version")
     if not isinstance(data_root, Path) or not data_root.is_absolute():
         raise LocalSecSMonitorViewReadError("configured data root is invalid")
     try:
         bundle = require_receiver_directory_path(
             data_root,
-            RECEIVER_BUNDLE_RELATIVE_PATH,
+            Path(f"secrets/secs-magik/devgraph.monitor.view.read.v{version}"),
             missing_ok=True,
         )
     except LocalPathIntegrityError as error:
@@ -596,14 +598,17 @@ def load_local_secs_monitor_view_read_adapter(
         label="secS public key registry",
         maximum_bytes=SECS_PUBLIC_KEY_REGISTRY_MAX_BYTES,
     )
-    manifest = _parse_receiver_manifest(manifest_raw)
+    manifest = _parse_receiver_manifest(manifest_raw, version=version)
     active_clock = clock or (lambda: int(time.time()))
     replay_store = DurableSecSMonitorViewReadReplayStore(
         _fixed_replay_store_path(data_root, bundle)
     )
     try:
         registry = SecSVerifierKeyRegistry.from_json(registry_raw)
-        verifier = SecSMonitorViewReadVerifier(
+        from devgraph.auth.secs_monitor_topology import SecSMonitorTopologyVerifier
+
+        verifier_type = SecSMonitorViewReadVerifier if version == 1 else SecSMonitorTopologyVerifier
+        verifier = verifier_type(
             SecSMonitorViewReadVerifierConfig(
                 audience=DEVGRAPH_MONITOR_VIEW_READ_AUDIENCE_V1,
                 origin=DEVGRAPH_MONITOR_VIEW_READ_ORIGIN_V1,
@@ -618,7 +623,10 @@ def load_local_secs_monitor_view_read_adapter(
         raise LocalSecSMonitorViewReadError(
             "monitor receiver trust configuration is malformed"
         ) from None
-    return SecSMonitorViewReadAdapter(
+    from devgraph.auth.secs_monitor_topology import SecSMonitorTopologyAdapter
+
+    adapter_type = SecSMonitorViewReadAdapter if version == 1 else SecSMonitorTopologyAdapter
+    return adapter_type(
         verifier=verifier,
         storage=storage,
         audit_log=audit_log,

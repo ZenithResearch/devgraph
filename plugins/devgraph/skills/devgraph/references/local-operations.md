@@ -99,6 +99,13 @@ Reconfiguration requires stopped services and explicit `--replace`; it neither
 copies nor migrates existing data. Consult the distribution's host runbook for
 runtime installation and ownership prerequisites before configuring a host.
 
+For an internal database, `local configure --recovery-external-root PATH` selects
+an existing external storage root for its `devgraph/recovery` copy. The other
+copy remains under the fixed internal installation. Omitting the option preserves
+the legacy data-root destination. Recovery refuses missing or linked roots and
+requires distinct physical disks, with at least one independent copy of every
+protected source. Configuration never moves existing recovery sets.
+
 Use `local recovery status` / `local recovery verify` for existing recovery
 evidence. A backup is not a verified restore; restored authority is not current
 authority. Restore drills require an isolated empty target. Do not claim public

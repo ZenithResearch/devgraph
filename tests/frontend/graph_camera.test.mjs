@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { topologySource } from './monitor_test_helpers.mjs';
 
 const frontend = readFileSync(new URL('../../src/devgraph/frontend/app.py', import.meta.url), 'utf8');
 const functionNames = [
@@ -32,9 +33,11 @@ function camera(width = 1080, height = 420) {
       });
       return elements.get(id);
     } },
+    announceGraph() {}, renderTopologyControls() {}, beginArrangement() {}, finishArrangement() {}, cancelArrangement() {}, requestGraphRender() {}, pickGraphNodes: () => [],
     text() {}, renderGraph() {}, renderGraphSelection() {}, renderGraphSearch() {}, renderArenaFilter() {},
     graphCoordinates(nodes) { return new Map(nodes.map(node => [node.key, node.point])); },
   });
+  vm.runInContext(topologySource, context); context.Topology = context.DevgraphTopology;
   vm.runInContext(source, context);
   return context;
 }
@@ -53,7 +56,7 @@ test('zoom keeps the graph point under an off-center cursor fixed, including at 
     const after = c.projectGraphPoint(point);
     near(after.x, anchor.x, 'cursor x');
     near(after.y, anchor.y, 'cursor y');
-    assert.ok(c.graphView.zoom >= .25 && c.graphView.zoom <= 4);
+    assert.ok(c.graphView.zoom >= .05 && c.graphView.zoom <= 4);
   }
 });
 
@@ -114,6 +117,32 @@ test('viewport resize preserves zoom and relative camera framing, and a round tr
   const restored = c.projectGraphPoint(point);
   near(restored.x, initial.x, 'restored x');
   near(restored.y, initial.y, 'restored y');
+});
+
+test('fit includes every corner of Arena volumes at oblique camera angles',()=>{
+  const c=camera(920,620),region={x:-420,y:-170,z:-150,width:900,height:440,depth:450,keys:[]};
+  c.graphView.layoutPlan={groups:[region]};c.graphView.nodePositions=new Map();
+  for(const [yaw,pitch] of [[-.32,.24],[.8,-.6],[2.2,.7]]){
+    Object.assign(c.graphView,{yaw,pitch});c.fitGraph();
+    for(const corner of c.Topology.regionCorners(region)){
+      const p=c.projectGraphPoint(corner);
+      assert.ok(p.x>=0&&p.x<=920&&p.y>=0&&p.y<=620,'volume fits, not only its diagonal');
+    }
+  }
+});
+
+test('large 3D volumes retain straight perspective edges instead of clamped depth planes',()=>{
+  const c=camera(1080,720),region={x:-1800,y:-700,z:-200,width:3600,height:1500,depth:500,keys:[]};
+  c.graphView.layoutPlan={groups:[region]};c.graphView.nodePositions=new Map();c.fitGraph();
+  const corners=c.Topology.regionCorners(region);
+  for(const yaw of [-1,.32,2]){
+    c.graphView.yaw=yaw;
+    for(const [a,b] of [[0,1],[0,4],[1,2],[6,7]]){
+      const p=c.projectGraphPoint(corners[a]),q=c.projectGraphPoint(corners[b]);
+      const m=c.projectGraphPoint({x:(corners[a].x+corners[b].x)/2,y:(corners[a].y+corners[b].y)/2,z:(corners[a].z+corners[b].z)/2});
+      near((q.x-p.x)*(m.y-p.y)-(q.y-p.y)*(m.x-p.x),0,'projected edge is straight');
+    }
+  }
 });
 
 test('a fitted graph remains visible when resizing between portrait and landscape', () => {
@@ -183,7 +212,7 @@ test('resizing updates both visible height and accessible value without changing
   Object.assign(c.graphView, { zoom: 1.8, panX: 94, panY: -11 });
   for (const [requested, expected] of [[20, 280], [573.8, 574], [5000, 1200]]) {
     c.setGraphHeight(requested);
-    assert.equal(c.document.getElementById('topology').properties['--graph-height'], `${expected}px`);
+    assert.equal(c.document.getElementById('graph-surface').properties['--graph-height'], `${expected}px`);
     assert.equal(c.document.getElementById('graph-resize').attributes['aria-valuenow'], String(expected));
     assert.equal(c.document.getElementById('graph-resize').attributes['aria-valuetext'], `${expected} pixels`);
     near(c.graphView.zoom, 1.8, 'zoom survives height changes');
@@ -223,9 +252,9 @@ function gestures() {
   vm.runInContext(frontend.slice(start, end), c);
   return {
     c, captures, classes,
-    send(type, pointerId, x = 0, y = 0, nodeKey = null) {
+    send(type, pointerId, x = 0, y = 0, nodeKey = null, modifiers = {}) {
       listeners.get(type)({
-        type, pointerId, clientX: x, clientY: y, button: 0, shiftKey: false,
+        type, pointerId, clientX: x, clientY: y, button: 0, shiftKey: false, ...modifiers,
         target: { closest() { return nodeKey ? { dataset: { nodeKey } } : null; } },
         preventDefault() {},
       });
@@ -246,6 +275,32 @@ test('pointer cancellation releases capture and does not select a dragged node',
   assert.equal(g.classes.size, 0);
 });
 
+test('ordinary background drag pans without rotating or moving nodes',()=>{
+  const g=gestures(),before={...g.c.graphView};
+  g.send('pointerdown',1,10,20);
+  g.send('pointermove',1,40,60);
+  g.send('pointerup',1,40,60);
+  near(g.c.graphView.panX,before.panX+30,'pan x');
+  near(g.c.graphView.panY,before.panY+40,'pan y');
+  near(g.c.graphView.yaw,before.yaw,'yaw unchanged');
+  near(g.c.graphView.pitch,before.pitch,'pitch unchanged');
+  assert.equal(g.c.movements.length,0);assert.equal(g.c.state.selectedGraphKey,null);
+});
+
+test('Command-drag rotates from background or nodes without panning or moving an item',()=>{
+  for(const nodeKey of [null,'test-node']){
+    const g=gestures(),before={...g.c.graphView};
+    g.send('pointerdown',1,10,20,nodeKey,{metaKey:true});
+    // Releasing Command during a gesture does not switch modes mid-drag.
+    g.send('pointermove',1,40,60,nodeKey,{metaKey:false});
+    g.send('pointerup',1,40,60,nodeKey);
+    assert.notEqual(g.c.graphView.yaw,before.yaw);assert.notEqual(g.c.graphView.pitch,before.pitch);
+    near(g.c.graphView.panX,before.panX,'pan x unchanged');near(g.c.graphView.panY,before.panY,'pan y unchanged');
+    assert.equal(g.c.movements.length,0);assert.equal(g.c.state.selectedGraphKey,null);
+    assert.equal(g.captures.size,0);
+  }
+});
+
 test('a node click, including small hand jitter, selects without moving neighbors', () => {
   for (const jitter of [0, 3]) {
     const g = gestures();
@@ -260,14 +315,14 @@ test('a node click, including small hand jitter, selects without moving neighbor
   }
 });
 
-test('a deliberate node drag moves the node and relaxes connected work only after the threshold', () => {
+test('a deliberate node drag moves only the selected node after the threshold without running physics', () => {
   const g = gestures();
   g.send('pointerdown', 1, 10, 10, 'test-node');
   g.send('pointermove', 1, 12, 11);
   assert.equal(g.c.relaxations.length, 0);
   assert.equal(g.c.movements.length, 0);
   g.send('pointermove', 1, 40, 20);
-  assert.ok(g.c.relaxations.length > 0);
+  assert.equal(g.c.relaxations.length, 0, 'pointer movement must never dispatch layout work');
   assert.ok(g.c.movements.length > 0);
   g.send('pointerup', 1, 40, 20, 'test-node');
   assert.equal(g.c.graphView.drag, null);

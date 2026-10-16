@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://work.zenith-research.ca/devgraph/contracts/v1/request-profile.schema.json",
+  "title": "Devgraph credential request profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "issuer", "audience", "resource", "requested_scopes", "requested_grants", "reason"],
+  "properties": {
+    "schema": {"const": "devgraph.credential-request-profile.v1"},
+    "issuer": {"type": "string", "minLength": 1, "maxLength": 256},
+    "audience": {"const": "devgraph"},
+    "resource": {"const": "https://work.zenith-research.ca/devgraph"},
+    "requested_scopes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["devgraph.graph.read", "devgraph.work.read", "devgraph.arena.read", "devgraph.observation.read", "devgraph.material.read", "devgraph.document.read", "devgraph.query.read"]}},
+    "requested_grants": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "read-grant.schema.json"}},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 1024}
+  }
+}

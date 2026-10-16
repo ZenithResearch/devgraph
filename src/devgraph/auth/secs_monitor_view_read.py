@@ -42,12 +42,8 @@ DEVGRAPH_MONITOR_VIEW_READ_HOST_V1 = "127.0.0.1:8080"
 DEVGRAPH_MONITOR_SESSION_SCHEMA_V1 = "secs-devgraph-monitor-session.v1"
 DEVGRAPH_MONITOR_REQUEST_PROOF_SCHEMA_V1 = "devgraph-monitor-request-proof.v1"
 DEVGRAPH_MONITOR_SIGNATURE_SUITE_V1 = "Ed25519"
-DEVGRAPH_MONITOR_SESSION_SIGNATURE_DOMAIN_V1 = (
-    b"secs-devgraph-monitor-session.v1/signature\x00"
-)
-DEVGRAPH_MONITOR_SESSION_DIGEST_DOMAIN_V1 = (
-    b"secs-devgraph-monitor-session.v1/session\x00"
-)
+DEVGRAPH_MONITOR_SESSION_SIGNATURE_DOMAIN_V1 = b"secs-devgraph-monitor-session.v1/signature\x00"
+DEVGRAPH_MONITOR_SESSION_DIGEST_DOMAIN_V1 = b"secs-devgraph-monitor-session.v1/session\x00"
 DEVGRAPH_MONITOR_REQUEST_PROOF_SIGNATURE_DOMAIN_V1 = (
     b"devgraph.monitor.view.read.v1/request-proof\x00"
 )
@@ -79,21 +75,13 @@ _AUTHORITY_IDENTIFIER = re.compile(
     re.ASCII,
 )
 _ED25519_FIELD_PRIME = (1 << 255) - 19
-_ED25519_SCALAR_ORDER = (
-    (1 << 252) + 27742317777372353535851937790883648493
-)
+_ED25519_SCALAR_ORDER = (1 << 252) + 27742317777372353535851937790883648493
 _ED25519_SMALL_ORDER_ENCODINGS = frozenset(
     {
         bytes.fromhex("00" * 32),
         bytes.fromhex("01" + "00" * 31),
-        bytes.fromhex(
-            "26e8958fc2b227b045c3f489f2ef98f0"
-            "d5dfac05d3c63339b13802886d53fc05"
-        ),
-        bytes.fromhex(
-            "c7176a703d4dd84fba3c0b760d10670f"
-            "2a2053fa2c39ccc64ec7fd7792ac037a"
-        ),
+        bytes.fromhex("26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05"),
+        bytes.fromhex("c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a"),
         bytes.fromhex("ec" + "ff" * 30 + "7f"),
         bytes.fromhex("ed" + "ff" * 30 + "7f"),
         bytes.fromhex("ee" + "ff" * 30 + "7f"),
@@ -299,6 +287,19 @@ class _VerifiedMonitorViewRead:
 class SecSMonitorViewReadVerifier:
     """Verify the exact secS session plus one page-key HTTP proof."""
 
+    operation = DEVGRAPH_MONITOR_VIEW_READ_OPERATION_V1
+    session_schema = DEVGRAPH_MONITOR_SESSION_SCHEMA_V1
+    proof_schema = DEVGRAPH_MONITOR_REQUEST_PROOF_SCHEMA_V1
+    version = 1
+    session_signature_domain = DEVGRAPH_MONITOR_SESSION_SIGNATURE_DOMAIN_V1
+    session_digest_domain = DEVGRAPH_MONITOR_SESSION_DIGEST_DOMAIN_V1
+    proof_signature_domain = DEVGRAPH_MONITOR_REQUEST_PROOF_SIGNATURE_DOMAIN_V1
+    proof_digest_domain = DEVGRAPH_MONITOR_REQUEST_PROOF_DIGEST_DOMAIN_V1
+
+    @classmethod
+    def valid_target(cls, target: str) -> bool:
+        return target == DEVGRAPH_MONITOR_PATH_QUERY_V1
+
     def __init__(self, config: SecSMonitorViewReadVerifierConfig) -> None:
         if not isinstance(config, SecSMonitorViewReadVerifierConfig):
             raise TypeError("invalid monitor verifier config")
@@ -337,7 +338,7 @@ class SecSMonitorViewReadVerifier:
         self._validate_session_authority(signed_session, now=now)
 
         session_digest_sha256 = hashlib.sha256(
-            DEVGRAPH_MONITOR_SESSION_DIGEST_DOMAIN_V1 + canonical_session
+            self.session_digest_domain + canonical_session
         ).hexdigest()
         request_proof, canonical_request_proof = _decode_canonical_header_object(
             request_proof_header,
@@ -369,15 +370,12 @@ class SecSMonitorViewReadVerifier:
         )
 
         request_proof_digest_sha256 = hashlib.sha256(
-            DEVGRAPH_MONITOR_REQUEST_PROOF_DIGEST_DOMAIN_V1
-            + canonical_request_proof
+            self.proof_digest_domain + canonical_request_proof
         ).hexdigest()
         correlation_id = (
             "dg:sha256:"
             + hashlib.sha256(
-                DEVGRAPH_MONITOR_SESSION_DIGEST_DOMAIN_V1
-                + canonical_session
-                + canonical_request_proof
+                self.session_digest_domain + canonical_session + canonical_request_proof
             ).hexdigest()
         )
         return _VerifiedMonitorViewRead(
@@ -407,17 +405,20 @@ class SecSMonitorViewReadVerifier:
             raise SecSMonitorViewReadDenied("clock_unavailable") from None
         return now
 
-    @staticmethod
-    def _validate_session_shape(session: Mapping[str, Any]) -> bytes:
+    @classmethod
+    def _validate_session_shape(cls, session: Mapping[str, Any]) -> bytes:
         exact_strings = {
             "actor_signature_suite": DEVGRAPH_MONITOR_SIGNATURE_SUITE_V1,
-            "operation": DEVGRAPH_MONITOR_VIEW_READ_OPERATION_V1,
-            "schema": DEVGRAPH_MONITOR_SESSION_SCHEMA_V1,
+            "operation": cls.operation,
+            "schema": cls.session_schema,
             "secs_verifier_signature_suite": DEVGRAPH_MONITOR_SIGNATURE_SUITE_V1,
         }
         if any(session.get(field) != value for field, value in exact_strings.items()):
             raise SecSMonitorViewReadDenied("invalid_monitor_session")
-        if type(session.get("schema_version")) is not int or session["schema_version"] != 1:
+        if (
+            type(session.get("schema_version")) is not int
+            or session["schema_version"] != cls.version
+        ):
             raise SecSMonitorViewReadDenied("invalid_monitor_session")
         for field in ("issued_at", "expires_at", "receiver_policy_version"):
             _require_nonnegative_safe_integer(
@@ -497,8 +498,9 @@ class SecSMonitorViewReadVerifier:
         ):
             raise SecSMonitorViewReadDenied("monitor_session_authority_mismatch")
 
-    @staticmethod
+    @classmethod
     def _verify_session_signature(
+        cls,
         session: Mapping[str, Any],
         key: SecSVerifierKey,
     ) -> None:
@@ -512,22 +514,23 @@ class SecSMonitorViewReadVerifier:
         _verify_ed25519_signature(
             key.public_key,
             signature,
-            DEVGRAPH_MONITOR_SESSION_SIGNATURE_DOMAIN_V1 + _canonical_json(unsigned),
+            cls.session_signature_domain + _canonical_json(unsigned),
             reason="invalid_monitor_session_signature",
         )
 
-    @staticmethod
-    def _validate_request_proof_shape(proof: Mapping[str, Any]) -> None:
+    @classmethod
+    def _validate_request_proof_shape(cls, proof: Mapping[str, Any]) -> None:
+        if not cls.valid_target(proof.get("path_query")):
+            raise SecSMonitorViewReadDenied("invalid_monitor_request_proof")
         exact_strings = {
             "method": "GET",
-            "operation": DEVGRAPH_MONITOR_VIEW_READ_OPERATION_V1,
-            "path_query": DEVGRAPH_MONITOR_PATH_QUERY_V1,
-            "schema": DEVGRAPH_MONITOR_REQUEST_PROOF_SCHEMA_V1,
+            "operation": cls.operation,
+            "schema": cls.proof_schema,
             "signature_suite": DEVGRAPH_MONITOR_SIGNATURE_SUITE_V1,
         }
         if any(proof.get(field) != value for field, value in exact_strings.items()):
             raise SecSMonitorViewReadDenied("invalid_monitor_request_proof")
-        if type(proof.get("schema_version")) is not int or proof["schema_version"] != 1:
+        if type(proof.get("schema_version")) is not int or proof["schema_version"] != cls.version:
             raise SecSMonitorViewReadDenied("invalid_monitor_request_proof")
         _require_nonnegative_safe_integer(
             proof.get("timestamp"),
@@ -572,7 +575,7 @@ class SecSMonitorViewReadVerifier:
     ) -> None:
         if (
             method != "GET"
-            or path_query != DEVGRAPH_MONITOR_PATH_QUERY_V1
+            or not self.valid_target(path_query)
             or origin != self._config.origin
             or type(body) is not bytes
             or body != b""
@@ -600,8 +603,9 @@ class SecSMonitorViewReadVerifier:
         ):
             raise SecSMonitorViewReadDenied("monitor_request_not_current")
 
-    @staticmethod
+    @classmethod
     def _verify_request_proof_signature(
+        cls,
         proof: Mapping[str, Any],
         page_public_key: bytes,
     ) -> None:
@@ -615,8 +619,7 @@ class SecSMonitorViewReadVerifier:
         _verify_ed25519_signature(
             page_public_key,
             signature,
-            DEVGRAPH_MONITOR_REQUEST_PROOF_SIGNATURE_DOMAIN_V1
-            + _canonical_json(unsigned),
+            cls.proof_signature_domain + _canonical_json(unsigned),
             reason="invalid_monitor_request_signature",
         )
 
@@ -658,17 +661,17 @@ class SecSMonitorViewReadAdapter:
             origin=origin,
             body=body,
         )
-        snapshot = build_monitor_snapshot(self._storage)
+        snapshot = self.project(path_query)
         self._audit_log.record(
             actor_id=grant.actor_id,
             session_id=grant.session_id,
             correlation_id=grant.correlation_id,
             category=CATEGORY_READ,
-            operation=DEVGRAPH_MONITOR_VIEW_READ_OPERATION_V1,
+            operation=self._verifier.operation,
             safe_summary={
                 "audience": grant.audience,
                 "issuer": grant.issuer,
-                "operation": DEVGRAPH_MONITOR_VIEW_READ_OPERATION_V1,
+                "operation": self._verifier.operation,
                 "origin": grant.origin,
                 "page_public_key_digest_sha256": (
                     grant.page_public_key_digest_sha256
@@ -685,6 +688,9 @@ class SecSMonitorViewReadAdapter:
             },
         )
         return snapshot
+
+    def project(self, path_query: str) -> dict[str, Any]:
+        return build_monitor_snapshot(self._storage)
 
 
 def _decode_canonical_header_object(
@@ -875,10 +881,6 @@ def _is_strict_ed25519_point_encoding(value: bytes) -> bool:
 
 
 def _require_nonnegative_safe_integer(value: object, *, reason: str) -> int:
-    if (
-        type(value) is not int
-        or value < 0
-        or value > DEVGRAPH_JSON_SAFE_INTEGER_MAX_V1
-    ):
+    if type(value) is not int or value < 0 or value > DEVGRAPH_JSON_SAFE_INTEGER_MAX_V1:
         raise SecSMonitorViewReadDenied(reason)
     return value

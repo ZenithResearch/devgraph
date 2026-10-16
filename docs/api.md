@@ -1,5 +1,10 @@
 # HTTP API reference
 
+Canonical Todo progress, independent archive and v2 reads/writes are described in
+[Todo progress v2](todo-progress-v2.md). Legacy lifecycle/status descriptions below
+remain the v1 compatibility contract; they do not determine canonical progress.
+
+
 The API is created by `devgraph.api.create_app(ApiServices(...))`. The app
 factory remains an injected composition boundary rather than a deployment
 launcher. The package separately includes a loopback-only macOS local-host
@@ -56,6 +61,7 @@ Idempotency-Key: <caller-generated non-empty value>
 | GET | `/ready` | none | readiness body; 200 ready or 503 not ready |
 | GET | `/` | none | official frontend HTML |
 | GET | `/monitor` | none | alias of `/` |
+| GET | `/monitor/topology/v1` | `devgraph.read` bearer or separate `devgraph.monitor.view.read.v2` PoP | [filtered topology, counts and limits](monitor-topology-v1.md) |
 | GET | `/monitor/snapshot` | `devgraph.read` bearer or exact `devgraph.monitor.view.read.v1` PoP | safe aggregate and topology |
 | GET | `/work/{kind}` | `devgraph.read` | work list |
 | GET | `/work/{kind}/{id}` | `devgraph.read` | one work object |

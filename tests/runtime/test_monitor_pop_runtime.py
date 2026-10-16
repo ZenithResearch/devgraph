@@ -46,6 +46,7 @@ def test_missing_data_root_keeps_exact_monitor_receiver_absent(monkeypatch) -> N
     services = build_production_services()
 
     assert services.monitor_view_read is None
+    assert services.monitor_topology_read is None
     loader.assert_not_called()
 
 
@@ -55,8 +56,8 @@ def test_configured_data_root_loads_fixed_receiver_with_shared_storage_and_audit
 ) -> None:
     _production_environment(monkeypatch)
     storage = StubNeo4jStorage()
-    exact_receiver = object()
-    loader = Mock(return_value=exact_receiver)
+    exact_receiver, topology_receiver = object(), object()
+    loader = Mock(side_effect=[exact_receiver, topology_receiver])
     monkeypatch.setenv(DATA_ROOT_VARIABLE, str(tmp_path))
     monkeypatch.setattr("devgraph.runtime.Neo4jGraphStorage", Mock(return_value=storage))
     monkeypatch.setattr(
@@ -67,8 +68,10 @@ def test_configured_data_root_loads_fixed_receiver_with_shared_storage_and_audit
     services = build_production_services()
 
     assert services.monitor_view_read is exact_receiver
-    loader.assert_called_once()
-    call = loader.call_args.kwargs
+    assert services.monitor_topology_read is topology_receiver
+    assert loader.call_count == 2
+    assert loader.call_args_list[1].kwargs == {**loader.call_args_list[0].kwargs, "version": 2}
+    call = loader.call_args_list[0].kwargs
     assert call["data_root"] == tmp_path
     assert call["storage"] is storage
     assert call["audit_log"] is services.authorized_graph._audit_log

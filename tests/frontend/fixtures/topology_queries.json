@@ -1,0 +1,7 @@
+[
+ {"input":{"work_kind":["Task","Issue"],"category":["work"],"relationship":[]},"query":"category=work&relationship=none&work_kind=Issue&work_kind=Task"},
+ {"input":{"q":"  A ~!*()' + B  "},"query":"q=a+~%21%2A%28%29%27+%2B+b"},
+ {"input":{"arena":"Arena:devgraph","anchor":"Artifact:an-observation","archived":"exclude"},"query":"anchor=Artifact%3Aan-observation&archived=exclude&arena=Arena%3Adevgraph"},
+ {"input":{"category":[],"work_kind":[]},"query":"category=none&work_kind=none"},
+ {"input":{"q":"CAFÉ"},"query":"q=caf%C3%A9"}
+]

@@ -114,9 +114,9 @@ def metadata(*, created_hour: int = 20) -> BackupMetadata:
         restore_size_bytes=1000,
         neo4j_edition="community",
         neo4j_version="5.26.28",
-        migration_current_version=26,
+        migration_current_version=28,
         migration_minimum_version=1,
-        migration_maximum_version=26,
+        migration_maximum_version=28,
         backend_id=BACKEND_ID,
         backend_version="1",
         consistency_mode="offline_consistent",
@@ -140,7 +140,7 @@ def plan(root: Path, *, target_value=None, capability_value=None):
         target_value or target(),
         capability_value or capability(),
         supported_migration_minimum=1,
-        supported_migration_maximum=26,
+        supported_migration_maximum=28,
     )
 
 
@@ -476,9 +476,7 @@ def _restore_cli_module():
 def test_restore_cli_has_no_noninteractive_confirmation_flags() -> None:
     module = _restore_cli_module()
     public_options = {
-        option
-        for action in module.parser()._actions
-        for option in action.option_strings
+        option for action in module.parser()._actions for option in action.option_strings
     }
 
     assert "--confirmation" not in public_options
@@ -516,9 +514,7 @@ def test_restore_cli_rejects_noninteractive_execution_before_mutation(
     assert backend.calls == []
 
 
-def test_restore_cli_load_only_is_explicit_non_success(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_restore_cli_load_only_is_explicit_non_success(tmp_path: Path, monkeypatch, capsys) -> None:
     root = tmp_path / "artifact"
     target_root = tmp_path / "target"
     artifact(root)

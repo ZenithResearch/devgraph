@@ -1,5 +1,47 @@
 # Changelog
 
+## Todo progress, archive and daily check-in
+
+- Add canonical three-state progress for base Todo and every subtype, preserving legacy signed requests. Base Todos can complete without a subtype workflow.
+- Separate archival from progress, preserve guarded subtype completion and proposal dispositions, and report ambiguous history through forward migration 28.
+- Add bounded v2 Todo/Kanban reads, priority-based daily counts, consistent reader/topology labels, and remove credential persistence.
+- Publish ontology v0.8.0 without rewriting older releases. See `docs/todo-progress-v2.md` for compatibility and installed qualification boundaries.
+
+## [Unreleased]
+
+### Fixed
+- Validate Kanban and SDK credential results through the same Rust/WASM decoder — partial receipts cannot announce success and failed status lookups cannot release an uncertain mutation.
+- Recognize bounded receiver rejections on initial execution — unmet workflow requirements no longer trap corrected requests behind reconciliation.
+- Audit all tracked Rust lockfiles and consume the coordinated patched Wallet parser — native and standalone packages participate in the dependency gate.
+
+
+### Added
+- Distinguish native request compatibility, custody and authority failures using bounded public diagnostics — valid workflow requests rejected by older companions no longer suggest resetting signing keys.
+- Reconcile the generic native dependency and release candidate with Wallet's holder-bound read contract and secS's standalone read authority — preserve phone reads when qualifying the coordinated signing upgrade.
+- Add the shared holder-bound read issuer/secS/receiver path and native-v2 composition — enforce approved Work/Arena scope before pagination without an owner bearer fallback.
+- Allow an explicit external recovery destination with an internal-SSD database — preserves two-physical-disk recovery coverage without depending on the live data root being external.
+
+- Reconcile the generic integration guidance with merged Wallet and its runtime provider approvals — the old build-time pins and Devgraph-specific bridge are no longer the supported Wallet setup.
+
+- Update the target Kanban/SDK architecture to generic Wallet approval with Devgraph-owned transport and a disposable macOS VM release gate — this prevents the superseded native bridge and source-only checks from being mistaken for installed qualification.
+
+- Move project scope controls into one compact Filter popover with an active-filter count, freeing the project list from two permanent dropdowns.
+
+- Limit the daily project list to Projects and add saved Arena/Initiative filters using containment and inherited Arena membership; dependency links never imply membership.
+
+- Make the daily Todo queue a compact vertical panel and give the main check-in area to scoped project progress, reviews and dependency follow-up. Preserve exact Todo counts and keep unclassified history explicit.
+
+
+- Add explicit native Wallet read enrollment with independent membership trust, scoped grants, replay protection and guarded read projections — support Zenith iOS without distributing owner keys or adding mutation authority.
+
+- Add the separately signed Work v2 protocol with base Todo, progress attestations, restoration and proposal rejection — shared consumers can adopt progress without changing historical v1 bytes.
+
+- Publish the shared Rust Work/Arena request protocol and cross-language synthetic fixtures — native and WASM consumers can pin public source without importing private history or losing Arena resource bindings.
+
+- Kanban reading page, versioned Vibe CEO/execution workflows, signed approval and transition operations, bounded board API, flexible parentage and ontology v0.7.0. Legacy work remains unclassified. Installed Chrome signing still requires isolated qualification.
+
+- Shared Rust workflow request parsing and cross-language vectors, preserving old signing bytes so Wallet and secS can admit the same explicit workflow operations.
+
 ## 0.1.0-beta.2 — 2026-09-15
 
 First public beta, published as a clean source snapshot under AGPL-3.0-only.

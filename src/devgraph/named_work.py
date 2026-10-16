@@ -15,11 +15,11 @@ from devgraph.model.repository import (
     WorkObjectRepository,
     WorkObjectVersionConflictError,
 )
-from devgraph.model.work import Decision, Initiative, Issue, Project, Proposal, Task
+from devgraph.model.work import Decision, Initiative, Issue, Project, Proposal, Task, Todo
 from devgraph.storage.base import GraphStorage, StorageUnavailable
 from devgraph.work_requests import WorkRequest
 
-_KINDS = {model.__name__: model for model in (Proposal, Initiative, Project, Issue, Task)}
+_KINDS = {model.__name__: model for model in (Todo, Proposal, Initiative, Project, Issue, Task)}
 
 
 class WorkRelationshipConflict(ValueError):
@@ -32,11 +32,12 @@ class NamedWorkMutations:
         self.repository = WorkObjectRepository(storage)
         self.lifecycle = ProposalLifecycle(storage)
 
-    def execute(self, request: WorkRequest):
+    def execute(self, request: WorkRequest, *, actor_id: str = ""):
+
         # Reparse immutable bytes; caller-supplied derived fields never select execution.
         request = WorkRequest.from_json(request.canonical)
         with self.storage.work_mutation_transaction():
-            return self._execute(request)
+            return self._execute(request, actor_id=actor_id)
 
     def _current(self, kind, work_id, version):
         current = self.repository.get_by_id(kind, work_id)
@@ -51,13 +52,18 @@ class NamedWorkMutations:
 
     @staticmethod
     def _active(work):
-        if work.status == WorkStatus.ARCHIVED:
+        if work.archived:
             raise InvalidStatusTransitionError("archived Work cannot be changed")
+
+    @staticmethod
+    def _reopen_before_scope_change(work):
+        if work.progress == "done":
+            raise WorkRelationshipConflict("Reopen completed work before changing its scope.")
 
     def _bump(self, work):
         return self.repository.update(work, expected_version=work.version)
 
-    def _execute(self, request):
+    def _execute(self, request, *, actor_id=""):
         operation, payload = request.operation, request.payload
         if operation == "create":
             values = dict(payload)
@@ -67,7 +73,31 @@ class NamedWorkMutations:
         subject = self._current(request.kind, request.id, request.expected_version)
         if operation == "archive":
             return self.repository.archive(subject.kind, subject.id)
+        if operation == "restore":
+            from dataclasses import replace
+
+            from devgraph.model.base import utc_now
+
+            if not subject.archived:
+                raise InvalidStatusTransitionError("Item is not archived.")
+            restored = replace(
+                subject, archived=False, version=subject.version + 1, updated_at=utc_now()
+            )
+            self.storage.restore_node(subject.kind, subject.id, restored.to_node_properties())
+            return restored
         self._active(subject)
+        if operation == "progress.set":
+            from devgraph.progress_mutations import set_progress
+
+            return set_progress(self.storage, subject, payload, actor_id)
+        if operation == "proposal.reject":
+            from devgraph.progress_mutations import reject_proposal
+
+            return reject_proposal(self.storage, subject, payload)
+        if operation.startswith("workflow."):
+            from devgraph.workflows import Workflows
+
+            return Workflows(self.storage, actor_id=actor_id).execute(subject, operation, payload)
         if operation == "patch":
             return self.repository.update_content(
                 subject.kind,
@@ -108,6 +138,7 @@ class NamedWorkMutations:
         return self._edge_change(subject, operation, payload)
 
     def _set_parent(self, child, payload):
+        self._reopen_before_scope_change(child)
         all_parents = self._bounded_edges("HAS_CHILD")
         parents = [
             edge for edge in all_parents if (edge.to_label, edge.to_id) == (child.kind, child.id)
@@ -122,6 +153,7 @@ class NamedWorkMutations:
             if reference is not None:
                 parent = self._reference(reference)
                 self._active(parent)
+                self._reopen_before_scope_change(parent)
                 key = (parent.kind, parent.id)
                 if key in touched and touched[key].version != reference["expected_version"]:
                     raise WorkRelationshipConflict("conflicting parent versions")
@@ -151,6 +183,8 @@ class NamedWorkMutations:
     def _edge_change(self, subject, operation, payload):
         target = self._reference(payload["target"])
         self._active(target)
+        self._reopen_before_scope_change(subject)
+        self._reopen_before_scope_change(target)
         relationship = "DEPENDS_ON" if operation.startswith("dependency.") else "BLOCKS"
         # dependency: subject depends on target; blocker: subject blocks target.
         source_key, target_key = (subject.kind, subject.id), (target.kind, target.id)

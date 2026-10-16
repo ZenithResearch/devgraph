@@ -94,9 +94,10 @@ An Arena may directly contain an Initiative or a parentless Task using
 `CONTAINS_WORK`. A direct member has no incoming Work `HAS_CHILD` edge, even
 from an archived parent, and belongs directly to at most one Arena.
 
-Arena membership is optional. The Initiative → Project → Issue → Task
-hierarchy, Proposal acceptance, statuses, priorities, scopes, and receipts
-remain unchanged. Assigning a Work parent to a direct Arena member must
+Arena membership is optional. Work parents may skip intermediate levels:
+Project → Initiative; Issue → Initiative or Project; Task → Initiative, Project
+or Issue. Proposal acceptance, lifecycle, priorities, scopes and receipts remain
+independent. Assigning a Work parent to a direct Arena member must
 remove that direct membership atomically; descendants then inherit the Arena
 of their Work root. Removing a Work parent does not invent Arena membership.
 Cycles or multiple Work parents must not be resolved by choosing an arbitrary
@@ -109,3 +110,8 @@ See `arena-contract.json` for the versioned normative profile.
 rg "accepted Proposal|Decision|archive|WorkRequest|Case|Subcase|direct delete|HermesSessionRef|ReadinessAssessment|Entity|Person|Agent|Organization|MEMBER_OF" ontology/invariants.md
 python3 -m pytest tests/docs/test_ontology_boundaries.py tests/docs/test_readiness_assessment_docs.py -q
 ```
+
+
+## Shared progress (v0.8.0)
+
+See [todo-progress.md](todo-progress.md) for the canonical three-state model, independent archival, and explicit historical classification. Legacy Draft/Review/Accepted/Archived vocabulary does not determine canonical progress.

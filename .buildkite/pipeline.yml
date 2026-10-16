@@ -1,0 +1,30 @@
+# Public-source checks: no Wallet source, issuer credentials or deployment.
+steps:
+  - label: ':python: Repository verification and packages'
+    key: repository
+    agents: {queue: linux-small}
+    command: bash .buildkite/run.sh repository
+    timeout_in_minutes: 45
+    artifact_paths: ['build/buildkite/repository/*', 'build/buildkite/packages/*']
+  - label: ':rust: Protocol, vectors and MSRV'
+    key: protocol
+    agents: {queue: linux-small}
+    command: bash .buildkite/run.sh protocol
+    timeout_in_minutes: 30
+    artifact_paths: ['build/buildkite/protocol/*']
+  - label: ':package: SDK, WASM and browsers'
+    key: sdk
+    agents: {queue: linux-medium}
+    command: bash .buildkite/run.sh sdk
+    timeout_in_minutes: 60
+    artifact_paths:
+      - 'build/buildkite/sdk/*'
+      - 'packages/web/*.tgz'
+      - '.sdk-validation/browser-core.json'
+      - '.sdk-validation/installed-consumers.json'
+  - label: ':shield: CodeQL Python and JavaScript'
+    key: codeql
+    agents: {queue: linux-medium}
+    command: bash .buildkite/run.sh codeql
+    timeout_in_minutes: 45
+    artifact_paths: ['build/buildkite/codeql/*']

@@ -1,0 +1,131 @@
+{
+  "deviceScaleFactor": 2,
+  "browser": "154.0.8037.97",
+  "viewport": "1440x1000",
+  "fixture": "5 Work kinds, edges at offsets 1/7/29; fitted overview; 45 camera frames",
+  "dimensions": [
+    {
+      "viewport": 1280,
+      "graph": 674,
+      "details": 416,
+      "columns": "676.141px 8px 417.891px",
+      "overflow": false
+    },
+    {
+      "viewport": 1440,
+      "graph": 767,
+      "details": 473,
+      "columns": "769.094px 8px 475.344px",
+      "overflow": false
+    },
+    {
+      "viewport": 1920,
+      "graph": 1058,
+      "details": 653,
+      "columns": "1059.8px 8px 655.016px",
+      "overflow": false
+    },
+    {
+      "viewport": 760,
+      "graph": 686,
+      "details": 686,
+      "columns": "688.406px",
+      "overflow": false
+    }
+  ],
+  "performanceResults": [
+    {
+      "cpuSlowdown": 1,
+      "nodes": 250,
+      "edges": 713,
+      "renderer": "canvas",
+      "initialMs": 5.700000017881393,
+      "drawMedianMs": 0.5999999940395355,
+      "drawP95Ms": 0.7000000178813934,
+      "frameP95Ms": 16.700000000000273,
+      "workerCompletionMs": 32.79999998211861,
+      "svgElements": 20
+    },
+    {
+      "cpuSlowdown": 1,
+      "nodes": 1500,
+      "edges": 4463,
+      "renderer": "canvas",
+      "initialMs": 6.399999976158142,
+      "drawMedianMs": 2.4000000059604645,
+      "drawP95Ms": 2.9000000059604645,
+      "frameP95Ms": 16.800000000000182,
+      "workerCompletionMs": 108.7999999821186,
+      "svgElements": 20
+    },
+    {
+      "cpuSlowdown": 4,
+      "nodes": 250,
+      "edges": 713,
+      "renderer": "canvas",
+      "initialMs": 7.5999999940395355,
+      "drawMedianMs": 2,
+      "drawP95Ms": 2.5999999940395355,
+      "frameP95Ms": 16.700000000000273,
+      "workerCompletionMs": 31.900000005960464,
+      "svgElements": 20
+    },
+    {
+      "cpuSlowdown": 4,
+      "nodes": 1500,
+      "edges": 4463,
+      "renderer": "canvas",
+      "initialMs": 24.400000005960464,
+      "drawMedianMs": 10.400000005960464,
+      "drawP95Ms": 12,
+      "frameP95Ms": 16.700000000000728,
+      "workerCompletionMs": 128.30000001192093,
+      "svgElements": 20
+    }
+  ],
+  "checks": [
+    "API-backed filters",
+    "empty selections",
+    "reload restoration",
+    "Observer collapse",
+    "hover labels",
+    "drag undo",
+    "reset undo",
+    "responsive layout",
+    "canvas picking",
+    "no page errors"
+  ],
+  "hardware": {
+    "model": "Mac16,8",
+    "chip": "Apple M4 Pro",
+    "memoryGiB": 24,
+    "os": "macOS 26.4.1 (25E253)",
+    "browserMode": "headless Chrome; power mode not recorded"
+  },
+  "database": {
+    "database": "Neo4j Community 5.26.29",
+    "storage": "Disposable /private/tmp instance; real graph untouched",
+    "results": [
+      {
+        "nodes": 250,
+        "edges": 713,
+        "coldMs": 488.36458299774677,
+        "warmMs": [
+          66.44291599513963,
+          60.28949999017641,
+          68.50545800989494
+        ]
+      },
+      {
+        "nodes": 1500,
+        "edges": 4463,
+        "coldMs": 343.4106250060722,
+        "warmMs": [
+          328.5605829732958,
+          317.5198340031784,
+          324.4145000062417
+        ]
+      }
+    ]
+  }
+}

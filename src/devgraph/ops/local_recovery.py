@@ -100,17 +100,30 @@ class RecoveryError(RuntimeError):
     """Fixed, redaction-safe recovery failure."""
 
 
+def _external_base(config):
+    base = config.recovery_external_root
+    if base is None:
+        return config.data_root
+    if (
+        not base.is_absolute()
+        or base in {Path("/"), Path("/Volumes"), Path.home()}
+        or any(path.is_symlink() for path in (base, *base.parents))
+    ):
+        raise RecoveryError("unsafe_external_recovery_root")
+    return base
+
+
 def recovery_roots(config):
     return {
         "internal": INSTALL_ROOT / INTERNAL_RELATIVE,
-        "external": config.data_root / EXTERNAL_RELATIVE,
+        "external": _external_base(config) / EXTERNAL_RELATIVE,
     }
 
 
 def _roots(config, *, create=False):
     roots = recovery_roots(config)
     for label, root in roots.items():
-        base = INSTALL_ROOT if label == "internal" else config.data_root
+        base = INSTALL_ROOT if label == "internal" else _external_base(config)
         relative = INTERNAL_RELATIVE if label == "internal" else EXTERNAL_RELATIVE
         if create:
             maintenance._private_directory(base, relative)
@@ -444,11 +457,12 @@ def create_recovery(config, artifact, *, lock_held=False):
             raise RecoveryError("recovery_signer_not_configured")
         key_disk = _disk_identity(Path(signer["DEVGRAPH_SIGNING_KEY_FILE"]).parent)
         authority_disk = _disk_identity(INSTALL_ROOT)
-        if (
-            not _independent(identities["internal"], source_disk)
-            or not _independent(identities["external"], key_disk)
-            or not _independent(identities["external"], authority_disk)
-            or not _independent(identities["internal"], identities["external"])
+        # Either disk may host production. Each protected source must have at
+        # least one independent recovery copy, and the copies must be independent
+        # of each other. APFS volumes on one physical device do not qualify.
+        if not _independent(identities["internal"], identities["external"]) or any(
+            not any(_independent(destination, source) for destination in identities.values())
+            for source in (source_disk, key_disk, authority_disk)
         ):
             raise RecoveryError("independent_recovery_storage_required")
         required = sum(item["bytes"] for item in manifest["files"].values()) + 512 * 1024**2
@@ -590,7 +604,7 @@ def recovery_status(config, *, verify=False):
     for label, root in recovery_roots(config).items():
         result = {"location": label, "path": str(root), "available": False, "verified": False}
         try:
-            base = INSTALL_ROOT if label == "internal" else config.data_root
+            base = INSTALL_ROOT if label == "internal" else _external_base(config)
             require_receiver_directory_path(
                 base,
                 INTERNAL_RELATIVE if label == "internal" else EXTERNAL_RELATIVE,

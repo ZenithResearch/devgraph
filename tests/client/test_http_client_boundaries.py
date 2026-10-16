@@ -76,6 +76,7 @@ def test_production_client_has_exact_public_method_surface() -> None:
         "get_arena_members",
         "get_work_arena",
         "execute_named_work",
+        "reconcile_credential_work",
         "accept_proposal",
         "archive_work",
         "convert_proposal",

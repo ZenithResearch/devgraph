@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -158,6 +159,85 @@ def test_physical_overlap_rejected_before_key_export(fixture, monkeypatch):
     )
     with pytest.raises(recovery.RecoveryError, match="independent"):
         recovery.create_recovery(settings, artifact)
+
+
+def _internal_data_config(fixture, tmp_path, monkeypatch):
+    settings, artifact, descriptor = fixture
+    external = tmp_path / "external"
+    external.mkdir(mode=0o700)
+    settings = replace(settings, recovery_external_root=external)
+
+    def disk(path):
+        on_external = path == external or external in path.parents
+        return {
+            "device": 2 if on_external else 1,
+            "physical_disks": ["disk2" if on_external else "disk0"],
+            "volume_uuid": "external" if on_external else "internal",
+        }
+
+    monkeypatch.setattr(recovery, "_disk_identity", disk)
+    return settings, artifact, descriptor
+
+
+def test_internal_database_keeps_a_complete_independent_external_copy(
+    fixture, tmp_path, monkeypatch,
+):
+    settings, artifact, _ = _internal_data_config(fixture, tmp_path, monkeypatch)
+    result = recovery.create_recovery(settings, artifact)
+    assert result["successful"] is True
+    roots = recovery.recovery_roots(settings)
+    assert roots["external"] == tmp_path / "external/devgraph/recovery"
+    assert not (settings.data_root / recovery.EXTERNAL_RELATIVE).exists()
+    assert recovery.recovery_status(settings, verify=True)["successful"] is True
+    # Config relocation does not rewrite or invalidate historical manifests.
+    for root in roots.values():
+        manifest = recovery.verify_recovery_set(root / result["artifact_id"])
+        assert manifest["source_storage"]["database"]["physical_disks"] == ["disk0"]
+        assert manifest["authority_restore_state"] == recovery.INACTIVE
+
+
+@pytest.mark.parametrize("fault", ["same-physical-disk", "source-spans-both-disks"])
+def test_explicit_root_never_weakens_physical_independence(
+    fixture, tmp_path, monkeypatch, fault,
+):
+    settings, artifact, _ = _internal_data_config(fixture, tmp_path, monkeypatch)
+    original = recovery._disk_identity
+
+    def disk(path):
+        value = original(path)
+        if fault == "same-physical-disk":
+            value["physical_disks"] = ["disk0"]
+        elif path == settings.data_root:
+            value["physical_disks"] = ["disk0", "disk2"]
+        return value
+
+    monkeypatch.setattr(recovery, "_disk_identity", disk)
+    monkeypatch.setattr(
+        recovery, "_native", lambda *a, **k: pytest.fail("export before independence proof"),
+    )
+    with pytest.raises(recovery.RecoveryError, match="independent"):
+        recovery.create_recovery(settings, artifact)
+
+
+@pytest.mark.parametrize("fault", ["missing", "symlink", "ancestor-symlink", "broad"])
+def test_external_destination_must_be_present_and_not_linked(
+    fixture, tmp_path, monkeypatch, fault,
+):
+    settings, artifact, _ = fixture
+    external = tmp_path / "external"
+    if fault in {"symlink", "ancestor-symlink"}:
+        external.symlink_to(settings.data_root, target_is_directory=True)
+        if fault == "ancestor-symlink":
+            external = external / "child"
+    elif fault == "broad":
+        external = Path("/")
+    settings = replace(settings, recovery_external_root=external)
+    monkeypatch.setattr(
+        recovery, "_native", lambda *a, **k: pytest.fail("export to unavailable destination"),
+    )
+    with pytest.raises(RuntimeError):
+        recovery.create_recovery(settings, artifact)
+    assert not (settings.data_root / recovery.EXTERNAL_RELATIVE).exists()
 
 
 def test_authority_drift_never_publishes_a_recovery_set(fixture, monkeypatch):

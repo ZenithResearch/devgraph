@@ -1,0 +1,10 @@
+{
+  "schema": "devgraph.browser-host-profile.v1",
+  "origin": "http://127.0.0.1:8080",
+  "audience": "devgraph://receiver-local",
+  "stable_issuer": "REPLACE_WITH_OPERATOR_STABLE_ISSUER",
+  "extension_ids": ["REPLACE_WITH_APPROVED_EXTENSION_ID"],
+  "read_credential_file": "/ABSOLUTE/PRIVATE/EXISTING/read-capability",
+  "secs_executable": "/ABSOLUTE/PRIVATE/EXISTING/secs-devgraph-work-v1",
+  "secs_data_root": "/REAL_PASSWD_HOME/Library/Application Support/Zenith/secS"
+}

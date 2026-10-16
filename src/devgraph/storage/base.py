@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal, NamedTuple, Protocol
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol
 
 from devgraph.storage.supporting_material import SupportingReference
+
+if TYPE_CHECKING:
+    from devgraph.storage.delegated import DelegatedWorkSelector
+    from devgraph.storage.todos import TodoPage, TodoQuery
 
 
 @dataclass(frozen=True)
@@ -193,6 +197,25 @@ class GraphStorage(Protocol):
         self, arena_id: str, *, after_resource: str | None = None, limit: int = 50
     ) -> list[WorkContainment]: ...
 
+    def delegated_arena_page(
+        self,
+        arena_ids: tuple[str, ...],
+        *,
+        after_id: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]: ...
+
+    def delegated_arena_member_page(
+        self,
+        arena_id: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[WorkContainment]: ...
+
     def update_node(self, label: str, node_id: str, properties: dict[str, Any]) -> NodeRecord: ...
 
     def archive_node(
@@ -201,6 +224,8 @@ class GraphStorage(Protocol):
         node_id: str,
         properties: dict[str, Any] | None = None,
     ) -> NodeRecord: ...
+
+    def restore_node(self, label: str, node_id: str, properties: dict[str, Any]) -> NodeRecord: ...
 
     def create_edge(
         self,
@@ -223,6 +248,20 @@ class GraphStorage(Protocol):
         limit: int = 50,
     ) -> list[NodeRecord]: ...
 
+    def delegated_related_work_nodes(
+        self,
+        label: str,
+        node_id: str,
+        relationship: str,
+        *,
+        incoming: bool,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        after_resource: str | None = None,
+        limit: int = 50,
+    ) -> list[NodeRecord]: ...
+
     def supporting_material_references(
         self,
         label: str,
@@ -234,7 +273,6 @@ class GraphStorage(Protocol):
         target_resource: str | None = None,
         limit: int = 50,
     ) -> list[SupportingReference]: ...
-
 
     def supporting_material_nodes(self, keys: list[tuple[str, str]]) -> list[NodeRecord]: ...
 
@@ -256,6 +294,24 @@ class GraphStorage(Protocol):
         descending: bool = False,
         after_id: str | None = None,
         limit: int | None = None,
+    ) -> list[NodeRecord]: ...
+
+    def todo_page(self, query: TodoQuery) -> TodoPage: ...
+
+    def todo_detail(self, todo_id: str) -> NodeRecord | None: ...
+
+    def monitor_records(self) -> tuple[list[NodeRecord], list[EdgeRecord]]: ...
+
+    def delegated_work_page(
+        self,
+        label: str,
+        *,
+        selectors: tuple[DelegatedWorkSelector, ...],
+        work_kinds: tuple[str, ...],
+        include_archived: bool,
+        descending: bool = False,
+        after_id: str | None = None,
+        limit: int = 50,
     ) -> list[NodeRecord]: ...
 
     def inspect_canonical_persistence(self) -> None: ...

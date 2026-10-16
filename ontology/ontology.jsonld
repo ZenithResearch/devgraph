@@ -1,13 +1,13 @@
 {
-  "@context": "https://zenith-research.ca/ontology/v0.6.0/context.jsonld",
+  "@context": "https://zenith-research.ca/ontology/v0.8.0/context.jsonld",
   "@graph": [
     {
       "@id": "https://zenith-research.ca/ontology",
       "@type": "owl:Ontology",
       "label": "Zenith Ontology",
       "comment": "Canonical vocabulary for Zenith work, arenas, directory entities, evidence, provenance, readiness, repository structure, and transport-neutral Devgraph operations.",
-      "versionIRI": "https://zenith-research.ca/ontology/v0.6.0/ontology.jsonld",
-      "versionInfo": "0.6.0",
+      "versionIRI": "https://zenith-research.ca/ontology/v0.8.0/ontology.jsonld",
+      "versionInfo": "0.8.0",
       "canonicalAuthority": "https://github.com/ZenithResearch/devgraph"
     },
     {
@@ -358,6 +358,46 @@
       "comment": "Directory class name published in v0.4.0, equivalent to Entity. Entity is preferred in v0.5.0; this identifier remains readable and does not denote an authentication Subject or credential.",
       "equivalentClass": "zn:Entity",
       "runtimeLabel": false
+    },
+    {
+      "@id": "zn:hasWorkflowDecision",
+      "@type": "owl:ObjectProperty",
+      "label": "has workflow decision",
+      "comment": "Authorized workflow approval or resolution Decision; separate from Proposal acceptance provenance.",
+      "domain": "zn:Todo",
+      "range": "zn:Decision"
+    },
+    {
+      "@id": "zn:workflowMetadata",
+      "@type": "owl:DatatypeProperty",
+      "label": "workflow metadata",
+      "comment": "Optional versioned workflow assignment and exact stage, separate from lifecycle and containment. Absent legacy values are preserved.",
+      "domain": "zn:Todo",
+      "range": "xsd:string"
+    },
+    {
+      "@id": "zn:progress",
+      "@type": "owl:DatatypeProperty",
+      "label": "Todo progress",
+      "domain": "zn:Todo",
+      "range": "xsd:string",
+      "comment": "Exactly not_started, in_progress or done. Absent historical values require classification; absence is not a fourth state. See todo-progress.md."
+    },
+    {
+      "@id": "zn:archived",
+      "@type": "owl:DatatypeProperty",
+      "label": "Archived",
+      "domain": "zn:Todo",
+      "range": "xsd:boolean",
+      "comment": "Independent visibility attribute. Archive and restore preserve progress, stage, evidence and history."
+    },
+    {
+      "@id": "zn:REJECTED_BY_DECISION",
+      "@type": "owl:ObjectProperty",
+      "label": "Rejected by Decision",
+      "domain": "zn:Proposal",
+      "range": "zn:Decision",
+      "comment": "Recorded rejection disposition. Does not complete any linked delivery work."
     }
   ]
 }

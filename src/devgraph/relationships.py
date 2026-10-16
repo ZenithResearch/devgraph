@@ -28,10 +28,10 @@ _HAS_HANDOFF_RELATIONSHIP = "HAS_HANDOFF"
 _HAS_REVIEW_PACKET_RELATIONSHIP = "HAS_REVIEW_PACKET"
 _ACCEPTED_BY_DECISION_RELATIONSHIP = "ACCEPTED_BY_DECISION"
 _CONVERSION_DECIDED_BY_RELATIONSHIP = "CONVERSION_DECIDED_BY"
-_PARENT_RULES: dict[type[Todo], type[Todo]] = {
-    Project: Initiative,
-    Issue: Project,
-    Task: Issue,
+_PARENT_RULES: dict[type[Todo], tuple[type[Todo], ...]] = {
+    Project: (Initiative,),
+    Issue: (Initiative, Project),
+    Task: (Initiative, Project, Issue),
 }
 _WORK_TYPES: dict[str, type[WorkObject]] = {
     "Initiative": Initiative,
@@ -101,7 +101,7 @@ class RelationshipGraph:
         expected_parent_type = _PARENT_RULES.get(type(child))
         if expected_parent_type is None or not isinstance(parent, expected_parent_type):
             raise ValueError(
-                "invalid parentage: v0 parentage must follow Initiative → Project → Issue → Task"
+                "invalid parentage: work must descend from Initiative, Project or Issue"
             )
         return self._storage.create_edge(
             parent.kind,
@@ -355,6 +355,7 @@ class RelationshipGraph:
                 str(value) for value in node.properties.get("external_link_ids", [])
             ),
             priority=int(node.properties.get("priority", 0)),
+            workflow_json=node.properties.get("workflow_json"),
         )
         if status is None:
             return obj

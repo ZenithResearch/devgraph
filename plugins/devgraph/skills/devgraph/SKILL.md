@@ -64,6 +64,13 @@ files are involved.
 
 ## Interpret records accurately
 
+The generic Wallet candidate is an explicit migration, not an automatic retry
+path. Its terminal signer requires real human interactive approval. An agent
+receiving `approval_required` keeps the exact request/idempotency files for the
+person; it must not synthesize approval or fall back to an old signer. Generic
+unknown outcomes use fresh approval for status-only `--credential-v2 --reconcile`.
+See the Work reference for compatibility diagnostics and migration boundaries.
+
 - `Arena` is a separate runtime type. It groups parentless Initiatives and
   Tasks; descendants inherit their Work root's membership. Dependencies do not
   confer membership, even when the monitor displays them in the Arena's graph.

@@ -14,7 +14,7 @@ export class FlowView {
     this.world = el('div', undefined, 'flow-world');
     this.lines = svg('svg', {'class': 'flow-lines', 'aria-hidden': 'true'});
     const defs = svg('defs');
-    for (const [name, color] of [['normal', '#698c7c'], ['flow', '#7cf7cf'], ['cut', '#f6c86f']]) {
+    for (const [name, color] of [['normal', 'var(--graph-edge)'], ['flow', 'var(--aqua)'], ['cut', 'var(--amber)']]) {
       const marker = svg('marker', {id: 'arrow-' + name, markerWidth: 8, markerHeight: 8, refX: 7, refY: 4, orient: 'auto', markerUnits: 'userSpaceOnUse'});
       marker.append(svg('path', {d: 'M0,0 L8,4 L0,8 Z', fill: color})); defs.append(marker);
     }
