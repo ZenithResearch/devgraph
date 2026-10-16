@@ -1,7 +1,9 @@
 # Generic Wallet installed release gate
 
-Status: **blocked — no disposable macOS VM is configured for this task**. Source
-checks and synthetic Chrome tests cannot clear this gate. The live account,
+Status: **installed signing qualification outstanding**. The operator has verified
+a disposable Buildkite macOS hosted route and persistent receiver preflight;
+these are setup evidence only. Source checks and synthetic Chrome tests cannot
+clear this gate. The live account,
 installation, keys, trust, grants, receiver and data are outside this delivery.
 
 ## Isolation and candidate preparation
@@ -18,6 +20,9 @@ hardware model, matching OS home, no existing Zenith installation and free port
 guided operator-observation recorder and artifact admission check. It does not
 create a VM or automate Chrome approval, fixture provisioning, or Neo4j setup.
 Those remain installed qualification work, not evidence implied by the harness.
+The separate [qualification tool builder](../../scripts/qualification/native-tools/README.md)
+provides pinned, guest-only shared secS administration and a native SDK consumer;
+building these tools grants no authority and records no installed scenario.
 
 Provision disposable Wallet custody and secS identities only inside that guest.
 Use the existing explicit operator setup commands, selecting each required
