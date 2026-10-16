@@ -10,6 +10,8 @@
 ## [Unreleased]
 
 ### Fixed
+- Update the SDK build and consumer tooling and enforce npm audits in Buildkite — patched source-map-js/esbuild dependencies and retained audit reports keep vulnerable development dependencies from passing release checks.
+- Accept an omitted Todo filter on Python 3.10 — default API and CLI reads use the documented defaults while malformed nonempty filters remain rejected.
 - Validate Kanban and SDK credential results through the same Rust/WASM decoder — partial receipts cannot announce success and failed status lookups cannot release an uncertain mutation.
 - Recognize bounded receiver rejections on initial execution — unmet workflow requirements no longer trap corrected requests behind reconciliation.
 - Audit all tracked Rust lockfiles and consume the coordinated patched Wallet parser — native and standalone packages participate in the dependency gate.

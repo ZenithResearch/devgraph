@@ -28,7 +28,11 @@ class TodoFilters:
     @classmethod
     def parse(cls, query):
         try:
-            values = parse_qs(query, keep_blank_values=True, max_num_fields=9, strict_parsing=True)
+            values = {}
+            if query != "":
+                values = parse_qs(
+                    query, keep_blank_values=True, max_num_fields=9, strict_parsing=True
+                )
             if (
                 len(query) > 4096
                 or set(values) - cls.__dataclass_fields__.keys()
