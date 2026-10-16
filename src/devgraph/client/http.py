@@ -46,6 +46,9 @@ MutationOperation: TypeAlias = Literal[
     "devgraph.work.dependency.remove.v1",
     "devgraph.work.blocker.add.v1",
     "devgraph.work.blocker.remove.v1",
+    "devgraph.work.workflow.assign.v1",
+    "devgraph.work.workflow.review.v1",
+    "devgraph.work.workflow.transition.v1",
 ]
 ReceiptStatus: TypeAlias = Literal["pending", "dispatched_dry_run", "retry_scheduled", "failed"]
 
@@ -271,7 +274,8 @@ class DevgraphProblem(DevgraphClientError):
         self.type = type
         self.detail = detail
         self.correlation_id = correlation_id
-        super().__init__(f"Devgraph problem {status}: {title}")
+        # The server redacts detail; it carries the actionable reason (e.g. which gate).
+        super().__init__(f"Devgraph problem {status}: {title}" + (f" ({detail})" if detail else ""))
 
     def __repr__(self) -> str:
         return f"DevgraphProblem(status={self.status!r}, title={self.title!r})"
