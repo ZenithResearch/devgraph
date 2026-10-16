@@ -49,6 +49,20 @@ def register_kanban(app: FastAPI, services):
     def static(name: str):
         return asset(name)
 
+    # wallet.mjs statically imports ../credential-v2/*.mjs, which the browser
+    # resolves under /monitor/. Serve the same allowlisted shared modules here.
+    shared = {"provider-setup.mjs", "subject.mjs"}
+
+    @app.get("/monitor/credential-v2/{name}", include_in_schema=False)
+    def shared_credential_module(name: str):
+        if name not in shared:
+            raise HTTPException(404)
+        return Response(
+            files("devgraph.frontend").joinpath("static/credential-v2", name).read_bytes(),
+            media_type="text/javascript",
+            headers=_HEADERS,
+        )
+
     @app.get("/monitor/kanban/v1")
     def board(
         request: Request, response: Response, authorization: str | None = Header(default=None)

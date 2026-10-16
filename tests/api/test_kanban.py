@@ -110,6 +110,26 @@ def test_page_security_and_asset_allowlist(fixture):
         assert response.status_code == 200
         assert "content-security-policy" in response.headers
     assert api.get("/monitor/kanban-assets/secrets.json").status_code == 404
+    assert api.get("/monitor/credential-v2/transport.d.mts").status_code == 404
+
+
+def test_every_static_board_import_is_served(fixture):
+    """Node tests load modules from disk; the browser resolves them by URL."""
+    import re
+    from urllib.parse import urljoin
+
+    api, _ = fixture
+    pending, seen = ["/monitor/kanban-assets/app.mjs"], set()
+    while pending:
+        url = pending.pop()
+        if url in seen:
+            continue
+        seen.add(url)
+        response = api.get(url)
+        assert response.status_code == 200, url
+        for target in re.findall(r"^import\b[^'\"]*['\"]([^'\"]+)['\"]", response.text, re.M):
+            pending.append(urljoin("http://testserver" + url, target)[len("http://testserver"):])
+    assert "/monitor/credential-v2/subject.mjs" in seen
 
 
 def test_scope_picker_is_bounded_and_searchable(fixture):
