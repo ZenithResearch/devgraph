@@ -105,8 +105,9 @@ The SDK CI no longer attempts to build removed Devgraph-specific Wallet modules.
 Installed acceptance requires the unchanged canonical extension package plus
 matched native Wallet/secS binaries, Devgraph wheel and SDK package in a clean
 macOS guest. The [release gate](generic-wallet-qualification.md) includes runtime
-provider setup, both real signing paths, and their failure/recovery cases. No VM
-runner is configured for this task. Source checks do not clear that gate. Live
+provider setup, both real signing paths, and their failure/recovery cases. A disposable Buildkite macOS hosted route and persistent receiver preflight are
+now verified in operator evidence; the complete signing matrix is still outstanding.
+Source checks and receiver preflight do not clear that gate. Live
 installation, trust, credentials, grants, migrations and data remain unchanged.
 
 ## Historical source verification (2026-10-06)

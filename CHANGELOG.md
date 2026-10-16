@@ -18,6 +18,7 @@
 
 
 ### Added
+- Add isolated, pinned-source authority administration and native SDK qualification tools — prepare real installed Wallet approval tests without reviving retired signers or treating unknown outcomes as success.
 - Distinguish native request compatibility, custody and authority failures using bounded public diagnostics — valid workflow requests rejected by older companions no longer suggest resetting signing keys.
 - Reconcile the generic native dependency and release candidate with Wallet's holder-bound read contract and secS's standalone read authority — preserve phone reads when qualifying the coordinated signing upgrade.
 - Add the shared holder-bound read issuer/secS/receiver path and native-v2 composition — enforce approved Work/Arena scope before pagination without an owner bearer fallback.

@@ -1,0 +1,29 @@
+[package]
+name = "devgraph-qualification-tools"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-only"
+
+[workspace]
+
+[dependencies]
+server = { path = "@SECS_ROOT@/server" }
+devgraph-client-native = { path = "@DEVGRAPH_ROOT@/crates/devgraph-client-native" }
+devgraph-client-core = { path = "@DEVGRAPH_ROOT@/crates/devgraph-client-core" }
+secs-native-private-files = { git = "https://github.com/ZenithResearch/secS-magik.git", rev = "11e7128e49c6df57f53e4c8b05e72d4bc78d798c" }
+clap = { version = "4.4", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+
+[patch."https://github.com/ZenithResearch/devgraph.git"]
+devgraph-work-protocol = { path = "@DEVGRAPH_ROOT@/crates/devgraph-work-protocol" }
+
+[[bin]]
+name = "qualification-authority-admin"
+path = "src/admin.rs"
+
+[[bin]]
+name = "qualification-native-client"
+path = "src/native.rs"
