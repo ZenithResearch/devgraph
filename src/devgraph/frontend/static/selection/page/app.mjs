@@ -1,11 +1,11 @@
-import {bindings, initializeDecision, describeNetwork, defaultProfile, fromMonitorSnapshot, validateDecision, validateProfile, evaluateScore, evaluateDecision, canonicalJSON} from '../core/index.mjs';
+import {bindings, initializeDecision, uniformProfile, describeNetwork, defaultProfile, fromMonitorSnapshot, validateDecision, validateProfile, evaluateScore, evaluateDecision, canonicalJSON} from '../core/index.mjs';
 import {FlowView} from './flow-view.mjs';
 import {exampleDecision} from './example.mjs';
-import {byId, setText, el, format, candidateRow, renderEditor, readEditor, renderResult} from './components.mjs';
+import {byId, setText, el, format, candidateRow, renderEditor, readEditor, runPresentation, renderResult} from './components.mjs';
 
 const emptySnapshot = () => ({schema: 'devgraph.selection-snapshot.v1', nodes: [], dependencies: [], blocks: [], hierarchy: [], coverage: {status: 'unknown', consistency: 'assembled', read_started_at: '', read_finished_at: '', unresolved: []}});
 const blank = () => ({schema: 'devgraph.selection-decision.v1', profile: defaultProfile(), snapshot: emptySnapshot(), seeds: [], observations: {}});
-const state = {decision: blank(), source: 'empty', revision: 0, run: null, runRevision: -1, evaluation: null, scopeError: null, worker: null, controller: null, request: 0, editorKey: null, loading: false, scopeFilter: '$all'};
+const state = {decision: blank(), source: 'empty', revision: 0, run: null, runRevision: -1, evaluation: null, scopeError: null, refreshError: '', worker: null, controller: null, request: 0, editorKey: null, loading: false, scopeFilter: '$all'};
 const storage = {get(key) { try { return sessionStorage.getItem(key); } catch { return null; } }, set(key, value) { try { sessionStorage.setItem(key, value); return true; } catch { return false; } }, remove(key) { try { sessionStorage.removeItem(key); } catch {} }};
 const cookieReader = document.querySelector('meta[name=devgraph-selection-reader]')?.content === 'local-session';
 byId('connection-settings').hidden = cookieReader;
@@ -78,6 +78,7 @@ function render() {
   for (const node of candidateNodes) { try { scores.set(node.key, evaluateScore(node, d.observations[node.key], d.profile)); } catch (e) { problems.set(node.key, e); } }
   const filter = byId('search').value.toLowerCase(), rows = byId('candidate-rows'); rows.replaceChildren();
   const currentRun = state.run && state.runRevision === state.revision ? state.run : null;
+  const presentation = runPresentation(state.run, {stale: state.runRevision !== state.revision, refreshing: state.loading, refreshError: state.refreshError});
   for (const node of candidateNodes) {
     if (!(node.title + ' ' + node.key).toLowerCase().includes(filter)) continue;
     rows.append(candidateRow(node, scores.get(node.key), problems.get(node.key), {seed: d.seeds.includes(node.key), required: added.includes(node.key), hasObservations: !!d.observations[node.key], result: currentRun?.rows.find(r => r.key === node.key), onSeed: setSeed, onEdit: openEditor}));
@@ -91,18 +92,18 @@ function render() {
   setText('scope-count', d.seeds.length + ' seeds + ' + added.length + ' added prerequisites');
   const blocked = !!state.scopeError || !!state.networkError || !evaluation || incomplete > 0 || state.loading;
   byId('run').disabled = blocked || !!state.worker; byId('run').textContent = state.worker ? 'Solving…' : 'Run selection ↗';
-  byId('export').disabled = !d.snapshot.nodes.length; byId('save-draft').disabled = !d.snapshot.nodes.length;
-  setText('flow-state', !d.snapshot.nodes.length && !state.loading ? 'No network loaded' : state.loading ? 'Loading network…' : currentRun ? 'Minimum cut' : state.run ? 'Edited · rerun' : blocked ? 'Network · needs inputs' : 'Capacities ready');
-  const issue = state.networkError || state.scopeError;
-  setText('run-help', state.worker ? 'Solving the frozen network…' : state.loading ? 'Loading Work objects and dependencies…' : !d.snapshot.nodes.length ? 'Load a network to reveal its required variables.' : blocked ? issue?.message || 'Fill or review variables on ' + incomplete + ' work item(s).' : 'Ready to solve ' + evaluation.scope.nodes.length + ' work items. Hard prerequisites stay together.');
-  const errors = byId('errors'); errors.replaceChildren(); errors.hidden = !d.snapshot.nodes.length || !issue;
-  if (!errors.hidden) errors.append(el('p', issue.message));
-  renderResult(state.run, state.runRevision !== state.revision);
+  byId('export').disabled = !d.snapshot.nodes.length || !presentation.exportable; byId('save-draft').disabled = !d.snapshot.nodes.length;
+  setText('flow-state', !d.snapshot.nodes.length && !state.loading ? 'No network loaded' : state.loading ? 'Refreshing snapshot…' : state.refreshError ? 'Previous snapshot' : currentRun ? 'Minimum cut' : state.run ? 'Edited · rerun' : blocked ? 'Network · needs inputs' : 'Capacities ready');
+  const issue = state.networkError || state.scopeError, issueText = issue?.message || state.refreshError;
+  setText('run-help', state.worker ? 'Solving the frozen network…' : state.loading ? 'Refreshing Work objects and dependencies. The prior result remains visible but cannot be exported.' : state.refreshError ? state.refreshError + ' Showing the previous snapshot.' : !d.snapshot.nodes.length ? 'Load a network to reveal its required variables.' : blocked ? issueText || 'Fill or review variables on ' + incomplete + ' work item(s).' : 'Ready to solve ' + evaluation.scope.nodes.length + ' work items. Hard prerequisites stay together.');
+  const errors = byId('errors'); errors.replaceChildren(); errors.hidden = !d.snapshot.nodes.length || !issueText;
+  if (!errors.hidden) errors.append(el('p', issueText));
+  renderResult(state.run, presentation);
   const focused = [...rows.querySelectorAll('[data-scope-key], [data-edit-key]')].find(n => focusedScope ? n.dataset.scopeKey === focusedScope && !n.disabled : focusedEdit && n.dataset.editKey === focusedEdit);
   if (focused) focused.focus({preventScroll: true});
 }
 function replaceDecision(decision, source) {
-  validateDecision(decision); closeEditor(); state.decision = JSON.parse(canonicalJSON(decision)); state.source = source; state.run = null; state.runRevision = -1; state.controller?.abort(); state.request++; state.loading = false;
+  validateDecision(decision); closeEditor(); state.decision = JSON.parse(canonicalJSON(decision)); state.source = source; state.run = null; state.runRevision = -1; state.refreshError = ''; state.controller?.abort(); state.request++; state.loading = false;
   const seedKind = state.decision.snapshot.nodes.find(n => state.decision.seeds.includes(n.key))?.kind; if (seedKind) byId('kind').value = seedKind;
   syncScopeFilter(); syncProfile(); changed();
 }
@@ -166,7 +167,7 @@ for (const [id, setter] of [
   ['goal-label', (p, v) => { p.goals[0].label = v; }], ['benefit-scale', (p, v) => { p.goals[0].scale = Number(v); }], ['kpi-reference', (p, v) => { p.goals[0].predictors[0].reference = Number(v); }], ['direction', (p, v) => { p.goals[0].predictors[0].direction = Number(v); }], ['conversion', (p, v) => { p.resources[0].conversion = Number(v); }], ['confidence', (p, v) => { p.confidence_mode = v; }], ['baseline', (p, v) => { p.baseline = v; }], ['horizon', (p, v) => { p.horizon = v; }],
 ]) byId(id).onchange = event => { try { if (event.target.value.trim() === '') throw Error('A value is required.'); updateProfile(p => setter(p, event.target.value)); message('Model updated. Run selection to refresh the result.'); } catch (e) { fail(e); syncProfile(); } };
 byId('apply-profile').onclick = () => { try { const next = JSON.parse(byId('profile-json').value); validateProfile(next); closeEditor(); state.decision.profile = next; syncProfile(); changed(); message('Profile applied. Review any new predictors before running.'); } catch (e) { fail(e); } };
-byId('uniform').onclick = () => { try { const next = JSON.parse(byId('profile-json').value); for (const g of [...next.goals, ...next.resources]) g.predictors.forEach(p => { p.weight = 1 / g.predictors.length; }); next.goals.forEach(g => { g.weight = 1 / next.goals.length; }); validateProfile(next); closeEditor(); state.decision.profile = next; syncProfile(); changed(); message('Equal weights applied within each group and across goals.'); } catch (e) { fail(e); } };
+byId('uniform').onclick = () => { try { const next = uniformProfile(JSON.parse(byId('profile-json').value)); closeEditor(); state.decision.profile = next; syncProfile(); changed(); message('Equal weights applied within each group and across goals.'); } catch (e) { fail(e); } };
 byId('project-scope').onchange = event => {
   closeEditor(); state.scopeFilter = event.target.value;
   if (state.scopeFilter === '$custom') return;
@@ -181,7 +182,7 @@ byId('none').onclick = () => { state.decision.seeds = []; syncScopeFilter(); cha
 for (const id of ['example', 'empty-example']) byId(id).onclick = () => { replaceDecision(exampleDecision(), 'sample'); message('Example loaded. These are illustrative values, separate from live Work.'); };
 byId('connect-form').onsubmit = async event => {
   event.preventDefault(); const token = byId('credential').value.trim(); if (!token && !cookieReader) { byId('connection-settings').open = true; message('Connect once with your scoped Monitor reader; projects load automatically after that.'); return; }
-  closeEditor(); state.controller?.abort(); const controller = new AbortController(); state.controller = controller; const request = ++state.request; state.loading = true; cancelRun(); render(); message('Loading Work objects, dependencies, and variable slots…');
+  closeEditor(); state.controller?.abort(); const controller = new AbortController(); state.controller = controller; const request = ++state.request; state.loading = true; state.refreshError = ''; cancelRun(); render(); message('Loading Work objects, dependencies, and variable slots…');
   const timer = setTimeout(() => controller.abort(), cookieReader ? 30000 : 15000);
   try {
     const response = await fetch('/monitor/snapshot', {headers: cookieReader ? {} : {Authorization: 'Bearer ' + token}, signal: controller.signal, cache: 'no-store', credentials: cookieReader ? 'same-origin' : 'omit', redirect: 'error'});
@@ -197,7 +198,7 @@ byId('connect-form').onsubmit = async event => {
     state.decision = d; state.source = 'live'; if (first) state.run = null;
     byId('connection-settings').open = false; syncProfile(); changed();
     message('Network loaded. Work versions and dependencies are assembled during a read window; external gates and outcome attribution remain scenario assumptions.');
-  } catch (e) { if (request === state.request) message(e.name === 'AbortError' ? 'Snapshot read timed out or was cancelled. Previous inputs remain unchanged.' : e.message); }
+  } catch (e) { if (request === state.request) { state.refreshError = e.name === 'AbortError' ? 'Snapshot read timed out or was cancelled. Previous inputs remain unchanged.' : e.message; message(state.refreshError); } }
   finally { clearTimeout(timer); if (request === state.request) { state.loading = false; state.controller = null; render(); } }
 };
 byId('credential').oninput = () => {
@@ -217,8 +218,10 @@ byId('import-file').onchange = async event => {
   try { const file = event.target.files[0]; if (!file) return; if (file.size > 8_000_000) throw Error('Decision files must be smaller than 8 MB.'); const value = JSON.parse(await file.text()); const decision = value.schema === 'devgraph.selection-run.v1' ? value.input : value; replaceDecision(decision, 'imported'); message('Imported input scenario. Run locally to verify its selection.'); } catch (e) { fail(e); } finally { event.target.value = ''; }
 };
 byId('export').onclick = () => {
-  const value = state.run && state.runRevision === state.revision ? state.run : state.decision;
-  const blob = new Blob([JSON.stringify(value, null, 2) + '\n'], {type: 'application/json'}), url = URL.createObjectURL(blob), link = el('a'); link.href = url; link.download = 'devgraph-selection-' + (value.schema === 'devgraph.selection-run.v1' ? 'run' : 'inputs') + '.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); message('Exported the ' + (value.schema === 'devgraph.selection-run.v1' ? 'current run and its inputs' : 'current inputs; previous results were out of date') + '.');
+  if (state.loading) { message('Wait for the snapshot refresh before exporting.'); return; }
+  const currentRun = state.run && state.runRevision === state.revision, value = currentRun ? state.run : state.decision;
+  const blob = new Blob([JSON.stringify(value, null, 2) + '\n'], {type: 'application/json'}), url = URL.createObjectURL(blob), link = el('a'); link.href = url; link.download = 'devgraph-selection-' + (value.schema === 'devgraph.selection-run.v1' ? 'run' : 'inputs') + '.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  message('Exported the ' + (value.schema === 'devgraph.selection-run.v1' ? state.refreshError ? 'run for the previous snapshot after the refresh failed' : 'current run and its inputs' : 'current inputs; previous results were out of date') + '.');
 };
 byId('save-draft').onclick = () => { message(storage.set('devgraph-selection-draft-v1', canonicalJSON({schema: 'devgraph.selection-draft.v1', source: ['live', 'restored_live'].includes(state.source) ? 'live' : 'scenario', decision: state.decision})) ? 'Draft saved for this browser tab. Export JSON to keep it independently.' : 'Browser storage is unavailable. Export JSON to save the draft.'); };
 byId('restore-draft').onclick = () => { try { const raw = storage.get('devgraph-selection-draft-v1'); if (!raw) throw Error('No draft saved in this tab.'); const saved = JSON.parse(raw); replaceDecision(saved.decision || saved, saved.source === 'live' ? 'restored_live' : 'restored'); message(saved.source === 'live' ? 'Saved Monitor inputs restored. Load snapshot to reconcile Work versions while preserving your estimates.' : 'Saved scenario restored. Run to verify the result.'); } catch (e) { fail(e); } };

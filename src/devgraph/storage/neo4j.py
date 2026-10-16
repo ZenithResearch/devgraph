@@ -283,10 +283,23 @@ class Neo4jGraphStorage:
             {"type": "UNIQUENESS", "labelsOrTypes": ["WorkMutationGuard"], "properties": ["id"]}
         ]:
             raise StorageUnavailable("named Work mutation schema unavailable")
+        # MATCH takes the existing singleton's write lock without MERGE's
+        # uniqueness/index locking. Concurrent MERGE + update transactions can
+        # deadlock while upgrading locks on this otherwise shared mutex.
+        locked = self._run_graph(
+            "MATCH (guard:WorkMutationGuard {id: 'named-work-v1'}) "
+            "SET guard.__work_lock = true REMOVE guard.__work_lock "
+            "RETURN guard.id AS id"
+        )
+        if locked:
+            return
+        # First use only: the uniqueness constraint serializes creation. Keep
+        # initialization and the protected mutation in the same transaction.
         self._run_graph(
             "MERGE (guard:WorkMutationGuard {id: 'named-work-v1'}) "
             "ON CREATE SET guard.revision = 0 "
-            "SET guard.revision = guard.revision + 1 RETURN guard.revision AS revision"
+            "SET guard.__work_lock = true REMOVE guard.__work_lock "
+            "RETURN guard.id AS id"
         )
 
     @staticmethod

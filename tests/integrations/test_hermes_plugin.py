@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -41,8 +42,8 @@ def fake_cli(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "hermes_cli.config", module)
 
     def install(body):
-        executable.write_text(
-            f"#!{sys.executable} -I\n"
+        script = tmp_path / "fake_cli.py"
+        script.write_text(
             "import json, os, stat, sys, time\nfrom pathlib import Path\n"
             "arguments = sys.argv[1:]\n"
             "call = {'arguments': arguments, 'environment': dict(os.environ)}\n"
@@ -55,6 +56,12 @@ def fake_cli(tmp_path, monkeypatch):
             "        directory_mode=stat.S_IMODE(request.parent.stat().st_mode))\n"
             f"with Path({str(audit)!r}).open('a') as stream:\n"
             "    stream.write(json.dumps(call) + '\\n')\n" + body + "\n",
+        )
+        # A shebang cannot quote an interpreter path containing spaces. Keep
+        # the real subprocess boundary while supporting such checkout paths.
+        executable.write_text(
+            f"#!/bin/sh\nexec {shlex.quote(sys.executable)} -I "
+            f'{shlex.quote(str(script))} "$@"\n',
         )
         executable.chmod(0o700)
         return executable
