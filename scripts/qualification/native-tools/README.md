@@ -44,7 +44,12 @@ authority or invokes Wallet. `--offline` is available after dependency fetch.
 Wallet's current and historical decoder crates remain private dependencies. In
 the existing Wallet-connected Buildkite lane, use its established read-only local
 Git rewrite after fetching the reviewed Wallet revisions; no new GitHub App,
-private key, token scope or production credential is needed. Do not put repository
+private key, token scope or production credential is needed. The manual
+`pipeline.yml` preserves an exact-source operator review block before the tools
+run beside private Wallet code; do not bypass that block with an alternate
+pipeline. Set `DEVGRAPH_TOOLING_REVISION` to the reviewed tooling commit and the
+build commit to the pinned Wallet revision. No source-test or earlier runtime
+acceptance substitutes for this distinct source review. Do not put repository
 credentials in a manifest or provenance file. The historical decoder is a frozen
 compatibility library, not permission to revive an obsolete executable.
 

@@ -1,0 +1,28 @@
+# Private manual pipeline, with castalia-wallet as the primary repository.
+# Require exact-source review before any new tooling runs beside private code.
+steps:
+  - block: 'Approve exact source for qualification tool packaging'
+    key: qualification-tool-source-review
+    prompt: >-
+      Review DEVGRAPH_TOOLING_REVISION and the exact Wallet checkout commit.
+      This builds guest-only tools using pinned public Devgraph/secS source.
+      It does not create an identity, grant, trust configuration or signing pass.
+  - label: 'Build pinned guest-only qualification tools'
+    key: qualification-tool-build
+    depends_on: qualification-tool-source-review
+    if: build.source == "ui"
+    agents: {queue: macos-15-medium}
+    timeout_in_minutes: 30
+    command: |
+      set -euo pipefail
+      [[ "$DEVGRAPH_TOOLING_REVISION" =~ ^[0-9a-f]{40}$ ]]
+      git init build/devgraph-tooling
+      git -C build/devgraph-tooling remote add origin https://github.com/ZenithResearch/devgraph.git
+      git -C build/devgraph-tooling fetch --depth=1 origin "$DEVGRAPH_TOOLING_REVISION"
+      git -C build/devgraph-tooling checkout --detach FETCH_HEAD
+      export DEVGRAPH_TOOLING_CHECKOUT="$PWD/build/devgraph-tooling"
+      bash "$DEVGRAPH_TOOLING_CHECKOUT/scripts/qualification/native-tools/hosted-build.sh"
+    artifact_paths:
+      - 'build/qualification-tools/qualification-authority-admin'
+      - 'build/qualification-tools/qualification-native-client'
+      - 'build/qualification-tools/tool-provenance.json'
