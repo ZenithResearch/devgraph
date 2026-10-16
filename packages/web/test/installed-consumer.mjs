@@ -193,7 +193,7 @@ try{
 }finally{await new Promise(resolve=>server.close(resolve))}
 assert.deepEqual(violations,[],'browser console errors/CSP violations');
 const evidence={scope:'External installed tarball; fixture transport only, no native/provider authority claim',
-  source_commit:sourceManifest.source_commit,consumer_directory:consumer,node:process.version,typescript:'5.9.3',vite:'7.3.5',playwright:'1.61.1',
+  source_commit:sourceManifest.source_commit,consumer_directory:consumer,node:process.version,typescript:'5.9.3',vite:'7.3.7',playwright:'1.61.1',
   package:packageJson.name,version:packageJson.version,tarball_sha256:hash(tarball),
   wasm_sha256:hash(installedWasm),runtime_js_sha256:hash(Buffer.concat(await Promise.all(runtimeFiles.map(file=>readFile(resolve(installed,'dist',file)))))),
   installation:'npm install --ignore-scripts; only SDK tarball plus pinned TypeScript/Vite dependencies',

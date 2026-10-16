@@ -29,4 +29,5 @@ steps:
       - 'build/devgraph/.sdk-validation/browser-core.json'
       - 'build/devgraph/.sdk-validation/installed-consumers.json'
       - 'build/devgraph/build/buildkite/companion/provenance.json'
+      - 'build/devgraph/build/buildkite/companion/*audit*.json'
       - 'build/devgraph/packages/web/*.tgz'

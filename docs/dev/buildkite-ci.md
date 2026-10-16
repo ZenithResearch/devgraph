@@ -78,6 +78,11 @@ metadata. A manual unblock alone cannot make invalid evidence pass.
 
 ## Security analysis and cutover
 
+SDK and companion jobs audit all npm dependencies, including development tools,
+and audit the separately installed SDK consumer before running it. Findings at
+low severity or above, or an unavailable audit service, fail the lane. Both JSON
+reports are retained with its provenance.
+
 CodeQL CLI and queries come from a checksum-pinned official bundle. Python and
 JavaScript SARIF reports are retained in Buildkite; inspect findings as part of
 review. GitHub's separately configured default CodeQL scan is outside repository

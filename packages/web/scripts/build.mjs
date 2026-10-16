@@ -99,7 +99,7 @@ const manifest = {
   protocol_source:{repository:'https://github.com/ZenithResearch/devgraph',path:'crates/devgraph-work-protocol',revision:capture('git',['rev-parse','HEAD'])},
   source_dependencies:gitPackages.map(({name,version,source})=>({name,version,source})).sort((a,b)=>a.name.localeCompare(b.name)),
   resolved_features:metadata.resolve.nodes.filter(n=>gitPackages.some(p=>p.id===n.id)).map(({id,features})=>({id,features})),
-  toolchains:{rust:capture('rustc',['--version']),wasm_bindgen:'0.2.127',node:process.version,typescript:'5.9.3',vite:'7.3.5',playwright:'1.61.1'},
+  toolchains:{rust:capture('rustc',['--version']),wasm_bindgen:'0.2.127',node:process.version,typescript:'5.9.3',vite:'7.3.7',playwright:'1.61.1'},
   target:'wasm32-unknown-unknown',wasm_sha256:digest(wasm),runtime_js_sha256:runtimeDigest,cargo_lock_sha256:digest(lock),
   ...evidenceInputs,
   credential_transport_schema:'devgraph.credential-transport-capabilities.v2',
