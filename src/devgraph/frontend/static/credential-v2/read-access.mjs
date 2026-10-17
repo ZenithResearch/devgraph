@@ -42,7 +42,17 @@ export class WalletReadClient{
   this.setup=await prepareProviderSetup({provider,origin:this.origin,current,requiredCapability:'read_access_v1',transport:{getProviderProfile:async()=>structuredClone(this.configuration.provider_profile)}});current();
   this.provider=provider;this.stage='profile';this.notify();
  }
+ get connectionDetails(){
+  return this.identity?{schema:'devgraph.wallet-connection-details.v1',server_origin:this.origin,subject_public_key:this.identity.subject_public_key,installation_id:this.identity.installation_id}:null;
+ }
+ async checkAccess(current){
+  this.challenge=null;this.stage='access';this.notify();
+  const challenge=await this.fetch(BASE+'/challenges',{body:{subject_public_key:this.identity.subject_public_key,installation_id:this.identity.installation_id}});current();
+  if(!plain(challenge)||typeof challenge.receiver!=='string'||!Number.isSafeInteger(challenge.expires_at)||challenge.expires_at<=this.now())throw failure('read_challenge_invalid');
+  this.challenge=challenge;this.stage='approval';this.notify();
+ }
  async advance(){
+  this.notice='';
   const generation=this.generation,current=()=>{if(generation!==this.generation)throw failure('wallet_connection_changed');};
   if(this.stage==='profile'){const pending=this.setup.approve();await pending;current();this.stage='connection';this.notify();return;}
   if(this.stage==='connection'){
@@ -50,11 +60,12 @@ export class WalletReadClient{
    const identity=await this.provider.readAccess({operation:'identity'});current();
    if(!plain(identity)||!/^[a-f0-9]{64}$/.test(identity.subject_public_key)||!/^[a-f0-9]{32}$/.test(identity.installation_id)||!Array.isArray(identity.memberships))throw failure('read_identity_invalid');
    this.identity=identity;this.memberships=identity.memberships;this.profileId=identity.memberships.length===1?identity.memberships[0].profileId:undefined;
-   this.challenge=await this.fetch(BASE+'/challenges',{body:{subject_public_key:identity.subject_public_key,installation_id:identity.installation_id}});current();
-   this.stage='approval';this.notify();return;
+   await this.checkAccess(current);return;
   }
+  if(this.stage==='access'){await this.checkAccess(current);return;}
   if(this.stage!=='approval')throw failure('wallet_read_access_required');
   if(this.memberships.length>1&&!this.profileId)throw failure('membership_selection_required');
+  if(this.now()>=this.challenge.expires_at-5){await this.checkAccess(current);this.notice='read_scope_refreshed';this.notify();return;}
   // Start the consent RPC immediately in this user gesture, before network waits.
   const pending=this.provider.readAccess({operation:'approve',challenge:this.challenge,...(this.profileId?{profileId:this.profileId}:{})});
   const approved=await pending;current();
@@ -84,7 +95,7 @@ export class WalletReadClient{
  }
  disconnect(){
   const provider=this.provider,accessId=this.accessId;this.provider=null;
-  this.generation++;this.accessId=null;this.sessionKey='';this.preferenceSeed='';this.identity=null;this.challenge=null;this.memberships=[];
+  this.generation++;this.accessId=null;this.sessionKey='';this.preferenceSeed='';this.identity=null;this.challenge=null;this.memberships=[];this.notice='';
   this.stage=this.configuration?'choose':'unavailable';this.notify();
   if(accessId&&provider?.readAccess)void provider.readAccess({operation:'disconnect',accessId}).catch(()=>{});
   provider?.dispose?.();

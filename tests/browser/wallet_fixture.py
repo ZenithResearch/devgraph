@@ -58,6 +58,7 @@ class Fixture:
     def challenge(self, owner, device):
         return {
             "receiver": policy.receiver,
+            "expires_at": int(time.time()) + 120,
             "credential_expires_at": int(time.time()) + 600,
             "details": {"fixture": True},
         }

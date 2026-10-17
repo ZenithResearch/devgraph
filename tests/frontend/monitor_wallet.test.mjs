@@ -7,7 +7,7 @@ function fixture(){
  const provider={getCapabilities:async()=>['read_access_v1','provider_profiles_v1','connection_v1'],proposeProviderProfile:async()=>({state:'approved'}),requestConnection:async()=>({state:'connected'}),readAccess:async input=>{events.push(input.operation);if(input.operation==='identity')return{subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32),memberships:[{profileId:'one'}]};if(input.operation==='approve')return{accessId:'access-one',enrollment:{challenge:{},proof:{},signature:'test'}};if(input.operation==='accept')return{accessId:'access-one',expires_at:4000,receiver:origin};if(input.operation==='present')return{credential:{},call:input.call,proof:{}};return{state:'disconnected'}}};
  const fetchImpl=async(url,options={})=>{
   assert.ok(url.startsWith('/monitor/wallet-access/v1'));assert.equal(options.credentials,'omit');assert.equal(options.redirect,'error');
-  const value=url.endsWith('/challenges')?{receiver:origin}:url.endsWith('/enrollments')?{schema:'devgraph.native-read-result.v3',credential:{}}:url.endsWith('/requests')?{items:[]} :configuration;
+  const value=url.endsWith('/challenges')?{receiver:origin,expires_at:1120}:url.endsWith('/enrollments')?{schema:'devgraph.native-read-result.v3',credential:{}}:url.endsWith('/requests')?{items:[]} :configuration;
   return{ok:true,status:200,json:async()=>value};
  };
  const client=new WalletReadClient({origin,fetchImpl,now:()=>1000});return{client,provider,events};
@@ -27,4 +27,40 @@ test('scope does not become arbitrary read or write transport',async()=>{
 });
 test('unsupported installed Wallet cannot fall back to pasted credentials',async()=>{
  const {client,provider}=fixture();provider.getCapabilities=async()=>['credential_presentation_v2'];await client.initialize();await assert.rejects(client.useProvider(provider),/wallet_upgrade_required/);
+});
+
+
+test('an unassigned Wallet exposes only public setup details and retries without new site consent',async()=>{
+ const {client,provider,events}=fixture();let connections=0,denied=true;
+ provider.requestConnection=async()=>{connections++;return{state:'connected'};};
+ const fetchImpl=client.fetchImpl;
+ client.fetchImpl=async(url,options)=>url.endsWith('/challenges')&&denied?{ok:false,status:401,json:async()=>({error:'member_access_not_granted'})}:fetchImpl(url,options);
+ await client.initialize();await client.useProvider(provider);await client.advance();
+ await assert.rejects(client.advance(),/wallet_read_denied/);
+ assert.equal(client.stage,'access');assert.equal(connections,1);
+ assert.deepEqual(client.connectionDetails,{schema:'devgraph.wallet-connection-details.v1',server_origin:'https://graph.example',subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32)});
+ const copy=client.connectionDetails;copy.subject_public_key='changed';
+ assert.equal(client.connectionDetails.subject_public_key,'b'.repeat(64));
+ denied=false;await client.advance();assert.equal(client.stage,'approval');assert.equal(connections,1);
+ assert.deepEqual(events,['identity']);await client.advance();assert.equal(client.stage,'ready');
+ client.disconnect();assert.equal(client.connectionDetails,null);
+});
+
+test('an expired read challenge refreshes before a new explicit signing gesture',async()=>{
+ const {client,provider,events}=fixture();let now=1000,challenges=0;
+ client.now=()=>now;const fetchImpl=client.fetchImpl;
+ client.fetchImpl=async(url,options)=>{if(url.endsWith('/challenges')){challenges++;return{ok:true,status:200,json:async()=>({receiver:'https://graph.example',expires_at:now+120})};}return fetchImpl(url,options);};
+ await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();
+ now=1120;await client.advance();assert.equal(client.stage,'approval');assert.equal(challenges,2);
+ assert.equal(events.filter(x=>x==='approve').length,0);
+ await client.advance();assert.equal(client.stage,'ready');assert.equal(events.filter(x=>x==='approve').length,1);
+});
+
+test('disconnect while checking access cannot revive public identity or approval',async()=>{
+ const {client,provider}=fixture();let release;const fetchImpl=client.fetchImpl;
+ client.fetchImpl=async(url,options)=>url.endsWith('/challenges')?new Promise(resolve=>{release=resolve;}):fetchImpl(url,options);
+ await client.initialize();await client.useProvider(provider);await client.advance();
+ const checking=client.advance();await new Promise(resolve=>setImmediate(resolve));assert.equal(client.stage,'access');
+ client.disconnect();release({ok:true,status:200,json:async()=>({receiver:'https://graph.example',expires_at:1120})});
+ await assert.rejects(checking,/wallet_connection_changed/);assert.equal(client.stage,'choose');assert.equal(client.connectionDetails,null);
 });

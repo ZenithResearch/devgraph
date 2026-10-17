@@ -37,6 +37,16 @@ Export still produces an offline review plan, not an installed grant. Member
 assignment revision/epoch checks prevent renewal from restoring removed rights.
 No existing policy, member, device or grant is upgraded automatically.
 
+If this Wallet has no assignment yet, the monitor offers **Check access** and
+**Public connection details for your administrator**. The copy contains only the
+server origin, approved public Member Key and Wallet installation identifier;
+it contains no proof, password, recovery file or credential. The operator can
+use those exact identifiers when reviewing an access draft. Sharing the details
+does not create authority. After the assignment is separately approved, choose
+Check access without repeating provider/site consent. Disconnect clears them.
+Expired challenges are refreshed without signing; a fresh button click still
+opens the Wallet's exact read approval.
+
 The public configuration endpoint `/monitor/wallet-access/v1` proposes issuer
 verification settings; it installs neither trust nor authority. Its challenge,
 enrollment and request endpoints use the existing shared read-signing domains.

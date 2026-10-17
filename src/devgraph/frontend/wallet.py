@@ -14,6 +14,14 @@ Restore a Wallet from a recovery file</button>
 <option value="">Choose membership</option>
 </select>
 </label>
+        <details class="wallet-connection-settings" data-wallet-access-details hidden>
+<summary>Public connection details for your administrator</summary>
+<p>Your administrator can use this Member Key and Wallet installation to assign a scope.
+These public details contain no password, key material, membership proof or credential,
+and do not grant access.</p>
+<pre data-wallet-access-json></pre>
+<button type="button" data-wallet-copy>Copy public connection details</button>
+</details>
         <details class="wallet-connection-settings" data-wallet-settings>
 <summary>Wallet connection help</summary>
 <p>Open your trusted Castalia Web Wallet to unlock it or restore an encrypted recovery file.
