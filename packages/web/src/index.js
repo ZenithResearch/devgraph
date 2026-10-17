@@ -41,7 +41,7 @@ const ERROR_CODES = new Set((
   + 'invalid_identity invalid_presentation invalid_authority invalid_clock randomness_unavailable '
   + 'read_authority_unavailable transport_error transport_unavailable transport_timeout port_disconnected stream_closed '
   + 'concurrent_pull read_limit mutation_limit control_limit duplicate_or_exhausted_id already_connected '
-  + 'outcome_unknown rejected'
+  + 'outcome_unknown rejected wallet_unlock_required wallet_connection_required approval_required'
 ).split(' '));
 const capability = Symbol('devgraph client');
 /** @type {Promise<any> | undefined} */

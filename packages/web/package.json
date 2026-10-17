@@ -1,6 +1,6 @@
 {
   "name": "@devgraph/web",
-  "version": "0.2.0-preview.2",
+  "version": "0.2.0-preview.3",
   "private": true,
   "description": "Rust/WASM Devgraph client with application-owned HTTP transport and generic Wallet approval",
   "type": "module",

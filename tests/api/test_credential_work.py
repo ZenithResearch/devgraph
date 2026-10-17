@@ -224,3 +224,37 @@ def test_provider_setup_obeys_browser_admission(monkeypatch, tmp_path, headers):
         client.post("/credential-work/v2/provider-profile", json={}, headers=headers).status_code
         == 403
     )
+
+
+def test_native_browser_snapshots_use_canonical_private_temporary_paths(monkeypatch, tmp_path):
+    import subprocess
+    from pathlib import Path
+
+    import devgraph.ops.browser_credential_work as browser
+
+    actual = tmp_path / "canonical-temp"
+    actual.mkdir(mode=0o700)
+    alias = tmp_path / "temp-alias"
+    alias.symlink_to(actual, target_is_directory=True)
+    monkeypatch.setattr(browser.tempfile, "tempdir", str(alias))
+    monkeypatch.setattr(browser, "_require_fixed_executable", lambda *a, **k: ([], None))
+    monkeypatch.setattr(browser, "_close_wallet_binary_descriptors", lambda *a: None)
+    observed = []
+
+    def adapter(command, *, env):
+        source, keyfile, output = map(Path, (command[3], command[5], command[7]))
+        assert source == source.resolve(strict=True)
+        assert keyfile == keyfile.resolve(strict=True)
+        assert output.parent == output.parent.resolve(strict=True)
+        assert source.stat().st_mode & 0o077 == 0
+        assert source.parent.stat().st_mode & 0o077 == 0
+        assert keyfile.read_text().strip() == KEY
+        observed.append(source.parent)
+        output.write_bytes(b"{}")
+        output.chmod(0o600)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(browser, "_run_adapter", adapter)
+    host = BrowserCredentialWorkHost(data_root=tmp_path, receiver=None)
+    assert host._produce("issue-credential", {"example": True}, KEY) == b"{}"
+    assert len(observed) == 1 and not observed[0].exists()

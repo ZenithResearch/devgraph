@@ -1,3 +1,4 @@
+import {normalizeWalletError} from './wallet-errors.mjs';
 /** Devgraph owns transport and execution. Wallet only presents an attached credential.
  * The transport is an application-owned, trusted composition dependency with
  * prepareCredential, executeCredential and reconcileOperation methods. This
@@ -81,7 +82,12 @@ export class DevgraphCredentialClient {
       this.#pending = null;
       return clone(result);
     } catch (error) {
-      if (dispatched) fail('outcome_unknown', true);
+      if (reconcile || this.#pending || dispatched) {
+        this.#pending ??= operation;
+        fail('outcome_unknown', true);
+      }
+      const walletError = normalizeWalletError(error);
+      if (walletError) throw walletError;
       if (error instanceof CredentialClientError) throw error;
       fail('preparation_failed');
     } finally {

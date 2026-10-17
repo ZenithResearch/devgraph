@@ -41,3 +41,14 @@ test('denial and disposed/late setup cannot enable writes',async()=>{
   await assert.rejects(pending,/disposed/);
   assert.throws(()=>setup.approve(),/disposed/);
 });
+
+test('legacy locked errors are actionable without disclosing arbitrary provider causes',async()=>{
+  for(const synchronous of [true,false]) {
+    const f=fixture();f.provider.requestConnection=()=>{if(synchronous)throw Error('wallet_unlock_required');return Promise.reject(Error('wallet_unlock_required'));};
+    const setup=await prepareProviderSetup(f);
+    await assert.rejects(async()=>setup.connect(),{code:'wallet_unlock_required',dispatched:false});
+  }
+  const f=fixture();f.provider.requestConnection=async()=>{throw Error('private diagnostic');};
+  const setup=await prepareProviderSetup(f);
+  await assert.rejects(setup.connect(),{code:'authorization_failed',message:'authorization_failed'});
+});

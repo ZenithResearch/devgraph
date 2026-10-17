@@ -112,7 +112,7 @@ fresh disposable macOS VM, including a rerun after packaged source changes. That
 qualification remains blocked until the VM is available; live activation is
 outside this delivery.
 
-## Merged Wallet provider setup (0.2.0-preview.2)
+## Merged Wallet provider setup (0.2.0-preview.3)
 
 Wallet `ff8de6ddc04ac2fb6b39408274276bc4ce984d42` starts with no trusted
 providers. `prepareWalletSetup()` preloads the operator's public provider profile
@@ -129,3 +129,23 @@ request-credential trust for the exact page origin. The receiver still requires
 explicit operation/resource grants. Terminal SDK configuration keeps its separate
 owner-private issuer trust and interactive signing ceremony. Historical Work/Arena
 request bytes, signatures and response envelopes are unchanged.
+
+## Session errors and recovery (preview.3)
+
+A locked Wallet now returns `wallet_unlock_required` before dispatch, with an
+instruction to unlock it. An unapproved site returns `wallet_connection_required`.
+Only exact recognized public errors are translated; arbitrary provider diagnostics
+are not exposed. Provider approval, connection and signing remain separate human
+ceremonies. This change does not install trust or expand grants.
+
+Keep the prepared request and its original idempotency key. After an unknown
+execution, `reconcile()` checks only the original operation with fresh approval.
+A locked Wallet, denied approval or failed status lookup leaves that original
+outcome unknown and blocks another execution, including in a freshly reconstructed
+client. Unlocking alone never resubmits a mutation. Update client controls from the
+returned outcome; only a validated committed result may announce success.
+
+The Chrome side panel's unlocked state is session-local. Worker suspension clears
+custody and the matched Wallet UI must show locked rather than stale readiness.
+Do not keep the worker awake to bypass this boundary. New package hashes require
+fresh installed qualification; earlier browser acceptance is not inherited.

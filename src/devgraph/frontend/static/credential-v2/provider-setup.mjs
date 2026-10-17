@@ -1,4 +1,6 @@
+import {normalizeWalletError} from './wallet-errors.mjs';
 /** Public configuration is a proposal, never authority or automatic trust. */
+const walletFailure=error=>{throw normalizeWalletError(error) ?? failure('authorization_failed');};
 const failure=code=>Object.assign(new Error(code),{code,dispatched:false});
 const shape=(value,keys)=>value&&Object.getPrototypeOf(value)===Object.prototype
   && Object.keys(value).sort().join(',')===[...keys].sort().join(',');
@@ -37,13 +39,17 @@ export async function prepareProviderSetup({provider,transport,origin,current=()
     get profile(){return structuredClone(snapshot);},
     approve(){
       current();
-      return provider.proposeProviderProfile(structuredClone(snapshot)).then(result=>{
+      let pending;
+      try {pending=provider.proposeProviderProfile(structuredClone(snapshot));} catch(error) {return walletFailure(error);}
+      return Promise.resolve(pending).catch(walletFailure).then(result=>{
         current();if(result?.state!=='approved')throw failure('user_denied');return result;
       });
     },
     connect(){
       current();
-      return provider.requestConnection().then(result=>{
+      let pending;
+      try {pending=provider.requestConnection();} catch(error) {return walletFailure(error);}
+      return Promise.resolve(pending).catch(walletFailure).then(result=>{
         current();if(result?.state!=='connected')throw failure('user_denied');return result;
       });
     },

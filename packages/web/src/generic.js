@@ -1,3 +1,4 @@
+import {normalizeWalletError} from '../../../src/devgraph/frontend/static/credential-v2/wallet-errors.mjs';
 import {decodeCredentialResult} from '../../../src/devgraph/frontend/static/credential-v2/result.mjs';
 /** Devgraph-owned browser transport. Reads do not depend on Wallet authority. */
 import {DevgraphCredentialClient} from '../../../src/devgraph/frontend/static/credential-v2/coordinator.mjs';
@@ -133,9 +134,11 @@ export class GenericClient {
       const {state: _, ...decoded}=result;
       this.#pending=null;return {kind:'committed',...decoded};
     } catch(error) {
-      const uncertain=received || /** @type {any} */(error)?.dispatched===true;
+      const uncertain=reconcile || this.#pending!==null || received || /** @type {any} */(error)?.dispatched===true;
       if(uncertain)this.#pending={raw,key};
       const known=['unsupported_operation','capability_unavailable','user_denied','cancelled','disposed','preparation_failed'];
+      const walletError=normalizeWalletError(error);
+      if(!uncertain && walletError)return {kind:'not_dispatched',error:walletError};
       const code=uncertain?'outcome_unknown':known.includes(/** @type {any} */(error)?.code)?/** @type {any} */(error).code:'authorization_failed';
       return {kind:uncertain?'outcome_unknown':'not_dispatched',error:failure(code,uncertain)};
     } finally {this.#busy=false;}

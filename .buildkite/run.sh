@@ -34,9 +34,9 @@ sdk_checks() {
     npm pack --ignore-scripts
   )
   mkdir "$DG_CI_TMP/consumer"
-  cp packages/web/devgraph-web-0.2.0-preview.2.tgz "$DG_CI_TMP/consumer/"
+  cp packages/web/devgraph-web-0.2.0-preview.3.tgz "$DG_CI_TMP/consumer/"
   npm install --prefix "$DG_CI_TMP/consumer" --ignore-scripts \
-    "$DG_CI_TMP/consumer/devgraph-web-0.2.0-preview.2.tgz" typescript@5.9.3 vite@7.3.7
+    "$DG_CI_TMP/consumer/devgraph-web-0.2.0-preview.3.tgz" typescript@5.9.3 vite@7.3.7
   npm audit --prefix "$DG_CI_TMP/consumer" --audit-level=low --json \
     > "$root/build/buildkite/$lane/npm-consumer-audit.json"
   node packages/web/test/installed-consumer.mjs "$DG_CI_TMP/consumer"

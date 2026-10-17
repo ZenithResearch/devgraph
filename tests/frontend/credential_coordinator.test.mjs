@@ -72,3 +72,17 @@ test('missing validator cannot dispatch; malformed commit and failed reconciliat
   await assert.rejects(client.execute('{}',key+'-new',{validateResult}),{code:'reconciliation_required'});
   await client.reconcile({validateResult});
 });
+
+test('locked Wallet during recovery cannot release ownership of an unknown mutation', async () => {
+  const {client,provider,calls}=fixture({transport:{executeCredential:async()=>{throw Error('lost');}}});
+  await assert.rejects(client.execute('{}',key,{validateResult}),{code:'outcome_unknown'});
+  provider.presentCredential=async()=>{throw Error('wallet_unlock_required');};
+  await assert.rejects(client.reconcile({validateResult}),{code:'outcome_unknown',dispatched:true});
+  await assert.rejects(client.execute('{}',key+'-new',{validateResult}),{code:'reconciliation_required'});
+  assert.equal(calls.filter(c=>c[0]==='reconcile').length,0);
+});
+test('fresh recovery also stays unknown when Wallet is locked before dispatch', async () => {
+  const {client}=fixture({provider:{presentCredential:async()=>{throw Error('wallet_unlock_required');}}});
+  await assert.rejects(client.execute('{}',key,{reconcile:true,validateResult}),{code:'outcome_unknown',dispatched:true});
+  await assert.rejects(client.execute('{}',key,{validateResult}),{code:'reconciliation_required'});
+});

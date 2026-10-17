@@ -132,3 +132,18 @@ composition and browser gesture tests remain source checks; they do not exercise
 the actual extension, interactive signer, secS and persistent receiver together.
 The exact-artifact installed gate still requires every case, including the new
 `provider-runtime-setup` case, to pass in the guest.
+
+## Session recovery candidate
+
+The follow-up source change keeps generic request and presentation bytes unchanged.
+SDK preview.3 translates exact public Wallet lock/connection errors before dispatch.
+Status recovery remains `outcome_unknown` until the original receipt is validated,
+even if unlocking or a new approval fails. Original request bytes and idempotency
+keys remain mandatory; the SDK never silently executes again.
+
+Native browser and terminal producers resolve their freshly created private
+temporary directory to its canonical path before passing files to secS. This handles
+macOS `/tmp` and `/var` aliases without relaxing secS's no-symlink file checks or
+private ownership/mode requirements. No migration, grant or trust change is needed.
+Source regression passes do not establish installed signing acceptance. Test the
+new SDK and Wallet package together; an earlier artifact's pass does not transfer.

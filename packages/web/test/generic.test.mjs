@@ -8,7 +8,7 @@ const origin='http://127.0.0.1:8080',key='generic-sdk-request-0001';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':status<400?'application/json':'application/problem+json'}});
 async function fixture({provider=true}={}) {
   const state={connections:0,profiles:[],calls:[],mode:'normal',approvals:0,delay:null};
-  const wallet={getSubject:async()=>({publicKey:'ab'.repeat(32)}),getCapabilities:async()=>['credential_presentation_v2','provider_profiles_v1','connection_v1'],requestConnection:()=>{state.connections++;return Promise.resolve({state:'connected'});},proposeProviderProfile:p=>{state.profiles.push(p);return Promise.resolve({state:'approved'});},presentCredential:async()=>{state.approvals++;if(state.delay)await state.delay;return state.mode==='denied'?{state:'denied'}:{state:'approved',presentation:{schema:'castalia.credential-presentation.v2'}};},devgraph:()=>{throw Error('old bridge must not be called');}};
+  const wallet={getSubject:async()=>{if(state.mode==='locked')throw Error('Wallet not set up or locked for this session');return {publicKey:'ab'.repeat(32)}},getCapabilities:async()=>['credential_presentation_v2','provider_profiles_v1','connection_v1'],requestConnection:()=>{state.connections++;return Promise.resolve({state:'connected'});},proposeProviderProfile:p=>{state.profiles.push(p);return Promise.resolve({state:'approved'});},presentCredential:async()=>{state.approvals++;if(state.delay)await state.delay;return state.mode==='denied'?{state:'denied'}:{state:'approved',presentation:{schema:'castalia.credential-presentation.v2'}};},devgraph:()=>{throw Error('old bridge must not be called');}};
   const request=async(url,options)=>{
     state.calls.push({url,options,body:options.body?JSON.parse(options.body):null});
     if(url.endsWith('/capabilities'))return json({operations:['devgraph.work.create.v2']});
@@ -98,4 +98,26 @@ test('definitive execute rejection permits a corrected request, rejected status 
     f.state.mode='normal';assert.equal((await prepared.reconcile()).kind,'committed');
     assert.equal(f.state.calls.filter(c=>c.url.endsWith('/execute')).length,3);
   }finally{f.runtime.dispose();}
+});
+
+
+test('locked Wallet before preparation is actionable and preserves the original bytes/key',async()=>{
+ const f=await fixture();try{
+  const prepared=f.prepare(),bytes=prepared.canonical_bytes;f.state.mode='locked';
+  const denied=await prepared.execute();assert.equal(denied.kind,'not_dispatched');
+  assert.equal(denied.error.code,'wallet_unlock_required');assert.match(denied.error.message,/Unlock/);
+  assert.equal(f.state.calls.some(c=>c.url.endsWith('/prepare')||c.url.endsWith('/execute')),false);
+  f.state.mode='normal';assert.equal((await prepared.execute()).kind,'committed');
+  assert.deepEqual(prepared.canonical_bytes,bytes);
+  assert.equal(f.state.calls.find(c=>c.url.endsWith('/execute')).body.idempotency_key,key);
+ }finally{f.runtime.dispose()}
+});
+test('locked Wallet during status recovery never changes an unknown outcome to not-dispatched',async()=>{
+ const f=await fixture();try{
+  const prepared=f.prepare();f.state.mode='lost';assert.equal((await prepared.execute()).kind,'outcome_unknown');
+  const setup=await f.client.prepareWalletSetup();await setup.connect();f.state.mode='locked';
+  const recovered=await prepared.reconcile();assert.equal(recovered.kind,'outcome_unknown');
+  await assert.rejects(prepared.execute(),{code:'reconciliation_required'});
+  assert.equal(f.state.calls.filter(c=>c.url.endsWith('/execute')).length,1);
+ }finally{f.runtime.dispose()}
 });

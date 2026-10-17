@@ -159,7 +159,7 @@ class BrowserCredentialWorkHost:
             stack.callback(_close_wallet_binary_descriptors, directories, binary)
             root = Path(
                 stack.enter_context(tempfile.TemporaryDirectory(prefix="devgraph-browser-v2-"))
-            )
+            ).resolve(strict=True)
             root.chmod(0o700)
             source, keyfile, output = root / "input.json", root / "key.txt", root / "output.json"
             _snapshot(source, _canonical_json(value))

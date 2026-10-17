@@ -72,7 +72,12 @@ def _json_file(path, label, cap=262_144):
 
 
 def execute_local_credential_work(
-    *, request_file, idempotency_key_file, operation, request_domain="work", transport=None,
+    *,
+    request_file,
+    idempotency_key_file,
+    operation,
+    request_domain="work",
+    transport=None,
     reconcile=False,
 ):
     from devgraph.arena_requests import ArenaRequest
@@ -127,7 +132,7 @@ def execute_local_credential_work(
             stack.callback(_close_wallet_binary_descriptors, directories, binary)
         directory = Path(
             stack.enter_context(tempfile.TemporaryDirectory(prefix="devgraph-work-v2-"))
-        )
+        ).resolve(strict=True)
         directory.chmod(0o700)
         preflight, keyfile = directory / "preflight.json", directory / "key.txt"
         prepared, presentation = (
@@ -222,8 +227,11 @@ def execute_local_credential_work(
         try:
             client = DevgraphHttpClient(transport=active, base_url=DEFAULT_BASE_URL, timeout=10.0)
             execute = (
-                client.reconcile_credential_work if reconcile else
-                client.execute_arena if request_domain == "arena" else client.execute_named_work
+                client.reconcile_credential_work
+                if reconcile
+                else client.execute_arena
+                if request_domain == "arena"
+                else client.execute_named_work
             )
             try:
                 return execute(
@@ -236,8 +244,9 @@ def execute_local_credential_work(
                 # repeat a mutation. Keep the user's immutable request/key files.
                 raise LocalCredentialWorkAgentError(
                     "status_unavailable: retry --credential-v2 --reconcile with the original "
-                    "request and idempotency key" if reconcile else
-                    "outcome_unknown: use --credential-v2 --reconcile with the original "
+                    "request and idempotency key"
+                    if reconcile
+                    else "outcome_unknown: use --credential-v2 --reconcile with the original "
                     "request and idempotency key"
                 ) from None
         finally:

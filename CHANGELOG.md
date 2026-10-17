@@ -10,6 +10,7 @@
 ## [Unreleased]
 
 ### Fixed
+- Preserve unknown mutation outcomes when Wallet locks during status recovery, expose bounded actionable Wallet errors, and canonicalize native temporary paths so macOS aliases do not fail secS secure-path checks. Web SDK preview.3 includes the new runtime module in artifact qualification hashes.
 - Update the SDK build and consumer tooling and enforce npm audits in Buildkite — patched source-map-js/esbuild dependencies and retained audit reports keep vulnerable development dependencies from passing release checks.
 - Accept an omitted Todo filter on Python 3.10 — default API and CLI reads use the documented defaults while malformed nonempty filters remain rejected.
 - Validate Kanban and SDK credential results through the same Rust/WASM decoder — partial receipts cannot announce success and failed status lookups cannot release an uncertain mutation.

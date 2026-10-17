@@ -66,12 +66,23 @@ def test_terminal_unavailable_fails_before_reading_keys_or_issuing_credentials(m
         )
 
 
-def test_exact_snapshots_run_issuer_wallet_authority_in_order(monkeypatch, tmp_path):
+@pytest.mark.parametrize("aliased_temporary", [False, True])
+def test_exact_snapshots_run_issuer_wallet_authority_in_order(
+    monkeypatch, tmp_path, aliased_temporary
+):
     request_file, key_file = fixture(monkeypatch, tmp_path)
     calls = []
+    if aliased_temporary:
+        actual = tmp_path / "actual-temp"
+        actual.mkdir(mode=0o700)
+        alias = tmp_path / "temp-alias"
+        alias.symlink_to(actual, target_is_directory=True)
+        monkeypatch.setattr(agent.tempfile, "tempdir", str(alias))
 
     def run(command, *, env, interactive=False):
         calls.append(command)
+        source_path = Path(command[command.index("--request-file") + 1])
+        assert source_path == source_path.resolve(strict=True)
         if len(calls) == 1:
             assert command[1] == "issue-credential"
             assert env == {} and not interactive
@@ -179,7 +190,9 @@ def signed_proof(raw, *, nonce="44" * 16):
     value = json.loads(proof_v2(request()))
     value.pop("secs_verifier_signature")
     value.update(
-        nonce=nonce, operation=parsed.authority_operation, resources=list(parsed.resources),
+        nonce=nonce,
+        operation=parsed.authority_operation,
+        resources=list(parsed.resources),
         request_digest_sha256=parsed.digest,
         credential_request_digest_sha256=binding.request_digest_sha256,
         disclosure_digest_sha256=binding.disclosure_digest_sha256,
@@ -194,11 +207,20 @@ def test_lost_response_then_fresh_approval_reconciles_without_another_mutation(
     monkeypatch, tmp_path, domain, committed
 ):
     request_file, key_file = fixture(monkeypatch, tmp_path)
-    raw = request() if domain == "work" else canonical({
-        "schema": "devgraph.arena-request.v1", "operation": "create", "kind": "Arena",
-        "id": "gallery", "expected_version": None,
-        "payload": {"id": "gallery", "title": "Gallery"},
-    })
+    raw = (
+        request()
+        if domain == "work"
+        else canonical(
+            {
+                "schema": "devgraph.arena-request.v1",
+                "operation": "create",
+                "kind": "Arena",
+                "id": "gallery",
+                "expected_version": None,
+                "payload": {"id": "gallery", "title": "Gallery"},
+            }
+        )
+    )
     request_file.write_bytes(raw)
     (tmp_path / "receiver").mkdir(mode=0o700)
     receiver, storage, _, _, _ = receiver_fixture(tmp_path / "receiver")
@@ -232,8 +254,13 @@ def test_lost_response_then_fresh_approval_reconciles_without_another_mutation(
                 raise TimeoutError("synthetic lost response after commit")
             return response
 
-    args = dict(request_file=request_file, idempotency_key_file=key_file,
-                operation="create", request_domain=domain, transport=LostResponse())
+    args = dict(
+        request_file=request_file,
+        idempotency_key_file=key_file,
+        operation="create",
+        request_domain=domain,
+        transport=LostResponse(),
+    )
     with pytest.raises(agent.LocalCredentialWorkAgentError, match="outcome_unknown"):
         agent.execute_local_credential_work(**args)
     assert len(receiver.audit_log.records) == int(committed)
@@ -258,8 +285,15 @@ def test_reconcile_flag_is_explicit_v2_only(monkeypatch, tmp_path, domain):
     monkeypatch.setattr(
         cli, "execute_local_named_work", lambda **args: pytest.fail("legacy invoked")
     )
-    command = [domain, "create", "--request-file", str(tmp_path / "r"),
-               "--idempotency-key-file", str(tmp_path / "k"), "--reconcile"]
+    command = [
+        domain,
+        "create",
+        "--request-file",
+        str(tmp_path / "r"),
+        "--idempotency-key-file",
+        str(tmp_path / "k"),
+        "--reconcile",
+    ]
     assert cli.main(command) == 2
     assert calls == []
     assert cli.main(command + ["--credential-v2"]) == 0

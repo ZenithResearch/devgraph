@@ -1,3 +1,4 @@
+import {normalizeWalletError} from '../credential-v2/wallet-errors.mjs';
 /** Application-owned orchestration. Wallet never receives Kanban operations or transport RPCs. */
 const load = async () => {
   try {
@@ -48,7 +49,10 @@ export class Wallet {
     const connection = this.setup.connect();
     this.client?.dispose(); this.client = null; this.connection = null;
     await connection; current();
-    const subject = await this.provider.getSubject(); current();
+    let subject;
+    try {subject = await this.provider.getSubject();}
+    catch(cause) {throw normalizeWalletError(cause) ?? error('Wallet connection failed. Unlock Wallet and connect again.');}
+    current();
     const holderPublicKey = subjectPublicKey(subject);
     const key = Uint8Array.from(holderPublicKey.match(/../g), value => parseInt(value, 16));
     const actor = 'pubkey:sha256:' + hex(await crypto.subtle.digest('SHA-256', key));
