@@ -4,12 +4,15 @@ WALLET_CONNECTION_HTML = r'''      <div class="wallet-connection" id="wallet-rea
         <p data-wallet-status role="status" aria-live="polite">Preparing Wallet connection…</p>
         <div class="wallet-connection-actions">
 <button type="button" class="button" data-wallet-chrome>Use Chrome Wallet</button>
-<button type="button" data-wallet-web>Open Wallet</button>
-<button type="button" class="wallet-help-action" data-wallet-import>
-Restore a Wallet from a recovery file</button>
+<button type="button" data-wallet-web>Unlock or import Wallet</button>
 <button type="button" data-wallet-advance hidden>Continue in Wallet</button>
 <button type="button" data-wallet-disconnect hidden>Disconnect</button>
 </div>
+        <section class="wallet-embedded" data-wallet-embed hidden
+aria-label="Embedded Castalia Wallet">
+<header><strong>Castalia Wallet</strong><span data-wallet-origin></span></header>
+<div data-wallet-frame></div>
+</section>
         <label data-wallet-membership-label hidden>Membership<select data-wallet-membership>
 <option value="">Choose membership</option>
 </select>
@@ -24,12 +27,13 @@ and do not grant access.</p>
 </details>
         <details class="wallet-connection-settings" data-wallet-settings>
 <summary>Wallet connection help</summary>
-<p>Open your trusted Castalia Web Wallet to unlock it or restore an encrypted recovery file.
+<p>The installed Chrome Wallet is selected automatically. In other browsers, unlock
+or import your Wallet below in the embedded Castalia Wallet.
 Your file, password and keys stay in Wallet.</p>
 <label>Wallet website<input data-wallet-url type="url" inputmode="url" autocomplete="url"
 placeholder="https://wallet.example" spellcheck="false">
 </label>
 <p>Use the address supplied by your Wallet provider.
-Chrome users can use the Castalia Wallet extension instead.</p>
+Your server and Wallet provider must both enable this embedded connection.</p>
 </details>
       </div>'''

@@ -1,12 +1,14 @@
 # Wallet connections for the monitor
 
 The Wallet monitor uses a holder-bound read connection instead of a pasted key.
-The Chrome extension advertises optional `read_access_v1`; other browsers open a
-separate Castalia Web `/wallet-connect` window. Login and encrypted recovery-file
+The Chrome extension advertises optional `read_access_v1`; the monitor detects and selects it automatically using public capabilities only.
+Other browsers offer an embedded Castalia Web `/wallet-connect?embed=1` surface
+on the operator-selected, separate HTTPS Wallet origin. Login and encrypted recovery-file
 selection happen in Wallet. Files chosen from cloud-backed Files/Downloads are
 processed locally by Wallet, never uploaded to the monitor.
 
-The flow is: choose Wallet → review server verification settings → approve the
+The flow is: detected Chrome Wallet (or unlock/import in embedded Wallet) →
+review server verification settings → approve the
 site → approve the exact read scope and expiry. The issuer chooses the scope from
 its operator-approved member/device assignment. Membership alone creates no
 access. Rust validates the issuer result before the monitor can read anything.
@@ -29,7 +31,13 @@ This is explicitly enabled by `devgraph.signed-read-runtime.v3` in the existing
 - the matching generic secS read policy, binary hash and private issuer key;
 - independently approved membership trust and revocation files;
 - retained audit/data paths and the current enrollment database;
-- optionally `web_wallet_url`, an operator-selected HTTPS Wallet website.
+- `web_wallet_url` for the embedded fallback, an operator-selected HTTPS Wallet website
+  on a different origin from the monitor. No internal host or unverified public
+  Wallet address is built in. The Wallet deployment must independently approve
+  this monitor's exact HTTPS origin using `CASTALIA_WALLET_EMBED_ORIGINS` and its
+  route-specific `frame-ancestors` HTTP header. The iframe allows scripts,
+  Wallet-origin storage and recovery downloads, but no parent navigation.
+  Unsupported/blocked framing fails closed; it does not import recovery in Devgraph.
 
 `devgraph auth access inspect/attenuate/registry/export` accepts explicitly
 versioned v2 drafts. Narrow against a v2 ceiling; mixing v1 and v2 is rejected.
@@ -77,6 +85,18 @@ The explicit local developer preview retains its already selected HttpOnly
 session adapter. It is not selected as a Wallet failure fallback. General SDK
 clients may still supply their existing explicit in-memory read credential;
 this monitor feature does not force Wallet onto every SDK read.
+
+The embedded channel is `castalia.wallet.embed.v1`, separate from the retained
+popup channel. It binds the exact frame window, origin, nonce and request IDs;
+a popup response cannot satisfy an embedded request. Only configured direct
+parents can start the Web custody UI. Nested/same-origin frames are rejected.
+The frame reuses the existing recovery panel, worker and shared Rust/WASM core;
+no recovery bytes or passphrases cross its postMessage bridge. The user must
+still approve provider trust, site connection and read access. An installed but
+locked, denied or outdated extension is never silently replaced by another Wallet.
+Cross-site browser storage may be partitioned; the embedded Wallet may require
+its own local unlock/import and does not imply synchronization with a top-level
+Wallet. Qualify browser storage and recovery downloads before deployment.
 
 ## Qualification
 

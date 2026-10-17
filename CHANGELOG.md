@@ -10,6 +10,7 @@
 ## [Unreleased]
 
 ### Fixed
+- Detect Chrome Wallet automatically and embed Wallet-owned recovery on a separately trusted origin when selected — removes the redundant chooser without exposing recovery inputs to the monitor or bypassing consent.
 - Keep unassigned Wallets connected while operators configure scoped access, disclose only public member/device setup details, and refresh expired challenges before signing — setup and delayed approvals no longer require restarting the Wallet connection.
 - Preserve unknown mutation outcomes when Wallet locks during status recovery, expose bounded actionable Wallet errors, and canonicalize native temporary paths so macOS aliases do not fail secS secure-path checks. Web SDK preview.3 includes the new runtime module in artifact qualification hashes.
 - Update the SDK build and consumer tooling and enforce npm audits in Buildkite — patched source-map-js/esbuild dependencies and retained audit reports keep vulnerable development dependencies from passing release checks.
