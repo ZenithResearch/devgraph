@@ -141,6 +141,15 @@ class NativeReadEnrollment:
         finally:
             db.close()
 
+    def _check_policy_snapshot(self, db) -> None:
+        """Opt-in policy adapters may reject a concurrently superseded snapshot."""
+
+    def _policy_for(self, owner: str, device: str, current: int) -> EnrollmentPolicy:
+        return self.policy()
+
+    def _credential_expiry(self, policy: EnrollmentPolicy, owner, device, current) -> int:
+        return current + policy.lifetime_seconds
+
     def challenge(self, owner: str, device: str, *, now: datetime | None = None) -> dict:
         if (
             not isinstance(owner, str)
@@ -150,7 +159,7 @@ class NativeReadEnrollment:
         ):
             raise UnauthenticatedError("invalid_request")
         current = _seconds(now)
-        policy = self.policy()
+        policy = self._policy_for(owner, device, current)
         value = {
             "schema": "castalia.read-access-challenge.v1",
             "request_id": secrets.token_hex(16),
@@ -162,11 +171,14 @@ class NativeReadEnrollment:
             "details": self._details(policy),
             "issued_at": current,
             "expires_at": current + 120,
-            "credential_expires_at": current + policy.lifetime_seconds,
+            "credential_expires_at": self._credential_expiry(policy, owner, device, current),
         }
+        if len(canonical_json(value)) > 16384:
+            raise UnauthenticatedError("read_policy_too_large")
         with self._database() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
+                self._check_policy_snapshot(db)
                 db.execute("DELETE FROM challenges WHERE expires < ?", (current,))
                 if db.execute("SELECT COUNT(*) FROM challenges").fetchone()[0] >= 256:
                     raise UnauthenticatedError("try_later")
@@ -183,7 +195,7 @@ class NativeReadEnrollment:
     def enroll(
         self, challenge: dict, proof: dict, signature: str, *, now: datetime | None = None
     ) -> dict:
-        current, policy = _seconds(now), self.policy()
+        current = _seconds(now)
         if (
             not isinstance(challenge, dict)
             or not isinstance(challenge.get("details"), dict)
@@ -199,6 +211,7 @@ class NativeReadEnrollment:
             or not DEVICE.fullmatch(device)
         ):
             raise UnauthenticatedError("invalid_request")
+        policy = self._policy_for(owner, device, current)
         if (
             challenge.get("details", {}).get("policy_digest") != policy.digest
             or challenge.get("receiver") != policy.receiver
@@ -220,6 +233,7 @@ class NativeReadEnrollment:
         with self._database() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
+                self._check_policy_snapshot(db)
                 row = db.execute(
                     "SELECT payload,expires,used FROM challenges WHERE id=?",
                     (challenge.get("request_id"),),

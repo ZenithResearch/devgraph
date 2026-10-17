@@ -40,3 +40,26 @@ def test_live_receiver_requires_retained_audit(monkeypatch, data_root):
         monkeypatch.setenv("DEVGRAPH_DATA_ROOT", data_root)
     with pytest.raises(RuntimeError, match="retained audit"):
         create_app()
+
+
+def test_member_selection_requires_explicit_runtime_version():
+    from devgraph.signed_read_runtime import ReadRuntimeConfiguration
+
+    values = {
+        "schema": "devgraph.signed-read-runtime.v1",
+        **{field: "/private/fixture/" + field for field in (
+            "enrollment_policy_file", "authority_policy_file", "membership_trust_file",
+            "revoked_memberships_file", "enrollment_database_file", "secs_binary",
+            "issuer_key_file",
+        )},
+        "secs_binary_sha256": "a"*64,
+    }
+    ReadRuntimeConfiguration.model_validate(values)
+    values["member_policy_file"] = "/private/fixture/members.json"
+    with pytest.raises(ValueError):
+        ReadRuntimeConfiguration.model_validate(values)
+    values["schema"] = "devgraph.signed-read-runtime.v2"
+    assert ReadRuntimeConfiguration.model_validate(values).member_policy_file.is_absolute()
+    del values["member_policy_file"]
+    with pytest.raises(ValueError):
+        ReadRuntimeConfiguration.model_validate(values)

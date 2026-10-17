@@ -195,3 +195,9 @@ outside the client and passes it only to bounded get/list calls.
 ```bash
 uv run pytest tests/auth tests/api/test_route_boundaries.py -q
 ```
+
+## Issuer-controlled member scope
+
+See [issuer-controlled member access](contracts/devgraph-access-draft/v1/README.md)
+for offline grant narrowing and opt-in per-member signed reads. These source tools
+do not activate live authority or implement holder-created child credentials.

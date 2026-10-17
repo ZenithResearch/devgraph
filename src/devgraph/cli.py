@@ -624,6 +624,29 @@ def _parser() -> argparse.ArgumentParser:
         read.add_argument("--actor-id", default="local-devgraph-operator")
         read.add_argument("--ttl-hours", type=int, default=24 * 30)
 
+    access = auth_commands.add_parser(
+        "access", help="review and narrow issuer-owned member grants; never activate authority"
+    )
+    access_commands = access.add_subparsers(dest="auth_access_command", required=True)
+    inspect_access = access_commands.add_parser("inspect")
+    inspect_access.add_argument("--draft-file", type=Path, required=True)
+    narrow_access = access_commands.add_parser("attenuate")
+    narrow_access.add_argument("--parent-file", type=Path, required=True)
+    narrow_access.add_argument("--selection-file", type=Path, required=True)
+    narrow_access.add_argument("--output-file", type=Path, required=True)
+    export_access = access_commands.add_parser("export")
+    export_access.add_argument("--ceiling-file", type=Path, required=True)
+    export_access.add_argument("--draft-file", type=Path, required=True)
+    export_access.add_argument("--format", choices=("read", "write"), required=True)
+    export_access.add_argument("--policy-id", default="devgraph-member-work")
+    export_access.add_argument("--policy-version", type=int, default=1)
+    export_access.add_argument("--output-file", type=Path, required=True)
+    registry = access_commands.add_parser("registry")
+    registry.add_argument("--revision", type=int, default=1)
+    registry.add_argument("--ceiling-file", type=Path, required=True)
+    registry.add_argument("--assignment-file", type=Path, action="append", required=True)
+    registry.add_argument("--output-file", type=Path, required=True)
+
     auth_work = auth_commands.add_parser(
         "work", help="plan and manage the local signer's named Work grants"
     )
@@ -883,6 +906,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         if args.command == "auth":
+            if args.auth_command == "access":
+                from devgraph.ops.access_plans import execute
+
+                try:
+                    result = execute(args)
+                except (OSError, ValueError, TypeError):
+                    # Validation errors can include private policy contents.
+                    print(_json({"error": "access_plan_failed"}), file=sys.stderr)
+                    return 2
+                print(_json(result))
+                return 0
             if args.auth_command == "work":
                 from devgraph.ops import work_grants
 

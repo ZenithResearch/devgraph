@@ -48,7 +48,10 @@ def private_json(path: Path) -> dict:
 
 class ReadRuntimeConfiguration(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    schema_: Literal["devgraph.signed-read-runtime.v1"] = Field(alias="schema")
+    schema_: Literal["devgraph.signed-read-runtime.v1", "devgraph.signed-read-runtime.v2"] = Field(
+        alias="schema"
+    )
+    member_policy_file: Path | None = None
     enrollment_policy_file: Path
     authority_policy_file: Path
     membership_trust_file: Path
@@ -60,6 +63,10 @@ class ReadRuntimeConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def paths(self):
+        if (self.schema_ == "devgraph.signed-read-runtime.v2") != (
+            self.member_policy_file is not None
+        ):
+            raise ValueError("member policy requires explicit runtime v2")
         for value in self.__dict__.values():
             if isinstance(value, Path) and not value.is_absolute():
                 raise ValueError("absolute configuration paths required")
@@ -88,7 +95,18 @@ def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
     # revocation source into an empty revocation set.
     private_json(config.membership_trust_file)
     revoked("")
-    return SignedReadEnrollment(
+    factory = SignedReadEnrollment
+    extra = {}
+    if config.member_policy_file is not None:
+        from devgraph.auth.access_policy import MemberAccessPolicy
+        from devgraph.auth.member_read import MemberReadEnrollment
+
+        factory = MemberReadEnrollment
+        extra["members"] = lambda: MemberAccessPolicy.model_validate(
+            private_json(config.member_policy_file)
+        )
+    return factory(
+        **extra,
         path=config.enrollment_database_file,
         policy=lambda: EnrollmentPolicy.model_validate(private_json(config.enrollment_policy_file)),
         membership_check=membership,

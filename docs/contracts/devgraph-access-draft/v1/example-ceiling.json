@@ -1,0 +1,42 @@
+{
+  "issuer": "example-operator",
+  "lifetime_seconds": 3600,
+  "not_after": 1894060800,
+  "not_before": 1893456000,
+  "read_grants": [
+    {
+      "include_archived": true,
+      "operations": [
+        "list",
+        "get"
+      ],
+      "relationship_types": [
+        "parent"
+      ],
+      "scope": "devgraph.work.read",
+      "work_kinds": [
+        "Proposal",
+        "Initiative",
+        "Project",
+        "Issue",
+        "Task"
+      ]
+    }
+  ],
+  "receiver": "https://devgraph.example.test",
+  "schema": "devgraph.access-draft.v1",
+  "write_audience": "devgraph://receiver-local",
+  "write_grants": [
+    {
+      "operation": "devgraph.work.patch.v2",
+      "resources": [
+        {
+          "kind": "Project"
+        },
+        {
+          "kind": "Task"
+        }
+      ]
+    }
+  ]
+}

@@ -12,6 +12,7 @@ import json
 import os
 import stat
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -63,8 +64,25 @@ class SecsReadAuthority:
             ],
         }
 
+    def invoke_under_policy(self, policy: dict, operation: str, **fields) -> dict:
+        # The application has already checked its typed narrowing rules against
+        # the separately configured ceiling. Keep the resulting policy local,
+        # private, and stable for the complete native invocation. Never accept a
+        # policy from HTTP request fields. Canonicalize macOS temporary aliases.
+        with tempfile.TemporaryDirectory(prefix="devgraph-read-policy-") as folder:
+            path = Path(folder).resolve(strict=True) / "policy.json"
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "wb") as file:
+                file.write(canonical_json(policy))
+                file.flush()
+                os.fsync(file.fileno())
+            return self._invoke(operation, path, **fields)
+
     def invoke(self, operation: str, **fields) -> dict:
-        args = [str(self.binary), "--policy-file", str(self.policy_file)]
+        return self._invoke(operation, self.policy_file, **fields)
+
+    def _invoke(self, operation: str, policy_file: Path, **fields) -> dict:
+        args = [str(self.binary), "--policy-file", str(policy_file)]
         if operation == "issue":
             args += ["--issuer-key-file", str(self.issuer_key_file)]
         elif operation != "verify":
@@ -114,8 +132,16 @@ class SignedReadEnrollment(NativeReadEnrollment):
             "authority_policy": self._authority_policy(policy),
         }
 
+    def _invoke(self, policy: dict, operation: str, **fields) -> dict:
+        return self.authority.invoke(operation, **fields)
+
     def _mint(self, manifest: dict, current: int) -> str:
-        policy = self._authority_policy(self.policy())
+        selected = self._policy_for(
+            manifest["subject_public_key"], manifest["installation_id"], current
+        )
+        if selected.digest != manifest["policy_digest"]:
+            raise UnauthenticatedError("policy_changed")
+        policy = self._authority_policy(selected)
         manifest["credential_id"] = manifest["credential_id"].removeprefix("dgrn_")
         claims = {
             "schema": "castalia.read-credential.v1",
@@ -131,7 +157,7 @@ class SignedReadEnrollment(NativeReadEnrollment):
             "issued_at": current,
             "expires_at": manifest["expires_at"],
         }
-        credential = self.authority.invoke("issue", claims=claims, now=current)
+        credential = self._invoke(policy, "issue", claims=claims, now=current)
         return canonical_json(credential).decode()
 
     def _result(self, credential: str, manifest: dict) -> dict:
@@ -146,29 +172,36 @@ class SignedReadEnrollment(NativeReadEnrollment):
         # accidentally wires this class to a legacy Authorization adapter.
         raise UnauthenticatedError("holder_proof_required")
 
+    def _manifest_current(self, manifest: dict, current: int) -> bool:
+        return True
+
     def verify_request(
         self, *, credential: dict, call: dict, proof: dict, now: datetime | None = None
     ) -> AuthorityContext:
         current = _seconds(now)
-        policy = self.policy()
-        self._authority_policy(policy)
         digest = hashlib.sha256(canonical_json(credential)).hexdigest()
         with self._database() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
+                self._check_policy_snapshot(db)
                 row = db.execute(
                     "SELECT manifest,proof,status FROM credentials WHERE digest=?", (digest,)
                 ).fetchone()
                 if not row:
                     raise UnauthenticatedError("unknown_credential")
                 manifest, membership = json.loads(row[0]), json.loads(row[1])
+                policy = self._policy_for(
+                    manifest["subject_public_key"], manifest["installation_id"], current
+                )
+                authority_policy = self._authority_policy(policy)
                 active = (
                     row[2] == "active"
+                    and self._manifest_current(manifest, current)
                     and manifest["policy_digest"] == policy.digest
                     and self.membership_check(membership, manifest["subject_public_key"])
                 )
-                verified = self.authority.invoke(
-                    "verify",
+                verified = self._invoke(
+                    authority_policy, "verify",
                     credential=credential,
                     call=call,
                     proof=proof,

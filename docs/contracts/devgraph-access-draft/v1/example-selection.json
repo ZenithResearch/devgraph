@@ -1,0 +1,35 @@
+{
+  "installation_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "issuer": "example-operator",
+  "lifetime_seconds": 900,
+  "not_after": 1894060800,
+  "not_before": 1893456000,
+  "previous_digest": "d2ae1e5400ebb26607f8e16245bd9baaceacb2de3b7a37941d3ff5cb9676dfae",
+  "read_grants": [
+    {
+      "arena_ids": [
+        "example-arena"
+      ],
+      "include_archived": false,
+      "operations": [
+        "list",
+        "get"
+      ],
+      "relationship_types": [
+        "parent"
+      ],
+      "scope": "devgraph.work.read",
+      "work_kinds": [
+        "Proposal",
+        "Initiative",
+        "Project",
+        "Issue",
+        "Task"
+      ]
+    }
+  ],
+  "receiver": "https://devgraph.example.test",
+  "schema": "devgraph.access-draft.v1",
+  "subject_public_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "write_audience": "devgraph://receiver-local"
+}
