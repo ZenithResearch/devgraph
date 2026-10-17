@@ -302,11 +302,8 @@ test('external source links permit only explicit HTTP(S) URLs without embedded c
   assert.equal(c.appendSource({ append() { assert.fail('unsafe link appended'); } }, 'javascript:alert(1)'), false);
 });
 
-test('authenticated JSON reads reject redirects and preserve response status for accurate error states', async () => {
+test('Wallet read denial preserves response status for accurate reader error states', async () => {
   const { c, realGetJson } = reader();
-  c.headers = () => ({ Authorization: 'Bearer synthetic-test-credential' });
-  let options;
-  c.fetch = async (_path, value) => { options = value; return { ok: false, status: 403, json: async () => ({ title: 'Read denied' }) }; };
-  await assert.rejects(realGetJson('/work/Task/a'), error => error.status === 403 && error.message === 'Read denied');
-  assert.equal(options.redirect, 'error', 'bearer-bearing requests must not follow source redirects');
+  c.walletAccess={read:async()=>{throw Object.assign(Error('Read denied'),{status:403});}};
+  await assert.rejects(realGetJson('/todos/v2/Task/a'), error => error.status === 403 && error.message === 'Read denied');
 });

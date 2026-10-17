@@ -1,3 +1,5 @@
+from devgraph.frontend.wallet import WALLET_CONNECTION_HTML
+
 # ruff: noqa: E501
 """Dependency-free official DevGraph operator frontend."""
 
@@ -283,6 +285,7 @@ FRONTEND_HTML = r"""<!doctype html>
   <link rel="stylesheet" href="/monitor/topology-assets/theme.css">
   <link rel="stylesheet" href="/monitor/topology-assets/check-in.css">
   <link rel="stylesheet" href="/monitor/topology-assets/chooser.css">
+  <link rel="stylesheet" href="/monitor/topology-assets/wallet-access.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to graph monitor</a>
@@ -298,12 +301,8 @@ FRONTEND_HTML = r"""<!doctype html>
         <div class="topbar-preferences"><label class="theme-picker"><span>Theme</span><select data-theme-picker aria-label="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="aqua">Aqua</option></select></label><div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Disconnected</span></div></div><span class="theme-status" data-theme-status role="status" aria-live="polite"></span>
       </header>
       <details class="connection-settings" id="connection-settings" open><summary id="connection-summary">Connect to your graph</summary>
-      <form class="auth-strip" id="auth-form">
-        <label for="token">Read access key</label><input id="token" name="token" type="password" autocomplete="off" placeholder="Paste a local devgraph.read credential">
-        <label for="refresh-rate">Refresh rate</label><select id="refresh-rate"><option value="0">Manual</option><option value="10" selected>10 seconds</option><option value="30">30 seconds</option></select>
-        <button class="button" type="submit">Connect</button>
-      </form></details>
-      <p class="status-line" id="status-line" role="status" aria-live="polite">Enter a scoped read credential to inspect the graph.</p>
+      __WALLET_CONNECTION__<div class="wallet-refresh"><label for="refresh-rate">Refresh</label><select id="refresh-rate"><option value="0">Manual</option><option value="10" selected>10 seconds</option><option value="30">30 seconds</option><option value="60">60 seconds</option></select><button type="button" id="refresh-now">Refresh now</button></div></details>
+      <p class="status-line" id="status-line" role="status" aria-live="polite">Connect Wallet to view shared work. Counts and connections cover only your permitted scope.</p>
       <section class="daily-check-in" id="daily-check-in" aria-label="Daily check-in">
         <article class="card todo-panel" id="todo-panel" aria-labelledby="todo-title">
           <header class="todo-heading"><div><h1 id="todo-title">Todo</h1><p>Not started · highest priority first</p></div><div class="todo-total"><span>At a glance</span><strong id="todo-count-total">—</strong><span>to start</span></div></header>
@@ -383,15 +382,20 @@ FRONTEND_HTML = r"""<!doctype html>
   <script src="/monitor/topology-assets/reader.js"></script>
   <script src="/monitor/topology-assets/check-in.js"></script>
   <script src="/monitor/topology-assets/chooser.js"></script>
+  <script src="/monitor/topology-assets/wallet-access.js"></script>
   <script>
     const Topology = DevgraphTopology;
     const state = { timer: null, snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshController: null, refreshQueued: false, pendingSnapshot: null, lastSuccess: null };
     const detailState = { node: null, data: null, error: null, loading: false, serial: 0, controller: null, promise: null, relations: new Map(), support: null, supportLoading: false, supportError: null, documents: new Map(), rendered: null, resourcesSerial: 0, credential: '' };
     const graphView = { ...Topology.defaultCamera, zoom: 1, panX: 0, panY: 0, width: 1080, height: 420, fitted: false, expanded: false, pointers: new Map(), pinch: null, orbit: false, frame: null, lastFrame: 0, drag: null, nodes: [], edges: [], nodePositions: new Map(), nodeVelocities: new Map(), edgeStrengths: new Map(), repulsionStrength: 1.5, pinnedKey: null, visibleCategories: new Set(['arena', 'work']), arenaKey: '', arenaNodes: [], neighborhood: null, labels: 'selected', filters: Topology.overviewFilters(), hoveredKey: null, focusedKey: null, history: [], arrangement: null, layoutGeneration: 0, worker: null, index: null, renderFrame: null, preferenceKey: null, preferences: Topology.preferences(), filterSerial: 0 };
-    const tokenInput = document.querySelector('#token');
-    tokenInput.value = ''; try { sessionStorage.removeItem('devgraph-monitor-token'); } catch {}
+    try { sessionStorage.removeItem('devgraph-monitor-token'); } catch {}
+    window.addEventListener('pagehide',()=>walletAccess.disconnect());
+    const walletAccess = DevgraphWalletAccess.mount(document.getElementById('wallet-read-connection'), {onChange() {
+      const before = detailState.credential; synchronizeCredential(); schedule();
+      if (walletAccess.connected && before !== detailState.credential) refresh();
+      if (!walletAccess.connected) { document.getElementById('connection-dot').className = 'dot'; text('connection-label', 'Disconnected'); }
+    }});
     const text = (id, value) => { const el = document.getElementById(id); if (el.textContent !== String(value)) el.textContent = String(value); };
-    const headers = () => ({ Authorization: `Bearer ${tokenInput.value.trim()}` });
     const make = (tag, className, value) => { const node = document.createElement(tag); if (className) node.className = className; if (value !== undefined) node.textContent = value; return node; };
     const svgMake = (tag, attributes = {}) => { const node = document.createElementNS('http://www.w3.org/2000/svg', tag); Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, String(value))); return node; };
     const count = (record, key) => Number(record?.[key] || 0);
@@ -403,11 +407,7 @@ FRONTEND_HTML = r"""<!doctype html>
       if (options.signal?.aborted) cancel();
       const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 30000);
       try {
-        const response = await fetch(path, { headers: headers(), signal: controller.signal, redirect: 'error' });
-        let payload;
-        try { payload = await response.json(); } catch (error) { if (controller.signal.aborted || response.ok) throw error; payload = {}; }
-        if (!response.ok) { const error = new Error(payload.title || `Request failed (${response.status})`); error.status = response.status; throw error; }
-        return payload;
+        return await walletAccess.read(path, { signal: controller.signal });
       } catch (error) {
         if (timedOut) { const timeout = new Error('The read timed out. Retry when the service is available.'); timeout.name = 'TimeoutError'; throw timeout; }
         throw error;
@@ -794,7 +794,7 @@ FRONTEND_HTML = r"""<!doctype html>
           }
         } catch (error) {
           if (serial !== detailState.serial || epoch !== state.authEpoch || error.name === 'AbortError') return;
-          detailState.error = error.status === 404 ? 'This record is no longer available.' : error.status === 401 || error.status === 403 ? 'Access to these details was denied. Reconnect with a valid read credential.' : 'Could not update details. Retry to check the connection.';
+          detailState.error = error.status === 404 ? 'This record is no longer available.' : error.status === 401 || error.status === 403 ? 'Access to these details was denied. Connect Wallet again, or ask the server administrator to review your read scope.' : 'Could not update details. Retry to check the connection.';
         } finally {
           if (serial === detailState.serial && epoch === state.authEpoch) {
             detailState.loading = false; detailState.promise = null; renderGraphSelection();
@@ -1395,6 +1395,11 @@ FRONTEND_HTML = r"""<!doctype html>
       if (!state.connected) { const restoreFocus = connection.contains(document.activeElement); connection.open = false; state.connected = true; if (restoreFocus) document.getElementById('connection-summary').focus({preventScroll:true}); }
       text('connection-summary', 'Connection settings');
       text('status-line', `Connected · Updated ${new Date(snapshot.generated_at).toLocaleTimeString()} · Read-only`);
+      if (snapshot.access_scope) {
+        text('status-line', 'Wallet connected · Read only · Counts and connections cover shared work only.');
+        if (!snapshot.access_scope.observations) { text('observation-count', 'Not shared'); text('pipeline-stages', 'Observations are not included in this read scope.'); text('observation-list', 'Observations are not included in this read scope.'); }
+        if (!snapshot.access_scope.receipts) { text('pending-receipts', 'Not shared'); text('receipt-note', 'Receipts need separate read permission.'); }
+      }
     }
 
     function refreshCheckIn(load = true) {
@@ -1407,7 +1412,7 @@ FRONTEND_HTML = r"""<!doctype html>
     }
 
     function synchronizeCredential() {
-      const credential = tokenInput.value.trim(); if (credential === detailState.credential) return;
+      const credential = walletAccess.sessionKey; if (credential === detailState.credential) return;
       state.refreshController?.abort(); state.refreshController = null;
       detailState.credential = credential; state.authEpoch += 1; state.refreshPromise = null; state.refreshQueued = false; state.pendingSnapshot = null; state.lastSuccess = null; state.connected = false;
       resetDetailState(); state.snapshot = null; state.observations = []; state.selectedGraphKey = null; graphView.neighborhood = null; graphView.arenaKey = '';
@@ -1431,14 +1436,14 @@ FRONTEND_HTML = r"""<!doctype html>
     async function refresh() {
       synchronizeCredential();
       if (!graphView.preferenceKey) await prepareGraphPreferences();
-      if (!tokenInput.value.trim()) { document.getElementById('connection-settings').open = true; text('status-line', 'Enter a read access key to connect.'); return; }
+      if (!walletAccess.connected) { document.getElementById('connection-settings').open = true; text('status-line', 'Connect Wallet to view shared work.'); return; }
       refreshCheckIn();
       if (state.refreshPromise) { state.refreshQueued = true; return state.refreshPromise; }
       const epoch = state.authEpoch, filterSerial = graphView.filterSerial, controller = new AbortController(); state.refreshController = controller;
       if (!state.snapshot) text('status-line', 'Loading graph…');
       const request = (async () => {
         try {
-          const [snapshot, observations] = await Promise.all([getJson(topologyPath(), { signal: controller.signal }), getJson('/initiative-observations?descending=true&limit=100', { signal: controller.signal })]);
+          const [snapshot, observations] = await Promise.all([getJson(topologyPath(), { signal: controller.signal }), getJson('/initiative-observations?descending=true&limit=100', { signal: controller.signal }).catch(error => { if (error.code === 'read_not_granted') return {items: []}; throw error; })]);
           if (epoch !== state.authEpoch || filterSerial !== graphView.filterSerial) return;
           applySnapshot(snapshot, observations.items);
           if (state.filterFeedback) { state.filterFeedback = false; announceGraph(snapshot.scope_error ? 'The saved scope is unavailable. Choose another Arena or clear filters.' : `${snapshot.counts.matching_nodes} matching items. ${state.preferenceSaveFailed ? 'Filters could not be saved on this device.' : 'Filters saved on this device.'}`); }
@@ -1450,7 +1455,7 @@ FRONTEND_HTML = r"""<!doctype html>
           if (!state.snapshot || error.status === 401 || error.status === 403) document.getElementById('connection-settings').open = true;
           state.connected = false;
           text('connection-label', error.status === 401 || error.status === 403 ? 'Access denied' : 'Connection interrupted');
-          text('status-line', `${state.snapshot ? `Showing saved snapshot from ${new Date(state.lastSuccess).toLocaleTimeString()}. ` : ''}${error.status === 401 || error.status === 403 ? 'Reconnect with a valid read credential.' : 'Refresh failed. Retrying on the next update.'}`);
+          text('status-line', `${state.snapshot ? `Showing saved snapshot from ${new Date(state.lastSuccess).toLocaleTimeString()}. ` : ''}${error.status === 401 || error.status === 403 ? 'Connect Wallet again, or ask the server administrator to review your read scope.' : 'Refresh failed. Retrying on the next update.'}`);
         } finally {
           if (epoch === state.authEpoch) { state.refreshPromise = null; state.refreshController = null; if (state.refreshQueued) { state.refreshQueued = false; queueMicrotask(refresh); } }
         }
@@ -1509,7 +1514,7 @@ FRONTEND_HTML = r"""<!doctype html>
     }
 
     async function prepareGraphPreferences() {
-      const credential = tokenInput.value.trim(); if (!credential || graphView.preferenceKey) return;
+      const credential = walletAccess.preferenceSeed; if (!credential || graphView.preferenceKey) return;
       const epoch = state.authEpoch;
       const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(credential)))].map(x=>x.toString(16).padStart(2,'0')).join('');
       if (epoch !== state.authEpoch) return;
@@ -1674,7 +1679,7 @@ FRONTEND_HTML = r"""<!doctype html>
 
     function schedule() {
       if (state.timer) window.clearInterval(state.timer); const seconds = Number(document.getElementById('refresh-rate').value);
-      if (seconds > 0) state.timer = window.setInterval(refresh, seconds * 1000);
+      if (seconds > 0 && walletAccess.connected) state.timer = window.setInterval(refresh, seconds * 1000);
     }
     const graphSvg = document.getElementById('graph-svg');
     const graphClientPoint = (x, y) => {
@@ -1873,9 +1878,11 @@ FRONTEND_HTML = r"""<!doctype html>
     document.getElementById('graph-settle').addEventListener('click', settleGraph); document.getElementById('graph-force-reset').addEventListener('click', resetForceStrengths);
     const orbitButton = document.getElementById('graph-orbit'); orbitButton.addEventListener('click', toggleGraphOrbit);
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { orbitButton.disabled = true; orbitButton.textContent = 'Orbit: reduced motion'; orbitButton.title = 'Continuous orbit follows your reduced-motion preference'; }
-    document.getElementById('auth-form').addEventListener('submit', event => { event.preventDefault(); schedule(); refresh(); });
+    document.getElementById('refresh-now').addEventListener('click', () => { schedule(); refresh(); });
     document.getElementById('refresh-rate').addEventListener('change', schedule);
-    schedule(); if (tokenInput.value) refresh();
+    schedule(); if (walletAccess.connected) refresh();
   </script>
 </body>
 </html>"""
+
+FRONTEND_HTML = FRONTEND_HTML.replace("__WALLET_CONNECTION__", WALLET_CONNECTION_HTML)

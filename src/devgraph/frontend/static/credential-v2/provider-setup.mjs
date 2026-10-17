@@ -25,12 +25,12 @@ function validate(profile,origin){
   if(new TextEncoder().encode(JSON.stringify(profile)).length>65536)throw failure('wallet_provider_setup_invalid');
 }
 /** Call before enabling controls. No connection, trust or signing consent occurs here. */
-export async function prepareProviderSetup({provider,transport,origin,current=()=>{}}){
+export async function prepareProviderSetup({provider,transport,origin,current=()=>{},requiredCapability='credential_presentation_v2'}){
   current();
   if(typeof provider?.getCapabilities!=='function'||typeof provider?.requestConnection!=='function'
     ||typeof provider?.proposeProviderProfile!=='function')throw failure('wallet_upgrade_required');
   const capabilities=await provider.getCapabilities();current();
-  if(!Array.isArray(capabilities)||!['credential_presentation_v2','provider_profiles_v1','connection_v1']
+  if(!Array.isArray(capabilities)||!['credential_presentation_v2','read_access_v1'].includes(requiredCapability)||![requiredCapability,'provider_profiles_v1','connection_v1']
     .every(c=>capabilities.includes(c)))throw failure('wallet_upgrade_required');
   const profile=await transport.getProviderProfile();current();validate(profile,origin);
   // Keep the approved proposal separate from caller-owned display objects.

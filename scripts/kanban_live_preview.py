@@ -51,27 +51,40 @@ HOURS = 4 * 60 * 60
 def monitor_html():
     # Adapt only the development shell to the same HttpOnly reader session used
     # by Kanban. The fixed host still validates the real read credential.
-    replacements = {
-        "if (!tokenInput.value.trim()) { "
-        "document.getElementById('connection-settings').open = true; "
-        "text('status-line', 'Enter a read access key to connect.'); return; }": "",
-        "const credential = tokenInput.value.trim(); "
-        "if (!credential || graphView.preferenceKey) return;": (
-            "const credential = tokenInput.value.trim() || 'local-reader-session'; "
-            "if (graphView.preferenceKey) return;"
-        ),
-        "schedule(); if (tokenInput.value) refresh();": "schedule(); refresh();",
-        '<option value="10" selected>10 seconds</option>': '<option value="10">10 seconds</option>'
-        '<option value="60" selected>60 seconds</option>',
-        "}, 30000);": "}, 120000);",
-        "Local graph · View only": "Live local data · Preview · View only",
-    }
+    # This explicit development proxy uses its already provisioned HttpOnly
+    # session. It is not a fallback when a Wallet connection fails.
     html = FRONTEND_HTML
-    for old, new in replacements.items():
-        if old not in html:
-            raise ValueError("The monitor development adapter needs updating")
-        html = html.replace(old, new)
-    return html
+    start = html.index("    const walletAccess = DevgraphWalletAccess.mount")
+    end = html.index("    const text =", start)
+    adapter = """    const walletAccess = {
+      sessionKey: 'local-reader-session', preferenceSeed: 'local-reader-session', connected: true,
+      disconnect() {},
+      async read(path,options={}) {
+        const response=await fetch(path,{signal:options.signal,credentials:'same-origin',
+          cache:'no-store',redirect:'error'});
+        if(!response.ok)throw Object.assign(Error('Local preview read unavailable'),
+          {status:response.status});
+        return response.json();
+      }
+    };
+"""
+    html = html[:start] + adapter + html[end:]
+    widget_start = html.index('<div class="wallet-connection" id="wallet-read-connection">')
+    widget_end = html.index('<div class="wallet-refresh">', widget_start)
+    html = (
+        html[:widget_start]
+        + "<p>Live local data · explicit development preview session</p>"
+        + html[widget_end:]
+    )
+    return (
+        html.replace("Local graph · View only", "Live local data · Preview · View only")
+        .replace("schedule(); if (walletAccess.connected) refresh();", "schedule(); refresh();")
+        .replace(
+            '<option value="10" selected>10 seconds</option>',
+            '<option value="10">10 seconds</option><option value="60" selected>60 seconds</option>',
+        )
+        .replace("}, 30000);", "}, 120000);")
+    )
 
 
 class ReadProjection:

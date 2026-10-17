@@ -34,10 +34,12 @@ _ASSETS = {
     "check-in.css": "text/css",
     "chooser.js": "text/javascript",
     "chooser.css": "text/css",
+    "wallet-access.js": "text/javascript",
+    "wallet-access.css": "text/css",
 }
 
 
-def register_topology(app: FastAPI, services) -> None:
+def register_topology_assets(app: FastAPI) -> None:
     @app.get("/monitor/topology-assets/{name}", include_in_schema=False)
     def asset(name: str):
         if name not in _ASSETS:
@@ -48,6 +50,9 @@ def register_topology(app: FastAPI, services) -> None:
             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
         )
 
+
+def register_topology(app: FastAPI, services) -> None:
+    register_topology_assets(app)
     parameters = [
         {
             "name": key,

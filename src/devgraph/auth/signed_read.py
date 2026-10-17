@@ -172,6 +172,13 @@ class SignedReadEnrollment(NativeReadEnrollment):
         # accidentally wires this class to a legacy Authorization adapter.
         raise UnauthenticatedError("holder_proof_required")
 
+    def _decode_grants(self, permissions):
+        return tuple(
+            WorkReadGrant.model_validate(p["constraints"]).model_copy(
+                update={"operations": (p["operation"].removeprefix("devgraph.work."),)}
+            ) for p in permissions
+        )
+
     def _manifest_current(self, manifest: dict, current: int) -> bool:
         return True
 
@@ -210,12 +217,7 @@ class SignedReadEnrollment(NativeReadEnrollment):
                 )
                 # Only typed Work constraints from the verified operation become
                 # selectors. Filtering still happens inside DelegatedReadService.
-                grants = tuple(
-                    WorkReadGrant.model_validate(p["constraints"]).model_copy(
-                        update={"operations": (p["operation"].removeprefix("devgraph.work."),)}
-                    )
-                    for p in verified["permissions"]
-                )
+                grants = self._decode_grants(verified["permissions"])
                 if verified["credential_id"] != manifest["credential_id"]:
                     raise UnauthenticatedError("invalid_credential")
                 db.execute("DELETE FROM read_replay WHERE expires <= ?", (current,))

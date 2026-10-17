@@ -41,6 +41,15 @@ RELATIONSHIP_TYPE_ORDER = (
     "blockers",
     "blocked",
 )
+# (storage edge, incoming): one direction vocabulary for scoped readers.
+WORK_RELATIONSHIPS = {
+    "children": ("HAS_CHILD", False),
+    "parent": ("HAS_CHILD", True),
+    "dependencies": ("DEPENDS_ON", False),
+    "dependents": ("DEPENDS_ON", True),
+    "blockers": ("BLOCKS", True),
+    "blocked": ("BLOCKS", False),
+}
 WORK_KIND_ORDER = ("Proposal", "Initiative", "Project", "Issue", "Task")
 
 DENIAL_REASONS = (

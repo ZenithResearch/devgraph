@@ -187,7 +187,7 @@ class MemberReadEnrollment(SignedReadEnrollment):
 
     def _credential_expiry(self, policy, owner, device, current):
         assignment = self._assignment(owner, device, current)
-        if compile_read(assignment).digest != policy.digest:
+        if self._policy_for(owner, device, current).digest != policy.digest:
             raise UnauthenticatedError("policy_changed")
         return min(current + policy.lifetime_seconds, assignment.not_after)
 

@@ -280,6 +280,10 @@ class GraphStorage(Protocol):
         self, relationship: str | None = None, *, limit: int | None = None
     ) -> list[EdgeRecord]: ...
 
+    def delegated_work_edges(
+        self, keys: tuple[tuple[str, str], ...], relationships: tuple[str, ...], *, limit: int
+    ) -> list[EdgeRecord]: ...
+
     def delete_edge(
         self, from_label: str, from_id: str, relationship: str, to_label: str, to_id: str
     ) -> None: ...

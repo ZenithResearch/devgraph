@@ -573,6 +573,27 @@ class Neo4jGraphStorage:
             raise KeyError("missing canonical relationship endpoint")
         return self._edge_from_row(rows[0])
 
+    def delegated_work_edges(self, keys, relationships, *, limit):
+        from devgraph.storage.delegated import validate_edge_selection
+
+        validate_edge_selection(keys, relationships, limit)
+        if not keys or not relationships:
+            return []
+        rows = self._run_graph(
+            "UNWIND $keys AS key MATCH (source {id:key.id}) "
+            "WHERE key.label IN labels(source) "
+            "MATCH (source)-[edge]->(target) WHERE type(edge) IN $relationships "
+            "AND any(k IN $keys WHERE k.id=target.id AND k.label IN labels(target)) "
+            "RETURN labels(source) AS from_labels, source.id AS from_id, "
+            "type(edge) AS relationship, labels(target) AS to_labels, "
+            "target.id AS to_id, properties(edge) AS properties "
+            "ORDER BY source.id, type(edge), target.id LIMIT $limit",
+            keys=[{"label": kind, "id": identifier} for kind, identifier in keys],
+            relationships=list(relationships),
+            limit=limit,
+        )
+        return [self._edge_from_row(row) for row in rows]
+
     def delete_edge(
         self, from_label: str, from_id: str, relationship: str, to_label: str, to_id: str
     ) -> None:

@@ -1,0 +1,92 @@
+import {prepareProviderSetup} from './provider-setup.mjs';
+const BASE='/monitor/wallet-access/v1';
+const failure=(code,status=0)=>Object.assign(new Error(code),{code,status});
+const plain=v=>!!v&&Object.getPrototypeOf(v)===Object.prototype;
+const aborted=signal=>{if(signal?.aborted)throw signal.reason??new DOMException('Aborted','AbortError');};
+async function cancellable(pending,signal){
+ aborted(signal);if(!signal)return pending;
+ let cancel;try{return await Promise.race([pending,new Promise((_,reject)=>{cancel=()=>reject(signal.reason??new DOMException('Aborted','AbortError'));signal.addEventListener('abort',cancel,{once:true});})]);}
+ finally{signal.removeEventListener('abort',cancel);}
+}
+export function monitorReadOperation(target){
+ if(typeof target!=='string'||target.length>4096||target.includes('#')||target.split('?')[0].includes('%'))throw failure('read_not_granted',403);
+ const path=target.split('?')[0];
+ if(['/monitor/topology/v1','/monitor/snapshot','/monitor/kanban/v2','/workflows/v1','/todos/v2','/todos/v2/classification-report'].includes(path))return'devgraph.work.list';
+ if(/^\/todos\/v2\/(Todo|Proposal|Initiative|Project|Issue|Task)\/[a-z0-9][a-z0-9-]{0,255}$/.test(path))return'devgraph.work.get';
+ if(/^\/work\/(Todo|Proposal|Initiative|Project|Issue|Task)\/[a-z0-9][a-z0-9-]{0,255}\/relationships\/(children|parent|dependencies|dependents|blockers|blocked)$/.test(path))return'devgraph.work.relationships';
+ throw failure('read_not_granted',403);
+}
+/** Application-owned transport. Wallet holds custody and approved read connections. */
+export class WalletReadClient{
+ constructor({origin=globalThis.location?.origin,fetchImpl=globalThis.fetch,now=()=>Math.floor(Date.now()/1000),onChange=()=>{}}={}){
+  Object.assign(this,{origin,fetchImpl,now,onChange,stage:'unavailable',provider:null,configuration:null,sessionKey:'',preferenceSeed:'',generation:0,accessId:null,memberships:[],profileId:undefined});
+ }
+ notify(){this.onChange(this);}
+ async fetch(path,{body,signal}={}){
+  const fetchImpl=this.fetchImpl;const response=await fetchImpl(path,{method:body===undefined?'GET':'POST',body:body===undefined?undefined:JSON.stringify(body),headers:body===undefined?{}:{'Content-Type':'application/json'},credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
+  let data;try{data=await response.json();}catch{throw failure('read_response_invalid',response.status);}
+  if(!response.ok)throw failure(response.status===401?'wallet_read_denied':response.status===403?'read_not_granted':response.status===409?'view_changed':'read_unavailable',response.status);
+  return data;
+ }
+ async initialize({signal}={}){
+  const config=await this.fetch(BASE,{signal});
+  if(!plain(config)||config.schema!=='devgraph.wallet-read-configuration.v1'||config.endpoint!==BASE)throw failure('wallet_read_setup_required');
+  if(config.web_wallet_url!==null&&config.web_wallet_url!==undefined){const u=new URL(config.web_wallet_url);if(u.protocol!=='https:'||u.username||u.password||u.hash||u.search)throw failure('wallet_read_setup_required');}
+  this.configuration=structuredClone(config);this.stage='choose';this.notify();return config;
+ }
+ async useProvider(provider){
+  this.disconnect();const generation=this.generation;
+  const current=()=>{if(this.generation!==generation)throw failure('wallet_connection_changed');};
+  if(typeof provider?.readAccess!=='function')throw failure('wallet_upgrade_required');
+  if(!this.configuration)await this.initialize();current();
+  this.setup=await prepareProviderSetup({provider,origin:this.origin,current,requiredCapability:'read_access_v1',transport:{getProviderProfile:async()=>structuredClone(this.configuration.provider_profile)}});current();
+  this.provider=provider;this.stage='profile';this.notify();
+ }
+ async advance(){
+  const generation=this.generation,current=()=>{if(generation!==this.generation)throw failure('wallet_connection_changed');};
+  if(this.stage==='profile'){const pending=this.setup.approve();await pending;current();this.stage='connection';this.notify();return;}
+  if(this.stage==='connection'){
+   const pending=this.setup.connect();await pending;current();
+   const identity=await this.provider.readAccess({operation:'identity'});current();
+   if(!plain(identity)||!/^[a-f0-9]{64}$/.test(identity.subject_public_key)||!/^[a-f0-9]{32}$/.test(identity.installation_id)||!Array.isArray(identity.memberships))throw failure('read_identity_invalid');
+   this.identity=identity;this.memberships=identity.memberships;this.profileId=identity.memberships.length===1?identity.memberships[0].profileId:undefined;
+   this.challenge=await this.fetch(BASE+'/challenges',{body:{subject_public_key:identity.subject_public_key,installation_id:identity.installation_id}});current();
+   this.stage='approval';this.notify();return;
+  }
+  if(this.stage!=='approval')throw failure('wallet_read_access_required');
+  if(this.memberships.length>1&&!this.profileId)throw failure('membership_selection_required');
+  // Start the consent RPC immediately in this user gesture, before network waits.
+  const pending=this.provider.readAccess({operation:'approve',challenge:this.challenge,...(this.profileId?{profileId:this.profileId}:{})});
+  const approved=await pending;current();
+  if(!plain(approved)||typeof approved.accessId!=='string'||!plain(approved.enrollment))throw failure('read_approval_invalid');
+  this.accessId=approved.accessId;
+  try{
+   const result=await this.fetch(BASE+'/enrollments',{body:approved.enrollment});current();
+   if(result?.schema!=='devgraph.native-read-result.v3'||!plain(result.credential))throw failure('read_credential_invalid');
+   const accepted=await this.provider.readAccess({operation:'accept',accessId:this.accessId,credential:result.credential});current();
+   if(accepted?.accessId!==this.accessId||accepted.receiver!==this.challenge.receiver||!Number.isSafeInteger(accepted.expires_at)||accepted.expires_at<=this.now())throw failure('read_credential_invalid');
+   this.expiresAt=accepted.expires_at;this.sessionKey=`wallet:${this.generation}:${this.accessId}`;
+   this.preferenceSeed=`${this.origin}:${this.identity.subject_public_key}`;this.stage='ready';this.notify();
+  }catch(error){this.disconnect();throw error;}
+ }
+ async read(path,{signal}={}){
+  if(this.stage!=='ready'||!this.accessId)throw failure('wallet_read_access_required',401);
+  if(this.now()>=this.expiresAt){this.disconnect();throw failure('read_access_expired',401);}
+  const operation=monitorReadOperation(path),generation=this.generation;
+  const call={operation,resource:'https://work.zenith-research.ca/devgraph',parameters:{path}};
+  try{
+   const envelope=await cancellable(this.provider.readAccess({operation:'present',accessId:this.accessId,call}),signal);aborted(signal);
+   if(generation!==this.generation)throw failure('wallet_connection_changed');
+   if(!plain(envelope)||!plain(envelope.credential)||!plain(envelope.proof)||!plain(envelope.call)||Object.keys(envelope.call).sort().join(',')!=='operation,parameters,resource'||envelope.call.operation!==call.operation||envelope.call.resource!==call.resource||!plain(envelope.call.parameters)||Object.keys(envelope.call.parameters).join(',')!=='path'||envelope.call.parameters.path!==path)throw failure('read_presentation_invalid');
+   const result=await this.fetch(BASE+'/requests',{body:envelope,signal});
+   if(generation!==this.generation)throw failure('wallet_connection_changed');return result;
+  }catch(error){if(error.status===401||['wallet_locked','read_access_required','read_context_changed','read_access_expired'].includes(error.message))this.disconnect();throw error;}
+ }
+ disconnect(){
+  const provider=this.provider,accessId=this.accessId;this.provider=null;
+  this.generation++;this.accessId=null;this.sessionKey='';this.preferenceSeed='';this.identity=null;this.challenge=null;this.memberships=[];
+  this.stage=this.configuration?'choose':'unavailable';this.notify();
+  if(accessId&&provider?.readAccess)void provider.readAccess({operation:'disconnect',accessId}).catch(()=>{});
+  provider?.dispose?.();
+ }
+}

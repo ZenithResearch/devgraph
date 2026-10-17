@@ -7,8 +7,9 @@ function requestContext() {
   const c = contextWithFunctions(['getJson'], {
     AbortController, DOMException, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
     window: clock,
-    headers() { return { Authorization: 'Bearer synthetic-deadline-test' }; },
+
   });
+  c.walletAccess={read:async(path,options)=>{const response=await c.fetch(path,options);const data=await response.json();if(!response.ok)throw Object.assign(Error(data.title),{status:response.status});return data;}};
   return { c, clock };
 }
 

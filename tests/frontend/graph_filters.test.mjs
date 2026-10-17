@@ -46,12 +46,12 @@ function monitor() {
   const c = vm.createContext({
     AbortController, refreshCheckIn() {}, checkIn: { reset() {} },
     state: { snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0, refreshPromise: null, refreshQueued: false },
-    detailState: { credential: 'synthetic-test-credential' },
+    detailState: { credential: 'synthetic-test-session' },
     graphView: {
       preferenceKey: 'fixture', filters: {}, filterSerial: 0, visibleCategories: new Set(categories), nodes: [], edges: [],
       nodePositions: new Map(), nodeVelocities: new Map(), pointers: new Map(), pinnedKey: null, fitted: false,
     },
-    tokenInput: { value: 'synthetic-test-credential' },
+    walletSession: { value: 'synthetic-test-session' },
     document: { getElementById(id) {
       if (!elements.has(id)) elements.set(id, { className: '', textContent: '' });
       return elements.get(id);
@@ -61,6 +61,7 @@ function monitor() {
     renderForceControls() {}, renderArenaFilter() {}, relaxGraph() {}, settleRevealedChildren() {}, fitGraph() {},
     renderGraph() {}, renderGraphSelection() {}, renderGraphSearch() {}, loadSelectedDetail() {}, queueMicrotask,
   });
+  c.walletAccess = { get sessionKey(){return c.walletSession.value;}, get connected(){return !!c.walletSession.value;} };
   c.relaxations = 0;
   c.relaxGraph = () => { c.relaxations += 1; };
   vm.runInContext(topologySource, c); c.Topology = c.DevgraphTopology;

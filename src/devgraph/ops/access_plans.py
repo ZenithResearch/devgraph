@@ -14,6 +14,7 @@ from devgraph.auth.access_policy import (
     require_subset,
 )
 from devgraph.auth.delegated_contract import canonical_json
+from devgraph.auth.monitor_read import AccessDraftV2, MemberAccessPolicyV2, compile_monitor_read
 from devgraph.signed_read_runtime import private_json
 
 
@@ -58,18 +59,31 @@ def _publish(path: Path, value):
         os.close(fd)
 
 
+def _draft(raw):
+    model = AccessDraftV2 if raw.get("schema") == "devgraph.access-draft.v2" else AccessDraft
+    return model.model_validate(raw)
+
+
+def _matching(child, parent):
+    if child.schema_ != parent.schema_:
+        raise ValueError("explicit matching access contract versions required")
+    require_subset(child, parent)
+
+
 def execute(args):
     action = args.auth_access_command
     if action == "registry":
-        ceiling = AccessDraft.model_validate(private_json(args.ceiling_file))
-        value = MemberAccessPolicy.model_validate(
+        ceiling = _draft(private_json(args.ceiling_file))
+        modern = isinstance(ceiling, AccessDraftV2)
+        model = MemberAccessPolicyV2 if modern else MemberAccessPolicy
+        value = model.model_validate(
             {
-                "schema": "devgraph.member-access-policy.v1",
+                "schema": "devgraph.member-access-policy.v2"
+                if modern
+                else "devgraph.member-access-policy.v1",
                 "revision": args.revision,
                 "ceiling": ceiling,
-                "assignments": [
-                    AccessDraft.model_validate(private_json(path)) for path in args.assignment_file
-                ],
+                "assignments": [_draft(private_json(path)) for path in args.assignment_file],
             }
         )
         _publish(args.output_file, value)
@@ -79,20 +93,28 @@ def execute(args):
             "assignments": len(value.assignments),
         }
     if action == "attenuate":
-        parent = AccessDraft.model_validate(private_json(args.parent_file))
+        parent = _draft(private_json(args.parent_file))
         raw = private_json(args.selection_file)
         if raw.get("previous_digest") not in (None, parent.digest):
             raise ValueError("previous draft mismatch")
         raw["previous_digest"] = parent.digest
-        draft = attenuate(parent, AccessDraft.model_validate(raw))
+        child = _draft(raw)
+        _matching(child, parent)
+        draft = attenuate(parent, child)
         _publish(args.output_file, draft)
     else:
-        draft = AccessDraft.model_validate(private_json(args.draft_file))
+        draft = _draft(private_json(args.draft_file))
         if action == "export":
-            ceiling = AccessDraft.model_validate(private_json(args.ceiling_file))
-            require_subset(draft, ceiling)
+            ceiling = _draft(private_json(args.ceiling_file))
+            _matching(draft, ceiling)
             if args.format == "read":
-                value = compile_read(draft)
+                if draft.subject_public_key is None or draft.installation_id is None:
+                    raise ValueError("read issuance needs an exact member and installation")
+                value = (
+                    compile_monitor_read(draft)
+                    if isinstance(draft, AccessDraftV2)
+                    else compile_read(draft)
+                )
             else:
                 value = compile_write(
                     draft, policy_id=args.policy_id, policy_version=args.policy_version
@@ -103,7 +125,10 @@ def execute(args):
             _publish(
                 args.output_file,
                 {
-                    "schema": f"devgraph.member-{args.format}-plan.v1",
+                    "schema": (
+                        f"devgraph.member-{args.format}-plan.v"
+                        f"{2 if isinstance(draft, AccessDraftV2) else 1}"
+                    ),
                     "draft": draft.model_dump(mode="json", by_alias=True, exclude_defaults=True),
                     "ceiling_digest": ceiling.digest,
                     "policy": (

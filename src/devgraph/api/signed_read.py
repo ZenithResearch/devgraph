@@ -32,7 +32,12 @@ class GetParameters(BaseModel):
 
 
 def create_signed_read_app(
-    *, storage: GraphStorage, enrollment: SignedReadEnrollment, audit_log: AuditLog, lifespan=None
+    *,
+    storage: GraphStorage,
+    enrollment: SignedReadEnrollment,
+    audit_log: AuditLog,
+    lifespan=None,
+    web_wallet_url=None,
 ) -> FastAPI:
     app = FastAPI(
         title="Devgraph holder-bound read access",
@@ -115,4 +120,16 @@ def create_signed_read_app(
             raise UnauthenticatedError("invalid_request")
         return await run_in_threadpool(read, body)
 
+    from devgraph.auth.monitor_read import MemberMonitorReadEnrollment
+
+    if isinstance(enrollment, MemberMonitorReadEnrollment):
+        from devgraph.api.wallet_monitor import register_wallet_monitor
+
+        register_wallet_monitor(
+            app,
+            storage=storage,
+            enrollment=enrollment,
+            audit_log=audit_log,
+            web_wallet_url=web_wallet_url,
+        )
     return app

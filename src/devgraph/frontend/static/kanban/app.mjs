@@ -2,13 +2,14 @@ import {KINDS,COLUMNS,DEFAULTS,FILTER_KEY,filters,query,safeUrl,request,appendPa
 import {Wallet} from './wallet.mjs';
 if(document.readyState==='loading')await new Promise(resolve=>document.addEventListener('DOMContentLoaded',resolve,{once:true}));
 const $=id=>document.getElementById(id), wallet=new Wallet();
-const localReader=!!document.querySelector('meta[name="devgraph-local-reader"]');
+const walletReader=!!$('wallet-read-connection');
+const localReader=walletReader||!!document.querySelector('meta[name="devgraph-local-reader"]');
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const button=(text,action,cls)=>{const n=el('button',text,cls);n.type='button';n.addEventListener('click',action);return n;};
 let prefs={...DEFAULTS};try{prefs=filters(JSON.parse(localStorage.getItem(FILTER_KEY)||'{}'));}catch{}
 let catalog=null,board=null,serial=0,readerSerial=0,active=null,pending=null,moveData=null,refreshTimer=null,lastQuery=null,moveSerial=0,refreshCount=0;
 try{sessionStorage.removeItem('devgraph-monitor-token');pending=JSON.parse(sessionStorage.getItem('devgraph.kanban.pending.v1')||'null');if(pending&&(!pending.raw||!pending.key))pending=null;}catch{}
-if(localReader){
+if(localReader&&!walletReader){
  const ticket=new URLSearchParams(location.hash.slice(1)).get('reader_session');
  if(ticket){
   history.replaceState(null,'',location.pathname+location.search);
@@ -23,11 +24,13 @@ const announce=text=>{$('status').textContent=text;};
 function save(){try{localStorage.setItem(FILTER_KEY,JSON.stringify(prefs));}catch{announce('Filters work for this visit; browser storage is unavailable.');}}
 function savePending(value){pending=value;try{if(value)sessionStorage.setItem('devgraph.kanban.pending.v1',JSON.stringify(value));else sessionStorage.removeItem('devgraph.kanban.pending.v1');}catch{}$('recovery').hidden=!value;}
 savePending(pending);
-async function get(path){const response=await fetch(path,{headers:{Authorization:'Bearer '+$('credential').value.trim()},cache:'no-store',credentials:localReader?'same-origin':'omit'});if(!response.ok){const error=Error(response.status===401||response.status===403?'Reconnect with a valid read access key.':response.status===409?'The board changed. Refresh to continue.':response.status===404?'This item is no longer available.':'Unable to load this view. Try again.');error.status=response.status;throw error;}return response.json();}
+const readAccess=walletReader?globalThis.DevgraphWalletAccess.mount($('wallet-read-connection'),{onChange(access){serial++;readerSerial++;catalog=null;board=null;$('board').replaceChildren();if(modal.active)modal.close();if(access.connected)void refresh();else announce('Connect Wallet to view shared work.');}}):null;
+
+async function get(path){if(walletReader)return readAccess.read(path);const response=await fetch(path,{headers:{Authorization:'Bearer '+$('credential').value.trim()},cache:'no-store',credentials:localReader?'same-origin':'omit'});if(!response.ok){const error=Error(response.status===401||response.status===403?'Reconnect with a valid read access key.':response.status===409?'The board changed. Refresh to continue.':response.status===404?'This item is no longer available.':'Unable to load this view. Try again.');error.status=response.status;throw error;}return response.json();}
 function solid(kind){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','-1.2 -1.2 2.4 2.4');svg.classList.add('solid');svg.setAttribute('aria-hidden','true');for(const face of globalThis.DevgraphTopology.solid(kind).faces){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',face.d);path.setAttribute('fill',face.fill);path.setAttribute('stroke','var(--graph-outline)');path.setAttribute('stroke-width','.014');svg.append(path);}return svg;}
 function options(select,entries,value){if(JSON.stringify([...select.options].map(o=>[o.value,o.textContent]))!==JSON.stringify(entries))select.replaceChildren(...entries.map(([key,label])=>{const o=el('option',label);o.value=key;return o;}));select.value=value;}
 async function loadCatalog(){catalog=await get('/workflows/v1');catalog.columns={...catalog.columns,backlog:'Not started',unclassified:'Needs classification'};const stages=new Map();for(const workflow of Object.values(catalog.workflows))for(const s of workflow.stages)stages.set(s.id,s.label);options($('stage'),[['','Every stage'],['unset','Stage not set'],...stages],prefs.stage);options($('column'),[['','Every column'],...Object.entries(catalog.columns)],prefs.column);options($('mobile-column'),[['','All columns'],...Object.entries(catalog.columns)],'');}
-async function refresh(){if(!$('credential').value.trim()&&!localReader)return;const generation=++serial;refreshCount++;if(!board)announce('Loading your work…');try{if(!catalog)await loadCatalog();const filterQuery=query(prefs),keep=filterQuery===lastQuery&&board?new Map(board.columns.map(c=>[c.id,c.items.length])):new Map();
+async function refresh(){if(walletReader?!readAccess.connected:!$('credential').value.trim()&&!localReader)return;const generation=++serial;refreshCount++;if(!board)announce('Loading your work…');try{if(!catalog)await loadCatalog();const filterQuery=query(prefs),keep=filterQuery===lastQuery&&board?new Map(board.columns.map(c=>[c.id,c.items.length])):new Map();
 const result=await get('/monitor/kanban/v2?'+filterQuery);if(generation!==serial)return;
 for(const column of result.columns){const wanted=keep.get(column.id)||column.items.length;while(column.items.length<wanted&&column.next_cursor){const next=await get('/monitor/kanban/v2?'+query(prefs,{column:column.id,after:column.next_cursor,revision:result.revision,limit:Math.min(100,wanted-column.items.length)}));if(generation!==serial)return;const page=next.columns.find(c=>c.id===column.id);column.items=appendPage(column.items,page.items);column.next_cursor=page.next_cursor;}}
 lastQuery=filterQuery;board=result;render();announce(`${result.total} ${result.total===1?'item':'items'} · Updated ${new Date(result.read_at||Date.now()).toLocaleTimeString()} · ${wallet.connection?'Signed moves connected':'Reading mode'}`);}catch(error){if(generation===serial)announce(error.message);}finally{refreshCount--;}}
@@ -93,5 +96,5 @@ for(const key of Object.keys(DEFAULTS))$(key).addEventListener(key==='q'?'input'
 $('clear').onclick=()=>{prefs={...DEFAULTS};for(const key of Object.keys(DEFAULTS))$(key)[typeof prefs[key]==='boolean'?'checked':'value']=prefs[key];save();refresh();};$('mobile-column').onchange=mobile;
 for(const kind of KINDS){const item=el('span');item.append(solid(kind),el('span',kind));$('legend-items').append(item);}
 setInterval(()=>{if(!refreshCount&&!document.hidden&&!document.querySelector('dialog[open]')&&!wallet.busy)refresh();},localReader?60000:10000);
-window.addEventListener('pagehide',()=>wallet.dispose().catch(()=>{}));
+window.addEventListener('pagehide',()=>{readAccess?.disconnect();void wallet.dispose().catch(()=>{});});
 await refresh();

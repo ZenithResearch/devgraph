@@ -97,3 +97,26 @@ def validate_work_filter(
     if after_id is not None:
         validate_work_object_id(after_id)
     validate_page_limit(limit)
+
+
+def validate_edge_selection(keys, relationships, limit):
+    import re
+
+    if (
+        not isinstance(keys, tuple)
+        or len(keys) > 10000
+        or not isinstance(relationships, tuple)
+        or len(relationships) > 16
+        or type(limit) is not int
+        or not 1 <= limit <= 10001
+    ):
+        raise ValueError("invalid scoped edge selection")
+    for key in keys:
+        if not isinstance(key, tuple) or len(key) != 2 or key[0] not in CANONICAL_WORK_KINDS:
+            raise ValueError("invalid scoped edge selection")
+        validate_work_object_id(key[1])
+    if len(set(keys)) != len(keys) or any(
+        not isinstance(r, str) or re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", r) is None
+        for r in relationships
+    ):
+        raise ValueError("invalid scoped edge selection")

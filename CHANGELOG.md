@@ -19,6 +19,7 @@
 
 
 ### Added
+- Connect the monitor and read-only board through generic Wallet read approval, with Wallet-owned login/recovery and six-kind per-member scoped projections. Explicit runtime v3 and v2 policy opt-in preserve existing grants and signing formats; observations/documents are not silently included.
 - Add issuer-owned member access drafts and opt-in per-member signed reads, so operators can narrow read/write selections without issuing a broad credential or granting new rights through renewal. Existing signing formats remain unchanged; unsupported restrictions fail closed.
 - Distinguish native request compatibility, custody and authority failures using bounded public diagnostics — valid workflow requests rejected by older companions no longer suggest resetting signing keys.
 - Reconcile the generic native dependency and release candidate with Wallet's holder-bound read contract and secS's standalone read authority — preserve phone reads when qualifying the coordinated signing upgrade.

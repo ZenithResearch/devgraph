@@ -10,13 +10,13 @@ function refreshMonitor() {
     'synchronizeCredential', 'resetDetailState', 'applySnapshot', 'flushPendingSnapshot', 'refresh', 'topologyPath',
   ], {
     AbortController, queueMicrotask, document,
-    tokenInput: { value: 'synthetic-credential-one' },
+    walletSession: { value: 'synthetic-session-one' },
     state: {
       snapshot: null, observations: [], selectedGraphKey: null, authEpoch: 0,
       refreshPromise: null, refreshQueued: false, pendingSnapshot: null, lastSuccess: null,
     },
     detailState: {
-      credential: 'synthetic-credential-one', serial: 0, node: null, data: null,
+      credential: 'synthetic-session-one', serial: 0, node: null, data: null,
       relations: new Map(), documents: new Map(), controller: null,
     },
     graphView: { preferenceKey: 'fixture', filters: {}, filterSerial: 0, pointers: new Map(), nodePositions: new Map(), nodeVelocities: new Map() },
@@ -28,6 +28,7 @@ function refreshMonitor() {
     renderManagerOverview() {}, renderActivity() {}, renderObservations() {}, renderPipeline() {}, renderBars() {},
     getJson(path, options) { const task = deferred(); requests.push({ path, options, ...task }); return task.promise; },
   });
+  c.walletAccess = { get sessionKey(){ return c.walletSession.value; }, get connected(){ return !!c.walletSession.value; }, read: async (path, options) => { const response=await c.fetch(path, options); const data=await response.json(); if(!response.ok)throw Object.assign(Error(data.title),{status:response.status}); return data; } };
   return { c, requests, rendered };
 }
 
@@ -40,7 +41,7 @@ function boundedTransport(c, fetch) {
   const clock = fakeClock();
   Object.assign(c, {
     AbortController, DOMException, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
-    window: clock, headers: () => ({ Authorization: `Bearer ${c.tokenInput.value}` }), fetch,
+    window: clock, headers: () => ({ Authorization: `Bearer ${c.walletSession.value}` }), fetch,
   });
   vm.runInContext(functionsSource(['getJson']), c);
   return clock;
@@ -69,7 +70,7 @@ test('snapshot refresh allows one flight and coalesces multiple requests into on
 test('old-auth responses cannot overwrite a newer credential’s snapshot or clear its in-flight request', async () => {
   const { c, requests } = refreshMonitor();
   const old = c.refresh();
-  c.tokenInput.value = 'synthetic-credential-two';
+  c.walletSession.value = 'synthetic-session-two';
   const current = c.refresh(); await flushPromises();
   const currentFlight = c.state.refreshPromise;
   const stale = { generated_at: '2026-09-13T01:00:00Z', graph_nodes: [{ id: 'private-old' }] };
@@ -92,7 +93,7 @@ test('changing or clearing the credential removes prior graph, reader, and docum
   c.detailState.relations.set('children', { items: [{ id: 'private-child' }] });
   c.graphView.nodePositions.set('private-work', { x: 0 });
   c.graphView.arenaKey = 'Arena:private';
-  c.tokenInput.value = '';
+  c.walletSession.value = '';
   c.synchronizeCredential();
   assert.equal(c.state.snapshot, null);
   assert.equal(c.state.pendingSnapshot, null);
@@ -226,7 +227,7 @@ test('changing credentials aborts both old network reads while allowing the new 
     return Promise.resolve({ ok: true, status: 200, json: async () => path === '/monitor/topology/v1' ? snapshot : { items: [] } });
   });
   const old = c.refresh();
-  c.tokenInput.value = 'synthetic-credential-two';
+  c.walletSession.value = 'synthetic-session-two';
   const current = c.refresh(); await flushPromises();
   assert.equal(transport[0].signal.aborted, true);
   assert.equal(transport[1].signal.aborted, true);
@@ -234,7 +235,7 @@ test('changing credentials aborts both old network reads while allowing the new 
   assert.equal(transport[3].signal.aborted, false);
   await Promise.all([old, current]);
   assert.equal(c.state.snapshot, snapshot);
-  assert.equal(transport[2].headers.Authorization, 'Bearer synthetic-credential-two');
+  assert.equal(transport[2].headers, undefined, 'the monitor does not construct bearer headers');
   assert.equal(clock.timers.size, 0);
   assert.equal(c.state.refreshPromise, null);
   assert.equal(c.state.refreshController, null);

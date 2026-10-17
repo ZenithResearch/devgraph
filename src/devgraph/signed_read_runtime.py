@@ -48,10 +48,13 @@ def private_json(path: Path) -> dict:
 
 class ReadRuntimeConfiguration(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    schema_: Literal["devgraph.signed-read-runtime.v1", "devgraph.signed-read-runtime.v2"] = Field(
-        alias="schema"
-    )
+    schema_: Literal[
+        "devgraph.signed-read-runtime.v1",
+        "devgraph.signed-read-runtime.v2",
+        "devgraph.signed-read-runtime.v3",
+    ] = Field(alias="schema")
     member_policy_file: Path | None = None
+    web_wallet_url: str | None = None
     enrollment_policy_file: Path
     authority_policy_file: Path
     membership_trust_file: Path
@@ -63,10 +66,24 @@ class ReadRuntimeConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def paths(self):
-        if (self.schema_ == "devgraph.signed-read-runtime.v2") != (
+        if (self.schema_ != "devgraph.signed-read-runtime.v1") != (
             self.member_policy_file is not None
         ):
             raise ValueError("member policy requires explicit runtime v2")
+        if self.web_wallet_url is not None:
+            from urllib.parse import urlsplit
+
+            url = urlsplit(self.web_wallet_url)
+            if (
+                self.schema_ != "devgraph.signed-read-runtime.v3"
+                or url.scheme != "https"
+                or not url.netloc
+                or url.username
+                or url.password
+                or url.query
+                or url.fragment
+            ):
+                raise ValueError("an explicit HTTPS Wallet URL requires runtime v3")
         for value in self.__dict__.values():
             if isinstance(value, Path) and not value.is_absolute():
                 raise ValueError("absolute configuration paths required")
@@ -105,10 +122,23 @@ def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
         extra["members"] = lambda: MemberAccessPolicy.model_validate(
             private_json(config.member_policy_file)
         )
+    policy_type = EnrollmentPolicy
+    if config.schema_ == "devgraph.signed-read-runtime.v3":
+        from devgraph.auth.monitor_read import (
+            EnrollmentPolicyV2,
+            MemberAccessPolicyV2,
+            MemberMonitorReadEnrollment,
+        )
+
+        factory = MemberMonitorReadEnrollment
+        policy_type = EnrollmentPolicyV2
+        extra["members"] = lambda: MemberAccessPolicyV2.model_validate(
+            private_json(config.member_policy_file)
+        )
     return factory(
         **extra,
         path=config.enrollment_database_file,
-        policy=lambda: EnrollmentPolicy.model_validate(private_json(config.enrollment_policy_file)),
+        policy=lambda: policy_type.model_validate(private_json(config.enrollment_policy_file)),
         membership_check=membership,
         authority=SecsReadAuthority(
             binary=config.secs_binary,
@@ -140,5 +170,9 @@ def create_app():
             storage.close()
 
     return create_signed_read_app(
-        storage=storage, enrollment=enrollment, audit_log=audit, lifespan=lifespan
+        storage=storage,
+        enrollment=enrollment,
+        audit_log=audit,
+        lifespan=lifespan,
+        web_wallet_url=config.web_wallet_url,
     )

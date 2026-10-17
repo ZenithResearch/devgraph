@@ -15,6 +15,7 @@ from devgraph.auth.delegated_contract import (
     SCOPE_OBSERVATION_READ,
     SCOPE_QUERY_READ,
     SCOPE_WORK_READ,
+    WORK_RELATIONSHIPS,
     ArenaReadGrant,
     WorkReadGrant,
 )
@@ -31,14 +32,7 @@ from devgraph.storage.delegated import DelegatedWorkSelector
 from devgraph.supporting_material import SupportingMaterialReader
 from devgraph.supporting_material_contract import WorkDocumentEnvelope
 
-_RELATIONSHIPS = {
-    "children": ("HAS_CHILD", False),
-    "parent": ("HAS_CHILD", True),
-    "dependencies": ("DEPENDS_ON", False),
-    "dependents": ("DEPENDS_ON", True),
-    "blockers": ("BLOCKS", True),
-    "blocked": ("BLOCKS", False),
-}
+_RELATIONSHIPS = WORK_RELATIONSHIPS
 
 
 class DelegatedReadService:

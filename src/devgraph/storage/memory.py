@@ -561,6 +561,22 @@ class MemoryGraphStorage:
             edges = [edge for edge in edges if edge.relationship == relationship]
         return edges if limit is None else edges[:limit]
 
+    def delegated_work_edges(self, keys, relationships, *, limit):
+        from devgraph.storage.delegated import validate_edge_selection
+
+        validate_edge_selection(keys, relationships, limit)
+        allowed = set(keys)
+        return sorted(
+            (
+                e
+                for e in self._edges
+                if e.relationship in relationships
+                and (e.from_label, e.from_id) in allowed
+                and (e.to_label, e.to_id) in allowed
+            ),
+            key=lambda e: (e.from_label, e.from_id, e.relationship, e.to_label, e.to_id),
+        )[:limit]
+
     def delete_edge(
         self, from_label: str, from_id: str, relationship: str, to_label: str, to_id: str
     ) -> None:

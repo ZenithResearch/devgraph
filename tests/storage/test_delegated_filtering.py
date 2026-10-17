@@ -106,3 +106,36 @@ def test_selectors_are_conjunctive_within_a_group_and_disjunctive_across_groups(
 
     assert conjunctive == []
     assert [node.id for node in disjunctive] == ["exact-only", "in-arena"]
+
+
+def test_scoped_edges_require_both_endpoints_before_limit():
+    storage = MemoryGraphStorage()
+    create(
+        storage,
+        Task(id="source", title="Source"),
+        Task(id="a-hidden", title="Hidden"),
+        Task(id="z-visible", title="Visible"),
+    )
+    storage.create_edge("Task", "source", "BLOCKS", "Task", "a-hidden")
+    storage.create_edge("Task", "source", "BLOCKS", "Task", "z-visible")
+    edges = storage.delegated_work_edges(
+        (("Task", "source"), ("Task", "z-visible")), ("BLOCKS",), limit=1
+    )
+    assert [(edge.from_id, edge.to_id) for edge in edges] == [("source", "z-visible")]
+    assert not storage.delegated_work_edges((("Task", "source"),), ("BLOCKS",), limit=1)
+
+
+def test_neo4j_scoped_edge_query_filters_targets_before_pagination():
+    from tests.storage.test_neo4j_persistence_contract import _storage_with_rows
+
+    storage, calls = _storage_with_rows([])
+    assert (
+        storage.delegated_work_edges((("Task", "source"), ("Task", "target")), ("BLOCKS",), limit=1)
+        == []
+    )
+    query, parameters = calls[0]
+    assert query.index("any(k IN $keys") < query.index("LIMIT $limit")
+    assert parameters["keys"] == [
+        {"label": "Task", "id": "source"},
+        {"label": "Task", "id": "target"},
+    ]

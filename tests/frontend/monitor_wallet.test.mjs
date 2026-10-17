@@ -1,0 +1,30 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {WalletReadClient} from '../../src/devgraph/frontend/static/credential-v2/read-access.mjs';
+
+function fixture(){
+ const events=[],origin='https://graph.example',configuration={schema:'devgraph.wallet-read-configuration.v1',endpoint:'/monitor/wallet-access/v1',web_wallet_url:null,provider_profile:{schema:'castalia.provider-profile.v1',display_name:'Devgraph read access',origins:[origin],membership:null,presentations:[{issuer:'fixture',key_id:'test',public_key:'a'.repeat(64),audience:'devgraph',callers:[{kind:'browser',id:origin}]}]}};
+ const provider={getCapabilities:async()=>['read_access_v1','provider_profiles_v1','connection_v1'],proposeProviderProfile:async()=>({state:'approved'}),requestConnection:async()=>({state:'connected'}),readAccess:async input=>{events.push(input.operation);if(input.operation==='identity')return{subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32),memberships:[{profileId:'one'}]};if(input.operation==='approve')return{accessId:'access-one',enrollment:{challenge:{},proof:{},signature:'test'}};if(input.operation==='accept')return{accessId:'access-one',expires_at:4000,receiver:origin};if(input.operation==='present')return{credential:{},call:input.call,proof:{}};return{state:'disconnected'}}};
+ const fetchImpl=async(url,options={})=>{
+  assert.ok(url.startsWith('/monitor/wallet-access/v1'));assert.equal(options.credentials,'omit');assert.equal(options.redirect,'error');
+  const value=url.endsWith('/challenges')?{receiver:origin}:url.endsWith('/enrollments')?{schema:'devgraph.native-read-result.v3',credential:{}}:url.endsWith('/requests')?{items:[]} :configuration;
+  return{ok:true,status:200,json:async()=>value};
+ };
+ const client=new WalletReadClient({origin,fetchImpl,now:()=>1000});return{client,provider,events};
+}
+test('read connection requires provider, site and read approvals before loading graph',async()=>{
+ const {client,provider,events}=fixture();await client.initialize();await client.useProvider(provider);
+ assert.equal(client.stage,'profile');await assert.rejects(client.read('/monitor/topology/v1'));
+ await client.advance();assert.equal(client.stage,'connection');await client.advance();assert.equal(client.stage,'approval');
+ await client.advance();assert.equal(client.stage,'ready');assert.ok(client.sessionKey);assert.equal(events.filter(x=>x==='approve').length,1);
+ await client.read('/monitor/topology/v1');assert.equal(events.at(-1),'present');
+ const profile=client.preferenceSeed;client.disconnect();assert.equal(client.sessionKey,'');assert.ok(profile);await assert.rejects(client.read('/monitor/topology/v1'));
+});
+test('scope does not become arbitrary read or write transport',async()=>{
+ const {client,provider,events}=fixture();await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();await client.advance();
+ for(const path of ['/work-operations/v1','https://evil.example/','/local/config','/todos/v2/Task/one/../../other'])await assert.rejects(client.read(path));
+ assert.equal(events.filter(x=>x==='present').length,0);
+});
+test('unsupported installed Wallet cannot fall back to pasted credentials',async()=>{
+ const {client,provider}=fixture();provider.getCapabilities=async()=>['credential_presentation_v2'];await client.initialize();await assert.rejects(client.useProvider(provider),/wallet_upgrade_required/);
+});
