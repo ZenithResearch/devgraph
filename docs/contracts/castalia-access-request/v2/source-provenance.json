@@ -1,0 +1,7 @@
+{
+  "schema": "devgraph.read-activation-source.v1",
+  "wallet_revision": "53a74ee1b6d1d60d86a613a3a0422b4c787057f3",
+  "wallet_core": "castalia-wallet-core/src/access_request.rs",
+  "fixture": "public custody fixture only; actual WASM signature; no user identity or consent",
+  "qualification": "source parity, not installed"
+}

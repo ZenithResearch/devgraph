@@ -49,3 +49,12 @@ test('operator review result must match the exact requested selection and digest
  const fetchImpl=async(path,o)=>{const body=JSON.parse(o.body);if(path.endsWith('challenges')){action=body.action;return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,details:{action}});}return json({schema:'devgraph.access-operator-result.v1',action_id:action.action_id,authority_issued:false,request_id:action.request_id,expected_version:1,request_digest_sha256:action.request_digest_sha256,review_id:action.action_id,selection:{...action.selection,injected:true},selection_digest_sha256:'d'.repeat(64),plans:{read:{}}});};
  const c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});await c.prepare({action:'review',request_id:'c'.repeat(32),expected_version:1,request_digest_sha256:'d'.repeat(64),selection});await assert.rejects(c.approve(),/operator_outcome_unknown/);assert.equal(c.state,'unknown');assert.ok(storage.getItem(c.key));
 });
+
+for(const tamper of [false,true])test('read activation result binds the exact assignment: tamper='+tamper,async()=>{
+ const storage=store(),wallet={requestIdentity:identity,approveAccess:async challenge=>({challenge,signature:'x'.repeat(86)})};let action,c;
+ const selected=makeSelection({ceiling,ceilingDigest:'d'.repeat(64),recipient:identity,mode:'read',workIds:['Task/one'],expiresAt:500,now:100});
+ const fetchImpl=async(path,o)=>{const body=JSON.parse(o.body);if(path.endsWith('challenges')){action=body.action;return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,details:{action}});}return json({schema:'devgraph.access-operator-result.v2',action_id:action.action_id,authority_issued:false,request_id:action.request_id,request_digest_sha256:action.request_digest_sha256,version:2,status:'active',activation:{active:true,credential_issued:false,assignment_digest:tamper?'f'.repeat(64):c.pending.assignment_digest}});};
+ c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});await c.prepare({schema:'devgraph.access-operator-action.v2',action:'approve',request_id:'c'.repeat(32),request_digest_sha256:'d'.repeat(64),expected_version:1,previous_assignment_digest:null,review_id:'e'.repeat(32),selection:selected});
+ if(tamper){await assert.rejects(c.approve(),/operator_outcome_unknown/);assert.ok(storage.getItem(c.key));}
+ else{assert.equal((await c.approve()).status,'active');assert.equal(storage.getItem(c.key),null);}
+});

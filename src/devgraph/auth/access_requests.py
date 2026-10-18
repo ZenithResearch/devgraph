@@ -444,6 +444,8 @@ class AccessRequestInbox:
         result = self._record_authenticated(
             legacy, Challenge.model_validate(legacy), proof, current
         )
+        if getattr(self, "provisioning", None) is not None:
+            self.provisioning.refresh()
         with self._database() as db:
             if db.execute("SELECT 1 FROM sqlite_master WHERE name='access_decisions'").fetchone():
                 decision = db.execute(
@@ -456,4 +458,25 @@ class AccessRequestInbox:
                         version=decision[0],
                         status=decision[1],
                     )
+                    if getattr(self, "provisioning", None) is not None and decision[1] in (
+                        "active",
+                        "revoked",
+                    ):
+                        result["schema"] = "devgraph.access-request-result.v3"
+                        assignment = db.execute(
+                            "SELECT request_id,assignment,active FROM access_assignments "
+                            "WHERE owner=? AND device=?",
+                            (request.subject_public_key, request.installation_id),
+                        ).fetchone()
+                        state = "revoked"
+                        if assignment and assignment[0] != request.request_id:
+                            state = "superseded"
+                        elif assignment and assignment[2] and decision[1] == "active":
+                            grant = AccessDraftV2.model_validate_json(assignment[1])
+                            state = (
+                                "active"
+                                if grant.not_before <= current < grant.not_after
+                                else "expired"
+                            )
+                        result.update(status=state, grant_active=state == "active")
         return result

@@ -91,3 +91,5 @@ Repository verification does not establish another machine's availability,
 backup recovery, or production readiness. See [beta setup](docs/user/beta.md).
 
 - Why: a lost review response can outlive its page. Restore its exact request identity after status recovery, and reject changed challenge/selection details before further consent or decision.
+
+- Why: an operator-approved request must become usable without manually editing member assignments. Add explicit runtime v5 read-grant activation/revocation, exact replacement consent, atomic decisions/receipts and reuse through the existing secS issuer. Preserve earlier runtime behavior and reject unsupported partial write activation before consent.

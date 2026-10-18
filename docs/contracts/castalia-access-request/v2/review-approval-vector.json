@@ -1,0 +1,60 @@
+{
+  "schema": "devgraph.read-activation-consent-vector.v1",
+  "challenge": {
+    "challenge_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "details": {
+      "action": {
+        "action": "review",
+        "action_id": "cccccccccccccccccccccccccccccccc",
+        "expected_version": 1,
+        "previous_assignment_digest": null,
+        "request_digest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "request_id": "dddddddddddddddddddddddddddddddd",
+        "schema": "devgraph.access-operator-action.v2",
+        "selection": {
+          "read": {
+            "installation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "issuer": "fixture",
+            "lifetime_seconds": 300,
+            "not_after": 1000,
+            "not_before": 99,
+            "previous_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "read_grants": [
+              {
+                "include_archived": false,
+                "operations": [
+                  "get",
+                  "list"
+                ],
+                "relationship_types": [
+                  "parent"
+                ],
+                "scope": "devgraph.work.read",
+                "work_kinds": [
+                  "Task"
+                ]
+              }
+            ],
+            "receiver": "https://example.test",
+            "schema": "devgraph.access-draft.v2",
+            "subject_public_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "write_audience": "devgraph://receiver-local"
+          }
+        }
+      },
+      "policy_digest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "policy_revision": 1
+    },
+    "expires_at": 220,
+    "installation_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "issued_at": 100,
+    "issuer": "fixture",
+    "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "operation": "access.review",
+    "receiver": "https://example.test",
+    "schema": "castalia.access-request-challenge.v1",
+    "subject_public_key": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+  },
+  "signature": "nSxl2fmKu0FckEUsoxDb4mp-LAWLEFN2ywl7fbXHeOulJ0ZRBv8KaL-vQT-ov59rThvc4xLzhKFPPe5Ap5tYDw",
+  "signing_sha256": "c8fb0b507a10fb44c5c8e9955faef0b4b89117c855e3b82dc6cdf1f34d0185ba"
+}

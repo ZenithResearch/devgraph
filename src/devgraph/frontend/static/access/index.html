@@ -4,6 +4,7 @@
 <details id="wallet"><summary>Operator Wallet</summary>__WALLET_CONNECTION__</details>
 <p id="status" role="status" aria-live="polite">Connect your operator Wallet to review requests.</p>
 <div class="actions"><button id="refresh">Review inbox</button><button id="confirm" hidden>Continue in Wallet</button><button id="recover" hidden>Check original result</button></div>
+<section class="panel" id="active-grants" hidden><h2>Active read grants</h2><p>Revoking a grant stops its credentials from accessing this graph.</p><div id="grant-list"></div></section>
 <div class="layout"><section class="panel"><h2>Waiting for review <span id="count"></span></h2><div id="requests"><p class="muted">Only an approved operator can load this inbox.</p></div><button id="more" hidden>Next page</button></section>
 <section class="panel" id="review" hidden><h2>Choose access</h2><dl><dt>Member</dt><dd id="member"></dd><dt>Wallet installation</dt><dd id="device"></dd></dl><details><summary>What they requested</summary><pre id="requested"></pre></details>
 <form id="grant"><label>Permissions<select id="mode"><option value="read">Read only</option><option value="both">Read and selected writes</option><option value="write">Selected writes only</option></select></label>
@@ -14,7 +15,7 @@
 <p id="future-note" class="muted">Unrestricted kinds and Arenas include matching future objects within the approved policy.</p>
 <label>Expires<input id="expiry" type="datetime-local" required></label>
 <button type="submit">Review selection</button></form>
-<div id="selection-review" hidden><h3>Exact selection</h3><div id="selection-summary"></div><details><summary>Full signed selection</summary><pre id="selection-json"></pre></details><p>Approval records this selection. Access remains pending until the issuer activates it; no credential is issued by this step.</p><button id="approve-selection">Approve this selection</button><button id="edit" class="secondary">Edit selection</button></div>
+<div id="selection-review" hidden><h3>Exact selection</h3><div id="selection-summary"></div><details><summary>Full signed selection</summary><pre id="selection-json"></pre></details><p id="activation-note">Approval records this selection. Access remains pending until the issuer activates it; no credential is issued by this step.</p><button id="approve-selection">Approve this selection</button><button id="edit" class="secondary">Edit selection</button></div>
 <details><summary>Decline request</summary><label>Reason<input id="reason" maxlength="512"></label><button id="deny" class="secondary">Decline with reason</button></details>
 </section></div>
 </main><script type="module" src="/monitor/access-assets/app.mjs"></script></body></html>

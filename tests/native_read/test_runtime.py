@@ -109,3 +109,36 @@ def test_operator_administration_requires_explicit_v4_and_separate_database():
         ReadRuntimeConfiguration.model_validate(
             {**values, "access_inbox_database_file": values["enrollment_database_file"]}
         )
+
+
+def test_read_activation_requires_explicit_runtime_v5():
+    from devgraph.signed_read_runtime import ReadRuntimeConfiguration
+
+    values = {
+        "schema": "devgraph.signed-read-runtime.v5",
+        **{
+            field: "/private/fixture/" + field
+            for field in (
+                "member_policy_file",
+                "access_operator_policy_file",
+                "access_inbox_database_file",
+                "enrollment_policy_file",
+                "authority_policy_file",
+                "membership_trust_file",
+                "revoked_memberships_file",
+                "enrollment_database_file",
+                "secs_binary",
+                "issuer_key_file",
+            )
+        },
+        "secs_binary_sha256": "a" * 64,
+    }
+    assert (
+        ReadRuntimeConfiguration.model_validate(values).schema_ == "devgraph.signed-read-runtime.v5"
+    )
+    with pytest.raises(ValueError):
+        ReadRuntimeConfiguration.model_validate({**values, "access_operator_policy_file": None})
+    with pytest.raises(ValueError):
+        ReadRuntimeConfiguration.model_validate(
+            {**values, "access_inbox_database_file": values["enrollment_database_file"]}
+        )

@@ -49,10 +49,16 @@ def register_access_operator(app: FastAPI, operator):
                     return JSONResponse(
                         {"error": "operator_result_unknown"}, status_code=503, headers=headers
                     )
-            if str(error) == "request_changed":
+            if str(error) in ("request_changed", "assignment_changed"):
                 return JSONResponse(
-                    {"error": "operator_request_changed"}, status_code=409, headers=headers
+                    {"error": "operator_" + str(error)}, status_code=409, headers=headers
                 )
+            if str(error) in (
+                "write_activation_unavailable",
+                "activation_unavailable",
+                "activation_upgrade_required",
+            ):
+                return JSONResponse({"error": str(error)}, status_code=400, headers=headers)
             return JSONResponse(
                 {"error": "operator_access_denied"}, status_code=401, headers=headers
             )

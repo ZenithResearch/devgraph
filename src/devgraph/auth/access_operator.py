@@ -1,4 +1,4 @@
-"""Independently authorized operator inbox and grant selection, not activation."""
+"""Independently authorized review, with explicitly composed read activation."""
 
 import hashlib
 import json
@@ -50,8 +50,10 @@ class GrantSelection(Closed):
 
 
 class OperatorAction(Closed):
-    schema_: Literal["devgraph.access-operator-action.v1"] = Field(alias="schema")
-    action: Literal["inbox", "review", "approve", "deny", "status"]
+    schema_: Literal["devgraph.access-operator-action.v1", "devgraph.access-operator-action.v2"] = (
+        Field(alias="schema")
+    )
+    action: Literal["inbox", "review", "approve", "deny", "status", "revoke"]
     action_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     original_action_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     request_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
@@ -60,11 +62,30 @@ class OperatorAction(Closed):
     selection: GrantSelection | None = None
     review_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     reason: str | None = Field(default=None, min_length=1, max_length=512)
+    target_public_key: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    target_installation_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    previous_assignment_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     limit: int = Field(default=50, strict=True, ge=1, le=100)
     after_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
 
     @model_validator(mode="after")
     def valid(self):
+        targets = {"target_public_key", "target_installation_id"} & self.model_fields_set
+        if self.action == "revoke":
+            if len(targets) != 2 or not self.target_public_key or not self.target_installation_id:
+                raise ValueError("revocation needs an exact target member and installation")
+        elif targets:
+            raise ValueError("revocation target is not valid for this action")
+        changed = "previous_assignment_digest" in self.model_fields_set
+        if self.schema_ == "devgraph.access-operator-action.v1" and (
+            changed or self.action == "revoke"
+        ):
+            raise ValueError("activation needs the v2 action contract")
+        if self.schema_ == "devgraph.access-operator-action.v2":
+            if (self.action in ("review", "approve", "revoke")) != changed:
+                raise ValueError("an exact previous assignment is required for activation")
+            if self.action == "revoke" and not self.previous_assignment_digest:
+                raise ValueError("revoke needs the exact active assignment")
         if self.action in ("inbox", "status"):
             if (self.action == "status") != bool(self.original_action_id):
                 raise ValueError("status needs the original action ID")
@@ -97,10 +118,21 @@ class OperatorAction(Closed):
                 raise ValueError("denial requires a reason")
         return self
 
+    def wire(self):
+        value = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)
+        if self.schema_ == "devgraph.access-operator-action.v2" and self.action in (
+            "review",
+            "approve",
+            "revoke",
+        ):
+            value["previous_assignment_digest"] = self.previous_assignment_digest
+        return value
+
 
 class AccessOperator:
-    def __init__(self, *, inbox, policy, inventory=None):
+    def __init__(self, *, inbox, policy, inventory=None, provisioning=None):
         self.inbox, self.policy, self.inventory = inbox, policy, inventory
+        self.provisioning = provisioning
         current = policy()
         if current.ceiling.issuer != inbox.issuer or current.ceiling.receiver != inbox.receiver:
             raise ValueError("operator policy receiver mismatch")
@@ -125,6 +157,8 @@ class AccessOperator:
         self._refresh_policy()
 
     def _refresh_policy(self):
+        if self.provisioning is not None:
+            self.provisioning.refresh()
         policy = self.policy()
         if (
             policy.ceiling.issuer != self.inbox.issuer
@@ -179,6 +213,21 @@ class AccessOperator:
             self.record_denial(operation + "_rejected")
             error._access_operator_audited = True
             raise
+        except RuntimeError:
+            self.record_denial(operation + "_failed")
+            raise
+
+    def _admit_action(self, action):
+        if action.schema_ == "devgraph.access-operator-action.v2" and self.provisioning is None:
+            raise UnauthenticatedError("activation_unavailable")
+        if self.provisioning is not None:
+            if (
+                action.action in ("review", "approve", "revoke")
+                and action.schema_ != "devgraph.access-operator-action.v2"
+            ):
+                raise UnauthenticatedError("activation_upgrade_required")
+            if action.selection and action.selection.write is not None:
+                raise UnauthenticatedError("write_activation_unavailable")
 
     def challenge(self, owner, device, action: OperatorAction, *, now=None):
         return self._audited("challenge", self._challenge, owner, device, action, now=now)
@@ -186,6 +235,7 @@ class AccessOperator:
     def _challenge(self, owner, device, action: OperatorAction, *, now=None):
         self._refresh_policy()
         current = _seconds(now)
+        self._admit_action(action)
         if (
             not isinstance(owner, str)
             or not re.fullmatch(r"[0-9a-f]{64}", owner)
@@ -201,7 +251,7 @@ class AccessOperator:
             if owner not in policy.operator_public_keys:
                 raise UnauthenticatedError("operator_required")
             details = dict(
-                action=action.model_dump(mode="json", by_alias=True, exclude_defaults=True),
+                action=action.wire(),
                 policy_revision=policy.revision,
                 policy_digest_sha256=policy.digest,
             )
@@ -211,6 +261,7 @@ class AccessOperator:
                 "approve": "access.decide",
                 "deny": "access.decide",
                 "status": "access.status",
+                "revoke": "access.decide",
             }[action.action]
             value = dict(
                 schema="castalia.access-request-challenge.v1",
@@ -282,12 +333,14 @@ class AccessOperator:
         if set(details) != {"action", "policy_revision", "policy_digest_sha256"}:
             raise UnauthenticatedError("invalid_operator_action")
         action = OperatorAction.model_validate(details["action"])
+        self._admit_action(action)
         expected = {
             "inbox": "access.inbox",
             "review": "access.review",
             "approve": "access.decide",
             "deny": "access.decide",
             "status": "access.status",
+            "revoke": "access.decide",
         }[action.action]
         if parsed.operation != expected:
             raise UnauthenticatedError("invalid_operator_action")
@@ -381,8 +434,65 @@ class AccessOperator:
                         policy_digest_sha256=policy.digest,
                         authority_issued=False,
                     )
+                    if self.provisioning is not None:
+                        result["activation"] = {
+                            "schema": "devgraph.access-activation-capabilities.v1",
+                            "read": True,
+                            "write": False,
+                        }
+                        result["active_grants"] = self.provisioning.summaries(db, policy, current)
+                        for item in result["inbox"]["items"]:
+                            existing = self.provisioning.current(
+                                db, item["subject_public_key"], item["installation_id"]
+                            )
+                            item["previous_assignment_digest"] = (
+                                existing.digest if existing else None
+                            )
                     if self.inventory is not None:
                         result["inventory"] = self.inventory(policy.ceiling.read_grants)
+                elif action.action == "revoke":
+                    record = db.execute(
+                        "SELECT * FROM access_requests WHERE id=?", (action.request_id,)
+                    ).fetchone()
+                    decision = db.execute(
+                        "SELECT version,status FROM access_decisions WHERE request_id=?",
+                        (action.request_id,),
+                    ).fetchone()
+                    if (
+                        not record
+                        or record[3] != action.request_digest_sha256
+                        or action.expected_version != 2
+                        or decision != (2, "active")
+                        or record[1:3] != (action.target_public_key, action.target_installation_id)
+                    ):
+                        raise UnauthenticatedError("request_changed")
+                    grant = self.provisioning.current(db, *record[1:3])
+                    if grant is None:
+                        raise UnauthenticatedError("assignment_changed")
+                    require_subset(grant, policy.ceiling)
+                    activation = self.provisioning.revoke(
+                        db,
+                        record,
+                        action.previous_assignment_digest,
+                        parsed.subject_public_key,
+                        action.action_id,
+                        current,
+                    )
+                    db.execute(
+                        "UPDATE access_decisions SET version=3,status='revoked',reason=? "
+                        "WHERE request_id=?",
+                        (action.reason, record[0]),
+                    )
+                    result = dict(
+                        schema="devgraph.access-operator-result.v2",
+                        action_id=action.action_id,
+                        request_id=record[0],
+                        request_digest_sha256=record[3],
+                        version=3,
+                        status="revoked",
+                        activation=activation,
+                        authority_issued=False,
+                    )
                 else:
                     record = db.execute(
                         "SELECT * FROM access_requests WHERE id=?", (action.request_id,)
@@ -401,6 +511,14 @@ class AccessOperator:
                         raise UnauthenticatedError("request_changed")
                     if action.action in ("review", "approve"):
                         plans = self._selection(action.selection, record, policy, current)
+                        if self.provisioning is not None:
+                            plans["activation"] = self.provisioning.preview(
+                                db,
+                                action.selection,
+                                record,
+                                action.previous_assignment_digest,
+                                current,
+                            )
                         selection = action.selection.model_dump(
                             mode="json", by_alias=True, exclude_defaults=True
                         )
@@ -443,9 +561,7 @@ class AccessOperator:
                                 "SELECT digest FROM access_operator_results WHERE action_id=?",
                                 (action.review_id,),
                             ).fetchone()[0]
-                            reviewed_action = action.model_dump(
-                                mode="json", by_alias=True, exclude_defaults=True
-                            )
+                            reviewed_action = action.wire()
                             reviewed_action.update(action="review", action_id=action.review_id)
                             reviewed_action.pop("review_id", None)
                             if (
@@ -466,6 +582,18 @@ class AccessOperator:
                             if action.action == "approve"
                             else "denied"
                         )
+                        activation = None
+                        if action.action == "approve" and self.provisioning is not None:
+                            activation = self.provisioning.activate(
+                                db,
+                                action.selection,
+                                record,
+                                action.previous_assignment_digest,
+                                parsed.subject_public_key,
+                                action.action_id,
+                                current,
+                            )
+                            state = "active"
                         db.execute(
                             "INSERT INTO access_decisions VALUES(?,2,?,?,?,?,?,?)",
                             (
@@ -486,6 +614,12 @@ class AccessOperator:
                             status=state,
                             authority_issued=False,
                         )
+                        if activation is not None:
+                            result.update(
+                                schema="devgraph.access-operator-result.v2",
+                                activation=activation,
+                                request_digest_sha256=record[3],
+                            )
                 if action.action == "inbox":
                     while (
                         len(canonical_json(result)) > 262144 and len(result["inbox"]["items"]) > 1

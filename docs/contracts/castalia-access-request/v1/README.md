@@ -140,3 +140,5 @@ Castalia Web and iOS request adapters, loaded Chrome acceptance, and installed
 end-to-end qualification with reviewed disposable operator policy. There is no
 sync operation or sync permission in these contracts. Full Work administration
 must not be described as active from selecting an unsigned draft.
+
+For the separately opted-in read activation candidate, see [v2 activation](../v2/README.md). V4 retains the pending-only behavior documented above.

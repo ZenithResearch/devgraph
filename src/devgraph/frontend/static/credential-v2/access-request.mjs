@@ -21,7 +21,8 @@ export class AccessRequestClient{
   const consent=this.wallet.approveAccess(challenge);
   return consent.then(async approval=>{
    this.attempted=true;let result;try{result=await this.post('actions',approval);}catch(error){throw Object.assign(Error('access_request_outcome_unknown'),{cause:error});}
-   if(!result||!['devgraph.access-request-result.v1','devgraph.access-request-result.v2'].includes(result.schema)||result.request_id!==this.original.request_id||result.authority_issued!==false||!['pending','expired','unknown','approved_pending_activation','denied'].includes(result.status))throw Error('access_request_outcome_unknown');
+   if(!result||!['devgraph.access-request-result.v1','devgraph.access-request-result.v2','devgraph.access-request-result.v3'].includes(result.schema)||result.request_id!==this.original.request_id||result.authority_issued!==false||!['pending','expired','unknown','approved_pending_activation','denied','active','revoked','superseded'].includes(result.status))throw Error('access_request_outcome_unknown');
+   if(result.schema==='devgraph.access-request-result.v3'&&result.grant_active!==(result.status==='active'))throw Error('access_request_outcome_unknown');
    return result;
   });
  }

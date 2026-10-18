@@ -53,6 +53,7 @@ class ReadRuntimeConfiguration(BaseModel):
         "devgraph.signed-read-runtime.v2",
         "devgraph.signed-read-runtime.v3",
         "devgraph.signed-read-runtime.v4",
+        "devgraph.signed-read-runtime.v5",
     ] = Field(alias="schema")
     member_policy_file: Path | None = None
     access_inbox_database_file: Path | None = None
@@ -73,7 +74,7 @@ class ReadRuntimeConfiguration(BaseModel):
             self.member_policy_file is not None
         ):
             raise ValueError("member policy requires explicit runtime v2")
-        if self.schema_ == "devgraph.signed-read-runtime.v4":
+        if self.schema_ in ("devgraph.signed-read-runtime.v4", "devgraph.signed-read-runtime.v5"):
             if self.access_inbox_database_file is None or self.access_operator_policy_file is None:
                 raise ValueError("access inbox requires explicit database and operator policy")
             if self.access_inbox_database_file == self.enrollment_database_file:
@@ -86,7 +87,11 @@ class ReadRuntimeConfiguration(BaseModel):
             url = urlsplit(self.web_wallet_url)
             if (
                 self.schema_
-                not in ("devgraph.signed-read-runtime.v3", "devgraph.signed-read-runtime.v4")
+                not in (
+                    "devgraph.signed-read-runtime.v3",
+                    "devgraph.signed-read-runtime.v4",
+                    "devgraph.signed-read-runtime.v5",
+                )
                 or url.scheme != "https"
                 or not url.netloc
                 or url.username
@@ -134,7 +139,11 @@ def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
             private_json(config.member_policy_file)
         )
     policy_type = EnrollmentPolicy
-    if config.schema_ in ("devgraph.signed-read-runtime.v3", "devgraph.signed-read-runtime.v4"):
+    if config.schema_ in (
+        "devgraph.signed-read-runtime.v3",
+        "devgraph.signed-read-runtime.v4",
+        "devgraph.signed-read-runtime.v5",
+    ):
         from devgraph.auth.monitor_read import (
             EnrollmentPolicyV2,
             MemberAccessPolicyV2,
@@ -146,6 +155,23 @@ def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
         extra["members"] = lambda: MemberAccessPolicyV2.model_validate(
             private_json(config.member_policy_file)
         )
+    if config.schema_ == "devgraph.signed-read-runtime.v5":
+        from devgraph.auth.access_provisioning import (
+            ProvisionedMonitorReadEnrollment,
+            ReadGrantProvisioning,
+        )
+        from devgraph.auth.access_requests import AccessRequestInbox
+
+        root = policy_type.model_validate(private_json(config.enrollment_policy_file))
+        inbox = AccessRequestInbox(
+            path=config.access_inbox_database_file,
+            issuer=root.issuer,
+            receiver=root.receiver,
+            membership_check=membership,
+        )
+        provisioning = ReadGrantProvisioning(inbox=inbox, members=extra.pop("members"))
+        factory = ProvisionedMonitorReadEnrollment
+        extra["provisioning"] = provisioning
     return factory(
         **extra,
         path=config.enrollment_database_file,
@@ -172,21 +198,26 @@ def create_app():
     # Same storage implementation/configuration as the production composition
     # root; no database migrations or direct ad-hoc queries are performed here.
     operator = None
-    if config.schema_ == "devgraph.signed-read-runtime.v4":
+    if config.schema_ in ("devgraph.signed-read-runtime.v4", "devgraph.signed-read-runtime.v5"):
         from devgraph.api.access_operator import register_access_operator
         from devgraph.api.access_requests import register_access_request_routes
         from devgraph.auth.access_operator import AccessOperator, OperatorPolicy
         from devgraph.auth.access_requests import AccessRequestInbox
 
         root = enrollment.policy()
-        inbox = AccessRequestInbox(
-            path=config.access_inbox_database_file,
-            issuer=root.issuer,
-            receiver=root.receiver,
-            membership_check=enrollment.membership_check,
+        inbox = (
+            enrollment.provisioning.inbox
+            if config.schema_ == "devgraph.signed-read-runtime.v5"
+            else AccessRequestInbox(
+                path=config.access_inbox_database_file,
+                issuer=root.issuer,
+                receiver=root.receiver,
+                membership_check=enrollment.membership_check,
+            )
         )
         operator = AccessOperator(
             inbox=inbox,
+            provisioning=getattr(enrollment, "provisioning", None),
             policy=lambda: OperatorPolicy.model_validate(
                 private_json(config.access_operator_policy_file)
             ),
