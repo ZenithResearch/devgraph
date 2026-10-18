@@ -257,6 +257,10 @@ class SecSWorkAdapter:
         self.arena_mutations = ArenaMutations(storage)
         self.outbox = EventOutbox(storage)
 
+    def _resource_scope(self, verified):
+        """Explicit receiver-owned restriction hook; native admission remains required."""
+        return None
+
     def execute(
         self, *, request_json: bytes, projection_json: bytes, idempotency_key: str,
         receiver_profile: str | None = None,
@@ -282,6 +286,11 @@ class SecSWorkAdapter:
                 ):
                     raise SecSWorkDenied("named_work_admission_binding_changed")
                 request = verified.request
+                scope = self._resource_scope(verified)
+                scoped_mutation = scope.prepare(self.storage, request) if scope else None
+                summary = (
+                    {**verified.safe_summary, **scope.summary} if scope else verified.safe_summary
+                )
                 subject_kind, subject_id = (
                     ("Issue", request.payload["issue_id"])
                     if request.operation == "convert"
@@ -296,11 +305,21 @@ class SecSWorkAdapter:
                         category="write",
                         operation=request.authority_operation,
                         safe_summary={
-                            **verified.safe_summary,
+                            **summary,
                             "receipt_id": receipt.id,
                             "duplicate": duplicate,
                         },
                     )
+
+                def mutate(_):
+                    work = (
+                        self.arena_mutations.execute(request)
+                        if isinstance(request, ArenaRequest) else
+                        self.mutations.execute(request, actor_id=verified.principal.actor_id)
+                    )
+                    if scoped_mutation is not None:
+                        scoped_mutation.check_after(self.storage)
+                    return work
 
                 work, receipt = self.outbox.record_named_work_v1_with_receipt(
                     principal=verified.principal,
@@ -310,12 +329,8 @@ class SecSWorkAdapter:
                     idempotency_key=idempotency_key,
                     request_digest_sha256=request.digest,
                     idempotency_key_digest_sha256=verified.idempotency_digest,
-                    summary=verified.safe_summary,
-                    mutation=lambda _: (
-                        self.arena_mutations.execute(request)
-                        if isinstance(request, ArenaRequest) else
-                        self.mutations.execute(request, actor_id=verified.principal.actor_id)
-                    ),
+                    summary=summary,
+                    mutation=mutate,
                     on_result=audit_result,
                 )
         return work, receipt, work is None

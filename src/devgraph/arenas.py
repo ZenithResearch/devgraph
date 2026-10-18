@@ -12,11 +12,12 @@ from devgraph.model.repository import (
     WorkObjectVersionConflictError,
 )
 from devgraph.model.validation import validate_page_limit, validate_work_object_id
+from devgraph.progress import TODO_KINDS
 from devgraph.storage.base import GraphStorage, StorageUnavailable, WorkContainment
 from devgraph.storage.containment import validate_arena_page
 from devgraph.workflow_contract import PARENTS
 
-WORK_KINDS = frozenset({"Proposal", "Initiative", "Project", "Issue", "Task"})
+WORK_KINDS = frozenset(TODO_KINDS)
 DIRECT_KINDS = frozenset({"Initiative", "Task"})
 
 PARENT_KINDS = PARENTS

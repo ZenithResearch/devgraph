@@ -100,3 +100,5 @@ a physical phone. Remaining integration includes scoped write activation and
 Arena write enforcement, a hierarchical scope browser, Web/iOS request adapters,
 packaging and installed qualification. Existing granted reads on supported clients
 continue using the unchanged read credential/enrollment contracts.
+
+The next source foundation is the separate [receiver write policy](../../receiver-write-policy/v1/README.md). It adds transactional resource enforcement without extending historical drafts, flattening Arena restrictions into native prefixes, or enabling write activation.

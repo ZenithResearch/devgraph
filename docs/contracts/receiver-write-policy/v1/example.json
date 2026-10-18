@@ -1,0 +1,32 @@
+{
+  "schema": "devgraph.receiver-write-policy.v1",
+  "revision": 1,
+  "stable_issuer": "secs:test-work",
+  "audience": "devgraph://receiver-local",
+  "native_policy_id": "test-policy",
+  "native_policy_version": 1,
+  "native_policy_digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "assignments": [
+    {
+      "actor_id": "pubkey:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "not_before": 1800000000,
+      "not_after": 1800003600,
+      "grants": [
+        {
+          "operation": "devgraph.work.patch.v2",
+          "resources": [
+            {
+              "kind": "Task",
+              "ids": [
+                "example-task"
+              ]
+            }
+          ],
+          "arena_ids": [
+            "demo"
+          ]
+        }
+      ]
+    }
+  ]
+}

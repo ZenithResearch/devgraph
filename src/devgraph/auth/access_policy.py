@@ -188,6 +188,8 @@ def compile_read(draft: AccessDraft) -> EnrollmentPolicy:
 
 
 def compile_write(draft: AccessDraft, *, policy_id: str, policy_version: int) -> dict:
+    if any(getattr(grant, "arena_ids", None) is not None for grant in draft.write_grants):
+        raise ValueError("Arena restrictions require the scoped receiver; cannot flatten")
     if draft.subject_public_key is None:
         raise ValueError("write issuance needs an exact member")
     if draft.installation_id is not None:
