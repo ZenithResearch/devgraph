@@ -93,3 +93,5 @@ backup recovery, or production readiness. See [beta setup](docs/user/beta.md).
 - Why: a lost review response can outlive its page. Restore its exact request identity after status recovery, and reject changed challenge/selection details before further consent or decision.
 
 - Why: an operator-approved request must become usable without manually editing member assignments. Add explicit runtime v5 read-grant activation/revocation, exact replacement consent, atomic decisions/receipts and reuse through the existing secS issuer. Preserve earlier runtime behavior and reject unsupported partial write activation before consent.
+
+- Why: status recovery returns an historical receipt, not a fresh assertion that a grant is still active. Label recovered activations accordingly and exercise lost activation responses without resubmission.
