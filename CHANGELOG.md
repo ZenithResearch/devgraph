@@ -89,3 +89,5 @@ Operational records retain the API/storage name `EventReceipt` and are unsigned;
 they are not cryptographic receipts. External event delivery is not implemented.
 Repository verification does not establish another machine's availability,
 backup recovery, or production readiness. See [beta setup](docs/user/beta.md).
+
+- Why: a lost review response can outlive its page. Restore its exact request identity after status recovery, and reject changed challenge/selection details before further consent or decision.

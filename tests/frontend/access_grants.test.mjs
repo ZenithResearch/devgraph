@@ -35,3 +35,17 @@ test('unsigned operator preparation can restart after reload without inventing a
  const fetchImpl=async(path,o)=>{const body=JSON.parse(o.body);return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,details:{action:body.action}});};
  let c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});await c.prepare({action:'inbox'});c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});assert.equal(c.state,'idle');await c.prepare({action:'inbox'});assert.equal(c.state,'prepared');
 });
+
+
+test('operator challenge cannot change the proposed action before consent',async()=>{
+ const storage=store(),wallet={requestIdentity:identity,approveAccess:()=>{throw Error('must not sign')}};
+ const fetchImpl=async(path,o)=>{const body=JSON.parse(o.body);return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,details:{action:{...body.action,action:'deny',reason:'injected'}}});};
+ const c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});await assert.rejects(c.prepare({action:'inbox'}),/invalid_operator_challenge/);assert.equal(storage.getItem(c.key),null);
+});
+
+test('operator review result must match the exact requested selection and digest',async()=>{
+ const storage=store(),wallet={requestIdentity:identity,approveAccess:async challenge=>({challenge,signature:'x'.repeat(86)})};
+ const selection={read:structuredClone(ceiling)};delete selection.read.write_grants;let action;
+ const fetchImpl=async(path,o)=>{const body=JSON.parse(o.body);if(path.endsWith('challenges')){action=body.action;return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,details:{action}});}return json({schema:'devgraph.access-operator-result.v1',action_id:action.action_id,authority_issued:false,request_id:action.request_id,expected_version:1,request_digest_sha256:action.request_digest_sha256,review_id:action.action_id,selection:{...action.selection,injected:true},selection_digest_sha256:'d'.repeat(64),plans:{read:{}}});};
+ const c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});await c.prepare({action:'review',request_id:'c'.repeat(32),expected_version:1,request_digest_sha256:'d'.repeat(64),selection});await assert.rejects(c.approve(),/operator_outcome_unknown/);assert.equal(c.state,'unknown');assert.ok(storage.getItem(c.key));
+});

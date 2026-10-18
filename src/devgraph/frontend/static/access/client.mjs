@@ -1,5 +1,6 @@
 const plain=v=>!!v&&Object.getPrototypeOf(v)===Object.prototype;
 const id=()=>crypto.randomUUID().replaceAll('-','');
+const stable=v=>v===null||typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?'['+v.map(stable).join(',')+']':'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
 export class AccessOperatorClient{
  constructor({wallet,fetchImpl=fetch,storage=globalThis.sessionStorage,origin=location.origin}={}){
   Object.assign(this,{wallet,fetchImpl,storage,origin,pending:null,state:'idle'});
@@ -17,7 +18,7 @@ export class AccessOperatorClient{
   const identity=this.wallet.requestIdentity;if(!identity)throw Error('wallet_connection_required');
   const request={schema:'devgraph.access-operator-action.v1',action_id:id(),...structuredClone(action)};
   const challenge=await this.post('/devgraph/access-operator/v1/challenges',{...identity,action:request});
-  if(!plain(challenge)||challenge.schema!=='castalia.access-request-challenge.v1'||challenge.receiver!==this.origin||challenge.subject_public_key!==identity.subject_public_key||challenge.installation_id!==identity.installation_id||challenge.details?.action?.action_id!==request.action_id)throw Error('invalid_operator_challenge');
+  if(!plain(challenge)||challenge.schema!=='castalia.access-request-challenge.v1'||challenge.receiver!==this.origin||challenge.subject_public_key!==identity.subject_public_key||challenge.installation_id!==identity.installation_id||stable(challenge.details?.action)!==stable(request))throw Error('invalid_operator_challenge');
   this.pending={schema:'devgraph.operator-pending.v1',origin:this.origin,identity,action:request,dispatched:false};this.challenge=challenge;this.persist();this.state='prepared';return challenge;
  }
  approve(){
@@ -38,7 +39,7 @@ export class AccessOperatorClient{
    result=result.result;
   }
   const action=this.recovering?this.original.action:this.pending.action;
-  const valid=action.action==='inbox'?plain(result.inbox)&&Array.isArray(result.inbox.items)&&Number.isSafeInteger(result.inbox.total)&&result.inbox.total>=result.inbox.items.length&&result.ceiling?.schema==='devgraph.access-draft.v2'&&/^[a-f0-9]{64}$/.test(result.ceiling_digest_sha256):action.action==='review'?result.request_id===action.request_id&&result.review_id===action.action_id&&result.expected_version===action.expected_version&&/^[a-f0-9]{64}$/.test(result.selection_digest_sha256)&&plain(result.selection)&&plain(result.plans):['approve','deny'].includes(action.action)?result.request_id===action.request_id&&result.version===2&&result.status===(action.action==='approve'?'approved_pending_activation':'denied'):false;
+  const valid=action.action==='inbox'?plain(result.inbox)&&Array.isArray(result.inbox.items)&&Number.isSafeInteger(result.inbox.total)&&result.inbox.total>=result.inbox.items.length&&result.ceiling?.schema==='devgraph.access-draft.v2'&&/^[a-f0-9]{64}$/.test(result.ceiling_digest_sha256):action.action==='review'?result.request_id===action.request_id&&result.review_id===action.action_id&&result.expected_version===action.expected_version&&result.request_digest_sha256===action.request_digest_sha256&&/^[a-f0-9]{64}$/.test(result.selection_digest_sha256)&&plain(result.selection)&&stable(result.selection)===stable(action.selection)&&plain(result.plans):['approve','deny'].includes(action.action)?result.request_id===action.request_id&&result.version===2&&result.status===(action.action==='approve'?'approved_pending_activation':'denied'):false;
   if(!valid||result.authority_issued!==false)throw Error('operator_outcome_unknown');
   this.storage.removeItem(this.key);this.pending=null;this.challenge=null;this.recovering=false;this.state='idle';return result;
  }
