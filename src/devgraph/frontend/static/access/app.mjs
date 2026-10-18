@@ -1,0 +1,53 @@
+import{AccessOperatorClient}from'./client.mjs';
+import{makeSelection,selectionSummary}from'./core.mjs';
+const $=id=>document.getElementById(id),status=$('status');
+let client,model,selected,review,busy=false,preparedKind;
+const messages={operator_request_changed:'The request changed since this review. Reload the inbox before deciding.',operator_access_denied:'This Wallet is not a current operator, or the policy changed. Ask the server owner to review operator access.',invalid_operator_selection:'This selection is outside the current policy or no longer matches the request. Review its scope and expiry.',operator_outcome_unknown:'The result is unknown. Keep this page open and check the original result. No decision will be sent again automatically.',wallet_request_upgrade_required:'Update Castalia Wallet to a version supporting access requests. The read-only connection remains available.',arena_scoped_writes_unsupported:'Arena-scoped writes are not supported by the current issuer. Choose read-only Arena access or explicit object IDs for writes.',read_scope_unavailable:'No selected read scope is available under operator policy.',write_scope_unavailable:'Select at least one permitted write operation and resource.',invalid_expiry:'Choose a future expiry within the operator policy.',wallet_connection_required:'Connect your operator Wallet first.',recover_original_action_first:'Check the original action before preparing another.',invalid_resource_selection:'Use explicit IDs such as Project/website or Task/review.',installation_scoped_writes_unsupported:'This policy binds writes to an installation, which the current issuer cannot enforce.'};
+const show=e=>{status.textContent=messages[e?.message]??'Could not finish this step. Check your Wallet, connection and selected scope.';};
+function controls(){
+ $('refresh').disabled=busy||!wallet?.requestIdentity||client?.state==='unknown';
+ $('confirm').hidden=client?.state!=='prepared';$('confirm').disabled=busy;
+ $('recover').hidden=client?.state!=='unknown';$('recover').disabled=busy||!wallet?.requestIdentity;
+ document.querySelectorAll('#review button').forEach(b=>b.disabled=busy||client?.state==='unknown');
+}
+async function run(fn){if(busy)return;busy=true;controls();try{await fn();}catch(e){show(e);}finally{busy=false;controls();}}
+let wallet=null;
+wallet=globalThis.DevgraphWalletAccess.mount(document.querySelector('#wallet-read-connection'),{onChange:()=>{if(wallet?.requestIdentity)$('wallet').open=false;controls();}});
+try{client=new AccessOperatorClient({wallet});if(client.state==='unknown')status.textContent=messages.operator_outcome_unknown;}catch(e){show(e);}
+const elt=(tag,text)=>{const n=document.createElement(tag);n.textContent=text;return n;};
+function renderInbox(result){
+ model=result;selected=null;review=null;$('review').hidden=true;$('count').textContent='('+result.inbox.total+')';$('requests').replaceChildren();
+ if(!result.inbox.items.length)$('requests').append(elt('p','No requests waiting for review.'));
+ for(const item of result.inbox.items){const b=elt('button','Member '+item.subject_public_key.slice(0,12)+'…');b.type='button';b.append(elt('small',' · received '+new Date(item.received_at*1000).toLocaleString()));b.onclick=()=>choose(item,b);$('requests').append(b);}
+ $('more').hidden=!result.inbox.next_cursor;$('more').onclick=()=>void run(()=>prepare({action:'inbox',after_id:result.inbox.next_cursor}));
+ status.textContent='Inbox loaded. Select a request to choose access.';
+}
+function choose(item,button){
+ if(client.state==='unknown')return;selected=item;review=null;$('review').hidden=false;$('grant').hidden=false;$('selection-review').hidden=true;
+ for(const b of $('requests').children)b.setAttribute('aria-pressed',String(b===button));
+ $('member').textContent=item.subject_public_key;$('device').textContent=item.installation_id;$('requested').textContent=item.intent?JSON.stringify(item.intent,null,2):'Access requested; no permissions preselected.';
+ $('mode').value=(model.ceiling.read_grants?.length??0)?'read':'write';
+ $('mode').querySelector('[value=read]').disabled=!model.ceiling.read_grants?.length;$('mode').querySelector('[value=write]').disabled=!model.ceiling.write_grants?.length;$('mode').querySelector('[value=both]').disabled=!model.ceiling.read_grants?.length||!model.ceiling.write_grants?.length;
+ $('scope').value='all';$('objects').value=$('arenas').value='';$('op-list').replaceChildren();
+ for(const operation of [...new Set((model.ceiling.write_grants??[]).map(g=>g.operation))]){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=operation;label.append(input,elt('span',operation.replace('devgraph.work.','').replace('.v2','').replaceAll('.',' ')));$('op-list').append(label);}
+ const expiry=new Date(Math.min(model.ceiling.not_after,Math.floor(Date.now()/1000)+3600)*1000);expiry.setMinutes(expiry.getMinutes()-expiry.getTimezoneOffset());$('expiry').value=expiry.toISOString().slice(0,16);
+ updateScope();$('review').scrollIntoView({behavior:'smooth',block:'start'});$('mode').focus();
+}
+function updateScope(){
+ $('operations').hidden=$('mode').value==='read';$('arena-field').hidden=$('scope').value!=='arena';$('objects-field').hidden=$('scope').value!=='objects';$('future-note').hidden=$('scope').value==='objects';
+}
+$('mode').onchange=$('scope').onchange=()=>{review=null;$('selection-review').hidden=true;updateScope();};
+$('all-ops').onclick=()=>{for(const input of $('op-list').querySelectorAll('input'))input.checked=true;};
+async function prepare(action){await client.prepare(action);preparedKind=action.action;status.textContent=action.action==='inbox'?'Continue in Wallet to authenticate and load the inbox.':action.action==='review'?'Continue in Wallet to review this exact selection.':'Continue in Wallet to confirm this decision.';}
+$('refresh').onclick=()=>void run(()=>prepare({action:'inbox'}));
+$('confirm').onclick=()=>void run(async()=>{const result=await client.approve();if(result.inbox)renderInbox(result);else if(result.review_id){review=result;$('grant').hidden=true;$('selection-review').hidden=false;$('selection-json').textContent=JSON.stringify(result.selection,null,2);$('selection-summary').replaceChildren();for(const group of selectionSummary(result.selection)){const section=document.createElement('section');section.append(elt('h3',group.title),elt('p',group.binding),elt('p','Expires '+new Date(group.expires_at*1000).toLocaleString()));
+const labels={'devgraph.work.create.v2':'Create work','devgraph.work.patch.v2':'Edit content','devgraph.work.progress.set.v2':'Change progress','devgraph.work.workflow.assign.v2':'Assign workflow','devgraph.work.workflow.review.v2':'Record workflow review','devgraph.work.workflow.transition.v2':'Change workflow stage','devgraph.work.archive.v2':'Archive work','devgraph.work.restore.v2':'Restore work','devgraph.work.parent.set.v2':'Change parent','devgraph.work.dependency.add.v2':'Add dependency','devgraph.work.dependency.remove.v2':'Remove dependency','devgraph.work.blocker.add.v2':'Add blocker','devgraph.work.blocker.remove.v2':'Remove blocker','devgraph.work.accept.v2':'Accept proposal','devgraph.work.proposal.reject.v2':'Reject proposal','devgraph.work.convert.v2':'Convert proposal'};
+if(group.title==='Read')for(const scope of group.resources){section.append(elt('p',scope.operations.map(op=>({get:'Read details',list:'List work',relationships:'Read relationships',children:'Read children',blockers:'Read blockers'})[op]??op).join(' · ')),elt('p',Array.isArray(scope.objects)?scope.objects.join(', '):'All '+scope.types.join(', ')+' objects matching policy, including future objects'),elt('p',(Array.isArray(scope.arenas)?'Arenas: '+scope.arenas.join(', '):scope.arenas)+' · '+(scope.archived?'Archived objects included':'Archived objects excluded')));}
+else for(const grant of group.grants){section.append(elt('h4',labels[grant.operation]??grant.operation),elt('p',grant.resources.map(r=>r.ids?r.ids.map(id=>r.kind+'/'+id).join(', '):'All '+r.kind+' objects permitted by policy, including future objects').join('; ')));} $('selection-summary').append(section);}status.textContent='Selection reviewed. Check its scope, then approve or edit.';}else if(result.status==='approved_pending_activation'||result.status==='denied'){status.textContent=result.status==='denied'?'Request declined.':'Selection approved. Issuer activation is still required; no credential has been issued.';$('review').hidden=true;}else throw Error('operator_outcome_unknown');});
+$('recover').onclick=()=>void run(async()=>{await client.prepareRecovery();status.textContent='Continue in Wallet to check the original result only.';});
+$('grant').onsubmit=event=>{event.preventDefault();void run(async()=>{if(!selected)throw Error('invalid_selection');const scope=$('scope').value;if(scope==='arena'&&!$('arenas').value.trim())throw Error('invalid_arena_selection');if(scope==='objects'&&!$('objects').value.trim())throw Error('invalid_resource_selection');const selection=makeSelection({ceiling:model.ceiling,ceilingDigest:model.ceiling_digest_sha256,recipient:selected,mode:$('mode').value,operations:[...$('op-list').querySelectorAll('input:checked')].map(i=>i.value),workIds:scope==='objects'?$('objects').value:[],arenaIds:scope==='arena'?$('arenas').value.split(/[\s,]+/).filter(Boolean):[],expiresAt:Math.floor(new Date($('expiry').value).getTime()/1000),now:Math.floor(Date.now()/1000)});await prepare({action:'review',request_id:selected.request_id,expected_version:selected.version,request_digest_sha256:selected.request_digest_sha256,selection});});};
+$('approve-selection').onclick=()=>void run(()=>prepare({action:'approve',request_id:selected.request_id,expected_version:selected.version,request_digest_sha256:selected.request_digest_sha256,selection:review.selection,review_id:review.review_id}));
+$('edit').onclick=()=>{review=null;$('grant').hidden=false;$('selection-review').hidden=true;};
+$('deny').onclick=()=>void run(()=>prepare({action:'deny',request_id:selected.request_id,expected_version:selected.version,request_digest_sha256:selected.request_digest_sha256,reason:$('reason').value.trim()}));
+globalThis.DevgraphTheme?.bindPickers();
+controls();

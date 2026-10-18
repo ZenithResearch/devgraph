@@ -1,0 +1,514 @@
+"""Independently authorized operator inbox and grant selection, not activation."""
+
+import hashlib
+import json
+import re
+import secrets
+from typing import Literal
+
+from pydantic import Field, model_validator
+
+from devgraph.auth.access_approval import WalletAccessChallenge, verify_wallet_approval
+from devgraph.auth.access_policy import compile_write, require_subset
+from devgraph.auth.access_requests import Closed
+from devgraph.auth.delegated_contract import canonical_json
+from devgraph.auth.errors import UnauthenticatedError
+from devgraph.auth.monitor_read import AccessDraftV2, compile_monitor_read
+from devgraph.auth.native_read import _seconds
+
+
+class OperatorPolicy(Closed):
+    schema_: Literal["devgraph.access-operator-policy.v1"] = Field(alias="schema")
+    revision: int = Field(strict=True, ge=1, le=9007199254740991)
+    operator_public_keys: tuple[str, ...] = Field(default=(), max_length=32)
+    ceiling: AccessDraftV2
+
+    @model_validator(mode="after")
+    def valid(self):
+        if len(set(self.operator_public_keys)) != len(self.operator_public_keys) or any(
+            not re.fullmatch(r"[0-9a-f]{64}", key) for key in self.operator_public_keys
+        ):
+            raise ValueError("invalid operator policy")
+        if len(canonical_json(self.ceiling)) > 65536:
+            raise ValueError("operator ceiling is too large")
+        return self
+
+    @property
+    def digest(self):
+        return hashlib.sha256(canonical_json(self)).hexdigest()
+
+
+class GrantSelection(Closed):
+    read: AccessDraftV2 | None = None
+    write: AccessDraftV2 | None = None
+
+    @model_validator(mode="after")
+    def nonempty(self):
+        if self.read is None and self.write is None:
+            raise ValueError("select at least one permission")
+        return self
+
+
+class OperatorAction(Closed):
+    schema_: Literal["devgraph.access-operator-action.v1"] = Field(alias="schema")
+    action: Literal["inbox", "review", "approve", "deny", "status"]
+    action_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    original_action_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    request_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    expected_version: int | None = Field(default=None, strict=True, ge=1)
+    request_digest_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    selection: GrantSelection | None = None
+    review_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    reason: str | None = Field(default=None, min_length=1, max_length=512)
+    limit: int = Field(default=50, strict=True, ge=1, le=100)
+    after_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+
+    @model_validator(mode="after")
+    def valid(self):
+        if self.action in ("inbox", "status"):
+            if (self.action == "status") != bool(self.original_action_id):
+                raise ValueError("status needs the original action ID")
+            if any(
+                (
+                    self.request_id,
+                    self.expected_version,
+                    self.selection,
+                    self.review_id,
+                    self.reason,
+                    self.request_digest_sha256,
+                )
+            ):
+                raise ValueError("invalid inbox action")
+        else:
+            if (
+                not self.request_id
+                or self.expected_version is None
+                or not self.request_digest_sha256
+            ):
+                raise ValueError("exact request and version required")
+            if self.after_id or self.limit != 50:
+                raise ValueError("pagination belongs to inbox")
+            if self.action in ("review", "approve"):
+                if not self.selection or self.reason:
+                    raise ValueError("selection required")
+                if (self.action == "approve") != bool(self.review_id):
+                    raise ValueError("approval requires a prior exact review")
+            elif self.selection or self.review_id or not self.reason:
+                raise ValueError("denial requires a reason")
+        return self
+
+
+class AccessOperator:
+    def __init__(self, *, inbox, policy, inventory=None):
+        self.inbox, self.policy, self.inventory = inbox, policy, inventory
+        current = policy()
+        if current.ceiling.issuer != inbox.issuer or current.ceiling.receiver != inbox.receiver:
+            raise ValueError("operator policy receiver mismatch")
+        with inbox._database() as db:
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS access_operator_denials (
+                    id TEXT PRIMARY KEY, reason TEXT NOT NULL, created INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS access_operator_head (
+                    id INTEGER PRIMARY KEY CHECK(id=1), revision INTEGER, digest TEXT);
+                CREATE TABLE IF NOT EXISTS access_operator_challenges (
+                    id TEXT PRIMARY KEY, owner TEXT, payload TEXT,
+                    expires INTEGER, used INTEGER DEFAULT 0);
+                CREATE TABLE IF NOT EXISTS access_operator_results (
+                    action_id TEXT PRIMARY KEY, owner TEXT, digest TEXT, result TEXT);
+                CREATE TABLE IF NOT EXISTS access_operator_audit (
+                    action_id TEXT PRIMARY KEY, owner TEXT, operation TEXT,
+                    digest TEXT, created INTEGER);
+                CREATE TABLE IF NOT EXISTS access_decisions (
+                    request_id TEXT PRIMARY KEY, version INTEGER, status TEXT,
+                    action_id TEXT, owner TEXT, selection TEXT, reason TEXT, created INTEGER);
+            """)
+        self._refresh_policy()
+
+    def _refresh_policy(self):
+        policy = self.policy()
+        if (
+            policy.ceiling.issuer != self.inbox.issuer
+            or policy.ceiling.receiver != self.inbox.receiver
+        ):
+            raise UnauthenticatedError("operator_policy_changed")
+        with self.inbox._database() as db:
+            db.execute("BEGIN IMMEDIATE")
+            old = db.execute(
+                "SELECT revision,digest FROM access_operator_head WHERE id=1"
+            ).fetchone()
+            if old and (
+                policy.revision < old[0] or policy.revision == old[0] and policy.digest != old[1]
+            ):
+                raise UnauthenticatedError("operator_policy_rollback")
+            db.execute(
+                "INSERT OR REPLACE INTO access_operator_head VALUES(1,?,?)",
+                (policy.revision, policy.digest),
+            )
+            db.execute("COMMIT")
+        return policy
+
+    def _current(self, db):
+        policy = self.policy()
+        head = db.execute("SELECT revision,digest FROM access_operator_head WHERE id=1").fetchone()
+        if head != (policy.revision, policy.digest):
+            raise UnauthenticatedError("operator_policy_changed")
+        if (
+            policy.ceiling.issuer != self.inbox.issuer
+            or policy.ceiling.receiver != self.inbox.receiver
+        ):
+            raise UnauthenticatedError("operator_policy_changed")
+        return policy
+
+    def record_denial(self, reason):
+        with self.inbox._database() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT count(*) FROM access_operator_denials").fetchone()[0] >= 10000:
+                import sqlite3
+
+                raise sqlite3.OperationalError("operator audit capacity exceeded")
+            db.execute(
+                "INSERT INTO access_operator_denials VALUES(?,?,?)",
+                (secrets.token_hex(16), reason, _seconds(None)),
+            )
+            db.execute("COMMIT")
+
+    def _audited(self, operation, function, *args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except (UnauthenticatedError, ValueError, TypeError) as error:
+            self.record_denial(operation + "_rejected")
+            error._access_operator_audited = True
+            raise
+
+    def challenge(self, owner, device, action: OperatorAction, *, now=None):
+        return self._audited("challenge", self._challenge, owner, device, action, now=now)
+
+    def _challenge(self, owner, device, action: OperatorAction, *, now=None):
+        self._refresh_policy()
+        current = _seconds(now)
+        if (
+            not isinstance(owner, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", owner)
+            or not isinstance(device, str)
+            or not re.fullmatch(r"[0-9a-f]{32}", device)
+        ):
+            raise UnauthenticatedError("operator_required")
+        with self.inbox._database() as db:
+            db.execute("BEGIN IMMEDIATE")
+            policy = self._current(db)
+            if not policy.ceiling.not_before <= current < policy.ceiling.not_after:
+                raise UnauthenticatedError("operator_policy_expired")
+            if owner not in policy.operator_public_keys:
+                raise UnauthenticatedError("operator_required")
+            details = dict(
+                action=action.model_dump(mode="json", by_alias=True, exclude_defaults=True),
+                policy_revision=policy.revision,
+                policy_digest_sha256=policy.digest,
+            )
+            operation = {
+                "inbox": "access.inbox",
+                "review": "access.review",
+                "approve": "access.decide",
+                "deny": "access.decide",
+                "status": "access.status",
+            }[action.action]
+            value = dict(
+                schema="castalia.access-request-challenge.v1",
+                challenge_id=secrets.token_hex(16),
+                nonce=secrets.token_urlsafe(32),
+                issuer=self.inbox.issuer,
+                receiver=self.inbox.receiver,
+                subject_public_key=owner,
+                installation_id=device,
+                issued_at=current,
+                expires_at=current + 120,
+                operation=operation,
+                details=details,
+            )
+            WalletAccessChallenge.model_validate(value)
+            db.execute("DELETE FROM access_operator_challenges WHERE expires<=?", (current,))
+            if db.execute("SELECT count(*) FROM access_operator_challenges").fetchone()[0] >= 256:
+                raise UnauthenticatedError("try_later")
+            # No request metadata/ceiling is returned before holder authentication.
+            db.execute(
+                "INSERT INTO access_operator_challenges VALUES(?,?,?,?,0)",
+                (value["challenge_id"], owner, canonical_json(value).decode(), current + 120),
+            )
+            db.execute("COMMIT")
+        return value
+
+    def _selection(self, selection, record, policy, current):
+        if selection is None:
+            raise UnauthenticatedError("selection_required")
+        plans = {}
+        for kind, draft in (("read", selection.read), ("write", selection.write)):
+            if draft is None:
+                continue
+            require_subset(draft, policy.ceiling)
+            if (
+                draft.previous_digest != policy.ceiling.digest
+                or draft.subject_public_key != record[1]
+                or not draft.not_before <= current < draft.not_after
+            ):
+                raise UnauthenticatedError("selection_binding_mismatch")
+            if kind == "read":
+                if draft.write_grants or draft.installation_id != record[2]:
+                    raise UnauthenticatedError("selection_binding_mismatch")
+                plans[kind] = compile_monitor_read(draft).model_dump(
+                    mode="json", by_alias=True, exclude_defaults=True
+                )
+            else:
+                if draft.read_grants or draft.installation_id is not None:
+                    raise UnauthenticatedError("unsupported_write_binding")
+                plans[kind] = compile_write(
+                    draft, policy_id="selected-work", policy_version=policy.revision
+                )
+        return plans
+
+    def execute(self, challenge, signature, *, now=None):
+        return self._audited("action", self._execute, challenge, signature, now=now)
+
+    def _execute(self, challenge, signature, *, now=None):
+        self._refresh_policy()
+        current = _seconds(now)
+        parsed = verify_wallet_approval(
+            challenge,
+            signature,
+            issuer=self.inbox.issuer,
+            receiver=self.inbox.receiver,
+            current=current,
+        )
+        details = parsed.details
+        if set(details) != {"action", "policy_revision", "policy_digest_sha256"}:
+            raise UnauthenticatedError("invalid_operator_action")
+        action = OperatorAction.model_validate(details["action"])
+        expected = {
+            "inbox": "access.inbox",
+            "review": "access.review",
+            "approve": "access.decide",
+            "deny": "access.decide",
+            "status": "access.status",
+        }[action.action]
+        if parsed.operation != expected:
+            raise UnauthenticatedError("invalid_operator_action")
+        digest = hashlib.sha256(canonical_json(details)).hexdigest()
+        with self.inbox._database() as db:
+            db.execute("BEGIN IMMEDIATE")
+            policy = self._current(db)
+            if not policy.ceiling.not_before <= current < policy.ceiling.not_after:
+                raise UnauthenticatedError("operator_policy_expired")
+            if (
+                parsed.subject_public_key not in policy.operator_public_keys
+                or details["policy_revision"] != policy.revision
+                or details["policy_digest_sha256"] != policy.digest
+            ):
+                raise UnauthenticatedError("operator_policy_changed")
+            row = db.execute(
+                "SELECT payload,used FROM access_operator_challenges WHERE id=?",
+                (parsed.challenge_id,),
+            ).fetchone()
+            if not row or row[0].encode() != canonical_json(challenge):
+                raise UnauthenticatedError("invalid_operator_challenge")
+            old = db.execute(
+                "SELECT owner,digest,result FROM access_operator_results WHERE action_id=?",
+                (action.action_id,),
+            ).fetchone()
+            if old:
+                if old[:2] != (parsed.subject_public_key, digest):
+                    raise UnauthenticatedError("operator_action_conflict")
+                result = json.loads(old[2])
+            else:
+                if (
+                    row[1]
+                    or db.execute("SELECT count(*) FROM access_operator_results").fetchone()[0]
+                    >= 1024
+                ):
+                    raise UnauthenticatedError("try_later")
+                if action.action == "status":
+                    original = db.execute(
+                        "SELECT owner,result FROM access_operator_results WHERE action_id=?",
+                        (action.original_action_id,),
+                    ).fetchone()
+                    if original and original[0] != parsed.subject_public_key:
+                        raise UnauthenticatedError("operator_result_unavailable")
+                    result = dict(
+                        schema="devgraph.access-operator-result.v1",
+                        action_id=action.action_id,
+                        original_action_id=action.original_action_id,
+                        status="reconciled" if original else "unknown",
+                        result=json.loads(original[1]) if original else None,
+                        authority_issued=False,
+                    )
+                elif action.action == "inbox":
+                    predicate = (
+                        "expires>? AND NOT EXISTS (SELECT 1 FROM access_decisions d "
+                        "WHERE d.request_id=access_requests.id)"
+                    )
+                    total = db.execute(
+                        "SELECT count(*) FROM access_requests WHERE " + predicate, (current,)
+                    ).fetchone()[0]
+                    records = db.execute(
+                        "SELECT * FROM access_requests WHERE "
+                        + predicate
+                        + " AND id>? ORDER BY id LIMIT ?",
+                        (current, action.after_id or "", action.limit + 1),
+                    ).fetchall()
+                    items = [
+                        dict(
+                            self.inbox._result(r, current),
+                            subject_public_key=r[1],
+                            installation_id=r[2],
+                            intent=json.loads(r[4]),
+                            version=1,
+                        )
+                        for r in records[: action.limit]
+                    ]
+                    result = dict(
+                        schema="devgraph.access-operator-result.v1",
+                        action_id=action.action_id,
+                        inbox=dict(
+                            total=total,
+                            items=items,
+                            next_cursor=records[action.limit - 1][0]
+                            if len(records) > action.limit
+                            else None,
+                        ),
+                        ceiling_digest_sha256=policy.ceiling.digest,
+                        ceiling=policy.ceiling.model_dump(
+                            mode="json", by_alias=True, exclude_defaults=True
+                        ),
+                        policy_revision=policy.revision,
+                        policy_digest_sha256=policy.digest,
+                        authority_issued=False,
+                    )
+                    if self.inventory is not None:
+                        result["inventory"] = self.inventory(policy.ceiling.read_grants)
+                else:
+                    record = db.execute(
+                        "SELECT * FROM access_requests WHERE id=?", (action.request_id,)
+                    ).fetchone()
+                    decision = db.execute(
+                        "SELECT version FROM access_decisions WHERE request_id=?",
+                        (action.request_id,),
+                    ).fetchone()
+                    if (
+                        not record
+                        or record[6] <= current
+                        or action.expected_version != 1
+                        or decision
+                        or record[3] != action.request_digest_sha256
+                    ):
+                        raise UnauthenticatedError("request_changed")
+                    if action.action in ("review", "approve"):
+                        plans = self._selection(action.selection, record, policy, current)
+                        selection = action.selection.model_dump(
+                            mode="json", by_alias=True, exclude_defaults=True
+                        )
+                        selection_digest = hashlib.sha256(canonical_json(selection)).hexdigest()
+                    else:
+                        selection = None
+                        selection_digest = None
+                        plans = None
+                    if action.action == "review":
+                        result = dict(
+                            schema="devgraph.access-operator-result.v1",
+                            action_id=action.action_id,
+                            request_id=record[0],
+                            request_digest_sha256=record[3],
+                            expected_version=1,
+                            review_id=action.action_id,
+                            selection=selection,
+                            selection_digest_sha256=selection_digest,
+                            plans=plans,
+                            authority_issued=False,
+                        )
+                    else:
+                        if action.action == "approve":
+                            review = db.execute(
+                                "SELECT owner,result FROM access_operator_results "
+                                "WHERE action_id=?",
+                                (action.review_id,),
+                            ).fetchone()
+                            approved = json.loads(review[1]) if review else {}
+                            if (
+                                not review
+                                or review[0] != parsed.subject_public_key
+                                or approved.get("request_id") != record[0]
+                                or approved.get("selection_digest_sha256") != selection_digest
+                                or "review_id" not in approved
+                            ):
+                                raise UnauthenticatedError("exact_review_required")
+                            # Review must belong to this exact policy revision as well.
+                            review_digest = db.execute(
+                                "SELECT digest FROM access_operator_results WHERE action_id=?",
+                                (action.review_id,),
+                            ).fetchone()[0]
+                            reviewed_action = action.model_dump(
+                                mode="json", by_alias=True, exclude_defaults=True
+                            )
+                            reviewed_action.update(action="review", action_id=action.review_id)
+                            reviewed_action.pop("review_id", None)
+                            if (
+                                review_digest
+                                != hashlib.sha256(
+                                    canonical_json(
+                                        dict(
+                                            action=reviewed_action,
+                                            policy_revision=policy.revision,
+                                            policy_digest_sha256=policy.digest,
+                                        )
+                                    )
+                                ).hexdigest()
+                            ):
+                                raise UnauthenticatedError("exact_review_required")
+                        state = (
+                            "approved_pending_activation"
+                            if action.action == "approve"
+                            else "denied"
+                        )
+                        db.execute(
+                            "INSERT INTO access_decisions VALUES(?,2,?,?,?,?,?,?)",
+                            (
+                                record[0],
+                                state,
+                                action.action_id,
+                                parsed.subject_public_key,
+                                canonical_json(selection).decode() if selection else None,
+                                action.reason,
+                                current,
+                            ),
+                        )
+                        result = dict(
+                            schema="devgraph.access-operator-result.v1",
+                            action_id=action.action_id,
+                            request_id=record[0],
+                            version=2,
+                            status=state,
+                            authority_issued=False,
+                        )
+                if action.action == "inbox":
+                    while (
+                        len(canonical_json(result)) > 262144 and len(result["inbox"]["items"]) > 1
+                    ):
+                        result["inbox"]["items"].pop()
+                        result["inbox"]["next_cursor"] = result["inbox"]["items"][-1]["request_id"]
+                if len(canonical_json(result)) > 262144:
+                    raise ValueError("operator result capacity exceeded")
+                db.execute(
+                    "INSERT INTO access_operator_results VALUES(?,?,?,?)",
+                    (
+                        action.action_id,
+                        parsed.subject_public_key,
+                        digest,
+                        canonical_json(result).decode(),
+                    ),
+                )
+                db.execute(
+                    "INSERT INTO access_operator_audit VALUES(?,?,?,?,?)",
+                    (action.action_id, parsed.subject_public_key, action.action, digest, current),
+                )
+            db.execute(
+                "UPDATE access_operator_challenges SET used=1 WHERE id=?", (parsed.challenge_id,)
+            )
+            db.execute("COMMIT")
+        return result

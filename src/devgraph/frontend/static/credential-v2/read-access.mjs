@@ -40,7 +40,7 @@ export class WalletReadClient{
   if(typeof provider?.readAccess!=='function')throw failure('wallet_upgrade_required');
   if(!this.configuration)await this.initialize();current();
   this.setup=await prepareProviderSetup({provider,origin:this.origin,current,requiredCapability:'read_access_v1',transport:{getProviderProfile:async()=>structuredClone(this.configuration.provider_profile)}});current();
-  this.provider=provider;this.stage='profile';this.notify();
+  this.supportsRequests=this.setup.accessRequests===true;this.provider=provider;this.stage='profile';this.notify();
  }
  get connectionDetails(){
   return this.identity?{schema:'devgraph.wallet-connection-details.v1',server_origin:this.origin,subject_public_key:this.identity.subject_public_key,installation_id:this.identity.installation_id}:null;
@@ -79,6 +79,22 @@ export class WalletReadClient{
    this.expiresAt=accepted.expires_at;this.sessionKey=`wallet:${this.generation}:${this.accessId}`;
    this.preferenceSeed=`${this.origin}:${this.identity.subject_public_key}`;this.stage='ready';this.notify();
   }catch(error){this.disconnect();throw error;}
+ }
+ approveAccess(challenge){
+  if(!this.supportsRequests||!this.provider?.readAccess)throw failure('wallet_request_upgrade_required');
+  if(!this.identity||challenge.subject_public_key!==this.identity.subject_public_key||challenge.installation_id!==this.identity.installation_id||challenge.receiver!==this.origin)throw failure('wallet_request_identity_changed');
+  const requiresMembership=challenge.details?.schema==='devgraph.access-request-action.v1';
+  if(requiresMembership&&!this.memberships.length)throw failure('membership_required');
+  if(requiresMembership&&this.memberships.length>1&&!this.profileId)throw failure('membership_selection_required');
+  const generation=this.generation,expected=structuredClone(challenge);
+  const stable=v=>v===null||typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?'['+v.map(stable).join(',')+']':'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
+  const pending=this.provider.readAccess({operation:'request',challenge:expected,...(requiresMembership&&this.profileId?{profileId:this.profileId}:{})});
+  return pending.then(result=>{
+   if(generation!==this.generation)throw failure('wallet_connection_changed');
+   const approval=result?.approval;
+   if(!plain(approval)||stable(approval.challenge)!==stable(expected)||typeof approval.signature!=='string'||!/^[A-Za-z0-9_-]{86}$/.test(approval.signature)||!plain(approval.proof))throw failure('wallet_request_approval_invalid');
+   return approval;
+  });
  }
  async read(path,{signal}={}){
   if(this.stage!=='ready'||!this.accessId)throw failure('wallet_read_access_required',401);

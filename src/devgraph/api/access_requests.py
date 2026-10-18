@@ -12,7 +12,8 @@ from devgraph.auth.errors import UnauthenticatedError
 
 
 def register_access_request_routes(app: FastAPI, inbox: AccessRequestInbox) -> None:
-    async def handle(request: Request, operation: str):
+    app.state.access_requests_enabled = True
+    async def handle(request: Request, operation: str, wallet=False):
         headers = {"Cache-Control": "no-store"}
         try:
             # TLS terminators must use the host's reviewed proxy configuration;
@@ -26,11 +27,16 @@ def register_access_request_routes(app: FastAPI, inbox: AccessRequestInbox) -> N
             if operation == "challenge":
                 body = await _body(request, {"request"})
                 action = RequestAction.model_validate(body["request"])
-                result = await run_in_threadpool(inbox.challenge, action)
+                result = await run_in_threadpool(
+                    inbox.wallet_challenge if wallet else inbox.challenge, action
+                )
             else:
                 body = await _body(request, {"challenge", "proof", "signature"})
                 result = await run_in_threadpool(
-                    inbox.execute, body["challenge"], body["proof"], body["signature"]
+                    inbox.execute_wallet if wallet else inbox.execute,
+                    body["challenge"],
+                    body["proof"],
+                    body["signature"],
                 )
             return JSONResponse(result, headers=headers)
         except UnauthenticatedError:
@@ -55,3 +61,11 @@ def register_access_request_routes(app: FastAPI, inbox: AccessRequestInbox) -> N
     @app.post("/devgraph/access-requests/actions")
     async def action(request: Request):
         return await handle(request, "action")
+
+    @app.post("/devgraph/access-requests/v2/challenges")
+    async def wallet_challenge(request: Request):
+        return await handle(request, "challenge", wallet=True)
+
+    @app.post("/devgraph/access-requests/v2/actions")
+    async def wallet_action(request: Request):
+        return await handle(request, "action", wallet=True)

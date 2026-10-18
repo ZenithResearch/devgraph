@@ -30,6 +30,11 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return HTMLResponse(
             FRONTEND_HTML.replace(
                 '<a href="/monitor/selection">', '<a hidden href="/monitor/selection">'
+            ).replace(
+                "</nav>",
+                '<a href="/monitor/access/">Access requests</a></nav>'
+                if getattr(app.state, "access_operator_enabled", False)
+                else "</nav>",
             ),
             headers={
                 "Cache-Control": "no-store",
@@ -93,6 +98,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             "subject.mjs",
             "wallet-errors.mjs",
             "read-access.mjs",
+            "access-request.mjs",
             "web-wallet.mjs",
         ):
             return Response(status_code=404)
@@ -112,6 +118,9 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return {
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
+            "access_requests_endpoint": "/devgraph/access-requests/v2"
+            if getattr(app.state, "access_requests_enabled", False)
+            else None,
             "web_wallet_url": web_wallet_url,
             "provider_profile": {
                 "schema": "castalia.provider-profile.v1",

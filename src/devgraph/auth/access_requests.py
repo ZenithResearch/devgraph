@@ -259,6 +259,9 @@ class AccessRequestInbox:
             ).verify(raw, signable_access_request(challenge))
         except (ValueError, TypeError, InvalidSignature):
             raise UnauthenticatedError("invalid_request_approval") from None
+        return self._record_authenticated(challenge, parsed, proof, current)
+
+    def _record_authenticated(self, challenge, parsed, proof, current):
         request = parsed.request
         # Hash explicit request JSON, not the fresh nonce: exact request retries
         # reconcile after a lost response, without creating another request.
@@ -394,3 +397,63 @@ class AccessRequestInbox:
                 for row in rows[:limit]
             ],
         )
+
+    def wallet_challenge(self, request: RequestAction, *, now=None):
+        legacy = self.challenge(request, now=now)
+        return dict(
+            schema="castalia.access-request-challenge.v1",
+            challenge_id=legacy["challenge_id"],
+            nonce=legacy["nonce"],
+            issuer=self.issuer,
+            receiver=self.receiver,
+            subject_public_key=request.subject_public_key,
+            installation_id=request.installation_id,
+            operation="access.request" if request.action == "submit" else "access.status",
+            issued_at=legacy["issued_at"],
+            expires_at=legacy["expires_at"],
+            details=legacy["request"],
+        )
+
+    def execute_wallet(self, challenge, proof, signature, *, now=None):
+        from devgraph.auth.access_approval import verify_wallet_approval
+
+        current = _seconds(now)
+        parsed = verify_wallet_approval(
+            challenge, signature, issuer=self.issuer, receiver=self.receiver, current=current
+        )
+        request = RequestAction.model_validate(parsed.details)
+        if (
+            parsed.subject_public_key != request.subject_public_key
+            or parsed.installation_id != request.installation_id
+            or parsed.operation
+            != ("access.request" if request.action == "submit" else "access.status")
+            or not isinstance(proof, dict)
+            or len(canonical_json(proof)) > 16384
+        ):
+            raise UnauthenticatedError("invalid_access_approval")
+        legacy = dict(
+            schema="devgraph.access-request-challenge.v1",
+            challenge_id=parsed.challenge_id,
+            nonce=parsed.nonce,
+            issuer=self.issuer,
+            receiver=self.receiver,
+            issued_at=parsed.issued_at,
+            expires_at=parsed.expires_at,
+            request=parsed.details,
+        )
+        result = self._record_authenticated(
+            legacy, Challenge.model_validate(legacy), proof, current
+        )
+        with self._database() as db:
+            if db.execute("SELECT 1 FROM sqlite_master WHERE name='access_decisions'").fetchone():
+                decision = db.execute(
+                    "SELECT version,status FROM access_decisions WHERE request_id=?",
+                    (request.request_id,),
+                ).fetchone()
+                if decision:
+                    result.update(
+                        schema="devgraph.access-request-result.v2",
+                        version=decision[0],
+                        status=decision[1],
+                    )
+        return result

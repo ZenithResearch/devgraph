@@ -1,0 +1,9 @@
+{
+  "schema": "devgraph.wallet-access-request-source.v1",
+  "repository": "castalia-wallet",
+  "revision": "53a74ee1b6d1d60d86a613a3a0422b4c787057f3",
+  "source_path": "docs/contracts/castalia-access-request-v1.vector.json",
+  "fixture_sha256": "380d68395de83de901c44f8cb2f1c9612521d9f2f2bd7ca26e9bc64a3f8080f0",
+  "custody_core": "castalia-wallet-core/src/access_request.rs",
+  "qualification": "source parity only; public synthetic fixture; no installed or live qualification"
+}

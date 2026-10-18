@@ -21,7 +21,6 @@ def test_configuration_is_private_unique_bounded_and_not_a_symlink(tmp_path: Pat
     with pytest.raises(ValueError):
         private_json(path)
 
-
     path.chmod(0o600)
     link = tmp_path / "link.json"
     link.symlink_to(path)
@@ -47,12 +46,19 @@ def test_member_selection_requires_explicit_runtime_version():
 
     values = {
         "schema": "devgraph.signed-read-runtime.v1",
-        **{field: "/private/fixture/" + field for field in (
-            "enrollment_policy_file", "authority_policy_file", "membership_trust_file",
-            "revoked_memberships_file", "enrollment_database_file", "secs_binary",
-            "issuer_key_file",
-        )},
-        "secs_binary_sha256": "a"*64,
+        **{
+            field: "/private/fixture/" + field
+            for field in (
+                "enrollment_policy_file",
+                "authority_policy_file",
+                "membership_trust_file",
+                "revoked_memberships_file",
+                "enrollment_database_file",
+                "secs_binary",
+                "issuer_key_file",
+            )
+        },
+        "secs_binary_sha256": "a" * 64,
     }
     ReadRuntimeConfiguration.model_validate(values)
     values["member_policy_file"] = "/private/fixture/members.json"
@@ -63,3 +69,43 @@ def test_member_selection_requires_explicit_runtime_version():
     del values["member_policy_file"]
     with pytest.raises(ValueError):
         ReadRuntimeConfiguration.model_validate(values)
+
+
+def test_operator_administration_requires_explicit_v4_and_separate_database():
+    from devgraph.signed_read_runtime import ReadRuntimeConfiguration
+
+    values = {
+        "schema": "devgraph.signed-read-runtime.v3",
+        **{
+            field: "/private/fixture/" + field
+            for field in (
+                "member_policy_file",
+                "enrollment_policy_file",
+                "authority_policy_file",
+                "membership_trust_file",
+                "revoked_memberships_file",
+                "enrollment_database_file",
+                "secs_binary",
+                "issuer_key_file",
+            )
+        },
+        "secs_binary_sha256": "a" * 64,
+    }
+    assert ReadRuntimeConfiguration.model_validate(values).access_operator_policy_file is None
+    for field in ("access_operator_policy_file", "access_inbox_database_file"):
+        with pytest.raises(ValueError):
+            ReadRuntimeConfiguration.model_validate({**values, field: "/private/fixture/" + field})
+        with pytest.raises(ValueError):
+            ReadRuntimeConfiguration.model_validate({**values, field: None})
+    values["schema"] = "devgraph.signed-read-runtime.v4"
+    with pytest.raises(ValueError):
+        ReadRuntimeConfiguration.model_validate(values)
+    values.update(
+        access_operator_policy_file="/private/fixture/operators.json",
+        access_inbox_database_file="/private/fixture/inbox.sqlite",
+    )
+    assert ReadRuntimeConfiguration.model_validate(values).access_inbox_database_file.is_absolute()
+    with pytest.raises(ValueError):
+        ReadRuntimeConfiguration.model_validate(
+            {**values, "access_inbox_database_file": values["enrollment_database_file"]}
+        )

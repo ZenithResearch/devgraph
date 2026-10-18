@@ -36,6 +36,7 @@ export async function prepareProviderSetup({provider,transport,origin,current=()
   // Keep the approved proposal separate from caller-owned display objects.
   const snapshot=structuredClone(profile);
   return Object.freeze({
+    accessRequests:capabilities.includes('access_request_v1'),
     get profile(){return structuredClone(snapshot);},
     approve(){
       current();

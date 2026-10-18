@@ -6,6 +6,7 @@ WALLET_CONNECTION_HTML = r'''      <div class="wallet-connection" id="wallet-rea
 <button type="button" class="button" data-wallet-chrome>Use Chrome Wallet</button>
 <button type="button" data-wallet-web>Unlock or import Wallet</button>
 <button type="button" data-wallet-advance hidden>Continue in Wallet</button>
+<button type="button" data-wallet-request hidden>Request access</button>
 <button type="button" data-wallet-disconnect hidden>Disconnect</button>
 </div>
         <section class="wallet-embedded" data-wallet-embed hidden

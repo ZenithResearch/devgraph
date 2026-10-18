@@ -21,6 +21,7 @@
 
 
 ### Added
+- Add generic Wallet request consent and an independently authorized monitor access inbox with attenuated grant review, versioned decisions and status-only recovery — operators can review exact permissions without confusing selection approval with credential activation.
 - Add an explicitly composed, member-authenticated access-request inbox with durable status recovery and bounded private operator projection — requesting permissions no longer needs to be confused with issuing them; Wallet consent and grant activation remain separate integration steps.
 - Connect the monitor and read-only board through generic Wallet read approval, with Wallet-owned login/recovery and six-kind per-member scoped projections. Explicit runtime v3 and v2 policy opt-in preserve existing grants and signing formats; observations/documents are not silently included.
 - Add issuer-owned member access drafts and opt-in per-member signed reads, so operators can narrow read/write selections without issuing a broad credential or granting new rights through renewal. Existing signing formats remain unchanged; unsupported restrictions fail closed.
