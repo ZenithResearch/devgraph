@@ -64,7 +64,12 @@ operator concern; use the server's actual browser origin in provider approval.
 
 ## Scope and compatibility
 
-The v2 application policy admits all six Todo types. Historical five-kind v1
+The v2 application policy admits all six Todo types. Repeat enrollment decodes
+its persisted ceiling with that same six-kind application contract, including
+`Todo`, before enforcing semantic narrowing. The stored JSON and signing domains
+are unchanged; existing monitor enrollments need no migration or reset. Renewing
+under a wider scope than the stored ceiling still fails, even if the current
+operator ceiling allows it. Historical five-kind v1
 policies, runtime v1/v2, Work request bytes, generic mutation signing and legacy
 native read endpoints remain unchanged. This is a separate application constraint
 version, not a rewrite of the shared credential format. Existing native clients

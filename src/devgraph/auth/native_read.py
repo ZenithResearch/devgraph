@@ -192,6 +192,11 @@ class NativeReadEnrollment:
                 raise
         return value
 
+    def _decode_enrollment_ceiling(self, grants):
+        # Persisted scopes use the contract selected by the enrollment service.
+        # The legacy service keeps its closed five-kind WorkReadGrant decoder.
+        return tuple(WorkReadGrant.model_validate(grant) for grant in grants)
+
     def enroll(
         self, challenge: dict, proof: dict, signature: str, *, now: datetime | None = None
     ) -> dict:
@@ -254,7 +259,7 @@ class NativeReadEnrollment:
                 if enrollment:
                     if enrollment[1]:
                         raise UnauthenticatedError("credential_revoked")
-                    ceiling = [WorkReadGrant.model_validate(v) for v in json.loads(enrollment[0])]
+                    ceiling = self._decode_enrollment_ceiling(json.loads(enrollment[0]))
                     if any(
                         not any(_grant_is_subset(g, allowed) for allowed in ceiling)
                         for g in policy.grants

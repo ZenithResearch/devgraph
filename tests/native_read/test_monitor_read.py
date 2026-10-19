@@ -107,7 +107,10 @@ def test_relationship_authority_does_not_cross_product_with_unrelated_visible_it
         project_monitor_read(storage, grants, "/work/Task/second/relationships/children")
 
 
-def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(tmp_path, monkeypatch):
+@pytest.mark.parametrize("renewals", [0, 2])
+def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(
+    tmp_path, monkeypatch, renewals
+):
     import hashlib
 
     from fastapi.testclient import TestClient
@@ -218,6 +221,26 @@ def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(tmp_path, mo
     )
     assert enrollment.status_code == 200, enrollment.text
     credential = enrollment.json()["credential"]
+    for _ in range(renewals):
+        previous = credential
+        fresh = http.post(
+            base + "/challenges", json={"subject_public_key": public, "installation_id": "a" * 32}
+        ).json()
+        renewed = http.post(
+            base + "/enrollments",
+            json={"challenge": fresh, "proof": membership, "signature": sign(owner, fresh)},
+        )
+        assert renewed.status_code == 200, renewed.text
+        credential = renewed.json()["credential"]
+        assert credential["claims"]["credential_id"] != previous["claims"]["credential_id"]
+        assert credential["claims"]["permissions"] == previous["claims"]["permissions"]
+        assert credential["claims"]["expires_at"] <= assignment.not_after
+        from tests.native_read.test_signed_authority import request
+
+        from devgraph.auth.errors import UnauthenticatedError
+
+        with pytest.raises(UnauthenticatedError):
+            service.verify_request(**request(owner, previous), now=NOW)
     counter = 0
 
     def read(path, operation="devgraph.work.list"):
@@ -253,10 +276,28 @@ def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(tmp_path, mo
     topology = read("/monitor/topology/v1").json()
     assert {n["id"] for n in topology["graph_nodes"]} == {"root", "b-visible", "c-child"}
     assert topology["access_scope"]["observations"] is False
+    # An operator may select a wider assignment under the root policy, but
+    # renewal must still respect this installation's persisted enrollment ceiling.
+    broader = AccessDraftV2.model_validate({**selection, "read_grants": [raw]})
     registry[0] = MemberAccessPolicyV2.model_validate(
         {
             "schema": "devgraph.member-access-policy.v2",
             "revision": 2,
+            "ceiling": root,
+            "assignments": [broader],
+        }
+    )
+    enlarged = http.post(
+        base + "/challenges", json={"subject_public_key": public, "installation_id": "a" * 32}
+    ).json()
+    assert http.post(
+        base + "/enrollments",
+        json={"challenge": enlarged, "proof": membership, "signature": sign(owner, enlarged)},
+    ).status_code == 401
+    registry[0] = MemberAccessPolicyV2.model_validate(
+        {
+            "schema": "devgraph.member-access-policy.v2",
+            "revision": 3,
             "ceiling": root,
             "assignments": [],
         }

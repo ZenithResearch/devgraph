@@ -149,6 +149,9 @@ class MemberMonitorReadEnrollment(MemberReadEnrollment):
     def _result(self, credential, manifest):
         return {**super()._result(credential, manifest), "schema": "devgraph.native-read-result.v3"}
 
+    def _decode_enrollment_ceiling(self, grants):
+        return tuple(MonitorWorkGrant.model_validate(grant) for grant in grants)
+
     def _decode_grants(self, permissions):
         result = {}
         for permission in permissions:
