@@ -15,6 +15,7 @@ from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.errors import UnauthenticatedError
 from devgraph.auth.monitor_read import AccessDraftV2, compile_monitor_read
 from devgraph.auth.native_read import _seconds
+from devgraph.auth.write_provisioning import WriteAccessDraft
 
 
 class OperatorPolicy(Closed):
@@ -38,9 +39,14 @@ class OperatorPolicy(Closed):
         return hashlib.sha256(canonical_json(self)).hexdigest()
 
 
+class OperatorPolicyV2(OperatorPolicy):
+    schema_: Literal["devgraph.access-operator-policy.v2"] = Field(alias="schema")
+    ceiling: WriteAccessDraft
+
+
 class GrantSelection(Closed):
     read: AccessDraftV2 | None = None
-    write: AccessDraftV2 | None = None
+    write: WriteAccessDraft | AccessDraftV2 | None = None
 
     @model_validator(mode="after")
     def nonempty(self):
@@ -50,9 +56,11 @@ class GrantSelection(Closed):
 
 
 class OperatorAction(Closed):
-    schema_: Literal["devgraph.access-operator-action.v1", "devgraph.access-operator-action.v2"] = (
-        Field(alias="schema")
-    )
+    schema_: Literal[
+        "devgraph.access-operator-action.v1",
+        "devgraph.access-operator-action.v2",
+        "devgraph.access-operator-action.v3",
+    ] = Field(alias="schema")
     action: Literal["inbox", "review", "approve", "deny", "status", "revoke"]
     action_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     original_action_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
@@ -70,6 +78,15 @@ class OperatorAction(Closed):
 
     @model_validator(mode="after")
     def valid(self):
+        if (
+            self.selection
+            and self.selection.write is not None
+            and (
+                isinstance(self.selection.write, WriteAccessDraft)
+                != (self.schema_ == "devgraph.access-operator-action.v3")
+            )
+        ):
+            raise ValueError("write draft and action versions must match")
         targets = {"target_public_key", "target_installation_id"} & self.model_fields_set
         if self.action == "revoke":
             if len(targets) != 2 or not self.target_public_key or not self.target_installation_id:
@@ -81,7 +98,10 @@ class OperatorAction(Closed):
             changed or self.action == "revoke"
         ):
             raise ValueError("activation needs the v2 action contract")
-        if self.schema_ == "devgraph.access-operator-action.v2":
+        if self.schema_ in (
+            "devgraph.access-operator-action.v2",
+            "devgraph.access-operator-action.v3",
+        ):
             if (self.action in ("review", "approve", "revoke")) != changed:
                 raise ValueError("an exact previous assignment is required for activation")
             if self.action == "revoke" and not self.previous_assignment_digest:
@@ -120,7 +140,10 @@ class OperatorAction(Closed):
 
     def wire(self):
         value = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)
-        if self.schema_ == "devgraph.access-operator-action.v2" and self.action in (
+        if self.schema_ in (
+            "devgraph.access-operator-action.v2",
+            "devgraph.access-operator-action.v3",
+        ) and self.action in (
             "review",
             "approve",
             "revoke",
@@ -218,16 +241,31 @@ class AccessOperator:
             raise
 
     def _admit_action(self, action):
-        if action.schema_ == "devgraph.access-operator-action.v2" and self.provisioning is None:
+        modern = action.schema_ in (
+            "devgraph.access-operator-action.v2",
+            "devgraph.access-operator-action.v3",
+        )
+        writes = getattr(self.provisioning, "write_enabled", False)
+        if modern and self.provisioning is None:
             raise UnauthenticatedError("activation_unavailable")
+        if action.schema_ == "devgraph.access-operator-action.v3" and not writes:
+            raise UnauthenticatedError("write_activation_unavailable")
         if self.provisioning is not None:
-            if (
-                action.action in ("review", "approve", "revoke")
-                and action.schema_ != "devgraph.access-operator-action.v2"
-            ):
+            if action.action in ("review", "approve", "revoke") and not modern:
                 raise UnauthenticatedError("activation_upgrade_required")
             if action.selection and action.selection.write is not None:
-                raise UnauthenticatedError("write_activation_unavailable")
+                if not writes:
+                    raise UnauthenticatedError("write_activation_unavailable")
+                if action.schema_ != "devgraph.access-operator-action.v3":
+                    raise UnauthenticatedError("write_activation_upgrade_required")
+                if action.selection.read is not None:
+                    raise UnauthenticatedError("mixed_activation_unavailable")
+                self.provisioning.review_write(action.selection.write)
+            elif action.schema_ == "devgraph.access-operator-action.v3" and action.action in (
+                "review",
+                "approve",
+            ):
+                raise UnauthenticatedError("write_activation_upgrade_required")
 
     def challenge(self, owner, device, action: OperatorAction, *, now=None):
         return self._audited("challenge", self._challenge, owner, device, action, now=now)
@@ -235,7 +273,6 @@ class AccessOperator:
     def _challenge(self, owner, device, action: OperatorAction, *, now=None):
         self._refresh_policy()
         current = _seconds(now)
-        self._admit_action(action)
         if (
             not isinstance(owner, str)
             or not re.fullmatch(r"[0-9a-f]{64}", owner)
@@ -250,6 +287,7 @@ class AccessOperator:
                 raise UnauthenticatedError("operator_policy_expired")
             if owner not in policy.operator_public_keys:
                 raise UnauthenticatedError("operator_required")
+            self._admit_action(action)
             details = dict(
                 action=action.wire(),
                 policy_revision=policy.revision,
@@ -311,9 +349,12 @@ class AccessOperator:
             else:
                 if draft.read_grants or draft.installation_id is not None:
                     raise UnauthenticatedError("unsupported_write_binding")
-                plans[kind] = compile_write(
-                    draft, policy_id="selected-work", policy_version=policy.revision
-                )
+                if getattr(self.provisioning, "write_enabled", False):
+                    plans[kind] = self.provisioning.review_write(draft)
+                else:
+                    plans[kind] = compile_write(
+                        draft, policy_id="selected-work", policy_version=policy.revision
+                    )
         return plans
 
     def execute(self, challenge, signature, *, now=None):
@@ -333,7 +374,6 @@ class AccessOperator:
         if set(details) != {"action", "policy_revision", "policy_digest_sha256"}:
             raise UnauthenticatedError("invalid_operator_action")
         action = OperatorAction.model_validate(details["action"])
-        self._admit_action(action)
         expected = {
             "inbox": "access.inbox",
             "review": "access.review",
@@ -356,6 +396,7 @@ class AccessOperator:
                 or details["policy_digest_sha256"] != policy.digest
             ):
                 raise UnauthenticatedError("operator_policy_changed")
+            self._admit_action(action)
             row = db.execute(
                 "SELECT payload,used FROM access_operator_challenges WHERE id=?",
                 (parsed.challenge_id,),
@@ -438,8 +479,14 @@ class AccessOperator:
                         result["activation"] = {
                             "schema": "devgraph.access-activation-capabilities.v1",
                             "read": True,
-                            "write": False,
+                            "write": getattr(self.provisioning, "write_enabled", False),
                         }
+                        if getattr(self.provisioning, "write_enabled", False):
+                            result["activation"].update(
+                                schema="devgraph.access-activation-capabilities.v2",
+                                mixed=False,
+                                write_action_schema="devgraph.access-operator-action.v3",
+                            )
                         result["active_grants"] = self.provisioning.summaries(db, policy, current)
                         for item in result["inbox"]["items"]:
                             existing = self.provisioning.current(
@@ -448,6 +495,13 @@ class AccessOperator:
                             item["previous_assignment_digest"] = (
                                 existing.digest if existing else None
                             )
+                            if getattr(self.provisioning, "write_enabled", False):
+                                previous_write = self.provisioning.write_current(
+                                    db, item["subject_public_key"]
+                                )
+                                item["previous_write_assignment_digest"] = (
+                                    previous_write.digest if previous_write else None
+                                )
                     if self.inventory is not None:
                         result["inventory"] = self.inventory(policy.ceiling.read_grants)
                 elif action.action == "revoke":
@@ -466,11 +520,17 @@ class AccessOperator:
                         or record[1:3] != (action.target_public_key, action.target_installation_id)
                     ):
                         raise UnauthenticatedError("request_changed")
-                    grant = self.provisioning.current(db, *record[1:3])
+                    writing = action.schema_ == "devgraph.access-operator-action.v3"
+                    grant = (
+                        self.provisioning.write_current(db, record[1])
+                        if writing
+                        else self.provisioning.current(db, *record[1:3])
+                    )
                     if grant is None:
                         raise UnauthenticatedError("assignment_changed")
                     require_subset(grant, policy.ceiling)
-                    activation = self.provisioning.revoke(
+                    revoke = self.provisioning.revoke_write if writing else self.provisioning.revoke
+                    activation = revoke(
                         db,
                         record,
                         action.previous_assignment_digest,

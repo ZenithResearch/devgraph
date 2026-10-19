@@ -434,8 +434,12 @@ def test_published_activation_schema_and_actual_wasm_consent_vector():
 
     root = Path(__file__).parents[2] / "docs/contracts/castalia-access-request/v2"
     assert json.loads(
-        (root / "operator-action.schema.json").read_text()
+        (root.parent / "v3/operator-action.schema.json").read_text()
     ) == OperatorAction.model_json_schema(by_alias=True)
+    assert (
+        hashlib.sha256((root / "operator-action.schema.json").read_bytes()).hexdigest()
+        == "654ad367068001d68bff387a01c1b6a00c5878579f055dc220fb2b8667cf8332"
+    )
     vector = json.loads((root / "review-approval-vector.json").read_text())
     challenge = vector["challenge"]
     assert (

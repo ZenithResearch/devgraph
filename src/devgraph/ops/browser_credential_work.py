@@ -85,7 +85,11 @@ class BrowserCredentialWorkHost:
 
         return {
             "schema": "devgraph.credential-transport-capabilities.v2",
-            "operations": [f"devgraph.work.{op}.v1" for op in WORK_OPERATIONS]
+            "operations": (
+                []
+                if hasattr(self.receiver, "preflight")
+                else [f"devgraph.work.{op}.v1" for op in WORK_OPERATIONS]
+            )
             + [f"devgraph.work.{op}.v2" for op in WORK_OPERATIONS_V2]
             + [f"devgraph.arena.{op}.v1" for op in ARENA_OPERATIONS],
         }
@@ -203,6 +207,17 @@ class BrowserCredentialWorkHost:
         return request, key, credential_request_binding(request.canonical, key)
 
     def prepare(self, *, value, origin):
+        if hasattr(self.receiver, "preflight"):
+            self.require_origin(origin)
+            request, _, _ = self._request(value)
+            holder = value.get("holder_public_key")
+            if not isinstance(holder, str) or re.fullmatch(r"[0-9a-f]{64}", holder) is None:
+                raise SecSWorkDenied()
+            with self.receiver.preflight(holder, request):
+                return self._prepare(value=value, origin=origin)
+        return self._prepare(value=value, origin=origin)
+
+    def _prepare(self, *, value, origin):
         self.require_origin(origin)
         if set(value) != {"request", "idempotency_key", "holder_public_key", "caller"}:
             raise SecSWorkDenied()

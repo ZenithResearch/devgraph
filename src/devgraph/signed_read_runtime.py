@@ -23,7 +23,9 @@ from devgraph.ops.retained_audit import RetainedAuditLog
 from devgraph.storage.neo4j import Neo4jConfig, Neo4jGraphStorage
 
 
-def private_json(path: Path) -> dict:
+def private_json(path: Path, *, maximum_bytes=65536) -> dict:
+    if maximum_bytes not in (65536, 262144):
+        raise ValueError("unsupported private configuration bound")
     if not path.is_absolute():
         raise ValueError("absolute owner-private configuration required")
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
@@ -34,11 +36,11 @@ def private_json(path: Path) -> dict:
             or info.st_uid != os.geteuid()
             or info.st_mode & 0o077
             or info.st_nlink != 1
-            or info.st_size > 65536
+            or info.st_size > maximum_bytes
         ):
             raise ValueError("owner-private configuration required")
-        raw = file.read(65537)
-        if len(raw) > 65536:
+        raw = file.read(maximum_bytes + 1)
+        if len(raw) > maximum_bytes:
             raise ValueError("configuration too large")
     value = json.loads(raw, object_pairs_hook=_unique)
     if not isinstance(value, dict):
@@ -54,7 +56,9 @@ class ReadRuntimeConfiguration(BaseModel):
         "devgraph.signed-read-runtime.v3",
         "devgraph.signed-read-runtime.v4",
         "devgraph.signed-read-runtime.v5",
+        "devgraph.signed-read-runtime.v6",
     ] = Field(alias="schema")
+    write_native_policy_file: Path | None = None
     member_policy_file: Path | None = None
     access_inbox_database_file: Path | None = None
     access_operator_policy_file: Path | None = None
@@ -70,11 +74,24 @@ class ReadRuntimeConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def paths(self):
+        if (self.schema_ == "devgraph.signed-read-runtime.v6") != (
+            self.write_native_policy_file is not None
+        ):
+            raise ValueError("native write admission requires explicit runtime v6")
+        if (
+            self.schema_ != "devgraph.signed-read-runtime.v6"
+            and "write_native_policy_file" in self.model_fields_set
+        ):
+            raise ValueError("write admission requires explicit runtime v6")
         if (self.schema_ != "devgraph.signed-read-runtime.v1") != (
             self.member_policy_file is not None
         ):
             raise ValueError("member policy requires explicit runtime v2")
-        if self.schema_ in ("devgraph.signed-read-runtime.v4", "devgraph.signed-read-runtime.v5"):
+        if self.schema_ in (
+            "devgraph.signed-read-runtime.v4",
+            "devgraph.signed-read-runtime.v5",
+            "devgraph.signed-read-runtime.v6",
+        ):
             if self.access_inbox_database_file is None or self.access_operator_policy_file is None:
                 raise ValueError("access inbox requires explicit database and operator policy")
             if self.access_inbox_database_file == self.enrollment_database_file:
@@ -91,6 +108,7 @@ class ReadRuntimeConfiguration(BaseModel):
                     "devgraph.signed-read-runtime.v3",
                     "devgraph.signed-read-runtime.v4",
                     "devgraph.signed-read-runtime.v5",
+                    "devgraph.signed-read-runtime.v6",
                 )
                 or url.scheme != "https"
                 or not url.netloc
@@ -106,7 +124,7 @@ class ReadRuntimeConfiguration(BaseModel):
         return self
 
 
-def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
+def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> SignedReadEnrollment:
     if hashlib.sha256(config.secs_binary.read_bytes()).hexdigest() != config.secs_binary_sha256:
         raise ValueError("secS artifact mismatch")
 
@@ -143,6 +161,7 @@ def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
         "devgraph.signed-read-runtime.v3",
         "devgraph.signed-read-runtime.v4",
         "devgraph.signed-read-runtime.v5",
+        "devgraph.signed-read-runtime.v6",
     ):
         from devgraph.auth.monitor_read import (
             EnrollmentPolicyV2,
@@ -155,7 +174,7 @@ def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
         extra["members"] = lambda: MemberAccessPolicyV2.model_validate(
             private_json(config.member_policy_file)
         )
-    if config.schema_ == "devgraph.signed-read-runtime.v5":
+    if config.schema_ in ("devgraph.signed-read-runtime.v5", "devgraph.signed-read-runtime.v6"):
         from devgraph.auth.access_provisioning import (
             ProvisionedMonitorReadEnrollment,
             ReadGrantProvisioning,
@@ -169,7 +188,37 @@ def load_enrollment(config: ReadRuntimeConfiguration) -> SignedReadEnrollment:
             receiver=root.receiver,
             membership_check=membership,
         )
-        provisioning = ReadGrantProvisioning(inbox=inbox, members=extra.pop("members"))
+        members = extra.pop("members")
+        if config.schema_ == "devgraph.signed-read-runtime.v6":
+            from devgraph.auth.access_operator import OperatorPolicyV2
+            from devgraph.auth.write_provisioning import NativeWritePolicy, WriteGrantProvisioning
+            from devgraph.ops.named_work_v2_receiver import LocalNamedWorkV2Receiver
+
+            if data_root is None:
+                raise ValueError("write admission requires a retained receiver data root")
+
+            def native():
+                policy = NativeWritePolicy.model_validate(
+                    private_json(config.write_native_policy_file, maximum_bytes=262144)
+                )
+                verifier = LocalNamedWorkV2Receiver(
+                    data_root=data_root, storage=None, audit_log=None
+                )._load_verifier()
+                verifier.config.policy_registry.require_binding(
+                    policy.policy_id, policy.policy_version, policy.digest
+                )
+                return policy
+
+            provisioning = WriteGrantProvisioning(
+                inbox=inbox,
+                members=members,
+                native=native,
+                operators=lambda: OperatorPolicyV2.model_validate(
+                    private_json(config.access_operator_policy_file)
+                ),
+            )
+        else:
+            provisioning = ReadGrantProvisioning(inbox=inbox, members=members)
         factory = ProvisionedMonitorReadEnrollment
         extra["provisioning"] = provisioning
     return factory(
@@ -194,20 +243,25 @@ def create_app():
         raise RuntimeError("signed read receiver requires a retained audit data root")
     config = ReadRuntimeConfiguration.model_validate(private_json(Path(path)))
     audit = RetainedAuditLog(Path(data_root))
-    enrollment = load_enrollment(config)
+    enrollment = load_enrollment(config, data_root=Path(data_root))
     # Same storage implementation/configuration as the production composition
     # root; no database migrations or direct ad-hoc queries are performed here.
     operator = None
-    if config.schema_ in ("devgraph.signed-read-runtime.v4", "devgraph.signed-read-runtime.v5"):
+    if config.schema_ in (
+        "devgraph.signed-read-runtime.v4",
+        "devgraph.signed-read-runtime.v5",
+        "devgraph.signed-read-runtime.v6",
+    ):
         from devgraph.api.access_operator import register_access_operator
         from devgraph.api.access_requests import register_access_request_routes
-        from devgraph.auth.access_operator import AccessOperator, OperatorPolicy
+        from devgraph.auth.access_operator import AccessOperator, OperatorPolicy, OperatorPolicyV2
         from devgraph.auth.access_requests import AccessRequestInbox
 
         root = enrollment.policy()
         inbox = (
             enrollment.provisioning.inbox
-            if config.schema_ == "devgraph.signed-read-runtime.v5"
+            if config.schema_
+            in ("devgraph.signed-read-runtime.v5", "devgraph.signed-read-runtime.v6")
             else AccessRequestInbox(
                 path=config.access_inbox_database_file,
                 issuer=root.issuer,
@@ -218,9 +272,11 @@ def create_app():
         operator = AccessOperator(
             inbox=inbox,
             provisioning=getattr(enrollment, "provisioning", None),
-            policy=lambda: OperatorPolicy.model_validate(
-                private_json(config.access_operator_policy_file)
-            ),
+            policy=lambda: (
+                OperatorPolicyV2
+                if config.schema_ == "devgraph.signed-read-runtime.v6"
+                else OperatorPolicy
+            ).model_validate(private_json(config.access_operator_policy_file)),
         )
     storage = Neo4jGraphStorage(Neo4jConfig.from_env())
 
@@ -239,6 +295,36 @@ def create_app():
         web_wallet_url=config.web_wallet_url,
     )
 
+    if config.schema_ == "devgraph.signed-read-runtime.v6":
+        from types import SimpleNamespace
+
+        from devgraph.api.audit import RetainedAuditMiddleware
+        from devgraph.api.credential_work import register_credential_work
+        from devgraph.api.errors import register_error_handlers
+        from devgraph.api.named_work import register_named_work
+        from devgraph.auth.write_provisioning import ProvisionedWriteReceiver
+        from devgraph.ops.browser_credential_work import BrowserCredentialWorkHost
+        from devgraph.ops.named_work_v2_receiver import LocalNamedWorkV2Receiver
+
+        receiver = ProvisionedWriteReceiver(
+            receiver=LocalNamedWorkV2Receiver(
+                data_root=Path(data_root), storage=storage, audit_log=audit
+            ),
+            provisioning=enrollment.provisioning,
+        )
+        services = SimpleNamespace(
+            named_work=None,
+            named_work_v2=receiver,
+            credential_work_host=BrowserCredentialWorkHost(
+                data_root=Path(data_root), receiver=receiver
+            ),
+        )
+        previous_handlers = dict(app.exception_handlers)
+        register_error_handlers(app)
+        app.exception_handlers.update(previous_handlers)
+        app.add_middleware(RetainedAuditMiddleware, audit_log=audit)
+        register_named_work(app, services)
+        register_credential_work(app, services)
     if operator is not None:
         register_access_request_routes(app, inbox)
         register_access_operator(app, operator)

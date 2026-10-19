@@ -1,0 +1,314 @@
+{
+  "$defs": {
+    "MonitorWorkGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "const": "devgraph.work.read",
+          "title": "Scope",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "enum": [
+              "list",
+              "get",
+              "relationships",
+              "children",
+              "blockers"
+            ],
+            "type": "string"
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "relationship_types": {
+          "items": {
+            "enum": [
+              "children",
+              "parent",
+              "dependencies",
+              "dependents",
+              "blockers",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "title": "Relationship Types",
+          "type": "array"
+        },
+        "work_kinds": {
+          "items": {
+            "enum": [
+              "Todo",
+              "Proposal",
+              "Initiative",
+              "Project",
+              "Issue",
+              "Task"
+            ],
+            "type": "string"
+          },
+          "title": "Work Kinds",
+          "type": "array"
+        },
+        "work_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Work Ids",
+          "type": "array"
+        },
+        "arena_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Arena Ids",
+          "type": "array"
+        },
+        "include_archived": {
+          "title": "Include Archived",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scope",
+        "operations",
+        "relationship_types",
+        "work_kinds",
+        "include_archived"
+      ],
+      "title": "MonitorWorkGrant",
+      "type": "object"
+    },
+    "ScopedWriteGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/WriteResource"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Resources",
+          "type": "array"
+        },
+        "arena_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arena Ids"
+        }
+      },
+      "required": [
+        "operation",
+        "resources"
+      ],
+      "title": "ScopedWriteGrant",
+      "type": "object"
+    },
+    "WriteAccessDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "devgraph.access-draft.v3",
+          "title": "Schema",
+          "type": "string"
+        },
+        "issuer": {
+          "title": "Issuer",
+          "type": "string"
+        },
+        "receiver": {
+          "title": "Receiver",
+          "type": "string"
+        },
+        "write_audience": {
+          "const": "devgraph://receiver-local",
+          "title": "Write Audience",
+          "type": "string"
+        },
+        "subject_public_key": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject Public Key"
+        },
+        "installation_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Installation Id"
+        },
+        "not_before": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Not Before",
+          "type": "integer"
+        },
+        "not_after": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Not After",
+          "type": "integer"
+        },
+        "lifetime_seconds": {
+          "maximum": 3600,
+          "minimum": 60,
+          "title": "Lifetime Seconds",
+          "type": "integer"
+        },
+        "read_grants": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MonitorWorkGrant"
+          },
+          "maxItems": 16,
+          "title": "Read Grants",
+          "type": "array"
+        },
+        "write_grants": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ScopedWriteGrant"
+          },
+          "maxItems": 64,
+          "title": "Write Grants",
+          "type": "array"
+        },
+        "previous_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Previous Digest"
+        }
+      },
+      "required": [
+        "schema",
+        "issuer",
+        "receiver",
+        "write_audience",
+        "not_before",
+        "not_after",
+        "lifetime_seconds"
+      ],
+      "title": "WriteAccessDraft",
+      "type": "object"
+    },
+    "WriteResource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "Todo",
+            "Proposal",
+            "Initiative",
+            "Project",
+            "Issue",
+            "Task",
+            "Arena",
+            "Decision",
+            "ReviewPacket",
+            "Handoff",
+            "ExternalLink"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ids"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "WriteResource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "devgraph.access-operator-policy.v2",
+      "title": "Schema",
+      "type": "string"
+    },
+    "revision": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "operator_public_keys": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Operator Public Keys",
+      "type": "array"
+    },
+    "ceiling": {
+      "$ref": "#/$defs/WriteAccessDraft"
+    }
+  },
+  "required": [
+    "schema",
+    "revision",
+    "ceiling"
+  ],
+  "title": "OperatorPolicyV2",
+  "type": "object"
+}

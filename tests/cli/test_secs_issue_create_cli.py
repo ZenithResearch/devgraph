@@ -140,8 +140,7 @@ def test_exact_cli_executes_one_verified_issue_receipt_audit_and_duplicate(
         "operation": "devgraph.issue.create.v1",
         "receipt": {
             "correlation_id": (
-                "dg:sha256:"
-                "d3bfcfc7829aece79f74d643525406e6565a49a3f862e71739aea4fc87d5e337"
+                "dg:sha256:d3bfcfc7829aece79f74d643525406e6565a49a3f862e71739aea4fc87d5e337"
             ),
             "id": first["receipt"]["id"],  # type: ignore[index]
             "status": "pending",
@@ -200,9 +199,7 @@ def test_cli_rejects_unbounded_persisted_correlation_without_copying_it(
 
     assert code == 2
     assert output.out == ""
-    assert json.loads(output.err) == {
-        "error": "exact Issue-create result is malformed"
-    }
+    assert json.loads(output.err) == {"error": "exact Issue-create result is malformed"}
     assert private_correlation not in output.err
     assert "Traceback" not in output.err
     assert _graph_counts(storage) == (1, 1, 1)
@@ -258,9 +255,7 @@ def test_issue_receiver_fails_closed_when_mount_ownership_is_disabled(
         missing_ok: bool,
     ) -> None:
         assert missing_ok is False
-        raise LocalPathIntegrityError(
-            "configured data-root mount has ownership disabled"
-        )
+        raise LocalPathIntegrityError("configured data-root mount has ownership disabled")
 
     monkeypatch.setattr(
         receiver,
@@ -303,6 +298,8 @@ def test_owner_fifo_is_rejected_without_blocking_on_open(tmp_path: Path) -> None
         "from pathlib import Path\n"
         "from devgraph.ops.secs_issue_create_receiver import "
         "LocalSecSIssueCreateError, _read_private_bounded_file\n"
+        "import signal\n"
+        "signal.alarm(2)\n"
         "try:\n"
         "    _read_private_bounded_file(Path(sys.argv[1]), "
         "label='FIFO input', maximum_bytes=4)\n"
@@ -316,7 +313,9 @@ def test_owner_fifo_is_rejected_without_blocking_on_open(tmp_path: Path) -> None
         check=False,
         capture_output=True,
         text=True,
-        timeout=2,
+        # Cold interpreter/import startup is not the FIFO opening operation.
+        # The child arms its unchanged two-second I/O bound after importing.
+        timeout=30,
     )
 
     assert completed.returncode == 0
@@ -434,9 +433,7 @@ def test_invalid_packaged_migration_manifest_is_fixed_safe_cli_json(
 
     assert code == 2
     assert output.out == ""
-    assert json.loads(output.err) == {
-        "error": "canonical migration manifest is invalid"
-    }
+    assert json.loads(output.err) == {"error": "canonical migration manifest is invalid"}
     assert "private package path" not in output.err
     assert "Traceback" not in output.err
     assert _graph_counts(storage) == (0, 0, 0)
@@ -635,9 +632,7 @@ def test_cli_normalizes_expected_receiver_failures_without_copying_details(
 
 
 def test_receiver_has_no_generic_authority_transport_or_database_input_seam() -> None:
-    assert set(
-        inspect.signature(receiver.execute_local_secs_issue_create_v1).parameters
-    ) == {
+    assert set(inspect.signature(receiver.execute_local_secs_issue_create_v1).parameters) == {
         "idempotency_key_file",
         "request_file",
         "signed_projection_file",

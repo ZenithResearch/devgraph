@@ -17,3 +17,7 @@ is separate: see [its fixtures](contracts/devgraph-delegated-read/v1/README.md).
 Provisioning and installed acceptance use a disposable macOS guest with independent
 OS identity. This source change creates no live trust, identity or grant. Earlier
 archive branch/workstation inventories are not deployment instructions.
+
+Standing read activation is documented in [v2](contracts/castalia-access-request/v2/README.md).
+The opt-in source path for persistent scoped write activation and independent
+native admission is [v3](contracts/castalia-access-request/v3/README.md).

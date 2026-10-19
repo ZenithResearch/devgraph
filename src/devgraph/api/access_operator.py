@@ -55,6 +55,9 @@ def register_access_operator(app: FastAPI, operator):
                 )
             if str(error) in (
                 "write_activation_unavailable",
+                "write_activation_upgrade_required",
+                "mixed_activation_unavailable",
+                "native_admission_required",
                 "activation_unavailable",
                 "activation_upgrade_required",
             ):

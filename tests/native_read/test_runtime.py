@@ -142,3 +142,35 @@ def test_read_activation_requires_explicit_runtime_v5():
         ReadRuntimeConfiguration.model_validate(
             {**values, "access_inbox_database_file": values["enrollment_database_file"]}
         )
+
+
+def test_v6_write_admission_requires_explicit_private_native_policy():
+    from devgraph.signed_read_runtime import ReadRuntimeConfiguration
+
+    values = {
+        "schema": "devgraph.signed-read-runtime.v6",
+        "secs_binary_sha256": "a" * 64,
+        **{
+            field: "/private/fixture/" + field
+            for field in (
+                "member_policy_file",
+                "access_operator_policy_file",
+                "access_inbox_database_file",
+                "enrollment_policy_file",
+                "authority_policy_file",
+                "membership_trust_file",
+                "revoked_memberships_file",
+                "enrollment_database_file",
+                "secs_binary",
+                "issuer_key_file",
+            )
+        },
+    }
+    with pytest.raises(ValueError):
+        ReadRuntimeConfiguration.model_validate(values)
+    values["write_native_policy_file"] = "/private/fixture/native-policy.json"
+    assert ReadRuntimeConfiguration.model_validate(values).write_native_policy_file.is_absolute()
+    with pytest.raises(ValueError):
+        ReadRuntimeConfiguration.model_validate(
+            {**values, "schema": "devgraph.signed-read-runtime.v5"}
+        )

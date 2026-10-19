@@ -58,3 +58,16 @@ for(const tamper of [false,true])test('read activation result binds the exact as
  if(tamper){await assert.rejects(c.approve(),/operator_outcome_unknown/);assert.ok(storage.getItem(c.key));}
  else{assert.equal((await c.approve()).status,'active');assert.equal(storage.getItem(c.key),null);}
 });
+
+
+test('v3 writes intersect Arena and object selectors without changing historical drafts',()=>{
+ const root={...structuredClone(ceiling),schema:'devgraph.access-draft.v3'};
+ root.write_grants[0].arena_ids=['a','b'];
+ const selected=makeSelection({ceiling:root,ceilingDigest:'d'.repeat(64),recipient:identity,
+  mode:'write',operations:['devgraph.work.patch.v2'],workIds:['Task/one'],arenaIds:['b','a','a'],expiresAt:500,now:100});
+ assert.equal(selected.write.schema,'devgraph.access-draft.v3');
+ assert.deepEqual(selected.write.write_grants[0].arena_ids,['a','b']);
+ assert.deepEqual(selected.write.write_grants[0].resources,[{kind:'Task',ids:['one']}]);
+ const read=makeSelection({ceiling:root,ceilingDigest:'d'.repeat(64),recipient:identity,mode:'read',expiresAt:500,now:100});
+ assert.equal(read.read.schema,'devgraph.access-draft.v2');
+});

@@ -21,7 +21,8 @@
 
 
 ### Added
-- Add an explicit receiver-owned scoped write adapter with intersected object/Arena grants, transactional checks before and after moves, guarded provenance and status-only receipt recovery. This is a source foundation; write-grant activation and production composition remain disabled.
+- Add opt-in runtime v6 for durable, holder-wide write assignments, pre-consent native admission checks, atomic activation/revocation and guarded generic receiver routes. Arena restrictions intersect object scope, existing read grants are preserved, and v1–v5 behavior/signing domains remain unchanged. Source checks do not activate or qualify an installed service.
+- Add an explicit receiver-owned scoped write adapter with intersected object/Arena grants, transactional checks before and after moves, guarded provenance and status-only receipt recovery. The foundation remains available independently; the separate runtime v6 path adds activation and guarded composition with explicit owner setup.
 - Add generic Wallet request consent and an independently authorized monitor access inbox with attenuated grant review, versioned decisions and status-only recovery — operators can review exact permissions without confusing selection approval with credential activation.
 - Add an explicitly composed, member-authenticated access-request inbox with durable status recovery and bounded private operator projection — requesting permissions no longer needs to be confused with issuing them; Wallet consent and grant activation remain separate integration steps.
 - Connect the monitor and read-only board through generic Wallet read approval, with Wallet-owned login/recovery and six-kind per-member scoped projections. Explicit runtime v3 and v2 policy opt-in preserve existing grants and signing formats; observations/documents are not silently included.

@@ -1,0 +1,8 @@
+{
+  "schema": "devgraph.write-activation-source.v1",
+  "wallet_revision": "53a74ee1b6d1d60d86a613a3a0422b4c787057f3",
+  "wallet_core": "castalia-wallet-core/src/access_request.rs",
+  "native_contract": "secs-devgraph-work-policy.v1; existing credential/projection v2",
+  "fixture": "disposable identities and actual Wallet WASM access-request signatures; fixture-signed native projections for writes",
+  "qualification": "source parity only; no installed native issuer or browser acceptance"
+}

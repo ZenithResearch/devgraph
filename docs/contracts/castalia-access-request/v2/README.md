@@ -102,3 +102,7 @@ packaging and installed qualification. Existing granted reads on supported clien
 continue using the unchanged read credential/enrollment contracts.
 
 The next source foundation is the separate [receiver write policy](../../receiver-write-policy/v1/README.md). It adds transactional resource enforcement without extending historical drafts, flattening Arena restrictions into native prefixes, or enabling write activation.
+
+The subsequent opt-in [v3 write activation path](../v3/README.md) composes this
+foundation with persistent assignments and independently installed native
+admission. The historical v2 contracts and runtime v5 behavior remain unchanged.

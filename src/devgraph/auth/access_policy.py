@@ -157,8 +157,17 @@ def require_subset(child: AccessDraft, parent: AccessDraft) -> None:
     for grant in child.write_grants:
         # Each resource must be covered for this exact operation. We may union
         # resource sets, but never borrow a different operation's resources.
+        arenas = getattr(grant, "arena_ids", None)
         allowed = [
-            r for g in parent.write_grants if g.operation == grant.operation for r in g.resources
+            r
+            for g in parent.write_grants
+            if g.operation == grant.operation
+            and (
+                getattr(g, "arena_ids", None) is None
+                or arenas is not None
+                and set(arenas) <= set(g.arena_ids)
+            )
+            for r in g.resources
         ]
         if any(not any(r.contained_by(p) for p in allowed) for r in grant.resources):
             raise ValueError("write grant amplification")

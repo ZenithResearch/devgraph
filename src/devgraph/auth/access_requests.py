@@ -479,4 +479,10 @@ class AccessRequestInbox:
                                 else "expired"
                             )
                         result.update(status=state, grant_active=state == "active")
+                        if hasattr(self.provisioning, "request_result"):
+                            write_result = self.provisioning.request_result(
+                                db, request.subject_public_key, request.request_id, current
+                            )
+                            if write_result is not None:
+                                result.update(write_result)
         return result
