@@ -71,3 +71,32 @@ test('v3 writes intersect Arena and object selectors without changing historical
  const read=makeSelection({ceiling:root,ceilingDigest:'d'.repeat(64),recipient:identity,mode:'read',expiresAt:500,now:100});
  assert.equal(read.read.schema,'devgraph.access-draft.v2');
 });
+
+test('expired operator approvals stop before Wallet; refresh retains the exact action',async()=>{
+ let now=100,issued=100,walletCalls=0;
+ const storage=store(),actions=[];
+ const wallet={requestIdentity:identity,approveAccess:()=>{walletCalls++;throw Error('test stops at Wallet');}};
+ const fetchImpl=async(path,o)=>{assert.ok(path.endsWith('/challenges'));const body=JSON.parse(o.body);actions.push(body.action);return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,issued_at:issued,expires_at:issued+120,details:{action:body.action}});};
+ const c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl,now:()=>now});
+ await c.prepare({action:'inbox'});const retained=storage.getItem(c.key);
+ now=220;assert.equal(c.approvalExpired,true);assert.throws(()=>c.approve(),/operator_approval_expired/);assert.equal(walletCalls,0);assert.equal(storage.getItem(c.key),retained);
+ issued=now;await c.refreshPrepared();assert.equal(c.approvalExpired,false);assert.deepEqual(actions[1],actions[0]);assert.equal(storage.getItem(c.key),retained);assert.equal(walletCalls,0);
+ assert.throws(()=>c.approve(),/test stops at Wallet/);assert.equal(walletCalls,1);
+});
+test('refresh refuses changed identity or challenge and never replays an unknown decision',async()=>{
+ const storage=store(),wallet={requestIdentity:identity,approveAccess:async challenge=>({challenge,signature:'x'.repeat(86)})};let tamper=false,calls=0;
+ const fetchImpl=async(path,o)=>{calls++;if(!path.endsWith('/challenges'))throw Error('lost');const b=JSON.parse(o.body);return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,expires_at:1000,details:{action:tamper?{...b.action,action:'deny'}:b.action}});};
+ const c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl,now:()=>100});await c.prepare({action:'inbox'});const challenge=c.challenge;
+ wallet.requestIdentity={...identity,subject_public_key:'f'.repeat(64)};await assert.rejects(c.refreshPrepared(),/wallet_connection_required/);assert.equal(calls,1);
+ wallet.requestIdentity=identity;tamper=true;await assert.rejects(c.refreshPrepared(),/invalid_operator_challenge/);assert.equal(c.challenge,challenge);
+ tamper=false;await assert.rejects(c.approve(),/operator_outcome_unknown/);const retained=storage.getItem(c.key),count=calls;
+ await assert.rejects(c.refreshPrepared(),/prepare_operator_action_first/);assert.equal(calls,count);assert.throws(()=>c.cancelPrepared(),/recover_original_action_first/);assert.equal(storage.getItem(c.key),retained);
+});
+test('refreshing status approval preserves the dispatched original across reload',async()=>{
+ const storage=store(),wallet={requestIdentity:identity,approveAccess:async challenge=>({challenge,signature:'x'.repeat(86)})};const actions=[];
+ const fetchImpl=async(path,o)=>{const b=JSON.parse(o.body);if(!path.endsWith('/challenges'))throw Error('lost');actions.push(b.action);return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,expires_at:1000,details:{action:b.action}});};
+ let c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl,now:()=>100});await c.prepare({action:'inbox'});await assert.rejects(c.approve(),/operator_outcome_unknown/);const retained=storage.getItem(c.key);
+ await c.prepareRecovery();await c.refreshPrepared();assert.equal(storage.getItem(c.key),retained);assert.deepEqual(actions[2],actions[1]);assert.equal(actions[2].action,'status');
+ assert.throws(()=>c.cancelPrepared(),/recover_original_action_first/);
+ c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});assert.equal(c.state,'unknown');assert.equal(c.pending.action.action,'inbox');
+});

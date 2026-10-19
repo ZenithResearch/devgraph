@@ -64,3 +64,27 @@ test('disconnect while checking access cannot revive public identity or approval
  client.disconnect();release({ok:true,status:200,json:async()=>({receiver:'https://graph.example',expires_at:1120})});
  await assert.rejects(checking,/wallet_connection_changed/);assert.equal(client.stage,'choose');assert.equal(client.connectionDetails,null);
 });
+
+test('read approval exposes opening, issuance and accepted states without announcing connection early',async()=>{
+ const {client,provider}=fixture();const phases=[];client.onChange=()=>phases.push({stage:client.stage,phase:client.readPhase});
+ await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();
+ let approve;const read=provider.readAccess;
+ provider.readAccess=input=>input.operation==='approve'?new Promise(resolve=>{approve=resolve;}):read(input);
+ const pending=client.advance();assert.equal(client.stage,'approval');assert.equal(client.readPhase,'opening_wallet');assert.equal(client.sessionKey,'');
+ approve({accessId:'access-one',enrollment:{challenge:{},proof:{},signature:'test'}});await pending;
+ assert.ok(phases.some(x=>x.phase==='issuing_credential'&&x.stage!=='ready'));
+ assert.ok(phases.some(x=>x.phase==='accepting_credential'&&x.stage!=='ready'));
+ assert.equal(client.stage,'ready');assert.equal(client.readPhase,'');
+});
+test('Wallet preflight failure clears opening state and sends no enrollment',async()=>{
+ const {client,provider}=fixture();await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();
+ let enrollments=0;const fetchImpl=client.fetchImpl;client.fetchImpl=async(path,o)=>{if(path.endsWith('/enrollments'))enrollments++;return fetchImpl(path,o);};
+ const read=provider.readAccess;provider.readAccess=input=>input.operation==='approve'?Promise.reject(Error('wallet_locked')):read(input);
+ await assert.rejects(client.advance(),/wallet_locked/);assert.equal(client.readPhase,'');assert.equal(client.stage,'approval');assert.equal(client.sessionKey,'');assert.equal(enrollments,0);
+});
+test('read expiry is visible before clicking and refresh never opens Wallet or issues a credential',async()=>{
+ const {client,provider,events}=fixture();let now=1000;client.now=()=>now;
+ const fetchImpl=client.fetchImpl;client.fetchImpl=async(path,o)=>path.endsWith('/challenges')?{ok:true,status:200,json:async()=>({receiver:'https://graph.example',expires_at:now+120})}:fetchImpl(path,o);
+ await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();assert.equal(client.approvalExpired,false);
+ now=1115;assert.equal(client.approvalExpired,true);await client.advance();assert.equal(client.approvalExpired,false);assert.equal(client.notice,'read_scope_refreshed');assert.equal(events.filter(x=>x==='approve').length,0);assert.equal(client.sessionKey,'');
+});

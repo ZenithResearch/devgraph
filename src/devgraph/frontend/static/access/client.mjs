@@ -3,8 +3,8 @@ const id=()=>crypto.randomUUID().replaceAll('-','');
 const sha=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stable(value))))].map(v=>v.toString(16).padStart(2,'0')).join('');
 const stable=v=>v===null||typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?'['+v.map(stable).join(',')+']':'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
 export class AccessOperatorClient{
- constructor({wallet,fetchImpl=fetch,storage=globalThis.sessionStorage,origin=location.origin}={}){
-  Object.assign(this,{wallet,fetchImpl,storage,origin,pending:null,state:'idle'});
+ constructor({wallet,fetchImpl=fetch,storage=globalThis.sessionStorage,origin=location.origin,now=()=>Math.floor(Date.now()/1000)}={}){
+  Object.assign(this,{wallet,fetchImpl,storage,origin,now,pending:null,state:'idle'});
   this.key='devgraph.operator-pending.v1:'+origin;
   const saved=storage?.getItem(this.key);
   if(saved){try{const p=JSON.parse(saved);if(!plain(p)||p.schema!=='devgraph.operator-pending.v1'||p.origin!==origin||!plain(p.action)||!/^[a-f0-9]{32}$/.test(p.action.action_id))throw Error();this.pending=p;this.state=p.dispatched===false?'idle':'unknown';}catch{throw Error('invalid_recovery_record');}}
@@ -14,6 +14,21 @@ export class AccessOperatorClient{
   const result=await response.json();if(!response.ok)throw Object.assign(Error(result.error??'access_request_failed'),{status:response.status});return result;
  }
  persist(){if(!this.storage)throw Error('recovery_storage_required');this.storage.setItem(this.key,JSON.stringify(this.recovering?this.original:this.pending));}
+ get approvalExpired(){return Number.isSafeInteger(this.challenge?.expires_at)&&this.now()>=this.challenge.expires_at;}
+ async refreshPrepared(){
+  // Renew only an unsigned challenge, never the action, selection or recovery target.
+  if(this.state!=='prepared'||!this.pending||this.pending.dispatched)throw Error('prepare_operator_action_first');
+  const identity=this.wallet.requestIdentity;
+  if(!identity||stable(identity)!==stable(this.pending.identity))throw Error('wallet_connection_required');
+  const action=this.pending.action;
+  const challenge=await this.post('/devgraph/access-operator/v1/challenges',{...identity,action});
+  if(!plain(challenge)||challenge.schema!=='castalia.access-request-challenge.v1'||challenge.receiver!==this.origin||challenge.subject_public_key!==identity.subject_public_key||challenge.installation_id!==identity.installation_id||stable(challenge.details?.action)!==stable(action)||!Number.isSafeInteger(challenge.expires_at)||challenge.expires_at<=this.now())throw Error('invalid_operator_challenge');
+  this.challenge=challenge;return challenge;
+ }
+ cancelPrepared(){
+  if(this.state!=='prepared'||this.recovering||!this.pending||this.pending.dispatched)throw Error('recover_original_action_first');
+  this.storage.removeItem(this.key);this.pending=null;this.challenge=null;this.state='idle';
+ }
  async prepare(action){
   if(this.state==='unknown')throw Error('recover_original_action_first');
   const identity=this.wallet.requestIdentity;if(!identity)throw Error('wallet_connection_required');
@@ -24,6 +39,7 @@ export class AccessOperatorClient{
  }
  approve(){
   if(this.state!=='prepared')throw Error('prepare_operator_action_first');
+  if(this.approvalExpired)throw Error('operator_approval_expired');
   const challenge=this.challenge;
   // Start Wallet within the click gesture, before awaiting any network call.
   const consent=this.wallet.approveAccess(challenge);

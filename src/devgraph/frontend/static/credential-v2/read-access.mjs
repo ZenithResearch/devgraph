@@ -19,8 +19,9 @@ export function monitorReadOperation(target){
 /** Application-owned transport. Wallet holds custody and approved read connections. */
 export class WalletReadClient{
  constructor({origin=globalThis.location?.origin,fetchImpl=globalThis.fetch,now=()=>Math.floor(Date.now()/1000),onChange=()=>{}}={}){
-  Object.assign(this,{origin,fetchImpl,now,onChange,stage:'unavailable',provider:null,configuration:null,sessionKey:'',preferenceSeed:'',generation:0,accessId:null,memberships:[],profileId:undefined});
+  Object.assign(this,{origin,fetchImpl,now,onChange,stage:'unavailable',provider:null,configuration:null,sessionKey:'',preferenceSeed:'',generation:0,accessId:null,memberships:[],profileId:undefined,readPhase:''});
  }
+ get approvalExpired(){return this.stage==='approval'&&Number.isSafeInteger(this.challenge?.expires_at)&&this.now()>=this.challenge.expires_at-5;}
  notify(){this.onChange(this);}
  async fetch(path,{body,signal}={}){
   const fetchImpl=this.fetchImpl;const response=await fetchImpl(path,{method:body===undefined?'GET':'POST',body:body===undefined?undefined:JSON.stringify(body),headers:body===undefined?{}:{'Content-Type':'application/json'},credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
@@ -65,19 +66,23 @@ export class WalletReadClient{
   if(this.stage==='access'){await this.checkAccess(current);return;}
   if(this.stage!=='approval')throw failure('wallet_read_access_required');
   if(this.memberships.length>1&&!this.profileId)throw failure('membership_selection_required');
-  if(this.now()>=this.challenge.expires_at-5){await this.checkAccess(current);this.notice='read_scope_refreshed';this.notify();return;}
+  if(this.approvalExpired){await this.checkAccess(current);this.notice='read_scope_refreshed';this.notify();return;}
   // Start the consent RPC immediately in this user gesture, before network waits.
-  const pending=this.provider.readAccess({operation:'approve',challenge:this.challenge,...(this.profileId?{profileId:this.profileId}:{})});
-  const approved=await pending;current();
-  if(!plain(approved)||typeof approved.accessId!=='string'||!plain(approved.enrollment))throw failure('read_approval_invalid');
+  this.readPhase='opening_wallet';this.notify();
+  let approved;
+  try{const pending=this.provider.readAccess({operation:'approve',challenge:this.challenge,...(this.profileId?{profileId:this.profileId}:{})});approved=await pending;current();}
+  catch(error){if(generation===this.generation){this.readPhase='';this.notify();}throw error;}
+  if(!plain(approved)||typeof approved.accessId!=='string'||!plain(approved.enrollment)){this.readPhase='';this.notify();throw failure('read_approval_invalid');}
   this.accessId=approved.accessId;
   try{
+   this.readPhase='issuing_credential';this.notify();
    const result=await this.fetch(BASE+'/enrollments',{body:approved.enrollment});current();
    if(result?.schema!=='devgraph.native-read-result.v3'||!plain(result.credential))throw failure('read_credential_invalid');
+   this.readPhase='accepting_credential';this.notify();
    const accepted=await this.provider.readAccess({operation:'accept',accessId:this.accessId,credential:result.credential});current();
    if(accepted?.accessId!==this.accessId||accepted.receiver!==this.challenge.receiver||!Number.isSafeInteger(accepted.expires_at)||accepted.expires_at<=this.now())throw failure('read_credential_invalid');
    this.expiresAt=accepted.expires_at;this.sessionKey=`wallet:${this.generation}:${this.accessId}`;
-   this.preferenceSeed=`${this.origin}:${this.identity.subject_public_key}`;this.stage='ready';this.notify();
+   this.preferenceSeed=`${this.origin}:${this.identity.subject_public_key}`;this.readPhase='';this.stage='ready';this.notify();
   }catch(error){this.disconnect();throw error;}
  }
  approveAccess(challenge){
@@ -112,7 +117,7 @@ export class WalletReadClient{
  disconnect(){
   const provider=this.provider,accessId=this.accessId;this.provider=null;
   this.generation++;this.accessId=null;this.sessionKey='';this.preferenceSeed='';this.identity=null;this.challenge=null;this.memberships=[];this.notice='';
-  this.stage=this.configuration?'choose':'unavailable';this.notify();
+  this.readPhase='';this.stage=this.configuration?'choose':'unavailable';this.notify();
   if(accessId&&provider?.readAccess)void provider.readAccess({operation:'disconnect',accessId}).catch(()=>{});
   provider?.dispose?.();
  }

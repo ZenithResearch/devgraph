@@ -10,6 +10,8 @@
 ## [Unreleased]
 
 ### Fixed
+- Distinguish read-review refresh, Wallet opening, issuer enrollment and credential acceptance — an expired review no longer looks like a missing Wallet dialog, and preflight failures remain actionable without announcing a connection.
+- Keep operator Wallet confirmation beside the selected permissions, freeze prepared selections, and explicitly refresh expired unsigned challenges without replacing action IDs — operators no longer have to find a second approval button elsewhere on the page or restart a timed-out flow.
 - Detect Chrome Wallet automatically and embed Wallet-owned recovery on a separately trusted origin when selected — removes the redundant chooser without exposing recovery inputs to the monitor or bypassing consent.
 - Keep unassigned Wallets connected while operators configure scoped access, disclose only public member/device setup details, and refresh expired challenges before signing — setup and delayed approvals no longer require restarting the Wallet connection.
 - Preserve unknown mutation outcomes when Wallet locks during status recovery, expose bounded actionable Wallet errors, and canonicalize native temporary paths so macOS aliases do not fail secS secure-path checks. Web SDK preview.3 includes the new runtime module in artifact qualification hashes.
