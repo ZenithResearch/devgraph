@@ -57,6 +57,7 @@ class ReadRuntimeConfiguration(BaseModel):
         "devgraph.signed-read-runtime.v4",
         "devgraph.signed-read-runtime.v5",
         "devgraph.signed-read-runtime.v6",
+        "devgraph.signed-read-runtime.v7",
     ] = Field(alias="schema")
     write_native_policy_file: Path | None = None
     member_policy_file: Path | None = None
@@ -74,12 +75,13 @@ class ReadRuntimeConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def paths(self):
-        if (self.schema_ == "devgraph.signed-read-runtime.v6") != (
-            self.write_native_policy_file is not None
-        ):
+        if (
+            self.schema_ in ("devgraph.signed-read-runtime.v6", "devgraph.signed-read-runtime.v7")
+        ) != (self.write_native_policy_file is not None):
             raise ValueError("native write admission requires explicit runtime v6")
         if (
-            self.schema_ != "devgraph.signed-read-runtime.v6"
+            self.schema_
+            not in ("devgraph.signed-read-runtime.v6", "devgraph.signed-read-runtime.v7")
             and "write_native_policy_file" in self.model_fields_set
         ):
             raise ValueError("write admission requires explicit runtime v6")
@@ -91,6 +93,7 @@ class ReadRuntimeConfiguration(BaseModel):
             "devgraph.signed-read-runtime.v4",
             "devgraph.signed-read-runtime.v5",
             "devgraph.signed-read-runtime.v6",
+            "devgraph.signed-read-runtime.v7",
         ):
             if self.access_inbox_database_file is None or self.access_operator_policy_file is None:
                 raise ValueError("access inbox requires explicit database and operator policy")
@@ -109,6 +112,7 @@ class ReadRuntimeConfiguration(BaseModel):
                     "devgraph.signed-read-runtime.v4",
                     "devgraph.signed-read-runtime.v5",
                     "devgraph.signed-read-runtime.v6",
+                    "devgraph.signed-read-runtime.v7",
                 )
                 or url.scheme != "https"
                 or not url.netloc
@@ -162,6 +166,7 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
         "devgraph.signed-read-runtime.v4",
         "devgraph.signed-read-runtime.v5",
         "devgraph.signed-read-runtime.v6",
+        "devgraph.signed-read-runtime.v7",
     ):
         from devgraph.auth.monitor_read import (
             EnrollmentPolicyV2,
@@ -174,7 +179,19 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
         extra["members"] = lambda: MemberAccessPolicyV2.model_validate(
             private_json(config.member_policy_file)
         )
-    if config.schema_ in ("devgraph.signed-read-runtime.v5", "devgraph.signed-read-runtime.v6"):
+    if config.schema_ == "devgraph.signed-read-runtime.v7":
+        from devgraph.auth.path_access import PathEnrollmentPolicy, PathMemberPolicy
+
+        policy_type = PathEnrollmentPolicy
+        extra["members"] = lambda: PathMemberPolicy.model_validate(
+            private_json(config.member_policy_file)
+        )
+
+    if config.schema_ in (
+        "devgraph.signed-read-runtime.v5",
+        "devgraph.signed-read-runtime.v6",
+        "devgraph.signed-read-runtime.v7",
+    ):
         from devgraph.auth.access_provisioning import (
             ProvisionedMonitorReadEnrollment,
             ReadGrantProvisioning,
@@ -182,14 +199,25 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
         from devgraph.auth.access_requests import AccessRequestInbox
 
         root = policy_type.model_validate(private_json(config.enrollment_policy_file))
-        inbox = AccessRequestInbox(
+        inbox_type = AccessRequestInbox
+        inbox_extra = {}
+        if config.schema_ == "devgraph.signed-read-runtime.v7":
+            from devgraph.auth.access_catalog import CatalogOperatorPolicy
+            from devgraph.auth.path_activation import PathAccessRequestInbox
+
+            inbox_type = PathAccessRequestInbox
+            inbox_extra["catalog_policy"] = lambda: CatalogOperatorPolicy.model_validate(
+                private_json(config.access_operator_policy_file)
+            )
+        inbox = inbox_type(
+            **inbox_extra,
             path=config.access_inbox_database_file,
             issuer=root.issuer,
             receiver=root.receiver,
             membership_check=membership,
         )
         members = extra.pop("members")
-        if config.schema_ == "devgraph.signed-read-runtime.v6":
+        if config.schema_ in ("devgraph.signed-read-runtime.v6", "devgraph.signed-read-runtime.v7"):
             from devgraph.auth.access_operator import OperatorPolicyV2
             from devgraph.auth.write_provisioning import NativeWritePolicy, WriteGrantProvisioning
             from devgraph.ops.named_work_v2_receiver import LocalNamedWorkV2Receiver
@@ -209,17 +237,27 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
                 )
                 return policy
 
-            provisioning = WriteGrantProvisioning(
+            provisioning_type, operator_type = WriteGrantProvisioning, OperatorPolicyV2
+            if config.schema_ == "devgraph.signed-read-runtime.v7":
+                from devgraph.auth.access_catalog import CatalogOperatorPolicy
+                from devgraph.auth.path_activation import PathGrantProvisioning
+
+                provisioning_type, operator_type = PathGrantProvisioning, CatalogOperatorPolicy
+            provisioning = provisioning_type(
                 inbox=inbox,
                 members=members,
                 native=native,
-                operators=lambda: OperatorPolicyV2.model_validate(
+                operators=lambda: operator_type.model_validate(
                     private_json(config.access_operator_policy_file)
                 ),
             )
         else:
             provisioning = ReadGrantProvisioning(inbox=inbox, members=members)
         factory = ProvisionedMonitorReadEnrollment
+        if config.schema_ == "devgraph.signed-read-runtime.v7":
+            from devgraph.auth.path_activation import PathMonitorReadEnrollment
+
+            factory = PathMonitorReadEnrollment
         extra["provisioning"] = provisioning
     return factory(
         **extra,
@@ -251,6 +289,7 @@ def create_app():
         "devgraph.signed-read-runtime.v4",
         "devgraph.signed-read-runtime.v5",
         "devgraph.signed-read-runtime.v6",
+        "devgraph.signed-read-runtime.v7",
     ):
         from devgraph.api.access_operator import register_access_operator
         from devgraph.api.access_requests import register_access_request_routes
@@ -261,7 +300,11 @@ def create_app():
         inbox = (
             enrollment.provisioning.inbox
             if config.schema_
-            in ("devgraph.signed-read-runtime.v5", "devgraph.signed-read-runtime.v6")
+            in (
+                "devgraph.signed-read-runtime.v5",
+                "devgraph.signed-read-runtime.v6",
+                "devgraph.signed-read-runtime.v7",
+            )
             else AccessRequestInbox(
                 path=config.access_inbox_database_file,
                 issuer=root.issuer,
@@ -269,16 +312,30 @@ def create_app():
                 membership_check=enrollment.membership_check,
             )
         )
-        operator = AccessOperator(
-            inbox=inbox,
-            provisioning=getattr(enrollment, "provisioning", None),
-            policy=lambda: (
-                OperatorPolicyV2
-                if config.schema_ == "devgraph.signed-read-runtime.v6"
-                else OperatorPolicy
-            ).model_validate(private_json(config.access_operator_policy_file)),
-        )
+        if config.schema_ != "devgraph.signed-read-runtime.v7":
+            operator = AccessOperator(
+                inbox=inbox,
+                provisioning=getattr(enrollment, "provisioning", None),
+                policy=lambda: (
+                    OperatorPolicyV2
+                    if config.schema_ == "devgraph.signed-read-runtime.v6"
+                    else OperatorPolicy
+                ).model_validate(private_json(config.access_operator_policy_file)),
+            )
     storage = Neo4jGraphStorage(Neo4jConfig.from_env())
+    if config.schema_ == "devgraph.signed-read-runtime.v7":
+        from devgraph.auth.access_catalog import CatalogOperatorPolicy
+        from devgraph.auth.path_activation import PathAccessOperator
+
+        inbox.storage = storage
+        operator = PathAccessOperator(
+            inbox=inbox,
+            provisioning=enrollment.provisioning,
+            storage=storage,
+            policy=lambda: CatalogOperatorPolicy.model_validate(
+                private_json(config.access_operator_policy_file)
+            ),
+        )
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -295,7 +352,7 @@ def create_app():
         web_wallet_url=config.web_wallet_url,
     )
 
-    if config.schema_ == "devgraph.signed-read-runtime.v6":
+    if config.schema_ in ("devgraph.signed-read-runtime.v6", "devgraph.signed-read-runtime.v7"):
         from types import SimpleNamespace
 
         from devgraph.api.audit import RetainedAuditMiddleware

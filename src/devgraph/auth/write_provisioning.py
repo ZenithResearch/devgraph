@@ -106,6 +106,12 @@ class NativeWritePolicy(_Closed):
 
 class WriteGrantProvisioning(ReadGrantProvisioning):
     write_enabled = True
+    receiver_policy_type = ReceiverWritePolicy
+    receiver_policy_schema = "devgraph.receiver-write-policy.v1"
+
+    @staticmethod
+    def decode_write_draft(raw):
+        return WriteAccessDraft.model_validate_json(raw)
 
     def __init__(self, *, operators, native, **kwargs):
         self.operators, self.native = operators, native
@@ -197,9 +203,9 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
         require_subset(grant, operator.ceiling)
         native.require(grant)
 
-    @staticmethod
-    def _decode(owner, raw, checksum):
-        grant = WriteAccessDraft.model_validate_json(raw)
+    @classmethod
+    def _decode(cls, owner, raw, checksum):
+        grant = cls.decode_write_draft(raw)
         if grant.subject_public_key != owner or grant.digest != checksum:
             raise UnauthenticatedError("write_registry_invalid")
         return grant
@@ -332,7 +338,7 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
         if row and row[0] != request_id:
             state = "superseded"
         elif row and row[2]:
-            grant = WriteAccessDraft.model_validate_json(row[1])
+            grant = self.decode_write_draft(row[1])
             state = "active" if grant.not_before <= now < grant.not_after else "expired"
         return dict(
             schema="devgraph.access-request-result.v3", status=state, grant_active=state == "active"
@@ -359,9 +365,9 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
                         grants=grant.write_grants,
                     )
                 )
-            policy = ReceiverWritePolicy.model_validate(
+            policy = self.receiver_policy_type.model_validate(
                 dict(
-                    schema="devgraph.receiver-write-policy.v1",
+                    schema=self.receiver_policy_schema,
                     revision=operator.revision,
                     stable_issuer=stable_issuer,
                     audience=native.audience,

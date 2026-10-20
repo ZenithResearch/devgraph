@@ -254,6 +254,7 @@ class NativeReadEnrollment:
                     raise UnauthenticatedError("challenge_expired")
                 if row[2]:
                     raise UnauthenticatedError("challenge_used")
+                self._prepare_enrollment(db, owner, device, policy)
                 enrollment = db.execute(
                     "SELECT ceiling,revoked FROM enrollments WHERE owner=? AND device=?",
                     (owner, device),
@@ -318,6 +319,9 @@ class NativeReadEnrollment:
                 db.execute("ROLLBACK")
                 raise
         return self._result(credential, manifest)
+
+    def _prepare_enrollment(self, db, owner, device, policy):
+        pass  # Versioned member runtimes may observe a new approved assignment.
 
     def _details(self, policy: EnrollmentPolicy) -> dict:
         return {

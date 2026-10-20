@@ -1,0 +1,319 @@
+{
+  "$defs": {
+    "AccessPreference": {
+      "additionalProperties": false,
+      "properties": {
+        "catalog_digest_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Catalog Digest Sha256",
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9-]{0,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Id"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version"
+        },
+        "resource_paths": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ResourcePath"
+          },
+          "maxItems": 16,
+          "title": "Resource Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "catalog_digest_sha256",
+        "id",
+        "version"
+      ],
+      "title": "AccessPreference",
+      "type": "object"
+    },
+    "MonitorWorkGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "const": "devgraph.work.read",
+          "title": "Scope",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "enum": [
+              "list",
+              "get",
+              "relationships",
+              "children",
+              "blockers"
+            ],
+            "type": "string"
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "relationship_types": {
+          "items": {
+            "enum": [
+              "children",
+              "parent",
+              "dependencies",
+              "dependents",
+              "blockers",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "title": "Relationship Types",
+          "type": "array"
+        },
+        "work_kinds": {
+          "items": {
+            "enum": [
+              "Todo",
+              "Proposal",
+              "Initiative",
+              "Project",
+              "Issue",
+              "Task"
+            ],
+            "type": "string"
+          },
+          "title": "Work Kinds",
+          "type": "array"
+        },
+        "work_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Work Ids",
+          "type": "array"
+        },
+        "arena_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Arena Ids",
+          "type": "array"
+        },
+        "include_archived": {
+          "title": "Include Archived",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scope",
+        "operations",
+        "relationship_types",
+        "work_kinds",
+        "include_archived"
+      ],
+      "title": "MonitorWorkGrant",
+      "type": "object"
+    },
+    "PresetIntent": {
+      "additionalProperties": false,
+      "properties": {
+        "read_grants": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MonitorWorkGrant"
+          },
+          "maxItems": 16,
+          "title": "Read Grants",
+          "type": "array"
+        },
+        "write_grants": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/WriteGrant"
+          },
+          "maxItems": 64,
+          "title": "Write Grants",
+          "type": "array"
+        },
+        "schema": {
+          "const": "devgraph.access-intent.v2",
+          "title": "Schema",
+          "type": "string"
+        },
+        "preference": {
+          "$ref": "#/$defs/AccessPreference"
+        }
+      },
+      "required": [
+        "schema",
+        "preference"
+      ],
+      "title": "PresetIntent",
+      "type": "object"
+    },
+    "ResourcePath": {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "devgraph.resource-path.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Path",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "path"
+      ],
+      "title": "ResourcePath",
+      "type": "object"
+    },
+    "WriteGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/WriteResource"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Resources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "operation",
+        "resources"
+      ],
+      "title": "WriteGrant",
+      "type": "object"
+    },
+    "WriteResource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "Todo",
+            "Proposal",
+            "Initiative",
+            "Project",
+            "Issue",
+            "Task",
+            "Arena",
+            "Decision",
+            "ReviewPacket",
+            "Handoff",
+            "ExternalLink"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ids"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "WriteResource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "devgraph.access-request-action.v2",
+      "title": "Schema",
+      "type": "string"
+    },
+    "action": {
+      "enum": [
+        "submit",
+        "status"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "request_id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "subject_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Subject Public Key",
+      "type": "string"
+    },
+    "installation_id": {
+      "pattern": "^[0-9a-f]{32}$",
+      "title": "Installation Id",
+      "type": "string"
+    },
+    "intent": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PresetIntent"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "action",
+    "request_id",
+    "subject_public_key",
+    "installation_id",
+    "intent"
+  ],
+  "title": "PresetRequestAction",
+  "type": "object"
+}

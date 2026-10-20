@@ -144,11 +144,12 @@ def test_read_activation_requires_explicit_runtime_v5():
         )
 
 
-def test_v6_write_admission_requires_explicit_private_native_policy():
+@pytest.mark.parametrize("version", ["v6", "v7"])
+def test_v6_write_admission_requires_explicit_private_native_policy(version):
     from devgraph.signed_read_runtime import ReadRuntimeConfiguration
 
     values = {
-        "schema": "devgraph.signed-read-runtime.v6",
+        "schema": "devgraph.signed-read-runtime." + version,
         "secs_binary_sha256": "a" * 64,
         **{
             field: "/private/fixture/" + field

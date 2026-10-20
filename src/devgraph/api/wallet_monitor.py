@@ -99,6 +99,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             "wallet-errors.mjs",
             "read-access.mjs",
             "access-request.mjs",
+            "scope-picker.mjs",
             "web-wallet.mjs",
         ):
             return Response(status_code=404)
@@ -118,6 +119,8 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return {
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
+            **({"access_catalog_endpoint": "/devgraph/access-requests/v2/catalog"}
+               if getattr(app.state, "access_catalog_enabled", False) else {}),
             "access_requests_endpoint": "/devgraph/access-requests/v2"
             if getattr(app.state, "access_requests_enabled", False)
             else None,

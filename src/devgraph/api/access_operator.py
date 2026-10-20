@@ -8,7 +8,6 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from devgraph.api.native_read import _body
-from devgraph.auth.access_operator import OperatorAction
 from devgraph.auth.errors import UnauthenticatedError
 from devgraph.frontend.wallet import WALLET_CONNECTION_HTML
 
@@ -33,7 +32,7 @@ def register_access_operator(app: FastAPI, operator):
                     operator.challenge,
                     body["subject_public_key"],
                     body["installation_id"],
-                    OperatorAction.model_validate(body["action"]),
+                    operator.parse_action(body["action"]),
                 )
             else:
                 body = await _body(request, {"challenge", "signature"})

@@ -81,7 +81,7 @@ export class WalletReadClient{
   try{
    this.readPhase='issuing_credential';this.notify();
    const result=await this.fetch(BASE+'/enrollments',{body:approved.enrollment});current();
-   if(result?.schema!=='devgraph.native-read-result.v3'||!plain(result.credential))throw failure('read_credential_invalid');
+   if(!['devgraph.native-read-result.v3','devgraph.native-read-result.v4'].includes(result?.schema)||!plain(result.credential))throw failure('read_credential_invalid');
    this.readPhase='accepting_credential';this.notify();
    const accepted=await this.provider.readAccess({operation:'accept',accessId:this.accessId,credential:result.credential});current();
    if(accepted?.accessId!==this.accessId||accepted.receiver!==this.challenge.receiver||!Number.isSafeInteger(accepted.expires_at)||accepted.expires_at<=this.now())throw failure('read_credential_invalid');
@@ -92,7 +92,7 @@ export class WalletReadClient{
  approveAccess(challenge){
   if(!this.supportsRequests||!this.provider?.readAccess)throw failure('wallet_request_upgrade_required');
   if(!this.identity||challenge.subject_public_key!==this.identity.subject_public_key||challenge.installation_id!==this.identity.installation_id||challenge.receiver!==this.origin)throw failure('wallet_request_identity_changed');
-  const requiresMembership=challenge.details?.schema==='devgraph.access-request-action.v1';
+  const requiresMembership=['devgraph.access-request-action.v1','devgraph.access-request-action.v2'].includes(challenge.details?.schema);
   if(requiresMembership&&!this.memberships.length)throw failure('membership_required');
   if(requiresMembership&&this.memberships.length>1&&!this.profileId)throw failure('membership_selection_required');
   const generation=this.generation,expected=structuredClone(challenge);

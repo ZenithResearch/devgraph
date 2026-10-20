@@ -61,6 +61,39 @@ def paths_subset(child, parent):
     )
 
 
+def intersect_paths(left, right):
+    """Combine two conjunctive path ceilings without dropping an ancestor.
+
+    An empty input is unrestricted by path. If both inputs constrain paths,
+    an empty output means no overlap: callers must deny, not remove the filter.
+    """
+    if not left:
+        return tuple(right)
+    if not right:
+        return tuple(left)
+    result = set()
+    for a in left:
+        for b in right:
+            anchors = dict(resource.split("/", 1) for resource in a.path)
+            if any(
+                kind in anchors and anchors[kind] != identifier
+                for kind, identifier in (resource.split("/", 1) for resource in b.path)
+            ):
+                continue
+            anchors.update(resource.split("/", 1) for resource in b.path)
+            result.add(
+                ResourcePath.model_validate(
+                    dict(
+                        schema="devgraph.resource-path.v1",
+                        path=[
+                            kind + "/" + anchors[kind] for kind in ANCHOR_KINDS if kind in anchors
+                        ],
+                    )
+                )
+            )
+    return tuple(sorted(result, key=lambda item: item.path))
+
+
 def current_resource_path(storage, kind, identifier):
     """Return one unambiguous current ancestry, or None; never guess parentage.
 

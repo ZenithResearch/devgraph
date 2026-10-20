@@ -22,6 +22,13 @@ def digest(value):
 
 
 class ReadGrantProvisioning:
+    registry_type = MemberAccessPolicyV2
+    registry_schema = "devgraph.member-access-policy.v2"
+
+    @staticmethod
+    def decode_draft(raw):
+        return AccessDraftV2.model_validate_json(raw)
+
     def __init__(self, *, inbox, members):
         self.inbox, self.members = inbox, members
         inbox.provisioning = self
@@ -61,7 +68,7 @@ class ReadGrantProvisioning:
                     "SELECT owner,device,assignment FROM access_assignments WHERE active=1"
                 ).fetchall():
                     try:
-                        require_subset(AccessDraftV2.model_validate_json(raw), base.ceiling)
+                        require_subset(self.decode_draft(raw), base.ceiling)
                     except ValueError:
                         db.execute(
                             "UPDATE access_assignments SET active=0 WHERE owner=? AND device=?",
@@ -101,14 +108,14 @@ class ReadGrantProvisioning:
             ):
                 assignments.pop((owner, device), None)
                 if active:
-                    grant = AccessDraftV2.model_validate_json(raw)
+                    grant = self.decode_draft(raw)
                     require_subset(grant, base.ceiling)
                     assignments[owner, device] = grant
             if len(assignments) > 128:
                 raise UnauthenticatedError("provisioning_capacity")
-            return MemberAccessPolicyV2.model_validate(
+            return self.registry_type.model_validate(
                 dict(
-                    schema="devgraph.member-access-policy.v2",
+                    schema=self.registry_schema,
                     revision=revision,
                     ceiling=base.ceiling,
                     assignments=list(assignments.values()),
@@ -122,7 +129,7 @@ class ReadGrantProvisioning:
             (owner, device),
         ).fetchone()
         if row:
-            return AccessDraftV2.model_validate_json(row[0]) if row[1] else None
+            return self.decode_draft(row[0]) if row[1] else None
         return next(
             (
                 g
@@ -205,7 +212,7 @@ class ReadGrantProvisioning:
             "WHERE active=1 ORDER BY request_id"
         ).fetchall()
         for owner, device, request_id, raw, checksum in rows:
-            grant = AccessDraftV2.model_validate_json(raw)
+            grant = self.decode_draft(raw)
             try:
                 require_subset(grant, policy.ceiling)
             except ValueError:

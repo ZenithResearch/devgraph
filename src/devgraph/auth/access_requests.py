@@ -83,6 +83,29 @@ def signable_access_request(challenge: dict) -> bytes:
 
 
 class AccessRequestInbox:
+    challenge_type = Challenge
+
+    @staticmethod
+    def parse_request(value):
+        return RequestAction.model_validate(value)
+
+    @staticmethod
+    def challenge_schema(request):
+        return "devgraph.access-request-challenge.v1"
+
+    @staticmethod
+    def decode_assignment(raw):
+        return AccessDraftV2.model_validate_json(raw)
+
+    def validate_intent(self, intent, current):
+        if intent:
+            AccessDraftV2.model_validate(dict(
+                schema="devgraph.access-draft.v2", issuer=self.issuer, receiver=self.receiver,
+                write_audience="devgraph://receiver-local", not_before=current,
+                not_after=current + 604800, lifetime_seconds=60,
+                read_grants=intent.read_grants, write_grants=intent.write_grants,
+            ))
+
     def __init__(
         self,
         *,
@@ -180,24 +203,9 @@ class AccessRequestInbox:
         current = _seconds(now)
         if not isinstance(request, RequestAction):
             raise UnauthenticatedError("invalid_request")
-        if request.intent:
-            # Validate the selection vocabulary and selectors, not eligibility to
-            # receive it. Unspecified access remains None, never a global grant.
-            AccessDraftV2.model_validate(
-                dict(
-                    schema="devgraph.access-draft.v2",
-                    issuer=self.issuer,
-                    receiver=self.receiver,
-                    write_audience="devgraph://receiver-local",
-                    not_before=current,
-                    not_after=current + 604800,
-                    lifetime_seconds=60,
-                    read_grants=request.intent.read_grants,
-                    write_grants=request.intent.write_grants,
-                )
-            )
+        self.validate_intent(request.intent, current)
         value = dict(
-            schema="devgraph.access-request-challenge.v1",
+            schema=self.challenge_schema(request),
             challenge_id=secrets.token_hex(16),
             nonce=secrets.token_urlsafe(32),
             issuer=self.issuer,
@@ -238,7 +246,7 @@ class AccessRequestInbox:
     ) -> dict:
         current = _seconds(now)
         try:
-            parsed = Challenge.model_validate(challenge)
+            parsed = self.challenge_type.model_validate(challenge)
             if (
                 len(canonical_json(challenge)) > 16384
                 or not isinstance(proof, dict)
@@ -297,6 +305,7 @@ class AccessRequestInbox:
                 if record and record[3] != digest:
                     raise UnauthenticatedError("request_conflict")
                 if not record:
+                    self.validate_intent(request.intent, current)
                     if row[1]:
                         raise UnauthenticatedError("challenge_used")
                     if (
@@ -421,7 +430,7 @@ class AccessRequestInbox:
         parsed = verify_wallet_approval(
             challenge, signature, issuer=self.issuer, receiver=self.receiver, current=current
         )
-        request = RequestAction.model_validate(parsed.details)
+        request = self.parse_request(parsed.details)
         if (
             parsed.subject_public_key != request.subject_public_key
             or parsed.installation_id != request.installation_id
@@ -432,7 +441,7 @@ class AccessRequestInbox:
         ):
             raise UnauthenticatedError("invalid_access_approval")
         legacy = dict(
-            schema="devgraph.access-request-challenge.v1",
+            schema=self.challenge_schema(request),
             challenge_id=parsed.challenge_id,
             nonce=parsed.nonce,
             issuer=self.issuer,
@@ -442,7 +451,7 @@ class AccessRequestInbox:
             request=parsed.details,
         )
         result = self._record_authenticated(
-            legacy, Challenge.model_validate(legacy), proof, current
+            legacy, self.challenge_type.model_validate(legacy), proof, current
         )
         if getattr(self, "provisioning", None) is not None:
             self.provisioning.refresh()
@@ -472,7 +481,7 @@ class AccessRequestInbox:
                         if assignment and assignment[0] != request.request_id:
                             state = "superseded"
                         elif assignment and assignment[2] and decision[1] == "active":
-                            grant = AccessDraftV2.model_validate_json(assignment[1])
+                            grant = self.decode_assignment(assignment[1])
                             state = (
                                 "active"
                                 if grant.not_before <= current < grant.not_after
