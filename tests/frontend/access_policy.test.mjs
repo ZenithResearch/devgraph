@@ -1,5 +1,5 @@
 import{test}from'node:test';import assert from'node:assert/strict';
-import{makeSelection}from'../../src/devgraph/frontend/static/access/core.mjs';
+import{makeSelection,grantExpiry}from'../../src/devgraph/frontend/static/access/core.mjs';
 import{policyView}from'../../src/devgraph/frontend/static/access/policy.mjs';
 const recipient={subject_public_key:'a'.repeat(64),installation_id:'b'.repeat(32)};
 const ceiling={schema:'devgraph.access-draft.v3',issuer:'issuer',receiver:'https://graph.example',not_before:1,not_after:1000,lifetime_seconds:300,read_grants:[{scope:'devgraph.work.read',operations:['list','get'],relationship_types:['parent'],work_kinds:['Todo','Task'],work_ids:['Todo/one','Task/two'],arena_ids:['research'],include_archived:false},{scope:'devgraph.work.read',operations:['get'],relationship_types:[],work_kinds:['Project'],arena_ids:['operations'],include_archived:true}],write_grants:[{operation:'devgraph.work.patch.v2',resources:[{kind:'Task',ids:['two']},{kind:'Project'}]},{operation:'devgraph.work.progress.set.v2',resources:[{kind:'Todo',ids:['one']},{kind:'ReviewPacket',ids:['evidence']}]}]};
@@ -33,4 +33,20 @@ test('policy display preserves independent rules and makes unsupported activatio
 test('checkbox display order cannot alter the server canonical grant order',()=>{
  const read=selection({readOperations:['get','list'],workKinds:['Task','Todo']}).read;
  assert.deepEqual(read.read_grants[0].operations,['list','get']);assert.deepEqual(read.read_grants[0].work_kinds,['Todo','Task']);
+});
+
+test('grant expiry requires a choice and supports long-lived standing grants independently of credential lifetime',()=>{
+ const now=1800000000,policyExpiresAt=now+365*86400;
+ assert.throws(()=>grantExpiry({choice:'',policyExpiresAt,now}),/invalid_expiry/);
+ const expiresAt=grantExpiry({choice:'policy',policyExpiresAt,now});
+ const result=selection({ceiling:{...ceiling,not_before:now-1,not_after:policyExpiresAt},expiresAt,now}).read;
+ assert.equal(result.not_after,policyExpiresAt);assert.equal(result.lifetime_seconds,300);
+ assert.equal(grantExpiry({choice:'custom',policyExpiresAt,customExpiresAt:now+30*86400,now}),now+30*86400);
+});
+test('custom expiry cannot exceed policy, be absent or reuse an expired deadline',()=>{
+ const now=100,policyExpiresAt=1000;
+ for(const customExpiresAt of [undefined,null,NaN,Infinity,100,99,1001,100.5])assert.throws(()=>grantExpiry({choice:'custom',policyExpiresAt,customExpiresAt,now}),/invalid_expiry/);
+ assert.throws(()=>grantExpiry({choice:'forever',policyExpiresAt,now}),/invalid_expiry/);
+ assert.throws(()=>grantExpiry({choice:'policy',policyExpiresAt:now,now}),/invalid_expiry/);
+ assert.equal(grantExpiry({choice:'custom',policyExpiresAt,customExpiresAt:policyExpiresAt,now}),policyExpiresAt);
 });

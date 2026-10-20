@@ -11,6 +11,12 @@ export function narrowPaths(parent,selected){
  for(const a of parent)for(const b of selected){const map=new Map(a.path.map(x=>x.split('/')));if(b.path.some(x=>{const[k,id]=x.split('/');return map.has(k)&&map.get(k)!==id;}))continue;for(const x of b.path){const[k,id]=x.split('/');map.set(k,id);}const path=ranks.filter(k=>map.has(k)).map(k=>k+'/'+map.get(k));const p={schema:'devgraph.resource-path.v1',path};if(!result.some(r=>JSON.stringify(r)===JSON.stringify(p)))result.push(p);}
  return result.sort((a,b)=>JSON.stringify(a.path).localeCompare(JSON.stringify(b.path)));
 }
+/** Grant validity is chosen explicitly and never inherits the credential timer. */
+export function grantExpiry({choice,policyExpiresAt,customExpiresAt,now}){
+ const expiresAt=choice==='policy'?policyExpiresAt:choice==='custom'?customExpiresAt:null;
+ if(!Number.isSafeInteger(now)||!Number.isSafeInteger(policyExpiresAt)||!Number.isSafeInteger(expiresAt)||expiresAt<=now||expiresAt>policyExpiresAt)throw Error('invalid_expiry');
+ return expiresAt;
+}
 export function makeSelection({ceiling,ceilingDigest,recipient,mode='read',operations=[],workIds=[],arenaIds=[],workKinds=null,readOperations=null,resourcePaths=[],preset=null,expiresAt,now}){
  if(!['read','write','both'].includes(mode)||!Number.isSafeInteger(expiresAt)||expiresAt<=now||expiresAt>ceiling.not_after)throw Error('invalid_expiry');
  workIds=resourceIds(workIds);

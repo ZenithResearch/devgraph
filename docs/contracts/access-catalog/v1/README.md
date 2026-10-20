@@ -30,7 +30,11 @@ configuration or a deployable grant.
 2. Wallet signs `devgraph.access-request-action.v2`, containing an
    `access-intent.v2` preference. A request grants nothing and creates no group.
 3. The operator authenticates to the inbox, chooses the preset and paths, and can
-   narrow operations, kinds, explicit objects, Arena filters and expiry in Advanced.
+   narrow operations, kinds, explicit objects and Arena filters in Advanced. Grant
+   expiry is a separate required choice: the exact owner-policy deadline or an
+   earlier date. There is no implicit one-hour standing-grant limit. Issued read
+   credentials keep their shorter lifetime and can be obtained again under an
+   active grant without another operator decision.
    Requested preferences are not trusted authority. A stale catalog requires review
    against current templates.
 4. Wallet reviews the exact selection and signs the final decision. Read action v4
