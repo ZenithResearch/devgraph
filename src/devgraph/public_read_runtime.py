@@ -89,6 +89,9 @@ class PublicReadBoundary:
         self.active = 0
         self.tokens, self.last = 60.0, time.monotonic()
 
+    def expired(self):
+        return self.clock() >= self.expires_at
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "lifespan":
             return await self.app(scope, receive, send)
@@ -114,7 +117,7 @@ class PublicReadBoundary:
             or any(k.lower() == b"authorization" for k, _ in headers)
         ):
             return await reject(421, "invalid_public_receiver")
-        if self.clock() >= self.expires_at:
+        if self.expired():
             return await reject(503, "pilot_window_closed")
         path, method = scope["path"], scope["method"]
         operator_route = (method == "POST" and path in OPERATOR_POST_PATHS) or (
