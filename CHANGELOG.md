@@ -9,7 +9,32 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add shared dated/until-revoked standing-grant validity semantics and strict vectors, with finite compatibility adapters — removes ambiguity from the next grant contract without changing historical signed drafts or enabling unreviewed runtime authority.
+
+### Added
+
+- Add an explicit private-LAN read listener without a test shutdown timer — keeps connection setup available while retaining grant expiry, revocation and closed administration/write routes.
+
+### Changed
+
+- Require an explicit standing-grant expiry in the operator inbox and show its separate credential lifetime — removes the hidden one-hour grant default without changing signed contracts or widening policy.
+
+### Added
+- Opt-in runtime v7, server-owned presets and shared hierarchy selection with persistent path grant activation — members can request a role and area, operators can review and atomically activate or revoke read/write authority, and resource moves change effective access without reissuing credentials. Legacy signed records retain their original contracts.
+
+
+### Added
+
+- Add versioned live resource-path read/write enforcement with ancestor-preserving attenuation, serialized projection and pre/post mutation checks — grants follow current and future descendants while moved-out objects lose access, without broadening legacy contracts.
+
+- Add an opt-in bounded HTTPS read pilot with public connection discovery and default-closed operator routes — enable real remote Wallet testing without exposing local mutations or database administration.
+
 ### Fixed
+- Show the authenticated operator ceiling and narrow read operations/object kinds while retaining canonical signing order — operators can inspect actual policy limits and safely select less access without creating invalid Wallet requests.
+- Preserve anonymous JSON metadata discovery on free ngrok HTTPS hosts with a non-secret transport hint — cookie-free monitor requests otherwise receive the tunnel browser notice and cannot open the operator inbox.
+- Decode persisted monitor enrollment ceilings with the versioned six-kind grant contract — repeat Todo read enrollment no longer fails after consent, while renewal narrowing and the historical five-kind decoder remain enforced.
 - Distinguish read-review refresh, Wallet opening, issuer enrollment and credential acceptance — an expired review no longer looks like a missing Wallet dialog, and preflight failures remain actionable without announcing a connection.
 - Keep operator Wallet confirmation beside the selected permissions, freeze prepared selections, and explicitly refresh expired unsigned challenges without replacing action IDs — operators no longer have to find a second approval button elsewhere on the page or restart a timed-out flow.
 - Detect Chrome Wallet automatically and embed Wallet-owned recovery on a separately trusted origin when selected — removes the redundant chooser without exposing recovery inputs to the monitor or bypassing consent.

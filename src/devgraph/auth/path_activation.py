@@ -5,7 +5,7 @@ import json
 
 from devgraph.auth.access_catalog import catalog, scope_inventory, validate_preset
 from devgraph.auth.access_operator import AccessOperator
-from devgraph.auth.access_policy import require_subset
+from devgraph.auth.access_policy import _draft_validity, require_subset
 from devgraph.auth.access_provisioning import (
     ProvisionedMonitorReadEnrollment,
     ReadGrantProvisioning,
@@ -17,6 +17,7 @@ from devgraph.auth.monitor_read import MonitorWorkGrant
 from devgraph.auth.path_access import (
     Actions,
     PathAccessDraft,
+    PathGrantSelection,
     PathMemberPolicy,
     PathReadGrant,
     PathRequestChallenge,
@@ -62,7 +63,7 @@ class PathAccessRequestInbox(AccessRequestInbox):
         policy = self.catalog_policy()
         from devgraph.auth.native_read import _seconds
 
-        if not policy.ceiling.not_before <= _seconds(None) < policy.ceiling.not_after:
+        if not _draft_validity(policy.ceiling).contains(_seconds(None)):
             raise UnauthenticatedError("operator_policy_expired")
         value = catalog(policy)
         value["scopes"] = (
@@ -81,7 +82,7 @@ class PathAccessRequestInbox(AccessRequestInbox):
         policy = self.catalog_policy()
         available, preference = catalog(policy), intent.preference
         if (
-            not policy.ceiling.not_before <= current < policy.ceiling.not_after
+            not _draft_validity(policy.ceiling).contains(current)
             or preference.catalog_digest_sha256 != available["catalog_digest_sha256"]
         ):
             raise UnauthenticatedError("access_catalog_changed")
@@ -107,6 +108,7 @@ class PathGrantProvisioning(WriteGrantProvisioning):
     receiver_policy_type = ReceiverPathWritePolicy
     receiver_policy_schema = "devgraph.receiver-write-policy.v2"
     mixed_enabled = True
+    selection_type = PathGrantSelection
 
     @staticmethod
     def decode_draft(raw):
@@ -121,15 +123,13 @@ class PathGrantProvisioning(WriteGrantProvisioning):
             return super().preview(db, selection, record, previous_digest, now)
         if not isinstance(previous_digest, dict) or set(previous_digest) != {"read", "write"}:
             raise UnauthenticatedError("both_assignments_required")
-        from devgraph.auth.path_access import PathGrantSelection
-
         read = ReadGrantProvisioning.preview(
-            self, db, PathGrantSelection(read=selection.read), record, previous_digest["read"], now
+            self, db, self.selection_type(read=selection.read), record, previous_digest["read"], now
         )
         write = WriteGrantProvisioning.preview(
             self,
             db,
-            PathGrantSelection(write=selection.write),
+            self.selection_type(write=selection.write),
             record,
             previous_digest["write"],
             now,
@@ -141,19 +141,20 @@ class PathGrantProvisioning(WriteGrantProvisioning):
             previous_write_assignment_digest=previous_digest["write"],
             read=read,
             write=write,
-            expires_at=min(selection.read.not_after, selection.write.not_after),
+            expires_at=min(
+                (v for v in (selection.read.not_after, selection.write.not_after) if v is not None),
+                default=None,
+            ),
         )
 
     def activate(self, db, selection, record, previous_digest, actor, action_id, now):
         if selection.read is None or selection.write is None:
             return super().activate(db, selection, record, previous_digest, actor, action_id, now)
         plan = self.preview(db, selection, record, previous_digest, now)
-        from devgraph.auth.path_access import PathGrantSelection
-
         read = ReadGrantProvisioning.activate(
             self,
             db,
-            PathGrantSelection(read=selection.read),
+            self.selection_type(read=selection.read),
             record,
             previous_digest["read"],
             actor,
@@ -163,7 +164,7 @@ class PathGrantProvisioning(WriteGrantProvisioning):
         write = WriteGrantProvisioning.activate(
             self,
             db,
-            PathGrantSelection(write=selection.write),
+            self.selection_type(write=selection.write),
             record,
             previous_digest["write"],
             actor,
@@ -222,7 +223,7 @@ class PathGrantProvisioning(WriteGrantProvisioning):
             active[name] = any(
                 enabled
                 and original == request_id
-                and (lambda g: g.not_before <= now < g.not_after)(
+                and (lambda g: _draft_validity(g).contains(now))(
                     self.decode_draft(raw) if name == "read" else self.decode_write_draft(raw)
                 )
                 for raw, enabled, original in row

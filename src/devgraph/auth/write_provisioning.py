@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from devgraph.auth.access_policy import _Closed, require_subset
+from devgraph.auth.access_policy import _Closed, _draft_validity, require_subset
 from devgraph.auth.access_provisioning import ReadGrantProvisioning
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.errors import UnauthenticatedError
@@ -88,16 +88,21 @@ class NativeWritePolicy(_Closed):
                             rule.effect == "deny"
                             and overlaps
                             and (
-                                rule.not_before < draft.not_after
-                                and rule.not_after > draft.not_before
+                                (
+                                    _draft_validity(draft).not_after is None
+                                    or rule.not_before < draft.not_after
+                                )
+                                and (
+                                    _draft_validity(rule).not_after is None
+                                    or rule.not_after > draft.not_before
+                                )
                             )
                         ):
                             raise UnauthenticatedError("native_admission_required")
                         if (
                             rule.effect == "allow"
                             and covers
-                            and rule.not_before <= draft.not_before
-                            and rule.not_after >= draft.not_after
+                            and _draft_validity(draft).contained_by(_draft_validity(rule))
                         ):
                             allowed = True
                     if not allowed:
@@ -240,7 +245,7 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
         current = self.write_current(db, record[1])
         if previous_digest != (current.digest if current else None):
             raise UnauthenticatedError("assignment_changed")
-        if not grant.not_before <= now < grant.not_after:
+        if not _draft_validity(grant).contains(now):
             raise UnauthenticatedError("assignment_expired")
         if (
             db.execute("SELECT 1 FROM write_assignments WHERE owner=?", (record[1],)).fetchone()
@@ -256,6 +261,11 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
             installation_id=record[2],
             holder_wide=True,
             expires_at=grant.not_after,
+            **(
+                {"validity": json.loads(grant.validity.to_json())}
+                if grant.schema_ == "devgraph.access-draft.v5"
+                else {}
+            ),
             replaces_existing=current is not None,
             native_policy_digest=native.digest,
         )
@@ -305,7 +315,7 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
                 require_subset(grant, policy.ceiling)
             except ValueError:
                 continue
-            if grant.not_before <= now < grant.not_after:
+            if _draft_validity(grant).contains(now):
                 record = db.execute(
                     "SELECT digest FROM access_requests WHERE id=?", (request_id,)
                 ).fetchone()
@@ -317,6 +327,11 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
                         installation_id=device,
                         assignment_digest=checksum,
                         expires_at=grant.not_after,
+                        **(
+                            {"validity": json.loads(grant.validity.to_json())}
+                            if grant.schema_ == "devgraph.access-draft.v5"
+                            else {}
+                        ),
                         version=2,
                         access_mode="write",
                         holder_wide=True,
@@ -339,9 +354,18 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
             state = "superseded"
         elif row and row[2]:
             grant = self.decode_write_draft(row[1])
-            state = "active" if grant.not_before <= now < grant.not_after else "expired"
+            state = "active" if _draft_validity(grant).contains(now) else "expired"
         return dict(
             schema="devgraph.access-request-result.v3", status=state, grant_active=state == "active"
+        )
+
+    @staticmethod
+    def receiver_assignment(grant, owner):
+        return dict(
+            actor_id="pubkey:sha256:" + hashlib.sha256(bytes.fromhex(owner)).hexdigest(),
+            not_before=grant.not_before,
+            not_after=grant.not_after,
+            grants=grant.write_grants,
         )
 
     @contextmanager
@@ -356,15 +380,7 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
             ):
                 grant = self._decode(owner, raw, checksum)
                 self._eligible(grant, base, operator, native)
-                assignments.append(
-                    dict(
-                        actor_id="pubkey:sha256:"
-                        + hashlib.sha256(bytes.fromhex(owner)).hexdigest(),
-                        not_before=grant.not_before,
-                        not_after=grant.not_after,
-                        grants=grant.write_grants,
-                    )
-                )
+                assignments.append(self.receiver_assignment(grant, owner))
             policy = self.receiver_policy_type.model_validate(
                 dict(
                     schema=self.receiver_policy_schema,

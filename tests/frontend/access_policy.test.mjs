@@ -50,3 +50,14 @@ test('custom expiry cannot exceed policy, be absent or reuse an expired deadline
  assert.throws(()=>grantExpiry({choice:'policy',policyExpiresAt:now,now}),/invalid_expiry/);
  assert.equal(grantExpiry({choice:'custom',policyExpiresAt,customExpiresAt:policyExpiresAt,now}),policyExpiresAt);
 });
+
+test('explicit standing validity supports until revoked without a timestamp sentinel',()=>{
+ const standing={...ceiling,schema:'devgraph.access-draft.v5',validity:{schema:'castalia.grant-validity.v1',mode:'until_revoked',not_before:1}};delete standing.not_before;delete standing.not_after;
+ const selected=selection({ceiling:standing,expiresAt:undefined,validity:{schema:'castalia.grant-validity.v1',mode:'until_revoked',not_before:10}});
+ assert.equal(selected.read.schema,'devgraph.access-draft.v5');assert.equal(selected.read.validity.mode,'until_revoked');assert.equal(Object.hasOwn(selected.read,'not_after'),false);
+ const view=policyView({ceiling:standing});assert.equal(view.notAfter,null);assert.equal(view.untilRevoked,true);
+ const finite={...standing,validity:{schema:'castalia.grant-validity.v1',mode:'dated',not_before:1,not_after:1000}};
+ assert.throws(()=>selection({ceiling:finite,validity:selected.read.validity}),/invalid_expiry/);
+ const earlier=selection({ceiling:standing,validity:{schema:'castalia.grant-validity.v1',mode:'dated',not_before:10,not_after:900}});assert.equal(earlier.read.validity.not_after,900);
+ assert.throws(()=>selection({ceiling,validity:selected.read.validity}),/validity_upgrade_required/);
+});

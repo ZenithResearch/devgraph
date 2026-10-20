@@ -97,3 +97,20 @@ for(const [origin,hint] of [['https://pilot.ngrok-free.app',true],['https://grap
  }});
  await client.initialize();assert.equal(client.stage,'choose');
 });
+
+test('advertised graph v2 uses its separate read API without community membership or metadata leakage',async()=>{
+ const {client,provider,events}=fixture();
+ provider.getCapabilities=async()=>['read_access_v1','provider_profiles_v1','connection_v1','access_request_v1','graph_access_v2'];
+ const old=provider.readAccess,network=client.fetchImpl;
+ provider.readAccess=async input=>{
+  if(input.operation==='identity')return{subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32),memberships:[]};
+  if(input.operation==='request'){assert.equal(input.profileId,undefined);return{approval:{challenge:input.challenge,signature:'x'.repeat(86),proof:{}}};}
+  assert.notEqual(input.operation,'approve');assert.notEqual(input.operation,'accept');assert.notEqual(input.operation,'present');
+  if(input.operation.endsWith('_graph_v2')){events.push(input.operation);return old({...input,operation:input.operation.replace('_graph_v2','')});}return old(input);
+ };
+ client.fetchImpl=async(path,o)=>{if(path.endsWith('/challenges'))assert.deepEqual(Object.keys(JSON.parse(o.body)).sort(),['installation_id','subject_public_key']);return network(path,o);};
+ await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();await client.advance();assert.equal(client.stage,'ready');
+ await client.read('/monitor/topology/v1');assert.ok(events.includes('approve_graph_v2'));assert.ok(events.includes('accept_graph_v2'));assert.ok(events.includes('present_graph_v2'));
+ const challenge={receiver:'https://graph.example',subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32),details:{schema:'devgraph.access-request-action.v2'}};
+ assert.deepEqual((await client.approveAccess(challenge)).proof,{});client.disconnect();assert.equal(client.graphAccessV2,false);
+});

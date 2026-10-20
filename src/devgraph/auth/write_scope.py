@@ -13,7 +13,7 @@ from typing import Literal
 from pydantic import Field, field_validator, model_validator
 
 from devgraph.arenas import ArenaConflict, ArenaRepository
-from devgraph.auth.access_policy import WriteGrant, _Closed
+from devgraph.auth.access_policy import WriteGrant, _Closed, _draft_validity
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.secs_work import SecSWorkAdapter, SecSWorkDenied
 from devgraph.events.outbox import _require_matching_scope, digest_idempotency_claim
@@ -105,28 +105,27 @@ class ReceiverWritePolicy(_Closed):
         assignment = next(
             (a for a in self.assignments if a.actor_id == verified.principal.actor_id), None
         )
-        if assignment is None or not assignment.not_before <= now < assignment.not_after:
+        if assignment is None or not _draft_validity(assignment).contains(now):
             raise SecSWorkDenied("write_scope_not_current")
         return ResourceScopeGuard(self, assignment, verified.request.authority_operation)
 
 
 def require_write_scope_subset(child: WriteScopeAssignment, parent: WriteScopeAssignment):
     """Narrow one issuer-owned assignment without crossing operation/selector pairs."""
-    if (
-        child.actor_id != parent.actor_id
-        or child.not_before < parent.not_before
-        or child.not_after > parent.not_after
+    if child.actor_id != parent.actor_id or not _draft_validity(child).contained_by(
+        _draft_validity(parent)
     ):
         raise ValueError("write assignment amplification")
     for grant in child.grants:
         parents = [
-            p for p in parent.grants
+            p
+            for p in parent.grants
             if p.operation == grant.operation
-            and paths_subset(getattr(grant, "resource_paths", ()),
-                             getattr(p, "resource_paths", ()))
+            and paths_subset(getattr(grant, "resource_paths", ()), getattr(p, "resource_paths", ()))
             and (
                 p.arena_ids is None
-                or grant.arena_ids is not None and set(grant.arena_ids) <= set(p.arena_ids)
+                or grant.arena_ids is not None
+                and set(grant.arena_ids) <= set(p.arena_ids)
             )
         ]
         if any(
@@ -154,7 +153,8 @@ class ResourceScopeGuard:
         for resource in request.resources:
             kind, identifier = resource.split("/", 1)
             candidates = tuple(
-                grant for grant in self.assignment.grants
+                grant
+                for grant in self.assignment.grants
                 if grant.operation == self.operation
                 and any(
                     r.kind == kind and (r.ids is None or identifier in r.ids)
@@ -230,7 +230,8 @@ class ScopedSecSWorkAdapter(SecSWorkAdapter):
         with self.audit_log.transaction():
             with self.storage.work_mutation_transaction():
                 verified = self.verifier.verify(
-                    request_json=request_json, projection_json=projection_json,
+                    request_json=request_json,
+                    projection_json=projection_json,
                     idempotency_key=idempotency_key,
                 )
                 request = verified.request
@@ -243,20 +244,26 @@ class ScopedSecSWorkAdapter(SecSWorkAdapter):
                 if receipt is not None:
                     kind, identifier = (
                         ("Issue", request.payload["issue_id"])
-                        if request.operation == "convert" else (request.kind, request.id)
+                        if request.operation == "convert"
+                        else (request.kind, request.id)
                     )
                     _require_matching_scope(
-                        receipt, operation=request.authority_operation,
-                        subject_label=kind, subject_id=identifier,
+                        receipt,
+                        operation=request.authority_operation,
+                        subject_label=kind,
+                        subject_id=identifier,
                         request_digest_sha256=request.digest,
                     )
                 self.audit_log.record(
                     actor_id=verified.principal.actor_id,
                     session_id=verified.principal.session_id,
                     correlation_id=verified.principal.correlation_id,
-                    category="read", operation=request.authority_operation,
+                    category="read",
+                    operation=request.authority_operation,
                     safe_summary={
-                        **verified.safe_summary, **scope.summary, "status_only": True,
+                        **verified.safe_summary,
+                        **scope.summary,
+                        "status_only": True,
                         "receipt_id": receipt.id if receipt else None,
                         "outcome": "committed" if receipt else "unknown",
                     },

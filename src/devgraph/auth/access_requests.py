@@ -22,7 +22,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from devgraph.auth.access_policy import WriteGrant
+from devgraph.auth.access_policy import WriteGrant, _draft_validity
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.errors import UnauthenticatedError
 from devgraph.auth.monitor_read import AccessDraftV2, EnrollmentPolicyV2, MonitorWorkGrant
@@ -99,12 +99,19 @@ class AccessRequestInbox:
 
     def validate_intent(self, intent, current):
         if intent:
-            AccessDraftV2.model_validate(dict(
-                schema="devgraph.access-draft.v2", issuer=self.issuer, receiver=self.receiver,
-                write_audience="devgraph://receiver-local", not_before=current,
-                not_after=current + 604800, lifetime_seconds=60,
-                read_grants=intent.read_grants, write_grants=intent.write_grants,
-            ))
+            AccessDraftV2.model_validate(
+                dict(
+                    schema="devgraph.access-draft.v2",
+                    issuer=self.issuer,
+                    receiver=self.receiver,
+                    write_audience="devgraph://receiver-local",
+                    not_before=current,
+                    not_after=current + 604800,
+                    lifetime_seconds=60,
+                    read_grants=intent.read_grants,
+                    write_grants=intent.write_grants,
+                )
+            )
 
     def __init__(
         self,
@@ -483,9 +490,7 @@ class AccessRequestInbox:
                         elif assignment and assignment[2] and decision[1] == "active":
                             grant = self.decode_assignment(assignment[1])
                             state = (
-                                "active"
-                                if grant.not_before <= current < grant.not_after
-                                else "expired"
+                                "active" if _draft_validity(grant).contains(current) else "expired"
                             )
                         result.update(status=state, grant_active=state == "active")
                         if hasattr(self.provisioning, "request_result"):

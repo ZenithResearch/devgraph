@@ -6,8 +6,9 @@ replacing or masking one requires its exact digest in the signed v2 review.
 """
 
 import hashlib
+import json
 
-from devgraph.auth.access_policy import require_subset
+from devgraph.auth.access_policy import _draft_validity, require_subset
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.errors import UnauthenticatedError
 from devgraph.auth.monitor_read import (
@@ -152,7 +153,7 @@ class ReadGrantProvisioning:
         current = self.current(db, *record[1:3])
         if previous_digest != (current.digest if current else None):
             raise UnauthenticatedError("assignment_changed")
-        if not grant.not_before <= now < grant.not_after:
+        if not _draft_validity(grant).contains(now):
             raise UnauthenticatedError("assignment_expired")
         # Count the union, not just active overlays. Replacements add no slot.
         keys = {(g.subject_public_key, g.installation_id) for g in base.assignments}
@@ -166,6 +167,11 @@ class ReadGrantProvisioning:
             subject_public_key=record[1],
             installation_id=record[2],
             expires_at=grant.not_after,
+            **(
+                {"validity": json.loads(grant.validity.to_json())}
+                if grant.schema_ == "devgraph.access-draft.v5"
+                else {}
+            ),
             replaces_existing=current is not None,
         )
 
@@ -217,7 +223,7 @@ class ReadGrantProvisioning:
                 require_subset(grant, policy.ceiling)
             except ValueError:
                 continue
-            if not grant.not_before <= now < grant.not_after:
+            if not _draft_validity(grant).contains(now):
                 continue
             record = db.execute(
                 "SELECT digest FROM access_requests WHERE id=?", (request_id,)
@@ -232,6 +238,11 @@ class ReadGrantProvisioning:
                     installation_id=device,
                     assignment_digest=checksum,
                     expires_at=grant.not_after,
+                    **(
+                        {"validity": json.loads(grant.validity.to_json())}
+                        if grant.schema_ == "devgraph.access-draft.v5"
+                        else {}
+                    ),
                     version=2,
                 )
             )

@@ -100,3 +100,20 @@ test('refreshing status approval preserves the dispatched original across reload
  assert.throws(()=>c.cancelPrepared(),/recover_original_action_first/);
  c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});assert.equal(c.state,'unknown');assert.equal(c.pending.action.action,'inbox');
 });
+
+for (const mode of ['read','write','both']) for (const tamper of [false,true]) test('standing '+mode+' activation binds validity and recovers only its original decision; tamper='+tamper,async()=>{
+ const root={...structuredClone(ceiling),schema:'devgraph.access-draft.v5',validity:{schema:'castalia.grant-validity.v1',mode:'until_revoked',not_before:99}};delete root.not_before;delete root.not_after;
+ const selection=makeSelection({ceiling:root,ceilingDigest:'d'.repeat(64),recipient:identity,mode,operations:['devgraph.work.patch.v2'],workIds:['Task/one'],validity:{schema:'castalia.grant-validity.v1',mode:'until_revoked',not_before:100},now:100});
+ const storage=store(),calls=[];let original,result,lose=true;
+ const wallet={requestIdentity:identity,approveAccess:async challenge=>({challenge,signature:'x'.repeat(86)})};
+ const stable=v=>v===null||typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?'['+v.map(stable).join(',')+']':'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
+ const selected=mode==='both'?selection:selection[mode];
+ const expected=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stable(selected))))].map(v=>v.toString(16).padStart(2,'0')).join('');
+ const fetchImpl=async(path,o)=>{const b=JSON.parse(o.body),a=b.action??b.challenge.details.action;calls.push({path,action:a});if(path.endsWith('challenges'))return json({schema:'castalia.access-request-challenge.v1',receiver:'https://example.test',...identity,details:{action:a}});
+ if(a.action==='status')return json({schema:'devgraph.access-operator-result.v2',action_id:a.action_id,original_action_id:original.action_id,status:'reconciled',result,authority_issued:false});
+ original=a;result={schema:'devgraph.access-operator-result.v2',action_id:a.action_id,authority_issued:false,request_id:a.request_id,request_digest_sha256:a.request_digest_sha256,version:2,status:'active',activation:{active:true,credential_issued:false,assignment_digest:tamper?'f'.repeat(64):expected,validity:root.validity}};if(lose)throw Error('lost');return json(result);};
+ let c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});await c.prepare({schema:mode==='read'?'devgraph.access-operator-action.v6':'devgraph.access-operator-action.v7',action:'approve',request_id:'c'.repeat(32),request_digest_sha256:'d'.repeat(64),expected_version:1,previous_assignment_digest:null,review_id:'e'.repeat(32),selection});assert.equal(c.pending.assignment_digest,expected);
+ await assert.rejects(c.approve(),/operator_outcome_unknown/);const retained=storage.getItem(c.key);c=new AccessOperatorClient({wallet,storage,origin:'https://example.test',fetchImpl});await c.prepareRecovery();assert.equal(storage.getItem(c.key),retained);
+ if(tamper){await assert.rejects(c.approve(),/operator_outcome_unknown/);assert.ok(storage.getItem(c.key));assert.equal(c.state,'unknown');}else{assert.equal((await c.approve()).status,'active');assert.equal(storage.getItem(c.key),null);}
+ assert.equal(calls.filter(x=>x.path.endsWith('/actions')&&x.action.action==='approve').length,1);
+});

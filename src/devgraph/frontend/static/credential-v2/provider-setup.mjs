@@ -37,6 +37,7 @@ export async function prepareProviderSetup({provider,transport,origin,current=()
   const snapshot=structuredClone(profile);
   return Object.freeze({
     accessRequests:capabilities.includes('access_request_v1'),
+    graphAccessV2:capabilities.includes('graph_access_v2'),
     get profile(){return structuredClone(snapshot);},
     approve(){
       current();

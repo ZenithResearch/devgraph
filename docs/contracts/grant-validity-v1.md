@@ -62,9 +62,11 @@ original finite JSON and signature bytes. Finite adapters do not serialize this
 new value into old objects. Old clients must never infer until-revoked from a
 missing/null/distant timestamp. Accepting a standing grant with this value needs
 an explicitly new enclosing draft, operator-action and persisted-policy version,
-with matched producer/consumer activation. The initial source slice supplies
-strict Rust, Python and Swift readers, common vectors and finite adapters; it
-**does not enable until-revoked runtime activation** or migrate existing grants.
+with matched producer/consumer activation. The first source slice supplied
+strict Rust, Python and Swift readers, common vectors and finite adapters. The
+opt-in [runtime v8 standing activation contract](standing-access-v8.md) now adds
+new enclosing versions and durable registry handling as a source candidate.
+Existing installations and grants are not automatically migrated or activated.
 
 `grant-validity-v1.json` contains the shared cross-language vectors. Its cases
 cover boundaries, safe-integer edges, duplicate and escaped keys, omitted/null

@@ -217,7 +217,7 @@ class MemberReadEnrollment(SignedReadEnrollment):
         )
         # Remember the complete assignment revision, including expiry and write
         # selections. Reducing a deadline must invalidate older credentials too.
-        if manifest["expires_at"] > assignment.not_after:
+        if assignment.not_after is not None and manifest["expires_at"] > assignment.not_after:
             raise UnauthenticatedError("policy_changed")
         manifest["assignment_digest"] = assignment.digest
         manifest["assignment_epoch"] = self._epoch(

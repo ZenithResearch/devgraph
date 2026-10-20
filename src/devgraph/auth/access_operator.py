@@ -9,7 +9,7 @@ from typing import ClassVar, Literal
 from pydantic import Field, model_validator
 
 from devgraph.auth.access_approval import WalletAccessChallenge, verify_wallet_approval
-from devgraph.auth.access_policy import compile_write, require_subset
+from devgraph.auth.access_policy import _draft_validity, compile_write, require_subset
 from devgraph.auth.access_requests import Closed
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.errors import UnauthenticatedError
@@ -167,14 +167,18 @@ class AccessOperator:
 
     def revoke_selection(self, db, action, record, policy, owner, current):
         writing = action.schema_ in self.write_action_schemas
-        grant = (self.provisioning.write_current(db, record[1]) if writing
-                 else self.provisioning.current(db, *record[1:3]))
+        grant = (
+            self.provisioning.write_current(db, record[1])
+            if writing
+            else self.provisioning.current(db, *record[1:3])
+        )
         if grant is None:
             raise UnauthenticatedError("assignment_changed")
         require_subset(grant, policy.ceiling)
         revoke = self.provisioning.revoke_write if writing else self.provisioning.revoke
-        return revoke(db, record, action.previous_assignment_digest,
-                      owner, action.action_id, current)
+        return revoke(
+            db, record, action.previous_assignment_digest, owner, action.action_id, current
+        )
 
     def __init__(self, *, inbox, policy, inventory=None, provisioning=None):
         self.inbox, self.policy, self.inventory = inbox, policy, inventory
@@ -305,7 +309,7 @@ class AccessOperator:
         with self.inbox._database() as db:
             db.execute("BEGIN IMMEDIATE")
             policy = self._current(db)
-            if not policy.ceiling.not_before <= current < policy.ceiling.not_after:
+            if not _draft_validity(policy.ceiling).contains(current):
                 raise UnauthenticatedError("operator_policy_expired")
             if owner not in policy.operator_public_keys:
                 raise UnauthenticatedError("operator_required")
@@ -359,7 +363,7 @@ class AccessOperator:
             if (
                 draft.previous_digest != policy.ceiling.digest
                 or draft.subject_public_key != record[1]
-                or not draft.not_before <= current < draft.not_after
+                or not _draft_validity(draft).contains(current)
             ):
                 raise UnauthenticatedError("selection_binding_mismatch")
             if kind == "read":
@@ -410,7 +414,7 @@ class AccessOperator:
         with self.inbox._database() as db:
             db.execute("BEGIN IMMEDIATE")
             policy = self._current(db)
-            if not policy.ceiling.not_before <= current < policy.ceiling.not_after:
+            if not _draft_validity(policy.ceiling).contains(current):
                 raise UnauthenticatedError("operator_policy_expired")
             if (
                 parsed.subject_public_key not in policy.operator_public_keys
