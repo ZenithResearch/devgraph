@@ -88,3 +88,12 @@ test('read expiry is visible before clicking and refresh never opens Wallet or i
  await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();assert.equal(client.approvalExpired,false);
  now=1115;assert.equal(client.approvalExpired,true);await client.advance();assert.equal(client.approvalExpired,false);assert.equal(client.notice,'read_scope_refreshed');assert.equal(events.filter(x=>x==='approve').length,0);assert.equal(client.sessionKey,'');
 });
+
+for(const [origin,hint] of [['https://pilot.ngrok-free.app',true],['https://graph.example',false],['https://ngrok-free.app.attacker.example',false]])test(`public tunnel metadata remains cookie-free for ${origin}`,async()=>{
+ const client=new WalletReadClient({origin,fetchImpl:async(path,options)=>{
+  assert.equal(path,'/monitor/wallet-access/v1');assert.equal(options.credentials,'omit');assert.equal(options.redirect,'error');
+  assert.equal(options.headers['ngrok-skip-browser-warning'],hint?'true':undefined);
+  return{ok:true,status:200,json:async()=>({schema:'devgraph.wallet-read-configuration.v1',endpoint:'/monitor/wallet-access/v1',web_wallet_url:null})};
+ }});
+ await client.initialize();assert.equal(client.stage,'choose');
+});

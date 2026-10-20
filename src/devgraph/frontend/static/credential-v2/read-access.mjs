@@ -24,7 +24,11 @@ export class WalletReadClient{
  get approvalExpired(){return this.stage==='approval'&&Number.isSafeInteger(this.challenge?.expires_at)&&this.now()>=this.challenge.expires_at-5;}
  notify(){this.onChange(this);}
  async fetch(path,{body,signal}={}){
-  const fetchImpl=this.fetchImpl;const response=await fetchImpl(path,{method:body===undefined?'GET':'POST',body:body===undefined?undefined:JSON.stringify(body),headers:body===undefined?{}:{'Content-Type':'application/json'},credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
+  const headers=body===undefined?{}:{'Content-Type':'application/json'};
+  // ngrok's browser notice otherwise replaces anonymous JSON with HTML when
+  // cookies are omitted. This public transport hint conveys no authority.
+  try{const endpoint=new URL(this.origin);if(endpoint.protocol==='https:'&&endpoint.hostname.endsWith('.ngrok-free.app'))headers['ngrok-skip-browser-warning']='true';}catch{}
+  const fetchImpl=this.fetchImpl;const response=await fetchImpl(path,{method:body===undefined?'GET':'POST',body:body===undefined?undefined:JSON.stringify(body),headers,credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
   let data;try{data=await response.json();}catch{throw failure('read_response_invalid',response.status);}
   if(!response.ok)throw failure(response.status===401?'wallet_read_denied':response.status===403?'read_not_granted':response.status===409?'view_changed':'read_unavailable',response.status);
   return data;

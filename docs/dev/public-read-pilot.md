@@ -52,3 +52,12 @@ closed routes, explicit opt-in closure, forged forwarding headers, wrong receive
 expiry and resource bounds. Run native read tests with the pinned real secS binary.
 Source checks and a tunnel health probe do not establish physical iPhone reads,
 correct mobile membership, revocation, durability, availability or backup posture.
+
+## Browser metadata over free ngrok endpoints
+
+The monitor keeps API requests cookie-free. On HTTPS hosts ending in
+`.ngrok-free.app`, its read transport sends the documented non-secret
+`ngrok-skip-browser-warning` header; otherwise ngrok may replace a successful
+anonymous JSON response with its HTML browser notice. This is a transport hint,
+not server trust, authentication or a grant. Other server hosts receive no such
+header. Credential omission, redirect rejection and Wallet approvals stay intact.
