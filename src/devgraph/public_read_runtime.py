@@ -79,6 +79,13 @@ class PublicReadBoundary:
     Holder proof, membership, replay and scope verification remain downstream.
     """
 
+    get_paths = GET_PATHS
+    post_paths = POST_PATHS
+    asset_patterns = (ASSET,)
+
+    def body_limit(self, path, method):
+        return 65536 if method == "POST" else 0
+
     def __init__(
         self, app, *, origin: str, expires_at: int, clock=time.time, approved_operator_policy=None
     ):
@@ -131,8 +138,11 @@ class PublicReadBoundary:
                 return await reject(503, "operator_policy_changed")
             operator_allowed = True
         if not (
-            (method == "GET" and (path in GET_PATHS or ASSET.fullmatch(path)))
-            or (method == "POST" and path in POST_PATHS)
+            (
+                method == "GET"
+                and (path in self.get_paths or any(p.fullmatch(path) for p in self.asset_patterns))
+            )
+            or (method == "POST" and path in self.post_paths)
             or operator_allowed
         ):
             return await reject(404, "not_found")
@@ -162,7 +172,7 @@ class PublicReadBoundary:
                         if message["type"] != "http.request":
                             return await reject(400, "invalid_request")
                         body.extend(message.get("body", b""))
-                        if len(body) > (65536 if method == "POST" else 0):
+                        if len(body) > self.body_limit(path, method):
                             return await reject(413, "request_too_large")
                         if not message.get("more_body", False):
                             break

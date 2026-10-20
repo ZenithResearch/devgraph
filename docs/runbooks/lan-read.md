@@ -29,3 +29,7 @@ Record the source revision, process IDs, verified certificate fingerprint and
 probe results. Stop the recorded receiver gracefully when requested; stop a
 dedicated database only after verifying ownership and absence of other users.
 No launch agent or restart-on-login service is created by this factory.
+
+The separately reviewed [LAN standing-access v8 factory](lan-access.md) admits
+its own closed, guarded inbox/write surface. This read-only factory does not
+select or enable it automatically.

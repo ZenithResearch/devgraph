@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Add durable explicit-validity read/write activation, resource-specific membership and matching browser selection — grant once and redeem finite credentials without conflating timers, legacy contracts or unrelated community membership.
+
+
 ### Added
 
 - Add shared dated/until-revoked standing-grant validity semantics and strict vectors, with finite compatibility adapters — removes ambiguity from the next grant contract without changing historical signed drafts or enabling unreviewed runtime authority.

@@ -87,3 +87,8 @@ Mocks/composition tests are identified as such; real secS read tests use the
 matched standalone binary. Browser UI, two distinct Wallets and physical iPad
 still require installed final-artifact qualification. No sync, delegation,
 owner bootstrap or production deployment is claimed.
+
+The [private LAN v8 listener](../runbooks/lan-access.md) is a separate factory
+with a closed route/method boundary. Existing LAN read-only/public factories
+stay unchanged. Native admission, listener activation and exact member decisions
+remain distinct reviewed actions.
