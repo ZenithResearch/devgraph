@@ -79,6 +79,8 @@ class EnrollmentPolicyV2(EnrollmentPolicy):
             or url.password
         ):
             raise ValueError("receiver must be an HTTPS origin")
+        if any(getattr(g, "resource_paths", ()) for g in self.grants):
+            raise ValueError("resource paths require a new enrollment contract")
         if sum(len(g.operations) for g in self.grants) > 32:
             raise ValueError("too many read permissions")
         for grant in self.grants:
@@ -92,6 +94,8 @@ class AccessDraftV2(AccessDraft):
 
     @model_validator(mode="after")
     def valid(self):
+        if any(getattr(g, "resource_paths", ()) for g in (*self.read_grants, *self.write_grants)):
+            raise ValueError("resource paths require a new access draft contract")
         if self.not_before >= self.not_after or not (self.read_grants or self.write_grants):
             raise ValueError("a grant and valid interval are required")
         if self.installation_id is not None and self.subject_public_key is None:
@@ -239,6 +243,15 @@ def monitor_target(target):
 
 
 def project_monitor_read(storage, grants, target):
+    if any(getattr(g, "resource_paths", ()) for g in grants):
+        # Capture every page and relationship in one serialized graph interval.
+        # A concurrent move cannot slip between permission check and disclosure.
+        with storage.work_mutation_transaction():
+            return _project_monitor_read(storage, grants, target)
+    return _project_monitor_read(storage, grants, target)
+
+
+def _project_monitor_read(storage, grants, target):
     operation, path, query = monitor_target(target)
     grants = [g for g in grants if operation in g.operations]
     if not grants:
@@ -248,6 +261,7 @@ def project_monitor_read(storage, grants, target):
     for index, grant in enumerate(grants):
         selector = DelegatedWorkSelector(
             work_ids=grant.work_ids,
+            resource_paths=getattr(grant, "resource_paths", ()),
             arena_ids=grant.arena_ids,
             work_kinds=grant.work_kinds,
             include_archived=grant.include_archived,

@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from devgraph.auth.delegated_contract import WorkReadGrant, _grant_is_subset, canonical_json
 from devgraph.auth.native_read import EnrollmentPolicy
 from devgraph.model.validation import validate_work_object_id
+from devgraph.resource_paths import paths_subset
 from devgraph.work_requests import WORK_OPERATIONS
 
 WRITE_OPERATIONS = frozenset(
@@ -102,6 +103,8 @@ class AccessDraft(_Closed):
 
     @model_validator(mode="after")
     def valid(self):
+        if any(getattr(g, "resource_paths", ()) for g in (*self.read_grants, *self.write_grants)):
+            raise ValueError("resource paths require a new access draft contract")
         if self.not_before >= self.not_after or not (self.read_grants or self.write_grants):
             raise ValueError("a nonempty grant and valid interval are required")
         if self.installation_id is not None and self.subject_public_key is None:
@@ -162,6 +165,8 @@ def require_subset(child: AccessDraft, parent: AccessDraft) -> None:
             r
             for g in parent.write_grants
             if g.operation == grant.operation
+            and paths_subset(getattr(grant, "resource_paths", ()),
+                             getattr(g, "resource_paths", ()))
             and (
                 getattr(g, "arena_ids", None) is None
                 or arenas is not None
@@ -197,8 +202,11 @@ def compile_read(draft: AccessDraft) -> EnrollmentPolicy:
 
 
 def compile_write(draft: AccessDraft, *, policy_id: str, policy_version: int) -> dict:
-    if any(getattr(grant, "arena_ids", None) is not None for grant in draft.write_grants):
-        raise ValueError("Arena restrictions require the scoped receiver; cannot flatten")
+    if any(
+        getattr(grant, "arena_ids", None) is not None or getattr(grant, "resource_paths", ())
+        for grant in draft.write_grants
+    ):
+        raise ValueError("Resource restrictions require the scoped receiver; cannot flatten")
     if draft.subject_public_key is None:
         raise ValueError("write issuance needs an exact member")
     if draft.installation_id is not None:

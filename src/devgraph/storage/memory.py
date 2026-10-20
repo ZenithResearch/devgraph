@@ -12,6 +12,7 @@ from devgraph.model.validation import (
     validate_page_limit,
     validate_work_object_id,
 )
+from devgraph.resource_paths import within_paths
 from devgraph.storage.base import (
     ConstraintResult,
     EdgeRecord,
@@ -177,6 +178,8 @@ class MemoryGraphStorage:
             for selector in selectors
         ]
 
+        path_cache = {}  # Per-query snapshot only, never retained between accesses.
+
         def admitted(key: tuple[str, str]) -> bool:
             node = self._nodes.get(key)
             if node is None:
@@ -186,6 +189,7 @@ class MemoryGraphStorage:
                 and (not node.archived or selector.include_archived)
                 and (not selector.work_ids or key in exact)
                 and (not selector.arena_ids or key in arena)
+                and within_paths(self, *key, selector.resource_paths, cache=path_cache)
                 for exact, arena, selector in groups
             )
 
@@ -210,6 +214,8 @@ class MemoryGraphStorage:
             after_id=None,
             limit=limit,
         )
+        if any(selector.resource_paths for selector in selectors):
+            raise ValueError("resource paths require the versioned monitor projection")
         with self._transaction_lock:
             admitted = self._delegated_selector_predicate(selectors)
             keys = sorted(
@@ -441,6 +447,8 @@ class MemoryGraphStorage:
         )
         if relationship not in {"HAS_CHILD", "DEPENDS_ON", "BLOCKS"} or type(incoming) is not bool:
             raise ValueError("invalid relationship read")
+        if any(selector.resource_paths for selector in selectors):
+            raise ValueError("resource paths require the versioned monitor projection")
         with self.transaction():
             admitted = self._delegated_selector_predicate(selectors)
             keys = set()

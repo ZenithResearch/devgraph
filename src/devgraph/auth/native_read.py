@@ -61,6 +61,8 @@ class EnrollmentPolicy(BaseModel):
             or url.password
         ):
             raise ValueError("receiver must be an HTTPS origin without a trailing slash")
+        if any(getattr(g, "resource_paths", ()) for g in self.grants):
+            raise ValueError("resource paths require a new enrollment contract")
         if any(set(g.operations) - {"list", "get"} for g in self.grants):
             raise ValueError("native v1 admits only bounded Work list/get")
         for grant in self.grants:
@@ -322,7 +324,8 @@ class NativeReadEnrollment:
             "schema": "devgraph.native-read-scope.v1",
             "policy_digest": policy.digest,
             "read_grants": [
-                g.model_dump(mode="json", exclude_defaults=True) for g in policy.grants
+                g.model_dump(mode="json", by_alias=True, exclude_defaults=True)
+                for g in policy.grants
             ],
         }
 

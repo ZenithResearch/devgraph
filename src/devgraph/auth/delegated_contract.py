@@ -14,6 +14,8 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from devgraph.resource_paths import paths_subset
+
 SCOPE_GRAPH_READ = "devgraph.graph.read"
 SCOPE_WORK_READ = "devgraph.work.read"
 SCOPE_ARENA_READ = "devgraph.arena.read"
@@ -276,6 +278,7 @@ def _is_unrestricted_query_prerequisite(grant: WorkReadGrant) -> bool:
         and grant.work_kinds == WORK_KIND_ORDER
         and not grant.work_ids
         and not grant.arena_ids
+        and not getattr(grant, "resource_paths", ())
     )
 
 
@@ -296,6 +299,8 @@ def _grant_is_subset(granted: ReadGrant, requested: ReadGrant) -> bool:
             and (not granted.include_archived or requested.include_archived)
             and _selector_subset(granted.work_ids, requested.work_ids)
             and _selector_subset(granted.arena_ids, requested.arena_ids)
+            and paths_subset(getattr(granted, "resource_paths", ()),
+                             getattr(requested, "resource_paths", ()))
         )
     if isinstance(granted, ArenaReadGrant) and isinstance(requested, ArenaReadGrant):
         return set(granted.arena_ids).issubset(requested.arena_ids)

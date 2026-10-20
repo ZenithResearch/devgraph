@@ -23,10 +23,10 @@ Reviewer/approver and credential administration remain explicit capabilities.
 Those preset/catalog and browsable hierarchy surfaces are **not implemented by
 this policy-display change**. The existing request contract has typed intent but
 no preset/version reference. Current scopes include Arena filters and explicit
-object IDs. Selecting a Project ID alone does not grant descendants. A future
-hierarchy picker must either use a versioned, receiver-enforced subtree predicate
-or explicitly disclose an exact current-object snapshot; it cannot claim that a
-UI checkbox changes the credential's scope semantics.
+object IDs. Selecting a Project ID alone does not grant descendants. The agreed hierarchy semantics are all resources currently under the selected
+path at each access. The versioned source enforcement foundation is described in
+[live resource paths](live-resource-paths.md); preset and durable activation
+integration are still required before the hierarchy picker can expose it.
 
 Reuse the same direct request/decision store for native clients, the monitor and
 future harness integrations. Notifications through Matrix or Nostr are deferred;

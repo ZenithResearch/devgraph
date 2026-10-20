@@ -1,0 +1,8 @@
+{
+  "schema": "devgraph.resource-path.v1",
+  "path": [
+    "Arena/example",
+    "Initiative/roadmap",
+    "Project/mobile"
+  ]
+}

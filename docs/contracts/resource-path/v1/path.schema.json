@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "devgraph.resource-path.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "path": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 3,
+      "minItems": 1,
+      "title": "Path",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "path"
+  ],
+  "title": "ResourcePath",
+  "type": "object"
+}

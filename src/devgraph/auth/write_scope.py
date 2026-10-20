@@ -20,6 +20,7 @@ from devgraph.events.outbox import _require_matching_scope, digest_idempotency_c
 from devgraph.model.repository import MissingWorkObjectError
 from devgraph.model.validation import validate_work_object_id
 from devgraph.progress import TODO_KINDS
+from devgraph.resource_paths import paths_subset, within_paths
 
 
 class ScopedWriteGrant(WriteGrant):
@@ -75,6 +76,10 @@ class ReceiverWritePolicy(_Closed):
 
     @model_validator(mode="after")
     def unique(self):
+        if self.schema_ == "devgraph.receiver-write-policy.v1" and any(
+            getattr(g, "resource_paths", ()) for a in self.assignments for g in a.grants
+        ):
+            raise ValueError("resource paths require receiver write policy v2")
         if len({g.actor_id for g in self.assignments}) != len(self.assignments):
             raise ValueError("duplicate actor assignment")
         if len(canonical_json(self)) > 262144:
@@ -117,6 +122,8 @@ def require_write_scope_subset(child: WriteScopeAssignment, parent: WriteScopeAs
         parents = [
             p for p in parent.grants
             if p.operation == grant.operation
+            and paths_subset(getattr(grant, "resource_paths", ()),
+                             getattr(p, "resource_paths", ()))
             and (
                 p.arena_ids is None
                 or grant.arena_ids is not None and set(grant.arena_ids) <= set(p.arena_ids)
@@ -162,6 +169,8 @@ class ResourceScopeGuard:
 
 
 def _inside(storage, kind, identifier, grant, cache):
+    if not within_paths(storage, kind, identifier, getattr(grant, "resource_paths", ())):
+        return False
     if grant.arena_ids is None:
         return True
     key = kind, identifier

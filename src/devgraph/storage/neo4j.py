@@ -19,6 +19,7 @@ from devgraph.model.validation import (
     validate_version,
     validate_work_object_id,
 )
+from devgraph.resource_paths import path_predicate_cypher
 from devgraph.storage.base import (
     BootstrapConstraint,
     EdgeRecord,
@@ -671,6 +672,8 @@ class Neo4jGraphStorage:
         if relationship not in {"HAS_CHILD", "DEPENDS_ON", "BLOCKS"} or type(incoming) is not bool:
             raise ValueError("invalid relationship read")
         arrow = f"<-[:{relationship}]-" if incoming else f"-[:{relationship}]->"
+        if any(selector.resource_paths for selector in selectors):
+            raise ValueError("resource paths require the versioned monitor projection")
         rows = self._run_graph(
             f"MATCH (source:`{label}` {{id: $node_id}}){arrow}(n) "
             "WHERE size(labels(n)) = 1 AND labels(n)[0] IN $kinds "
@@ -812,6 +815,8 @@ class Neo4jGraphStorage:
             after_id=None,
             limit=limit,
         )
+        if any(selector.resource_paths for selector in selectors):
+            raise ValueError("resource paths require the versioned monitor projection")
         rows = self._run_graph(
             "MATCH (:Arena {id: $arena_id})-[:CONTAINS_WORK]->(n) "
             "WHERE n.id IS NULL OR size(labels(n)) <> 1 OR ("
@@ -1265,6 +1270,9 @@ class Neo4jGraphStorage:
         comparison = "<" if descending else ">"
         direction = "DESC" if descending else "ASC"
         cursor = "" if after_id is None else f" AND n.id {comparison} $after_id"
+        path_filter = " AND " + path_predicate_cypher() if any(
+            selector.resource_paths for selector in selectors
+        ) else ""
         rows = self._run_graph(
             f"MATCH (n:`{node_label}`) WHERE ($include_archived OR n.archived = false)"
             f"{cursor} AND any(selector IN $selectors WHERE "
@@ -1274,12 +1282,14 @@ class Neo4jGraphStorage:
             "labels(n)[0] + '/' + n.id IN selector.work_ids) AND "
             "(size(selector.arena_ids) = 0 OR EXISTS { "
             "MATCH (a:Arena)-[:CONTAINS_WORK]->(root)-[:HAS_CHILD*0..]->(n) "
-            "WHERE a.id IN selector.arena_ids })) "
+            f"WHERE a.id IN selector.arena_ids }}){path_filter}) "
             "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
             f"properties(n) AS properties ORDER BY n.id {direction} LIMIT $limit",
             include_archived=include_archived,
             after_id=after_id,
             selectors=[selector.as_parameters() for selector in selectors],
+            **({"path_arena_kind": self._generic_properties({"kind": "Arena"})["kind"]}
+               if path_filter else {}),
             limit=limit,
         )
         return [self._node_from_row(row, node_label) for row in rows]

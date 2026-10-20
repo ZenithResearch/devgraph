@@ -57,7 +57,9 @@ class SecsReadAuthority:
                 {
                     "operation": "devgraph.work." + operation,
                     "resource": RESOURCE,
-                    "constraints": grant.model_dump(mode="json", exclude_defaults=True),
+                    "constraints": grant.model_dump(
+                        mode="json", by_alias=True, exclude_defaults=True
+                    ),
                 }
                 for grant in policy.grants
                 for operation in grant.operations

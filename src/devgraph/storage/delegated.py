@@ -9,6 +9,7 @@ from devgraph.model.validation import (
     validate_page_limit,
     validate_work_object_id,
 )
+from devgraph.resource_paths import ResourcePath
 
 
 def validate_selectors(
@@ -49,8 +50,17 @@ class DelegatedWorkSelector:
     )
     include_archived: bool = False
 
+    resource_paths: tuple[ResourcePath, ...] = ()
+
     def __post_init__(self) -> None:
         validate_selectors(self.work_ids, self.arena_ids)
+        if (
+            not isinstance(self.resource_paths, tuple)
+            or len(self.resource_paths) > 16
+            or any(not isinstance(p, ResourcePath) for p in self.resource_paths)
+            or len(set(self.resource_paths)) != len(self.resource_paths)
+        ):
+            raise ValueError("invalid resource paths")
         if (
             not self.work_kinds
             or any(kind not in CANONICAL_WORK_KINDS for kind in self.work_kinds)
@@ -65,6 +75,8 @@ class DelegatedWorkSelector:
             "arena_ids": list(self.arena_ids),
             "work_kinds": list(self.work_kinds),
             "include_archived": self.include_archived,
+            **({"resource_paths": [p.model_dump(mode="json", by_alias=True)
+                                    for p in self.resource_paths]} if self.resource_paths else {}),
         }
 
 

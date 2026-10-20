@@ -1,0 +1,278 @@
+{
+  "$defs": {
+    "PathWriteAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_id": {
+          "pattern": "^pubkey:sha256:[0-9a-f]{64}$",
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "not_before": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Not Before",
+          "type": "integer"
+        },
+        "not_after": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Not After",
+          "type": "integer"
+        },
+        "grants": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PathWriteGrant"
+              },
+              {
+                "$ref": "#/$defs/ScopedWriteGrant"
+              }
+            ]
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Grants",
+          "type": "array"
+        }
+      },
+      "required": [
+        "actor_id",
+        "not_before",
+        "not_after",
+        "grants"
+      ],
+      "title": "PathWriteAssignment",
+      "type": "object"
+    },
+    "PathWriteGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/WriteResource"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Resources",
+          "type": "array"
+        },
+        "arena_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arena Ids"
+        },
+        "schema": {
+          "const": "devgraph.path-write-grant.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "resource_paths": {
+          "items": {
+            "$ref": "#/$defs/ResourcePath"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Resource Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "operation",
+        "resources",
+        "schema",
+        "resource_paths"
+      ],
+      "title": "PathWriteGrant",
+      "type": "object"
+    },
+    "ResourcePath": {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "devgraph.resource-path.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Path",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "path"
+      ],
+      "title": "ResourcePath",
+      "type": "object"
+    },
+    "ScopedWriteGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/WriteResource"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Resources",
+          "type": "array"
+        },
+        "arena_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arena Ids"
+        }
+      },
+      "required": [
+        "operation",
+        "resources"
+      ],
+      "title": "ScopedWriteGrant",
+      "type": "object"
+    },
+    "WriteResource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "Todo",
+            "Proposal",
+            "Initiative",
+            "Project",
+            "Issue",
+            "Task",
+            "Arena",
+            "Decision",
+            "ReviewPacket",
+            "Handoff",
+            "ExternalLink"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ids"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "WriteResource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "devgraph.receiver-write-policy.v2",
+      "title": "Schema",
+      "type": "string"
+    },
+    "revision": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "stable_issuer": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Stable Issuer",
+      "type": "string"
+    },
+    "audience": {
+      "const": "devgraph://receiver-local",
+      "title": "Audience",
+      "type": "string"
+    },
+    "native_policy_id": {
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+      "title": "Native Policy Id",
+      "type": "string"
+    },
+    "native_policy_version": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Native Policy Version",
+      "type": "integer"
+    },
+    "native_policy_digest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Native Policy Digest Sha256",
+      "type": "string"
+    },
+    "assignments": {
+      "items": {
+        "$ref": "#/$defs/PathWriteAssignment"
+      },
+      "maxItems": 128,
+      "title": "Assignments",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "revision",
+    "stable_issuer",
+    "audience",
+    "native_policy_id",
+    "native_policy_version",
+    "native_policy_digest_sha256",
+    "assignments"
+  ],
+  "title": "ReceiverPathWritePolicy",
+  "type": "object"
+}

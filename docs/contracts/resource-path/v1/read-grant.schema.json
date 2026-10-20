@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "ResourcePath": {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "devgraph.resource-path.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Path",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "path"
+      ],
+      "title": "ResourcePath",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "scope": {
+      "const": "devgraph.work.read",
+      "title": "Scope",
+      "type": "string"
+    },
+    "operations": {
+      "items": {
+        "enum": [
+          "list",
+          "get",
+          "relationships",
+          "children",
+          "blockers"
+        ],
+        "type": "string"
+      },
+      "title": "Operations",
+      "type": "array"
+    },
+    "relationship_types": {
+      "items": {
+        "enum": [
+          "children",
+          "parent",
+          "dependencies",
+          "dependents",
+          "blockers",
+          "blocked"
+        ],
+        "type": "string"
+      },
+      "title": "Relationship Types",
+      "type": "array"
+    },
+    "work_kinds": {
+      "items": {
+        "enum": [
+          "Todo",
+          "Proposal",
+          "Initiative",
+          "Project",
+          "Issue",
+          "Task"
+        ],
+        "type": "string"
+      },
+      "title": "Work Kinds",
+      "type": "array"
+    },
+    "work_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Work Ids",
+      "type": "array"
+    },
+    "arena_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Arena Ids",
+      "type": "array"
+    },
+    "include_archived": {
+      "title": "Include Archived",
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "devgraph.path-read-grant.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "resource_paths": {
+      "items": {
+        "$ref": "#/$defs/ResourcePath"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Resource Paths",
+      "type": "array"
+    }
+  },
+  "required": [
+    "scope",
+    "operations",
+    "relationship_types",
+    "work_kinds",
+    "include_archived",
+    "schema",
+    "resource_paths"
+  ],
+  "title": "PathReadGrant",
+  "type": "object"
+}

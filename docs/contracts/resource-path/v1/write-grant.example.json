@@ -1,0 +1,18 @@
+{
+  "operation": "devgraph.work.patch.v2",
+  "resources": [
+    {
+      "kind": "Task"
+    }
+  ],
+  "schema": "devgraph.path-write-grant.v1",
+  "resource_paths": [
+    {
+      "schema": "devgraph.resource-path.v1",
+      "path": [
+        "Arena/example",
+        "Project/mobile"
+      ]
+    }
+  ]
+}

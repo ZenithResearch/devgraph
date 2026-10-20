@@ -1,0 +1,28 @@
+{
+  "scope": "devgraph.work.read",
+  "operations": [
+    "list",
+    "get",
+    "relationships"
+  ],
+  "relationship_types": [
+    "children",
+    "parent",
+    "dependencies"
+  ],
+  "work_kinds": [
+    "Project",
+    "Task"
+  ],
+  "include_archived": false,
+  "schema": "devgraph.path-read-grant.v1",
+  "resource_paths": [
+    {
+      "schema": "devgraph.resource-path.v1",
+      "path": [
+        "Arena/example",
+        "Project/mobile"
+      ]
+    }
+  ]
+}
