@@ -5,9 +5,12 @@ export function resourceIds(text){
  return [...new Set(ids)].sort();
 }
 const intersect=(a,b)=>b.filter(x=>!a||a.includes(x));
-export function makeSelection({ceiling,ceilingDigest,recipient,mode='read',operations=[],workIds=[],arenaIds=[],expiresAt,now}){
+export function makeSelection({ceiling,ceilingDigest,recipient,mode='read',operations=[],workIds=[],arenaIds=[],workKinds=null,readOperations=null,expiresAt,now}){
  if(!['read','write','both'].includes(mode)||!Number.isSafeInteger(expiresAt)||expiresAt<=now||expiresAt>ceiling.not_after)throw Error('invalid_expiry');
  workIds=resourceIds(workIds);
+ if(workKinds!==null&&(!Array.isArray(workKinds)||workKinds.some(k=>!kinds.has(k))))throw Error('invalid_kind_selection');
+ const readNames=new Set(['list','get','relationships','children','blockers']);
+ if(readOperations!==null&&(!Array.isArray(readOperations)||readOperations.some(op=>!readNames.has(op))))throw Error('invalid_read_operation_selection');
  if(arenaIds.some(id=>typeof id!=='string'||!/^[a-z0-9][a-z0-9-]{0,255}$/.test(id)))throw Error('invalid_arena_selection');
  arenaIds=[...new Set(arenaIds)].sort();
  if(arenaIds.length&&mode!=='read'&&ceiling.schema!=='devgraph.access-draft.v3')throw Error('arena_scoped_writes_unsupported');
@@ -18,6 +21,8 @@ export function makeSelection({ceiling,ceilingDigest,recipient,mode='read',opera
   const read={...base,schema:'devgraph.access-draft.v2',installation_id:recipient.installation_id};delete read.write_grants;
   read.read_grants=(ceiling.read_grants??[]).map(raw=>{
    const g=structuredClone(raw);
+   if(workKinds!==null){g.work_kinds=g.work_kinds.filter(kind=>workKinds.includes(kind));if(!g.work_kinds.length)return null;if(g.work_ids){g.work_ids=g.work_ids.filter(id=>g.work_kinds.includes(id.split('/')[0]));if(!g.work_ids.length)return null;}}
+   if(readOperations!==null){g.operations=g.operations.filter(operation=>readOperations.includes(operation));if(!g.operations.length)return null;}
    if(workIds.length){g.work_ids=intersect(g.work_ids,workIds).filter(id=>g.work_kinds.includes(id.split('/')[0]));if(!g.work_ids.length)return null;}
    if(arenaIds.length){g.arena_ids=intersect(g.arena_ids,arenaIds);if(!g.arena_ids.length)return null;}
    return g;
@@ -29,6 +34,7 @@ export function makeSelection({ceiling,ceilingDigest,recipient,mode='read',opera
   const write={...base};delete write.read_grants;delete write.installation_id;
   write.write_grants=(ceiling.write_grants??[]).filter(g=>operations.includes(g.operation)).map(raw=>{
    const g=structuredClone(raw);
+   if(workKinds!==null)g.resources=g.resources.filter(r=>workKinds.includes(r.kind));
    if(arenaIds.length){g.arena_ids=intersect(g.arena_ids,arenaIds);if(!g.arena_ids.length)return null;}
    if(workIds.length)g.resources=g.resources.map(r=>({...r,ids:intersect(r.ids,workIds.filter(id=>id.startsWith(r.kind+'/')).map(id=>id.slice(r.kind.length+1)))})).filter(r=>r.ids.length);
    return g.resources.length?g:null;

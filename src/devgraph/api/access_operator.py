@@ -113,7 +113,7 @@ def register_access_operator(app: FastAPI, operator):
 
     @app.get("/monitor/access-assets/{name}", include_in_schema=False)
     def asset(name: str):
-        if name not in ("app.mjs", "core.mjs", "client.mjs", "style.css"):
+        if name not in ("app.mjs", "core.mjs", "client.mjs", "policy.mjs", "style.css"):
             return Response(status_code=404)
         return Response(
             files("devgraph.frontend").joinpath("static/access", name).read_bytes(),

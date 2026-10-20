@@ -279,6 +279,7 @@ def test_operator_http_is_opt_in_signed_and_never_bearer_admin(tmp_path):
     assert result.headers["cache-control"] == "no-store"
     assert client.get("/monitor/access/").status_code == 200
     assert client.get("/monitor/access-assets/core.mjs").status_code == 200
+    assert client.get("/monitor/access-assets/policy.mjs").status_code == 200
     assert client.get("/monitor/access-assets/unknown").status_code == 404
     assert (
         TestClient(app).post("/devgraph/access-operator/v1/challenges", json=body).status_code
@@ -317,3 +318,51 @@ def test_operator_policy_expiry_blocks_inbox_and_decisions(tmp_path):
     )
     with pytest.raises(UnauthenticatedError, match="operator_policy_expired"):
         service.challenge(key, "a" * 32, a, now=future)
+
+
+def test_browser_checkbox_selection_keeps_exact_server_signing_bytes(tmp_path):
+    """UI ordering must not cause the receiver to rewrite a reviewed request."""
+    import json
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    from devgraph.auth.access_operator import GrantSelection
+
+    if shutil.which("node") is None:
+        pytest.skip("node required for browser/server contract check")
+    _, _, _, public, _, _, _, policies = fixture(tmp_path)
+    ceiling = policies[0].ceiling
+    now = ceiling.not_before + 1
+    module = (
+        Path(__file__).resolve().parents[2]
+        / "src/devgraph/frontend/static/access/core.mjs"
+    ).as_uri()
+    script = (
+        "import{makeSelection}from " + json.dumps(module) + ";"
+        "import{readFileSync}from'node:fs';"
+        "const args=JSON.parse(readFileSync(0,'utf8'));"
+        "console.log(JSON.stringify(makeSelection(args)));"
+    )
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        input=json.dumps(
+            dict(
+                ceiling=ceiling.model_dump(mode="json", by_alias=True, exclude_defaults=True),
+                ceilingDigest=ceiling.digest,
+                recipient=dict(subject_public_key=public, installation_id="a" * 32),
+                mode="read",
+                workKinds=sorted(ceiling.read_grants[0].work_kinds),
+                readOperations=["get", "list"],
+                expiresAt=now + 100,
+                now=now,
+            )
+        ),
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=True,
+    )
+    selected = json.loads(result.stdout)
+    parsed = GrantSelection.model_validate(selected)
+    assert canonical_json(selected) == canonical_json(parsed)

@@ -4,3 +4,5 @@
 #grant-list>div{overflow-wrap:anywhere;padding:16px 0;border-top:1px solid var(--color-base-300)}#grant-list input{margin:8px 0}#active-grants{margin-top:20px}
 
 #wallet-step{border:1px solid var(--color-primary,#175c49);border-radius:12px;padding:16px;margin:16px 0;background:var(--color-base-100,#fff)}#wallet-step p{margin:0 0 12px}#wallet-step .actions{align-items:stretch}#wallet-step button{min-height:44px}#approval-time{font-size:.88rem}#wallet-step .actions button{overflow-wrap:anywhere}#grant>#wallet-step{grid-column:1/-1}
+
+#operator-policy{margin:20px 0;overflow-wrap:anywhere}.policy-rule{padding:10px;border:1px solid var(--color-base-300,#a4bdb0);border-radius:8px}.policy-rule p{margin:8px 0}#kind-list,#read-op-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0 12px}
