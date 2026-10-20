@@ -189,7 +189,7 @@ class MemberReadEnrollment(SignedReadEnrollment):
         assignment = self._assignment(owner, device, current)
         if self._policy_for(owner, device, current).digest != policy.digest:
             raise UnauthenticatedError("policy_changed")
-        return min(current + policy.lifetime_seconds, assignment.not_after)
+        return assignment.validity.credential_deadline(current, policy.lifetime_seconds)
 
     def _authority_policy(self, policy: EnrollmentPolicy):
         # The native shared contract compares exact permission records. Validate

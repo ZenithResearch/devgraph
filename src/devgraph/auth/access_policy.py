@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from devgraph.auth.delegated_contract import WorkReadGrant, _grant_is_subset, canonical_json
+from devgraph.auth.grant_validity import GrantValidity
 from devgraph.auth.native_read import EnrollmentPolicy
 from devgraph.model.validation import validate_work_object_id
 from devgraph.resource_paths import paths_subset
@@ -133,8 +134,23 @@ class AccessDraft(_Closed):
         return self
 
     @property
+    def validity(self) -> GrantValidity:
+        # Semantic adapter only: do not add fields to historical signed drafts.
+        return GrantValidity.dated(self.not_before, self.not_after)
+
+    @property
     def digest(self):
         return hashlib.sha256(canonical_json(self)).hexdigest()
+
+
+def _draft_validity(draft) -> GrantValidity:
+    value = getattr(draft, "validity", None)
+    if value is None:
+        # Preserve the public semantic helper's historical duck-typed callers.
+        return GrantValidity.dated(draft.not_before, draft.not_after)
+    if not isinstance(value, GrantValidity):
+        raise ValueError("invalid grant validity")
+    return value
 
 
 def require_subset(child: AccessDraft, parent: AccessDraft) -> None:
@@ -147,8 +163,7 @@ def require_subset(child: AccessDraft, parent: AccessDraft) -> None:
         if expected is not None and getattr(child, field) != expected:
             raise ValueError("member binding changed")
     if (
-        child.not_before < parent.not_before
-        or child.not_after > parent.not_after
+        not _draft_validity(child).contained_by(_draft_validity(parent))
         or child.lifetime_seconds > parent.lifetime_seconds
     ):
         raise ValueError("validity amplification")
@@ -283,7 +298,7 @@ class MemberAccessPolicy(_Closed):
             if (
                 grant.subject_public_key == owner
                 and grant.installation_id == device
-                and grant.not_before <= current < grant.not_after
+                and grant.validity.contains(current)
                 and grant.read_grants
             ):
                 return grant
