@@ -90,3 +90,13 @@ rg "BLOCKS|DEPENDS_ON|HAS_REQUIREMENT|HAS_ACCEPTANCE_CRITERION|ACCEPTED_BY_DECIS
 | Workflow evidence predicate | Source | Target | Meaning |
 | --- | --- | --- | --- |
 | `HAS_WORKFLOW_DECISION` | Todo-derived work | Decision | Workflow approval or Waiting resolution; distinct from acceptance provenance. |
+
+## Zenith local discovery (v0.9.0)
+
+| Predicate | Shape | Meaning |
+| --- | --- | --- |
+| `HAS_LOCAL_REGISTRY` | ZenithLocalSpace → LocalResourceRegistry | Coordination-space discovery index. |
+| `HAS_LOCAL_REGISTRATION` | LocalResourceRegistry → LocalResourceRegistration | Typed public descriptor entry. |
+| `DESCRIBES_SERVICE` | LocalResourceRegistration → ServiceInstance | Advisory configured-service reference. |
+
+These descriptive relationships establish no ownership, liveness, trust or permission.

@@ -13,3 +13,7 @@ and [Arena contract](arena-runtime.md).
 
 The original Devgraph ontology is licensed under AGPL-3.0-only with the rest of
 the project; see [LICENSE](../LICENSE).
+
+The [Zenith local space](zenith-local-space.md) vocabulary defines the independent
+`~/.zenith` namespace and its public service registry. Discovery records and
+service-instance identifiers remain separate from Wallet custody and authority.

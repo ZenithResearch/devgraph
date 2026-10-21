@@ -26,7 +26,7 @@ def test_arena_vocabulary_and_profile_agree_without_broadening_work_kinds() -> N
     assert "subClassOf" not in arena
     edge = by_id["zn:CONTAINS_WORK"]
     assert (edge["domain"], edge["range"]) == ("zn:Arena", "zn:Todo")
-    assert PROFILE["ontology_version"] == publication["version"] == "0.8.0"
+    assert PROFILE["ontology_version"] == publication["version"] == "0.9.0"
     assert PROFILE["runtime_binding"] is True
     assert PROFILE["arena"]["subclass_of_todo"] is False
     assert PROFILE["arena"]["nested_arenas"] is False
@@ -82,7 +82,7 @@ def test_ontology_extension_preserves_existing_operations_and_constraints() -> N
     old_root = ONTOLOGY / "releases/v0.4.0"
     previous = json.loads((old_root / "operations.json").read_text())
     current = json.loads((ONTOLOGY / "operations.json").read_text())
-    assert current.pop("ontology_version") == "0.8.0"
+    assert current.pop("ontology_version") == "0.9.0"
     assert previous.pop("ontology_version") == "0.4.0"
     old_operations = previous.pop("operations")
     operations = current.pop("operations")

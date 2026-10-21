@@ -1,13 +1,13 @@
 {
-  "@context": "https://zenith-research.ca/ontology/v0.8.0/context.jsonld",
+  "@context": "https://zenith-research.ca/ontology/v0.9.0/context.jsonld",
   "@graph": [
     {
       "@id": "https://zenith-research.ca/ontology",
       "@type": "owl:Ontology",
       "label": "Zenith Ontology",
       "comment": "Canonical vocabulary for Zenith work, arenas, directory entities, evidence, provenance, readiness, repository structure, and transport-neutral Devgraph operations.",
-      "versionIRI": "https://zenith-research.ca/ontology/v0.8.0/ontology.jsonld",
-      "versionInfo": "0.8.0",
+      "versionIRI": "https://zenith-research.ca/ontology/v0.9.0/ontology.jsonld",
+      "versionInfo": "0.9.0",
       "canonicalAuthority": "https://github.com/ZenithResearch/devgraph"
     },
     {
@@ -398,6 +398,58 @@
       "domain": "zn:Proposal",
       "range": "zn:Decision",
       "comment": "Recorded rejection disposition. Does not complete any linked delivery work."
+    },
+    {
+      "@id": "zn:ZenithLocalSpace",
+      "@type": "owl:Class",
+      "label": "Zenith local space",
+      "comment": "The per-operating-system-user Zenith coordination namespace rooted at ~/.zenith. It is its own space, distinct from Castalia identity custody; its contents are not all public or discoverable.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:LocalResourceRegistry",
+      "@type": "owl:Class",
+      "label": "Local resource registry",
+      "comment": "An advisory per-user index of configured services under ~/.zenith/resources/v1. Discovery does not establish process liveness, issuer trust, ownership or access.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:LocalResourceRegistration",
+      "@type": "owl:Class",
+      "label": "Local resource registration",
+      "comment": "A bounded public zenith.local-resource.v1 descriptor with a stable instance UUID, endpoint and optional public Wallet connection settings. It contains no credential or signing material.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:ServiceInstance",
+      "@type": "owl:Class",
+      "label": "Service instance",
+      "comment": "A configured instance of a service such as DevGraph, identified independently of its endpoint, Wallet identity, member installation or operating-system process. This term does not declare a new Work kind or authority subject.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:HAS_LOCAL_REGISTRY",
+      "@type": "owl:ObjectProperty",
+      "label": "HAS_LOCAL_REGISTRY",
+      "domain": "zn:ZenithLocalSpace",
+      "range": "zn:LocalResourceRegistry",
+      "comment": "Names the local discovery index within a Zenith coordination space; confers no authority."
+    },
+    {
+      "@id": "zn:HAS_LOCAL_REGISTRATION",
+      "@type": "owl:ObjectProperty",
+      "label": "HAS_LOCAL_REGISTRATION",
+      "domain": "zn:LocalResourceRegistry",
+      "range": "zn:LocalResourceRegistration",
+      "comment": "Indexes a public registration record in a local registry; it is not an operator approval."
+    },
+    {
+      "@id": "zn:DESCRIBES_SERVICE",
+      "@type": "owl:ObjectProperty",
+      "label": "DESCRIBES_SERVICE",
+      "domain": "zn:LocalResourceRegistration",
+      "range": "zn:ServiceInstance",
+      "comment": "Describes an advertised service instance. This advisory statement does not prove ownership, liveness, signing identity or permission."
     }
   ]
 }

@@ -115,3 +115,11 @@ python3 -m pytest tests/docs/test_ontology_boundaries.py tests/docs/test_readine
 ## Shared progress (v0.8.0)
 
 See [todo-progress.md](todo-progress.md) for the canonical three-state model, independent archival, and explicit historical classification. Legacy Draft/Review/Accepted/Archived vocabulary does not determine canonical progress.
+
+## Zenith local namespace (v0.9.0)
+
+- `.zenith` is its own per-user machine space, not nested under Castalia.
+- Public resource discovery covers only typed registry descriptors, not all files in that space.
+- A service-instance UUID is not a Wallet key, process ID, access grant or owner signature.
+- Local registration cannot mint authority or silently replace saved issuer/TLS pins.
+- The namespace vocabulary introduces no graph labels, Work kinds or storage migrations.
