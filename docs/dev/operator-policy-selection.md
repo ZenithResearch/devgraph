@@ -20,13 +20,18 @@ Project, with finer objects under Advanced. Contributor and Project Manager are
 permission templates, not implicit group membership or signing authority.
 Reviewer/approver and credential administration remain explicit capabilities.
 
-Those preset/catalog and browsable hierarchy surfaces are **not implemented by
-this policy-display change**. The existing request contract has typed intent but
-no preset/version reference. Current scopes include Arena filters and explicit
-object IDs. Selecting a Project ID alone does not grant descendants. The agreed hierarchy semantics are all resources currently under the selected
-path at each access. The versioned source enforcement foundation is described in
-[live resource paths](live-resource-paths.md); preset and durable activation
-integration are still required before the hierarchy picker can expose it.
+The current candidate implements the versioned preset catalog and hierarchical
+multi-area picker described in [the catalog contract](../contracts/access-catalog/v1/README.md).
+Requester preferences do not grant access. An operator can select globally within
+the ceiling, or select multiple Arena/Initiative/Project paths. Each selected
+container includes resources beneath it at each access, including future
+resources; moved-out work loses access through that path. The separate Advanced
+explicit-ID filter selects only those objects, not their descendants. Path
+creation/evidence and native admission still have independent limits.
+
+Current active grants can be revoked. Editing a grant without another member
+request needs the [standing-grant revision change](standing-grant-revision.md);
+it is not implemented by the picker or by this status-display fix.
 
 Reuse the same direct request/decision store for native clients, the monitor and
 future harness integrations. Notifications through Matrix or Nostr are deferred;
@@ -39,3 +44,14 @@ resource rules, actual JS-to-Python canonical selection parity, served policy
 assets, and synthetic read/write review, lost-result recovery and revocation in
 the existing browser walkthrough. Synthetic checks are not installed Wallet,
 physical-device or live grant qualification.
+
+
+### Connection state and request history
+
+The Wallet connection controls report the current read-connection stage separately
+from access-request progress. A completed request result is labeled “Last access
+request update”; it is a receipt of that earlier response, not a live statement
+that the grant remains pending or active. Connecting reads must show the accepted
+connection even when the last request response was pending. Request history is
+hidden when the corresponding Wallet identity/installation is disconnected.
+Original request bytes and status recovery remain unchanged.

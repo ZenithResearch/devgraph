@@ -9,6 +9,7 @@ WALLET_CONNECTION_HTML = r'''      <div class="wallet-connection" id="wallet-rea
 <button type="button" data-wallet-request hidden>Request access</button>
 <button type="button" data-wallet-disconnect hidden>Disconnect</button>
 </div>
+<p data-wallet-request-status role="status" aria-live="polite" hidden></p>
 <section data-wallet-request-options hidden aria-label="Access request preferences"></section>
 <button type="button" data-wallet-new-request hidden>Request different access</button>
         <section class="wallet-embedded" data-wallet-embed hidden
