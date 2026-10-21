@@ -880,6 +880,23 @@ def _parser() -> argparse.ArgumentParser:
     local_status.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     local_status.add_argument("--base-url", default=DEFAULT_BASE_URL)
 
+    resource = local_commands.add_parser(
+        "resource", help="publish public local service discovery settings"
+    )
+    resource_commands = resource.add_subparsers(dest="resource_command", required=True)
+    registration = resource_commands.add_parser(
+        "register", help="register this instance in ~/.zenith/resources/v1"
+    )
+    registration.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    registration.add_argument(
+        "--connection-file", type=Path, help="optional public HTTPS Wallet connection settings"
+    )
+    registration.add_argument("--name", default="DevGraph on this Mac")
+    registration.add_argument(
+        "--replace", action="store_true",
+        help="reviewed replacement settings; keeps the resource ID"
+    )
+
     read_credential = local_commands.add_parser(
         "read-credential",
         help="inspect, reveal, or rotate the local devgraph.read capability",
@@ -1194,6 +1211,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 print(_json(result))
                 return 0 if result["healthy"] else 1
+            if args.local_command == "resource":
+                from devgraph.local_resources import register_resource
+
+                assert load_local_config(args.config) is not None
+                print(_json(register_resource(
+                    args.config, connection_file=args.connection_file,
+                    name=args.name, replace=args.replace,
+                )))
+                return 0
             if args.local_command == "read-credential":
                 config = load_local_config(args.config)
                 assert config is not None
@@ -1219,10 +1245,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             if args.local_command == "start" and config is not None:
                 result = start_local_services(config)
+                if result["successful"]:
+                    from devgraph.local_resources import refresh_resource
+                    result["local_resource"] = refresh_resource(args.config)
                 print(_json(result))
                 return 0 if result["successful"] else 1
             if args.local_command == "restart" and config is not None:
                 result = restart_local_services(config)
+                if result["successful"]:
+                    from devgraph.local_resources import refresh_resource
+                    result["local_resource"] = refresh_resource(args.config)
                 print(_json(result))
                 return 0 if result["successful"] else 1
             if args.local_command == "stop" and config is not None:

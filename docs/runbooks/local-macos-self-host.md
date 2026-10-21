@@ -257,3 +257,11 @@ initial-password command as a recovery step. An unencrypted external volume
 leaves its contents available to someone with physical access. Backup/restore,
 RPO, RTO, public ingress, high availability, and any claim that a host is
 canonical or production require separate evidence.
+
+## Local app discovery
+
+Use `devgraph local resource register` to publish this configured instance to
+`~/.zenith/resources/v1` without credentials or service changes. Wallet-ready
+profiles require explicit public HTTPS connection settings; local monitor
+discovery alone does not enable Wallet administration. See
+[the shared discovery contract](../dev/local-resource-discovery.md).
