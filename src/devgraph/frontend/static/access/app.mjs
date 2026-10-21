@@ -21,7 +21,7 @@ function controls(){
  const expiry=client?.challenge?.expires_at;
  $('approval-time').hidden=!prepared||!Number.isSafeInteger(expiry);
  if(prepared&&Number.isSafeInteger(expiry))$('approval-time').textContent=client.approvalExpired?'Approval expired. Refreshing keeps this exact selection; it does not submit a decision.':'Open Wallet within '+Math.max(0,expiry-Math.floor(Date.now()/1000))+' seconds. This is the approval timer, not the grant expiry.';
- document.querySelectorAll('#review button, #grant-list button, #requests button, #grant input, #grant select, #grant textarea').forEach(b=>{if(!b.closest('#wallet-step'))b.disabled=busy||prepared||unknown||(b.closest('#grant')&&(pickerLoading||pickerFailed));});
+ document.querySelectorAll('#review button, #grant-list button, #requests button, #grant input, #grant select, #grant textarea').forEach(b=>{if(!b.closest('#wallet-step'))b.disabled=b.dataset.scopeInherited==='true'||busy||prepared||unknown||(b.closest('#grant')&&(pickerLoading||pickerFailed));});
  $('approve-selection').hidden=prepared&&action==='approve';$('edit').hidden=prepared;
 }
 

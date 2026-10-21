@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';
-import {validateCatalog,validPath,preferenceFor} from '../../src/devgraph/frontend/static/credential-v2/scope-picker.mjs';
+import {validateCatalog,validPath,preferenceFor,normalizePaths,pathCovers,scopeTree,pathLabel} from '../../src/devgraph/frontend/static/credential-v2/scope-picker.mjs';
 import {makeSelection,narrowPaths} from '../../src/devgraph/frontend/static/access/core.mjs';
 const fixture=JSON.parse(await readFile(new URL('../../docs/contracts/access-catalog/v1/catalog.example.json',import.meta.url)));
 const path=(...path)=>({schema:'devgraph.resource-path.v1',path});
@@ -37,4 +37,24 @@ test('preset request persists before consent, recovers exact bytes, and can corr
  await assert.rejects(c.prepare({catalog:fixture,presetID:'contributor',resourcePaths:[path]}),/access_catalog_changed/);assert.equal(c.original,null);assert.equal(values.size,0);
  reject=false;await c.prepare({catalog:fixture,presetID:'project-manager',resourcePaths:[path]});const before=structuredClone(c.original);await assert.rejects(c.approve(),/outcome_unknown/);
  c=new AccessRequestClient({wallet,storage,fetchImpl,origin:'https://example.test'});await c.prepare();assert.equal(c.action.action,'status');assert.equal(c.action.intent,null);assert.deepEqual(c.original,before);await c.approve();assert.equal(submits,1);c.startNew();assert.equal(c.original,null);assert.ok([...values.values()].some(v=>JSON.parse(v).request_id===before.request_id));
+});
+
+
+test('multi-area union keeps distinct arenas and initiatives; selecting a parent subsumes only its descendants',()=>{
+ const a=path('Arena/a'),ap=path('Arena/a','Project/p'),b=path('Arena/b'),bi=path('Arena/b','Initiative/i');
+ assert.deepEqual(normalizePaths([ap,b,a]),[b,a]);
+ assert.deepEqual(normalizePaths([ap,bi]),[ap,bi]);
+ assert.equal(pathCovers(a,ap),true);assert.equal(pathCovers(a,bi),false);
+ assert.throws(()=>normalizePaths(Array.from({length:17},(_,i)=>path('Project/p'+i))),/too_many_resource_paths/);
+});
+test('tree shows only disclosed ancestry, uses readable titles and preserves typed IDs',()=>{
+ const tree=scopeTree(fixture.scopes);assert.equal(tree.length,1);assert.equal(tree[0].children[0].children[0].resource,'Project/project-a');
+ assert.match(pathLabel(fixture.scopes.at(-1).resource_path,fixture.scopes),/Arena: A → Initiative: Fixture → Project: Fixture/);
+ const published=fixture.scopes.at(-1),hidden=scopeTree([{...published,resource_path:path('Project/project-a'),parent:null}]);
+ assert.equal(hidden.length,1);assert.equal(hidden[0].resource,'Project/project-a');assert.equal(hidden[0].children.length,0);
+});
+test('global selection adds no path filter and cannot remove the operator ceiling',()=>{
+ const ceiling={schema:'devgraph.access-draft.v4',not_before:1,not_after:100,read_grants:[{operations:['get'],work_kinds:['Task'],resource_paths:[path('Arena/a')]}],write_grants:[]};
+ const selected=makeSelection({ceiling,ceilingDigest:'a'.repeat(64),recipient:{subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32)},resourcePaths:[],expiresAt:90,now:10});
+ assert.deepEqual(selected.read.read_grants[0].resource_paths,[path('Arena/a')]);
 });

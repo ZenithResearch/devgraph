@@ -6,6 +6,12 @@ const standing=process.env.DEVGRAPH_STANDING_GRANT==='1';
 const origin='https://example.test',catalog=JSON.parse(await readFile(join(root,'docs/contracts/access-catalog/v1/catalog.example.json'))),now=Math.floor(Date.now()/1000),key='a'.repeat(64),device='b'.repeat(32),id='c'.repeat(32),digest='d'.repeat(64),actions=[];
 const ceiling={schema:'devgraph.access-draft.v4',issuer:'fixture',receiver:origin,write_audience:'devgraph://receiver-local',not_before:now-10,not_after:now+365*86400,lifetime_seconds:300,read_grants:[{scope:'devgraph.work.read',operations:['get','list'],relationship_types:['parent'],work_kinds:['Task','Project'],include_archived:false}],write_grants:[{operation:'devgraph.work.patch.v2',resources:[{kind:'Task'}]},{operation:'devgraph.work.create.v2',resources:[{kind:'Task'}]}]};
 if(standing){ceiling.schema='devgraph.access-draft.v5';ceiling.validity={schema:'castalia.grant-validity.v1',mode:'until_revoked',not_before:now-10};delete ceiling.not_before;delete ceiling.not_after;}
+// Additional published roots exercise unions, not an invented broad grant.
+for(const [kind,id,title,path] of [
+ ['Arena','b','B',['Arena/b']],
+ ['Initiative','root-b','Second initiative',['Arena/b','Initiative/root-b']],
+ ['Project','project-b','Second project',['Arena/b','Initiative/root-b','Project/project-b']]
+])catalog.scopes.push({resource:`${kind}/${id}`,title,parent:path.length>1?path.at(-2):null,resource_path:{schema:'devgraph.resource-path.v1',path}});
 const stable=v=>v===null||typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?'['+v.map(stable).join(',')+']':'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
 const browser=await chromium.launch({headless:true,...(process.env.DEVGRAPH_BROWSER_EXECUTABLE?{executablePath:process.env.DEVGRAPH_BROWSER_EXECUTABLE}:{})});
 try{
@@ -23,10 +29,38 @@ try{
  });
  const consent=async()=>{await page.locator('#confirm:not([hidden])').click();};
  await page.goto(origin+'/monitor/access/');await page.locator('#refresh').click();await consent();await page.locator('#requests button').click();
- await page.getByRole('combobox',{name:'Access preset',exact:true}).waitFor();assert.equal(await page.locator('#mode').inputValue(),'both');assert.equal(await page.getByRole('combobox',{name:'Project scope',exact:true}).inputValue(),'Project/project-a');
+ await page.getByRole('combobox',{name:'Access preset',exact:true}).waitFor();assert.equal(await page.locator('#mode').inputValue(),'both');assert.equal(await page.getByRole('checkbox',{name:'Project: Fixture',exact:true}).isChecked(),true);
  assert.equal(await page.locator('#op-list input[value="devgraph.work.create.v2"]').isChecked(),false);
- await page.getByRole('combobox',{name:'Access preset',exact:true}).selectOption('project-manager');await page.getByRole('combobox',{name:'Initiative scope',exact:true}).selectOption('Initiative/root-a');assert.equal(await page.getByRole('combobox',{name:'Project scope',exact:true}).inputValue(),'');
- await page.getByRole('combobox',{name:'Project scope',exact:true}).selectOption('Project/project-a');
+ await page.getByRole('combobox',{name:'Access preset',exact:true}).selectOption('project-manager');
+ await page.getByRole('checkbox',{name:'Initiative: Fixture',exact:true}).check();
+ assert.equal(await page.getByRole('checkbox',{name:'Project: Fixture',exact:true}).isChecked(),true);
+ assert.equal(await page.getByRole('checkbox',{name:'Project: Fixture',exact:true}).isDisabled(),true);
+ await page.getByRole('checkbox',{name:'Initiative: Fixture',exact:true}).uncheck();
+ await page.getByRole('checkbox',{name:'Project: Fixture',exact:true}).check();
+ // Multiple Arenas and Initiatives form a union; inherited children stay disabled.
+ await page.getByRole('checkbox',{name:'Arena: A',exact:true}).check();
+ await page.getByRole('checkbox',{name:'Arena: B',exact:true}).check();
+ assert.match(await page.locator('.scope-picker-summary').textContent(),/Arena: A; Arena: B/);
+ await page.getByRole('checkbox',{name:'Arena: A',exact:true}).uncheck();
+ await page.getByRole('checkbox',{name:'Arena: B',exact:true}).uncheck();
+ await page.getByRole('checkbox',{name:'Initiative: Fixture',exact:true}).check();
+ if(await page.getByRole('button',{name:'Expand Arena: B',exact:true}).count())await page.getByRole('button',{name:'Expand Arena: B',exact:true}).click();
+ await page.getByRole('checkbox',{name:'Initiative: Second initiative',exact:true}).check();
+ assert.match(await page.locator('.scope-picker-summary').textContent(),/Second initiative/);
+ await page.getByRole('checkbox',{name:'Initiative: Fixture',exact:true}).uncheck();
+ await page.getByRole('checkbox',{name:'Initiative: Second initiative',exact:true}).uncheck();
+ await page.getByRole('checkbox',{name:'Project: Fixture',exact:true}).check();
+ // Visual navigation must not reset manually narrowed operations.
+ await page.locator('#advanced-scope>summary').click();
+ const patch=page.locator('#op-list input[value="devgraph.work.patch.v2"]');await patch.uncheck();
+ await page.getByRole('searchbox',{name:'Find resources',exact:true}).fill('project-a');
+ assert.equal(await page.getByRole('checkbox',{name:'Project: Fixture',exact:true}).isChecked(),true);
+ assert.equal(await patch.isChecked(),false);
+ await page.getByRole('searchbox',{name:'Find resources',exact:true}).fill('');assert.equal(await patch.isChecked(),false);await patch.check();
+ await page.getByRole('radio',{name:'Global · All resources permitted by policy',exact:true}).check();
+ assert.match(await page.locator('.scope-picker-summary').textContent(),/Global within operator policy/);
+ await page.getByRole('radio',{name:'Selected areas · Choose one or more subtrees',exact:true}).check();
+ assert.equal(await page.getByRole('checkbox',{name:'Project: Fixture',exact:true}).isChecked(),true);
  assert.equal(await page.locator('#validity').inputValue(),'');
  await page.getByRole('button',{name:'Review selection',exact:true}).click();assert.equal(actions.filter(a=>a.action==='review').length,0);
  await page.locator('#validity').selectOption(standing?'until_revoked':'policy');assert.match(await page.locator('#validity-note').textContent(),/Read credentials last up to 300 seconds/);

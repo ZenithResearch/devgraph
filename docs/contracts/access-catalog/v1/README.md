@@ -23,6 +23,24 @@ clients verify that digest and bind requests to this origin and catalog version.
 `catalog.example.json` is a synthetic cross-language Unicode fixture, not host
 configuration or a deployable grant.
 
+## Scope selection presentation
+
+Permission presets select operations; resource scope is an independent selection.
+The browser picker displays a searchable, multi-select Arena/Initiative/Project
+hierarchy with titles, typed IDs and inherited access. Several roots form a union,
+with a maximum of 16 nonredundant paths. Selecting a parent covers its current and
+future descendants; removing it clears that inherited coverage. Search and visual
+expansion do not alter selected authority or reset advanced permission choices.
+Only published rows are shown; a published Project never fabricates hidden ancestors.
+
+Global adds no path restriction. For an operator it means all resources already
+permitted by the configured ceiling, not additional rights or other graphs. A
+path-restricted ceiling stays restricted. For a requester, global is a general
+request with no explicit path preference: the existing v2 wire shape deliberately
+leaves the exact scope to the operator. It is not a global credential or a new
+self-authorized right. Presets, filters, validity, revocation and native admission
+still constrain every grant. Existing pending requests and signed bytes are unchanged.
+
 ## User and operator flow
 
 1. Connect Wallet, choose Contributor, Project Manager or No preset, then choose

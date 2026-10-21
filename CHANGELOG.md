@@ -11,6 +11,8 @@
 
 ### Fixed
 
+- Give the enabled credential SDK mount precedence over the composed read-only asset handler — makes SDK/WASM assets reachable while standalone read-only factories retain their allowlist.
+
 - Bind the standing inbox policy decoder before provisioning imports — restores the composed preset/scope catalog without changing authority or stored contracts.
 
 ### Added
@@ -19,6 +21,8 @@
 
 
 ### Changed
+
+- Separate permission presets from global or multi-root resource scope with a searchable inheritance tree — selecting a container covers current/future descendants without expanding the operator ceiling.
 
 - Add durable explicit-validity read/write activation, resource-specific membership and matching browser selection — grant once and redeem finite credentials without conflating timers, legacy contracts or unrelated community membership.
 
