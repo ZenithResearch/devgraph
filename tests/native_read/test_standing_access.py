@@ -427,6 +427,25 @@ def test_runtime_v8_composes_standing_persistence_and_explicit_membership(tmp_pa
     assert isinstance(enrollment.membership_check, ResourceMembershipAdmission)
     assert enrollment.membership_check({}, s.public)
     assert enrollment.provisioning.registry().ceiling.validity.not_after is None
+    # Exercise the composed HTTP path, not a directly constructed policy: later
+    # provisioning imports must not change the inbox's selected v8 decoder.
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from devgraph.api.access_requests import register_access_request_routes
+
+    inbox = enrollment.provisioning.inbox
+    inbox.storage = s.storage
+    app = FastAPI()
+    register_access_request_routes(app, inbox)
+    with TestClient(app, base_url=inbox.receiver) as client:
+        response = client.get("/devgraph/access-requests/v2/catalog")
+    assert response.status_code == 200
+    available = response.json()
+    assert {p["id"] for p in available["presets"]} == {"contributor", "project-manager"}
+    assert available["scopes"]
+    assert all(row["resource_path"]["path"][0] == "Arena/a" for row in available["scopes"])
+    assert isinstance(inbox.catalog_policy(), StandingOperatorPolicy)
     assert seen and all(
         v == (s.native[0].policy_id, s.native[0].policy_version, s.native[0].digest) for v in seen
     )

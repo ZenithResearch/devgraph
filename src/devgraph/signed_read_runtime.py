@@ -242,8 +242,12 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
                 CatalogOperatorPolicy = StandingOperatorPolicy
                 PathAccessRequestInbox = StandingAccessRequestInbox
             inbox_type = PathAccessRequestInbox
-            inbox_extra["catalog_policy"] = lambda: CatalogOperatorPolicy.model_validate(
-                private_json(config.access_operator_policy_file)
+            # Bind the selected decoder now: provisioning imports below also
+            # use CatalogOperatorPolicy and must not reset a v8 inbox to v3.
+            inbox_extra["catalog_policy"] = (
+                lambda selected=CatalogOperatorPolicy: selected.model_validate(
+                    private_json(config.access_operator_policy_file)
+                )
             )
         inbox = inbox_type(
             **inbox_extra,

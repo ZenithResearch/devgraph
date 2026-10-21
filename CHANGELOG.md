@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add a separate RFC1918-only runtime v8 listener with guarded inbox and Work routes — enables reviewed LAN activation while keeping the existing read-only/public factories closed and preserving transport limits.
+
+
 ### Changed
 
 - Add durable explicit-validity read/write activation, resource-specific membership and matching browser selection — grant once and redeem finite credentials without conflating timers, legacy contracts or unrelated community membership.
