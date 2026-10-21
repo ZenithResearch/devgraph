@@ -1,8 +1,8 @@
 # Generic Wallet candidate reconciliation
 
 The coordinated source set pins Wallet #33
-`9777b9420767a882ea6731f36f9a01a7cd83fdfe` and secS #299
-`1c74c722d76534a4b3332037fe04c23deeab1c15`. These include the
+`95be8af399e22cf627e20fbb09c9f1cdf09e72aa` and secS #300
+`ab5f297e2e31809f0fa1f5ee29ba7522a3eae76c`. These include the
 prior generic foundation and add graph access, explicit native operator consent,
 standing grant validity and a matching seven-file read-contract snapshot.
 The [source-set manifest](generic-wallet-source-set.json) is authoritative when

@@ -9,6 +9,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Return constant operator error codes and exercise the matched Wallet WASM in companion acceptance — prevent diagnostic text from crossing the public boundary and refuse a partial skipped credential-flow pass.
+- Emit packed SDK declarations from the staged runtime with its existing module interfaces — keep exported TypeScript paths complete for external consumers. Add least-privilege public source CI rather than leaving the Actions scan without workflow source.
+
 ### Changed
 
 - Reconcile the exact Wallet/secS release pins and seven-file companion inventory — retain byte-matched finite read contracts while promoting the Wallet-key operator flow through explicit source and runtime review gates.
