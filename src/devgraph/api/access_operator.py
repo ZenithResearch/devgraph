@@ -48,19 +48,21 @@ def register_access_operator(app: FastAPI, operator):
                     return JSONResponse(
                         {"error": "operator_result_unknown"}, status_code=503, headers=headers
                     )
-            if str(error) in ("request_changed", "assignment_changed"):
-                return JSONResponse(
-                    {"error": "operator_" + str(error)}, status_code=409, headers=headers
-                )
-            if str(error) in (
-                "write_activation_unavailable",
-                "write_activation_upgrade_required",
-                "mixed_activation_unavailable",
-                "native_admission_required",
-                "activation_unavailable",
-                "activation_upgrade_required",
+            # Exception diagnostics never become public response text. Read once,
+            # then select a constant code; even a changing __str__ cannot leak.
+            reason = str(error)
+            for internal, public, status in (
+                ("request_changed", "operator_request_changed", 409),
+                ("assignment_changed", "operator_assignment_changed", 409),
+                ("write_activation_unavailable", "write_activation_unavailable", 400),
+                ("write_activation_upgrade_required", "write_activation_upgrade_required", 400),
+                ("mixed_activation_unavailable", "mixed_activation_unavailable", 400),
+                ("native_admission_required", "native_admission_required", 400),
+                ("activation_unavailable", "activation_unavailable", 400),
+                ("activation_upgrade_required", "activation_upgrade_required", 400),
             ):
-                return JSONResponse({"error": str(error)}, status_code=400, headers=headers)
+                if reason == internal:
+                    return JSONResponse({"error": public}, status_code=status, headers=headers)
             return JSONResponse(
                 {"error": "operator_access_denied"}, status_code=401, headers=headers
             )

@@ -253,6 +253,23 @@ def main():
                 wallet,
                 wallet_env,
             )
+            # New request/revocation cases require the actual matched Wallet WASM.
+            # This is a disposable source fixture, not the canonical Linux package
+            # reproduction job (the companion itself also runs on macOS).
+            run(
+                "wallet-access-wasm",
+                ["node", "scripts/build-castalia-wallet-wasm.mjs"],
+                wallet,
+                {**wallet_env, "BUILDKITE": "false", "CARGO_NET_OFFLINE": "true"},
+            )
+            access_driver = wallet / "scripts/access-request-fixture-driver.mjs"
+            wasm = (wallet / "apps/chrome-extension/src/generated/castalia-wallet-core"
+                    / "castalia_wallet_core_bg.wasm")
+            if not access_driver.is_file() or not wasm.is_file():
+                raise ValueError("matched Wallet access-request WASM fixture missing")
+            report["access_fixture_sha256"] = {
+                "driver": digest(access_driver), "wasm": digest(wasm)
+            }
             work_vectors, progress_vectors = scratch / "work.json", scratch / "progress.json"
             run(
                 "secs-generic-vectors",
@@ -345,6 +362,7 @@ def main():
                 {
                     "SECS_READ_AUTHORITY_TEST_BINARY": str(binary),
                     "CASTALIA_RECOVERY_TEST_DRIVER": str(driver),
+                    "CASTALIA_ACCESS_REQUEST_FIXTURE_DRIVER": str(access_driver),
                 },
             )
             report["checks"][-1].update(python_results(junit))

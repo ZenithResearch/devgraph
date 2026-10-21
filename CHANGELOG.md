@@ -9,6 +9,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Reconcile the exact Wallet/secS release pins and seven-file companion inventory — retain byte-matched finite read contracts while promoting the Wallet-key operator flow through explicit source and runtime review gates.
+
 ### Fixed
 
 - Give the enabled credential SDK mount precedence over the composed read-only asset handler — makes SDK/WASM assets reachable while standalone read-only factories retain their allowlist.

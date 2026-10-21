@@ -1,7 +1,7 @@
 import {execFileSync} from 'node:child_process';
 import {runtimeFiles} from './artifact-files.mjs';
 import {createHash} from 'node:crypto';
-import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
+import {cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -44,6 +44,12 @@ for(const [source,target] of [
   ['credential-v2/provider-setup.mjs','credential-provider-setup.mjs'],
 ]) {
   cpSync(resolve(root,'src/devgraph/frontend/static',source),resolve(dist,'internal',target));
+  // Keep each existing checked module interface beside its renamed runtime.
+  // Emitting facade types must not traverse the original out-of-package tree.
+  const declaration = source.replace(/\.mjs$/,'.d.mts');
+  if (existsSync(resolve(root,'src/devgraph/frontend/static',declaration)))
+    cpSync(resolve(root,'src/devgraph/frontend/static',declaration),
+      resolve(dist,'internal',target.replace(/\.mjs$/,'.d.mts')));
   genericSource=genericSource.replace('../../../src/devgraph/frontend/static/'+source,'./internal/'+target);
 }
 writeFileSync(resolve(dist,'generic.js'),genericSource);
@@ -54,7 +60,7 @@ cpSync(resolve(dist,'internal/devgraph_web.d.ts'),resolve(here,'src/internal/dev
 cpSync(resolve(dist,'internal/devgraph_web_factory.d.ts'),resolve(here,'src/internal/devgraph_web_factory.d.ts'));
 run('cargo',['run','--locked','-p','devgraph-client-core','--features','declarations','--bin','export-sdk-types','--',resolve(here,'src/domain.d.ts')]);
 cpSync(resolve(here,'src/domain.d.ts'),resolve(dist,'domain.d.ts'));
-run(resolve(here,'node_modules/.bin/tsc'), [], {cwd:here});
+run(resolve(here,'node_modules/.bin/tsc'), ['--project','tsconfig.dist.json'], {cwd:here});
 const gitPackages = metadata.packages.filter(p => p.source?.startsWith('git+'));
 const webId = metadata.packages.find(p=>p.name==='devgraph-web').id;
 const nodes = new Map(metadata.resolve.nodes.map(n=>[n.id,n]));

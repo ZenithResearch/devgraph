@@ -48,3 +48,17 @@ operator review. The source release does not authorize direct database access,
 a writable bearer or unverified proxy identity. Physical-device and human unlock
 checks remain open when the operator is unavailable; report the precise remaining
 gate instead of marking the MVP complete.
+
+## Source gate coverage
+
+The companion lane builds the pinned Wallet WASM fixture as well as the native
+read driver, then supplies both to the required request/revocation tests. A skip
+in that required suite remains a failure, not qualification. The WASM fixture
+build is source interoperability only; canonical loaded-browser package acceptance
+remains Wallet's separate explicit gate.
+
+Public GitHub source verification runs without private companions or deployment
+credentials. The SDK build emits declarations from its staged runtime and keeps
+reviewed internal module declarations beside renamed imports, so packed consumers
+receive the same checked facade at the advertised root export. Hosted packaging
+and strict external TypeScript/browser consumer checks remain required.

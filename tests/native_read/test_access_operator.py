@@ -366,3 +366,42 @@ def test_browser_checkbox_selection_keeps_exact_server_signing_bytes(tmp_path):
     selected = json.loads(result.stdout)
     parsed = GrantSelection.model_validate(selected)
     assert canonical_json(selected) == canonical_json(parsed)
+
+
+@pytest.mark.parametrize("reason,expected,status", [
+    ("request_changed", "operator_request_changed", 409),
+    ("assignment_changed", "operator_assignment_changed", 409),
+    ("write_activation_unavailable", "write_activation_unavailable", 400),
+    ("native_admission_required", "native_admission_required", 400),
+    ("private-database-diagnostic", "operator_access_denied", 401),
+])
+def test_operator_http_returns_closed_error_codes(reason, expected, status):
+    from types import SimpleNamespace
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from devgraph.api.access_operator import register_access_operator
+
+    class ChangingDiagnostic(UnauthenticatedError):
+        reads = 0
+        _access_operator_audited = True
+
+        def __str__(self):
+            self.reads += 1
+            allowed_reads = 1 if reason.endswith("_changed") else 2
+            return reason if self.reads <= allowed_reads else "private-database-diagnostic"
+
+    def fail(*_args):
+        raise ChangingDiagnostic(reason)
+
+    operator = SimpleNamespace(inbox=SimpleNamespace(receiver="https://example.test"), execute=fail)
+    app = FastAPI()
+    register_access_operator(app, operator)
+    response = TestClient(app, base_url="https://example.test").post(
+        "/devgraph/access-operator/v1/actions", json={"challenge": {}, "signature": "fixture"}
+    )
+    assert response.status_code == status
+    assert response.json() == {"error": expected}
+    assert "private-database-diagnostic" not in response.text
+    assert response.headers["cache-control"] == "no-store"
