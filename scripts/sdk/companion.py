@@ -22,6 +22,7 @@ PARITY_FILES = {
     "LICENSE",
     "src/lib.rs",
     "src/read_authority.rs",
+    "src/grant_validity.rs",
     "tests/read_authority.rs",
     "tests/origin_security.rs",
 }

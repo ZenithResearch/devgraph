@@ -1,13 +1,22 @@
 # Generic Wallet candidate reconciliation
 
-The generic native dependency and candidate source set pin Wallet #32
-`6c9c2e5819547ed6a2170c129ca6dc1d6c501516` and secS #298
-`254f744d3151f234e6cc58db239c694937a0838e`, including the #297 foundation
-`d8148f82dd7eb2bb3b1664409d7c7776366f0421`. The
-[source-set manifest](generic-wallet-source-set.json) is authoritative when pins
-advance. This preserves the holder-bound read
-contract used by native readers as well as generic human signing. These are
-candidate revisions requiring review and exact-artifact qualification.
+The coordinated source set pins Wallet #33
+`9777b9420767a882ea6731f36f9a01a7cd83fdfe` and secS #299
+`1c74c722d76534a4b3332037fe04c23deeab1c15`. These include the
+prior generic foundation and add graph access, explicit native operator consent,
+standing grant validity and a matching seven-file read-contract snapshot.
+The [source-set manifest](generic-wallet-source-set.json) is authoritative when
+pins advance. These are review candidates: source acceptance and exact installed
+artifact qualification remain separate gates.
+
+The current operator MVP authorizes Wallet public keys from receiver-held policy
+and verifies each action-bound Wallet proof. A portable admin credential is
+follow-on work, not a prerequisite for this flow. The explicit signed-read/LAN
+composition supplies one HTTPS origin for requester, read, write and operator
+routes. The ordinary private host factory does not enable those routes from a
+source update alone; TLS, issuer pins, native admission and operator policy still
+require reviewed configuration. See the
+[coordinated release plan](coordinated-wallet-release-20261021.md).
 
 Wallet's generic baseline is merged main `ff8de6ddc04ac2fb6b39408274276bc4ce984d42`.
 The candidate adds the separate `read_authority` module and license metadata to

@@ -17,10 +17,18 @@
 
 ### Added
 
+- Define ZenithLocalSpace, its local registry, registrations and service instances in additive ontology v0.9.0 — give ~/.zenith its own per-user namespace while keeping discovery separate from Castalia custody, owner proof and authority; preserve all earlier bundles and runtime kinds.
+
+- Publish stable, owner-protected public local-resource descriptors and refresh registered instances after successful CLI start/restart — let local Zenith apps discover a configured DevGraph without reading private host configuration, credentials or Wallet stores.
+
 - Add a separate RFC1918-only runtime v8 listener with guarded inbox and Work routes — enables reviewed LAN activation while keeping the existing read-only/public factories closed and preserving transport limits.
 
 
 ### Changed
+
+- Report live Wallet connection separately from historical access-request results — an earlier pending response must not hide a working read session or invite repeated setup; the next standing-grant edit flow is specified without reinterpreting old approvals.
+
+- Keep scope inheritance explicit in a multi-select tree and preserve advanced permission edits during navigation — permission presets and resource boundaries must remain independently reviewable.
 
 - Separate permission presets from global or multi-root resource scope with a searchable inheritance tree — selecting a container covers current/future descendants without expanding the operator ceiling.
 

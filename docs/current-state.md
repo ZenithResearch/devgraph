@@ -8,6 +8,24 @@ remain the v1 compatibility contract; they do not determine canonical progress.
 This page records the combined official-frontend and private macOS deployment
 baseline. Repository behavior and live machine state remain separate evidence.
 
+## Wallet access release candidate (2026-10-21)
+
+The current source candidate adds direct requests, an authenticated operator inbox,
+separate operation presets and multi-root hierarchical selection, Until-revoked
+read/write activation, current-subtree enforcement, and public local resource
+registration. The explicit signed-read / guarded LAN composition shares one HTTPS
+origin across requester, read, scoped Work and operator routes. Operator Wallet
+public keys are admitted by receiver-held policy; a separate admin credential is
+not required for this MVP. secS remains the native read issuer and Work authority
+producer. See the [coordinated source/release plan](dev/coordinated-wallet-release-20261021.md).
+
+Ontology source v0.9.0 additionally defines the independent Zenith local namespace;
+its new vocabulary has no runtime labels or authority. Exact source pins, deployed
+runtime composition, certificate/issuer trust and installed browser/native/iPad
+qualification remain separate evidence. A source merge does not configure the
+private installed host or activate new grants. Active-grant revision, generic
+admin credentials/owner bootstrap and non-DevGraph adapters remain follow-on work.
+
 ## Integrated UI and workflow candidate
 
 The combined source includes the canvas topology renderer, Platonic node shapes,
@@ -64,7 +82,7 @@ and identity/grant activation need their own machine evidence.
 
 | Surface | Current evidence |
 |---|---|
-| Ontology | `ontology/`, immutable releases `v0.1.0` through `v0.7.0`, and `scripts/build_ontology_bundle.py --check` |
+| Ontology | `ontology/`, immutable releases `v0.1.0` through `v0.9.0`, and `scripts/build_ontology_bundle.py --check` |
 | Storage | `src/devgraph/storage/`; parity, persistence-contract, migration-store, and opt-in Neo4j tests |
 | Domain model | `src/devgraph/model/`, `src/devgraph/relationships.py`, and `src/devgraph/services/priority.py` |
 | Authorization | `src/devgraph/auth/` and `tests/auth/` |

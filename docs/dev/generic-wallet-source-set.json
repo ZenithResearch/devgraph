@@ -2,15 +2,15 @@
   "schema": "devgraph.generic-wallet-source-set.v2",
   "sources": {
     "secs_generic_todo": {
-      "revision": "254f744d3151f234e6cc58db239c694937a0838e",
+      "revision": "1c74c722d76534a4b3332037fe04c23deeab1c15",
       "depends_on": "https://github.com/ZenithResearch/secS-magik/pull/297",
-      "pr": "https://github.com/ZenithResearch/secS-magik/pull/298"
+      "pr": "https://github.com/ZenithResearch/secS-magik/pull/299"
     },
     "wallet_generic": {
-      "revision": "6c9c2e5819547ed6a2170c129ca6dc1d6c501516",
-      "pr": "https://github.com/bananawalnut/castalia-wallet/pull/32",
-      "tree": "864b3daa3571548d257d35ff7a1cb82d77b9cc7d",
-      "status": "candidate; review and exact-artifact qualification required",
+      "revision": "9777b9420767a882ea6731f36f9a01a7cd83fdfe",
+      "pr": "https://github.com/bananawalnut/castalia-wallet/pull/33",
+      "tree": "8210b3621dd72460d41216f57d896bfa5758fed3",
+      "status": "coordinated graph-access/operator candidate; exact CI and installed qualification required",
       "generic_baseline": "ff8de6ddc04ac2fb6b39408274276bc4ce984d42"
     },
     "wallet_legacy_decoder": {
@@ -24,7 +24,7 @@
   },
   "read_authority": {
     "secs_workspace": "tools/read-authority",
-    "wallet_revision": "6c9c2e5819547ed6a2170c129ca6dc1d6c501516",
+    "wallet_revision": "9777b9420767a882ea6731f36f9a01a7cd83fdfe",
     "provenance": "tools/read-authority/SOURCE.json in the pinned secS candidate",
     "requires": "Standalone workspace tests, checksum/source parity, and separate native-read artifact inventory; root secS tests do not include this workspace."
   },
