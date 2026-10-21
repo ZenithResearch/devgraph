@@ -21,6 +21,15 @@ def register_credential_work(app, services):
         StaticFiles(directory=str(files("devgraph").joinpath("frontend/static/credential-v2"))),
         name="credential-v2-assets",
     )
+    # Signed-read composition already registered a narrower read-only asset
+    # handler. Give this explicitly enabled SDK mount precedence over that
+    # handler; read-only factories that do not enable writes keep their list.
+    asset_mount = app.router.routes[-1]
+    for index, route in enumerate(app.router.routes[:-1]):
+        if getattr(route, "path", "").startswith("/assets/credential-v2/"):
+            app.router.routes.remove(asset_mount)
+            app.router.routes.insert(index, asset_mount)
+            break
 
     async def submit(request, action):
         host = services.credential_work_host

@@ -9,6 +9,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Bind the standing inbox policy decoder before provisioning imports — restores the composed preset/scope catalog without changing authority or stored contracts.
+
 ### Added
 
 - Add a separate RFC1918-only runtime v8 listener with guarded inbox and Work routes — enables reviewed LAN activation while keeping the existing read-only/public factories closed and preserving transport limits.

@@ -258,3 +258,28 @@ def test_native_browser_snapshots_use_canonical_private_temporary_paths(monkeypa
     host = BrowserCredentialWorkHost(data_root=tmp_path, receiver=None)
     assert host._produce("issue-credential", {"example": True}, KEY) == b"{}"
     assert len(observed) == 1 and not observed[0].exists()
+
+
+def test_signed_read_composition_does_not_shadow_credential_sdk_assets():
+    from fastapi import FastAPI
+
+    from devgraph.api.credential_work import register_credential_work
+    from devgraph.api.wallet_monitor import register_wallet_monitor
+    from devgraph.lan_access_runtime import LanAccessBoundary
+
+    app = FastAPI()
+    register_wallet_monitor(app, storage=None, enrollment=None, audit_log=None)
+    with TestClient(app) as client:
+        assert client.get("/assets/credential-v2/read-access.mjs").status_code == 200
+        assert client.get("/assets/credential-v2/coordinator.mjs").status_code == 404
+    register_credential_work(app, None)
+    with TestClient(
+        LanAccessBoundary(app, origin="https://192.168.50.10:18891"),
+        base_url="https://192.168.50.10:18891",
+    ) as client:
+        response = client.get("/assets/credential-v2/coordinator.mjs")
+        assert response.status_code == 200
+        assert "DevgraphCredentialClient" in response.text
+        assert client.get("/assets/credential-v2/read-access.mjs").status_code == 200
+        assert client.get("/assets/credential-v2/missing-private-file").status_code == 404
+        assert client.get("/work/Task/private").status_code == 404
