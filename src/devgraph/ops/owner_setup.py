@@ -28,6 +28,61 @@ OPERATIONS = next(p for p in DEFAULT_PRESETS if p.id == "project-manager").write
 SHORT_OPERATIONS = tuple(op.removeprefix("devgraph.work.").removesuffix(".v2") for op in OPERATIONS)
 
 
+class PresetSeatAssociation(_Closed):
+    seat_class_iri: str = Field(min_length=1, max_length=2048)
+    seat_type_iri: str = Field(min_length=1, max_length=2048)
+    label: str = Field(min_length=1, max_length=80)
+
+    @model_validator(mode="after")
+    def valid(self):
+        if self.seat_class_iri != "https://zenith-research.ca/ontology/terms/Seat":
+            raise ValueError("use the shared Zenith Seat class")
+        for raw in (self.seat_class_iri, self.seat_type_iri):
+            uri = urlsplit(raw)
+            if (
+                any(c.isspace() or ord(c) < 32 for c in raw)
+                or uri.username is not None
+                or uri.password is not None
+            ):
+                raise ValueError("invalid ontology reference")
+            if not (
+                (uri.scheme == "https" and uri.hostname)
+                or (raw.startswith("urn:") and len(raw) > 4)
+            ):
+                raise ValueError("ontology reference must be an absolute HTTPS or URN IRI")
+        if not self.label.strip():
+            raise ValueError("seat type label required")
+        return self
+
+
+class CredentialPresetRevision(_Closed):
+    schema_: Literal["zenith.credential-preset.v1"] = Field(alias="schema")
+    preset_id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
+    revision: int = Field(strict=True, ge=1, le=9007199254740991)
+    name: str = Field(min_length=1, max_length=80)
+    description: str = Field(max_length=2000)
+    read_operations: tuple[Literal["list", "get", "relationships"], ...] = Field(max_length=3)
+    write_operations: tuple[str, ...] = Field(max_length=12)
+    seat: PresetSeatAssociation | None = None
+    archived: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def valid(self):
+        if "seat" in self.model_fields_set and self.seat is None:
+            raise ValueError("omit an absent seat association")
+        if not self.name.strip() or not (self.read_operations or self.write_operations):
+            raise ValueError("preset needs name and permissions")
+        if self.read_operations != tuple(
+            op for op in ("list", "get", "relationships") if op in self.read_operations
+        ):
+            raise ValueError("invalid read operation order or duplicates")
+        if self.write_operations != tuple(
+            op for op in SHORT_OPERATIONS if op in self.write_operations
+        ):
+            raise ValueError("invalid write operation order, unknown operation or duplicates")
+        return self
+
+
 class OwnerContainer(_Closed):
     kind: Literal["Arena", "Initiative", "Project"]
     resource_id: str
@@ -50,7 +105,9 @@ class OwnerContainer(_Closed):
 
 
 class OwnerSetupPlan(_Closed):
-    schema_: Literal["zenith.devgraph-owner-setup.v1"] = Field(alias="schema")
+    schema_: Literal["zenith.devgraph-owner-setup.v1", "zenith.devgraph-owner-setup.v2"] = Field(
+        alias="schema"
+    )
     status: Literal["prepared_not_applied"]
     resource_id: str
     resource_name: str = Field(min_length=1, max_length=80)
@@ -61,6 +118,8 @@ class OwnerSetupPlan(_Closed):
     wallet_endpoint: str = Field(min_length=1, max_length=2048)
     preset: Literal["reader", "contributor", "project-manager", "custom"]
     write_operations: tuple[str, ...] = Field(max_length=12)
+    read_operations: tuple[Literal["list", "get", "relationships"], ...] | None = None
+    preset_snapshot: CredentialPresetRevision | None = None
     scope_mode: Literal["global", "paths"]
     paths: tuple[OwnerContainer, ...] = Field(max_length=16)
     not_before: int = Field(strict=True, ge=0, le=9007199254740991)
@@ -69,6 +128,27 @@ class OwnerSetupPlan(_Closed):
 
     @model_validator(mode="after")
     def valid(self):
+        if self.schema_ == "zenith.devgraph-owner-setup.v1":
+            if {"read_operations", "preset_snapshot"} & self.model_fields_set:
+                raise ValueError("v1 setup cannot contain v2 fields")
+        else:
+            reads = self.read_operations
+            if reads is None or reads != tuple(
+                op for op in ("list", "get", "relationships") if op in reads
+            ):
+                raise ValueError("v2 setup requires ordered explicit reads")
+            if not (reads or self.write_operations):
+                raise ValueError("empty owner permission ceiling")
+            if "preset_snapshot" in self.model_fields_set and self.preset_snapshot is None:
+                raise ValueError("omit an absent preset snapshot")
+            snapshot = self.preset_snapshot
+            if snapshot is not None and (
+                snapshot.archived
+                or self.preset != "custom"
+                or snapshot.read_operations != reads
+                or snapshot.write_operations != self.write_operations
+            ):
+                raise ValueError("preset snapshot differs from explicit permissions")
         if str(UUID(self.resource_id)) != self.resource_id:
             raise ValueError("invalid resource identity")
         endpoint = urlsplit(self.wallet_endpoint)
@@ -154,7 +234,9 @@ def compile_operator_policy(
     issuer = "devgraph-" + plan.resource_id
     read = dict(
         scope="devgraph.work.read",
-        operations=("list", "get", "relationships"),
+        operations=plan.read_operations
+        if plan.read_operations is not None
+        else ("list", "get", "relationships"),
         work_kinds=("Initiative", "Project", "Issue", "Task"),
         include_archived=False,
         relationship_types=(
@@ -182,7 +264,7 @@ def compile_operator_policy(
             receiver=plan.wallet_endpoint,
             validity=json.loads(validity.to_json()),
             lifetime_seconds=900,
-            read_grants=[read],
+            read_grants=[read] if read["operations"] else [],
             write_grants=writes,
             write_audience="devgraph://receiver-local",
         )

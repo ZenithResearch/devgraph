@@ -44,7 +44,7 @@ def test_descriptive_terms_do_not_expand_runtime_kinds_operations_or_constraints
         old = json.loads((ONTOLOGY / "releases/v0.8.0" / filename).read_text())
         new = json.loads((ONTOLOGY / filename).read_text())
         assert old.pop("ontology_version") == "0.8.0"
-        assert new.pop("ontology_version") == "0.9.0"
+        assert new.pop("ontology_version") == "0.10.0"
         assert old == new
     assert (ONTOLOGY / "neo4j/constraints.cypher").read_bytes() == (
         ONTOLOGY / "releases/v0.8.0/constraints.cypher"
@@ -59,7 +59,15 @@ def test_profile_is_in_new_canonical_and_packaged_bundles_and_v08_stays_pinned()
             item["path"] for item in manifest["files"]
         }
         for name in ["zenith-local-space.md", "zenith-local-space.json"]:
-            assert (root / "v0.9.0" / name).read_bytes() == (ONTOLOGY / name).read_bytes()
+            old = (root / "v0.9.0" / name).read_bytes()
+            new = (ONTOLOGY / name).read_bytes()
+            if name.endswith(".json"):
+                a, b = json.loads(old), json.loads(new)
+                a.pop("ontology_version")
+                b.pop("ontology_version")
+                assert a == b
+            else:
+                assert old == new
         assert hashlib.sha256((root / "v0.8.0/manifest.json").read_bytes()).hexdigest() == (
             "0f8e8eebc3e6c3eac45cd2be5e9d181d1174b250987fd855fec9138b277fca8d"
         )

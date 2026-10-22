@@ -100,3 +100,12 @@ rg "BLOCKS|DEPENDS_ON|HAS_REQUIREMENT|HAS_ACCEPTANCE_CRITERION|ACCEPTED_BY_DECIS
 | `DESCRIBES_SERVICE` | LocalResourceRegistration → ServiceInstance | Advisory configured-service reference. |
 
 These descriptive relationships establish no ownership, liveness, trust or permission.
+
+## Seats and credential recipes (v0.10.0)
+
+- `HAS_SEAT`: `Organization` → `Seat`. An organization has an organizational position; this is not an authentication or ownership grant.
+- `HAS_SEAT_TYPE`: `Seat` → `SeatType`. Classifies a position using a shared seat template.
+- `ASSIGNS_SEAT`: `SeatAssignment` → `Seat`. The organizational position filled by this assignment.
+- `HAS_SEAT_OCCUPANT`: `SeatAssignment` → `Actor`. The Person or Agent occupying a seat. Organization is not an allowed occupant in the seat profile.
+- `SUGGESTS_CREDENTIAL_PRESET`: `SeatType` → `CredentialPreset`. Suggests a permission recipe. Does not issue authority or silently update existing grants.
+- `HAS_PRESET_REVISION`: `CredentialPreset` → `CredentialPresetRevision`. Names an immutable permission recipe revision. Revocation is a separate receiver decision.

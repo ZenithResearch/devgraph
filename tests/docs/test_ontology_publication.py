@@ -107,6 +107,7 @@ def test_discovery_pins_manifest_and_release_digest() -> None:
         "0.7.0",
         "0.8.0",
         "0.9.0",
+        "0.10.0",
     ]
 
 

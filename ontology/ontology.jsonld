@@ -1,13 +1,13 @@
 {
-  "@context": "https://zenith-research.ca/ontology/v0.9.0/context.jsonld",
+  "@context": "https://zenith-research.ca/ontology/v0.10.0/context.jsonld",
   "@graph": [
     {
       "@id": "https://zenith-research.ca/ontology",
       "@type": "owl:Ontology",
       "label": "Zenith Ontology",
       "comment": "Canonical vocabulary for Zenith work, arenas, directory entities, evidence, provenance, readiness, repository structure, and transport-neutral Devgraph operations.",
-      "versionIRI": "https://zenith-research.ca/ontology/v0.9.0/ontology.jsonld",
-      "versionInfo": "0.9.0",
+      "versionIRI": "https://zenith-research.ca/ontology/v0.10.0/ontology.jsonld",
+      "versionInfo": "0.10.0",
       "canonicalAuthority": "https://github.com/ZenithResearch/devgraph"
     },
     {
@@ -450,6 +450,89 @@
       "domain": "zn:LocalResourceRegistration",
       "range": "zn:ServiceInstance",
       "comment": "Describes an advertised service instance. This advisory statement does not prove ownership, liveness, signing identity or permission."
+    },
+    {
+      "@id": "zn:Seat",
+      "@type": "owl:Class",
+      "label": "Seat",
+      "comment": "An organizational position independent of its occupant. A Person or Agent may fill it through a dated SeatAssignment. Neither the seat nor its assignment is a credential or runtime Work object.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:SeatType",
+      "@type": "owl:Class",
+      "label": "Seat type",
+      "comment": "A reusable classification/template for organizational seats. It can suggest permission presets without issuing authority. Many Seats may share one SeatType.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:SeatAssignment",
+      "@type": "owl:Class",
+      "label": "Seat assignment",
+      "comment": "A dated placement of one Person or Agent into one Seat. Keeps identity separate from organizational responsibility; creates no credential or permission by itself.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:CredentialPreset",
+      "@type": "owl:Class",
+      "label": "Credential preset",
+      "comment": "A stable named permission recipe with immutable revisions; holder, resource scope, validity and signed receiver approval are separate.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:CredentialPresetRevision",
+      "@type": "owl:Class",
+      "label": "Credential preset revision",
+      "comment": "An immutable exact revision of a permission recipe, optionally associated with SeatTypes. A granted credential retains its approved permission snapshot; editing a preset never widens existing authority.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:HAS_SEAT",
+      "@type": "owl:ObjectProperty",
+      "label": "HAS_SEAT",
+      "domain": "zn:Organization",
+      "range": "zn:Seat",
+      "comment": "An organization has an organizational position; this is not an authentication or ownership grant."
+    },
+    {
+      "@id": "zn:HAS_SEAT_TYPE",
+      "@type": "owl:ObjectProperty",
+      "label": "HAS_SEAT_TYPE",
+      "domain": "zn:Seat",
+      "range": "zn:SeatType",
+      "comment": "Classifies a position using a shared seat template."
+    },
+    {
+      "@id": "zn:ASSIGNS_SEAT",
+      "@type": "owl:ObjectProperty",
+      "label": "ASSIGNS_SEAT",
+      "domain": "zn:SeatAssignment",
+      "range": "zn:Seat",
+      "comment": "The organizational position filled by this assignment."
+    },
+    {
+      "@id": "zn:HAS_SEAT_OCCUPANT",
+      "@type": "owl:ObjectProperty",
+      "label": "HAS_SEAT_OCCUPANT",
+      "domain": "zn:SeatAssignment",
+      "range": "zn:Actor",
+      "comment": "The Person or Agent occupying a seat. Organization is not an allowed occupant in the seat profile."
+    },
+    {
+      "@id": "zn:SUGGESTS_CREDENTIAL_PRESET",
+      "@type": "owl:ObjectProperty",
+      "label": "SUGGESTS_CREDENTIAL_PRESET",
+      "domain": "zn:SeatType",
+      "range": "zn:CredentialPreset",
+      "comment": "Suggests a permission recipe. Does not issue authority or silently update existing grants."
+    },
+    {
+      "@id": "zn:HAS_PRESET_REVISION",
+      "@type": "owl:ObjectProperty",
+      "label": "HAS_PRESET_REVISION",
+      "domain": "zn:CredentialPreset",
+      "range": "zn:CredentialPresetRevision",
+      "comment": "Names an immutable permission recipe revision. Revocation is a separate receiver decision."
     }
   ]
 }

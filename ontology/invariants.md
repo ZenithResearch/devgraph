@@ -123,3 +123,10 @@ See [todo-progress.md](todo-progress.md) for the canonical three-state model, in
 - A service-instance UUID is not a Wallet key, process ID, access grant or owner signature.
 - Local registration cannot mint authority or silently replace saved issuer/TLS pins.
 - The namespace vocabulary introduces no graph labels, Work kinds or storage migrations.
+
+## Organizational seats (v0.10.0)
+
+A seat is independent of its occupant. Only Person or Agent may occupy a seat;
+organization membership, appointment and reports-to never issue credentials.
+Preset revisions are immutable and existing grants retain their approved exact
+permission snapshots. All seat and recipe vocabulary is descriptive only.

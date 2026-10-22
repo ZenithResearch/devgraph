@@ -17,3 +17,6 @@ the project; see [LICENSE](../LICENSE).
 The [Zenith local space](zenith-local-space.md) vocabulary defines the independent
 `~/.zenith` namespace and its public service registry. Discovery records and
 service-instance identifiers remain separate from Wallet custody and authority.
+
+[Organizational seats](seats.md) define shared Person/Agent positions and their
+separate permission recipe associations. Seat assignment is not authority.

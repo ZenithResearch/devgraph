@@ -181,3 +181,13 @@ See [todo-progress.md](todo-progress.md) for the canonical three-state model, in
 `ServiceInstance` describe the independent `~/.zenith` namespace and advisory
 service discovery. Each has `runtimeLabel: false`; none is a Work kind or
 authentication subject. See [Zenith local space](zenith-local-space.md).
+
+## Organizational seats and permission recipes (v0.10.0)
+
+- `Seat`: An organizational position independent of its occupant. A Person or Agent may fill it through a dated SeatAssignment. Neither the seat nor its assignment is a credential or runtime Work object.
+- `SeatType`: A reusable classification/template for organizational seats. It can suggest permission presets without issuing authority. Many Seats may share one SeatType.
+- `SeatAssignment`: A dated placement of one Person or Agent into one Seat. Keeps identity separate from organizational responsibility; creates no credential or permission by itself.
+- `CredentialPreset`: A stable named permission recipe with immutable revisions; holder, resource scope, validity and signed receiver approval are separate.
+- `CredentialPresetRevision`: An immutable exact revision of a permission recipe, optionally associated with SeatTypes. A granted credential retains its approved permission snapshot; editing a preset never widens existing authority.
+
+All five classes have `runtimeLabel: false`. They are not Work kinds. See [seats.md](seats.md).
