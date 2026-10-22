@@ -342,3 +342,231 @@ def test_progress_grants_are_explicit_versioned_and_preserved_on_validation(aren
     broken = {**new, "rules": new["rules"][:-1]}
     with pytest.raises(grants.WorkGrantError):
         grants._validate_policy(broken, PUBLIC)
+
+
+@pytest.fixture
+def shared_installation(installation, monkeypatch):
+    from devgraph.auth.standing_access import StandingNativePolicy
+
+    i = installation
+    apply_new(i)
+    old = copy.deepcopy(i.state["current"])
+    policy = copy.deepcopy(old["policy"])
+    policy.update(schema="secs-devgraph-work-policy.v2", schema_version=2, policy_version=2)
+    for rule in policy["rules"]:
+        start, end = rule.pop("not_before"), rule.pop("not_after")
+        rule["validity"] = dict(
+            schema="castalia.grant-validity.v1", mode="dated", not_before=start, not_after=end
+        )
+    foreign = dict(
+        actor_id=grants._actor("33" * 32),
+        effect="allow",
+        status="active",
+        operation="devgraph.work.patch.v2",
+        resource="Task/",
+        resource_match="prefix",
+        validity=dict(schema="castalia.grant-validity.v1", mode="until_revoked", not_before=99),
+    )
+    deny = copy.deepcopy(foreign)
+    deny.update(effect="deny", resource="Task/private-", resource_match="prefix")
+    revoked = copy.deepcopy(foreign)
+    revoked.update(status="revoked", resource="Project/")
+    # The saved agent need not be the first identity in an explicitly shared policy.
+    policy["rules"] = [foreign, deny, revoked] + policy["rules"]
+    key_end = old["registry"]["keys"][0]["not_after"]
+
+    def state_for(policy, end, key_id="test-secs-1"):
+        result = copy.deepcopy(old)
+        result.update(
+            policy=copy.deepcopy(policy),
+            policy_version=policy["policy_version"],
+            policy_digest_sha256=grants._digest(policy),
+            secs_verifier_key_id=key_id,
+        )
+        key = result["registry"]["keys"][0]
+        key.update(not_after=end, key_id=key_id)
+        result["registry_sha256"] = hashlib.sha256(grants._json(result["registry"])).hexdigest()
+        result["key_current"] = key["not_before"] <= i.now[0] < end and key["status"] == "active"
+        parsed = StandingNativePolicy.model_validate(policy)
+        result["ready"] = result["key_current"] and any(
+            r.status == "active" and r.effect == "allow" and r.validity.contains(i.now[0])
+            for r in parsed.rules
+        )
+        return result
+
+    i.state["current"] = state_for(policy, key_end)
+    for version in (1, 2):
+        directory = i.data / f"secrets/secs-magik/devgraph.work.v{version}"
+        directory.mkdir(mode=0o700, exist_ok=True)
+        for name, value in [
+            ("receiver.json", grants._receiver_manifest(i.state["current"], version)),
+            ("secs-public-key-registry.json", i.state["current"]["registry"]),
+        ]:
+            path = directory / name
+            path.write_bytes(grants._json(value))
+            path.chmod(0o600)
+
+    def native(*args):
+        i.state["calls"].append(args)
+        if args[0] == "status":
+            current = i.state["current"]
+            return state_for(
+                current["policy"],
+                current["registry"]["keys"][0]["not_after"],
+                current["secs_verifier_key_id"],
+            )
+        assert args[0] == "provision"
+        proposed = json.loads(Path(args[args.index("--policy-file") + 1]).read_bytes())
+        assert (
+            args[args.index("--expected-policy-digest") + 1]
+            == i.state["current"]["policy_digest_sha256"]
+        )
+        assert "--verifier-not-after" in args
+        if all(r["status"] == "revoked" for r in proposed["rules"]):
+            assert not (i.receiver / "receiver.json").exists()
+        end = int(args[args.index("--verifier-not-after") + 1])
+        key = (
+            "test-secs-2"
+            if "--rotate-verifier" in args
+            else i.state["current"]["secs_verifier_key_id"]
+        )
+        i.state["current"] = state_for(proposed, end, key)
+        return copy.deepcopy(i.state["current"])
+
+    monkeypatch.setattr(grants, "_native", native)
+    i.foreign = copy.deepcopy(policy["rules"][:3])
+    i.native = native
+    return i
+
+
+def test_shared_status_tracks_saved_agent_instead_of_first_holder(shared_installation):
+    i = shared_installation
+    result = grants.grant_status()
+    assert result["ready"] and result["actor_id"] == grants._actor(PUBLIC)
+    assert result["operations_authorized"] == 11
+    assert (
+        result["expires_at"]
+        == grants._managed_policy(i.state["current"]["policy"], PUBLIC)["rules"][0]["not_after"]
+    )
+
+
+def test_shared_agent_expiry_is_not_masked_by_standing_holder(shared_installation):
+    i = shared_installation
+    # Keep the service key valid and another holder current after agent expiry.
+    end = i.state["current"]["registry"]["keys"][0]["not_after"]
+    i.state["current"]["registry"]["keys"][0]["not_after"] = end + 3600
+    i.now[0] = end
+    assert i.native("status")["ready"]
+    result = grants.grant_status()
+    assert not result["ready"] and result["operations_authorized"] == 0
+    assert (
+        result["signer_matches"] and result["receiver_matches"] is False
+    )  # changed key pin is independently denied
+    # Match the reviewed key deadline; an expired agent still cannot use another holder's grant.
+    current = i.native("status")
+    for version in (1, 2):
+        path = i.data / f"secrets/secs-magik/devgraph.work.v{version}/secs-public-key-registry.json"
+        path.write_bytes(grants._json(current["registry"]))
+        path.chmod(0o600)
+    result = grants.grant_status()
+    assert result["receiver_matches"] and not result["ready"]
+
+
+def test_shared_renewal_preserves_other_holders_and_updates_both_pins(shared_installation):
+    i = shared_installation
+    plan = grants.plan_grant(24, renew=True)
+    assert plan["schema"] == "devgraph.work-grant-plan.v2"
+    assert grants._unmanaged_rules(plan["policy"], PUBLIC) == i.foreign
+    path = i.path / "shared-plan.json"
+    grants.write_plan(plan, path)
+    result = grants.apply_grant(path)
+    assert result["ready"] and result["policy_version"] == 3
+    assert grants._unmanaged_rules(i.state["current"]["policy"], PUBLIC) == i.foreign
+    assert i.state["current"]["secs_verifier_key_id"] == "test-secs-1"
+    for version in (1, 2):
+        manifest = json.loads(
+            (i.data / f"secrets/secs-magik/devgraph.work.v{version}/receiver.json").read_bytes()
+        )
+        assert manifest["policy_binding"]["policy_digest_sha256"] == plan["policy_digest_sha256"]
+    assert grants.rotate_verifier(24)["secs_verifier_key_id"] == "test-secs-2"
+    assert grants._unmanaged_rules(i.state["current"]["policy"], PUBLIC) == i.foreign
+
+
+@pytest.mark.parametrize(
+    "change", ["foreign", "key_deadline", "key_extension", "stale", "schema", "initial"]
+)
+def test_shared_tampered_plan_never_dispatches(shared_installation, change):
+    i = shared_installation
+    plan = grants.plan_grant(24, renew=True)
+    if change == "foreign":
+        # Updating a self-consistent hash does not authorize changing a different holder.
+        plan["policy"]["rules"][-3]["resource"] = "Project/"
+        plan["policy_digest_sha256"] = grants._digest(plan["policy"])
+        plan["preserved_rules_sha256"] = hashlib.sha256(
+            grants._json(grants._unmanaged_rules(plan["policy"], PUBLIC))
+        ).hexdigest()
+    elif change == "key_deadline":
+        plan["verifier_not_after"] = i.now[0] + 24 * 3600
+    elif change == "key_extension":
+        plan["verifier_not_after"] = 9007199254740991
+    elif change == "stale":
+        plan["previous_policy_digest_sha256"] = "0" * 64
+    elif change == "initial":
+        plan["previous_policy_digest_sha256"] = None
+    else:
+        plan["schema"] = grants.PLAN_SCHEMA
+    before = sum(c[0] == "provision" for c in i.state["calls"])
+    with pytest.raises(grants.WorkGrantError):
+        grants._apply(plan)
+    assert sum(c[0] == "provision" for c in i.state["calls"]) == before
+    assert grants.grant_status()["ready"]
+
+
+def test_shared_mismatched_v2_pin_holds_before_provision(shared_installation):
+    i = shared_installation
+    plan = grants.plan_grant(24, renew=True)
+    path = i.data / "secrets/secs-magik/devgraph.work.v2/receiver.json"
+    manifest = json.loads(path.read_bytes())
+    manifest["policy_binding"]["policy_version"] = 999
+    path.write_bytes(grants._json(manifest))
+    path.chmod(0o600)
+    before = sum(c[0] == "provision" for c in i.state["calls"])
+    assert not grants.grant_status()["ready"]
+    with pytest.raises(grants.WorkGrantError, match="binding reconciliation"):
+        grants._apply(plan)
+    assert sum(c[0] == "provision" for c in i.state["calls"]) == before
+
+
+def test_shared_emergency_revocation_removes_receiver_before_all_holder_revocation(
+    shared_installation,
+):
+    i = shared_installation
+    result = grants.revoke_grant()
+    assert result["producer_revoked"] and not result["ready"]
+    assert all(r["status"] == "revoked" for r in i.state["current"]["policy"]["rules"])
+    assert not (i.receiver / "receiver.json").exists()
+    assert "--verifier-not-after" in i.state["calls"][-1] or i.state["calls"][-1][0] == "status"
+
+
+def test_shared_partial_pin_update_preserves_original_plan_and_refuses_redispatch(
+    shared_installation, monkeypatch
+):
+    i = shared_installation
+    plan = grants.plan_grant(24, renew=True)
+    original = grants._replace_at
+
+    def fail(directory, name, value):
+        if value.get("schema") == "devgraph-secs-work-receiver.v2":
+            raise OSError("interrupted v2 receiver pin replacement")
+        return original(directory, name, value)
+
+    monkeypatch.setattr(grants, "_replace_at", fail)
+    with pytest.raises(OSError):
+        grants._apply(plan)
+    assert i.state["current"]["policy_digest_sha256"] == plan["policy_digest_sha256"]
+    assert not grants.grant_status()["ready"]
+    before = sum(c[0] == "provision" for c in i.state["calls"])
+    with pytest.raises(grants.WorkGrantError, match="binding reconciliation"):
+        grants._apply(plan)
+    assert sum(c[0] == "provision" for c in i.state["calls"]) == before
+    assert grants._unmanaged_rules(i.state["current"]["policy"], PUBLIC) == i.foreign

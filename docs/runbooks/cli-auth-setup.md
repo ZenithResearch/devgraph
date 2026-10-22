@@ -199,3 +199,13 @@ for zero. Revocation returns zero only when both receiver admission and producer
 authority are revoked; partial receiver-only revocation returns nonzero with its
 safe outcome retained. Verifier rotation changes the secS key, not the Wallet
 actor. Rebinding to a different actor requires a separate explicit workflow.
+
+
+For an explicitly installed shared native-policy v2 bundle, the administrator
+tracks the saved agent's dated profile separately from other Wallet holders.
+Renewal and rotation preserve their rules and update both existing receiver
+bindings through a versioned review plan. See
+[shared native authority administration](../contracts/managed-work-shared-authority-v2.md)
+for finite key deadlines, partial-cutover handling and the whole-authority
+scope of emergency `auth work revoke`. This support does not itself install
+a shared policy or grant access to another Wallet.

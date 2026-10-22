@@ -39,6 +39,7 @@ SECS_BINARY = Path("secS/bin/secs-devgraph-work-v1")
 POLICY_ID = "devgraph-local-work"
 STABLE_ISSUER = "secs-local-devgraph-work"
 PLAN_SCHEMA = "devgraph.work-grant-plan.v1"
+SHARED_PLAN_SCHEMA = "devgraph.work-grant-plan.v2"
 KINDS = ("Proposal", "Initiative", "Project", "Issue", "Task")
 SCOPES = {
     **{operation: KINDS for operation in ("create", "patch", "status", "archive")},
@@ -105,7 +106,8 @@ def _json(value):
 
 
 def _digest(policy):
-    return hashlib.sha256(b"secs-devgraph-work-policy.v1\0" + _json(policy)).hexdigest()
+    domain = policy["schema"].encode() + b"\0"
+    return hashlib.sha256(domain + _json(policy)).hexdigest()
 
 
 def _actor(public):
@@ -296,6 +298,59 @@ def _validate_policy(policy, public=None):
         ) from None
 
 
+def _standing_policy(policy):
+    from devgraph.auth.standing_access import StandingNativePolicy
+
+    parsed = StandingNativePolicy.model_validate(policy)
+    if parsed.policy_id != POLICY_ID:
+        raise WorkGrantError("standing policy is outside the managed authority")
+    # Require the exact closed wire shape, without silently materializing defaults.
+    if _json(policy) != _json(parsed.model_dump(mode="json", by_alias=True)):
+        raise WorkGrantError("standing policy has a noncanonical shape")
+    return parsed
+
+
+def _managed_policy(policy, public):
+    """Recover only the saved agent's exact finite profile from shared authority."""
+    if policy.get("schema") != "secs-devgraph-work-policy.v2":
+        _validate_policy(policy, public)
+        return policy
+    _standing_policy(policy)
+    actor = _actor(public)
+    selected = [dict(r) for r in policy["rules"] if r["actor_id"] == actor]
+    for rule in selected:
+        validity = rule.pop("validity")
+        if validity["mode"] != "dated":
+            raise WorkGrantError("saved agent requires an explicitly dated managed profile")
+        rule.update(not_before=validity["not_before"], not_after=validity["not_after"])
+    managed = dict(policy, schema="secs-devgraph-work-policy.v1", schema_version=1, rules=selected)
+    _validate_policy(managed, public)
+    return managed
+
+
+def _unmanaged_rules(policy, public):
+    return [r for r in policy["rules"] if r["actor_id"] != _actor(public)]
+
+
+def _shared_policy(previous, managed, public):
+    # Preserve other identities' ordered allow/deny/revoked rules verbatim.
+    rules = []
+    for item in managed["rules"]:
+        rule = dict(item)
+        start, end = rule.pop("not_before"), rule.pop("not_after")
+        rule["validity"] = dict(
+            schema="castalia.grant-validity.v1", mode="dated", not_before=start, not_after=end
+        )
+        rules.append(rule)
+    result = dict(
+        previous,
+        policy_version=managed["policy_version"],
+        rules=rules + _unmanaged_rules(previous, public),
+    )
+    _standing_policy(result)
+    return result
+
+
 def _validate_producer(state):
     if type(state.get("ready")) is not bool:
         raise WorkGrantError("invalid secS administration readiness")
@@ -331,7 +386,10 @@ def _validate_producer(state):
         ):
             raise ValueError()
         policy = state["policy"]
-        _validate_policy(policy)
+        standing = policy.get("schema") == "secs-devgraph-work-policy.v2"
+        parsed = _standing_policy(policy) if standing else None
+        if not standing:
+            _validate_policy(policy)
         if (
             state["policy_digest_sha256"] != _digest(policy)
             or state["policy_id"] != policy["policy_id"]
@@ -353,8 +411,14 @@ def _validate_producer(state):
         current = key["status"] == "active" and key["not_before"] <= now < key["not_after"]
         if type(state["key_current"]) is not bool or state["key_current"] != current:
             raise ValueError()
-        start, end, _ = _validate_policy(policy)
-        ready = current and start <= now < end and policy["rules"][0]["status"] == "active"
+        if standing:
+            ready = current and any(
+                r.effect == "allow" and r.status == "active" and r.validity.contains(now)
+                for r in parsed.rules
+            )
+        else:
+            start, end, _ = _validate_policy(policy)
+            ready = current and start <= now < end and policy["rules"][0]["status"] == "active"
         if state["ready"] is not ready:
             raise ValueError()
         return state
@@ -362,10 +426,10 @@ def _validate_producer(state):
         raise WorkGrantError("secS authority metadata is invalid or inconsistent") from None
 
 
-def _receiver_manifest(producer):
+def _receiver_manifest(producer, version=1):
     return {
-        "schema": "devgraph-secs-work-receiver.v1",
-        "schema_version": 1,
+        "schema": f"devgraph-secs-work-receiver.v{version}",
+        "schema_version": version,
         "audience": "devgraph://receiver-local",
         "stable_issuer": STABLE_ISSUER,
         "policy_binding": {
@@ -377,12 +441,12 @@ def _receiver_manifest(producer):
 
 
 @contextmanager
-def _receiver_directory(*, create=False):
+def _receiver_directory(*, create=False, version=1):
     config = load_local_config(DEFAULT_CONFIG_PATH)
     if not config.availability_path.exists():
         raise WorkGrantError("configured storage is unavailable")
     root = config.data_root
-    relative = Path("secrets/secs-magik/devgraph.work.v1")
+    relative = Path(f"secrets/secs-magik/devgraph.work.v{version}")
     require_receiver_directory_path(root, Path("secrets"), missing_ok=False)
     if not create and require_receiver_directory_path(root, relative, missing_ok=True) is None:
         yield None
@@ -453,12 +517,18 @@ def _replace_at(directory, name, value):
 
 
 def _receiver_matches(producer):
-    with _receiver_directory() as directory:
-        return _json(_read_at(directory, "receiver.json")) == _json(
-            _receiver_manifest(producer)
-        ) and _json(_read_at(directory, "secs-public-key-registry.json")) == _json(
-            producer["registry"]
-        )
+    versions = (1, 2) if producer["policy"]["schema"] == "secs-devgraph-work-policy.v2" else (1,)
+    for version in versions:
+        with _receiver_directory(version=version) as directory:
+            if version == 2 and directory is None:
+                continue
+            if _json(_read_at(directory, "receiver.json")) != _json(
+                _receiver_manifest(producer, version)
+            ) or _json(_read_at(directory, "secs-public-key-registry.json")) != _json(
+                producer["registry"]
+            ):
+                return False
+    return True
 
 
 def grant_status():
@@ -468,17 +538,22 @@ def grant_status():
             return {"ready": False, "state": "missing", "operations_authorized": 0}
         matches = _receiver_matches(producer)
         public = signer_profile.signer_status(check=False).get("public_key")
-        actor_matches = (
-            public is not None and _actor(public) == producer["policy"]["rules"][0]["actor_id"]
+        managed = _managed_policy(producer["policy"], public) if public else None
+        actor_matches = managed is not None
+        now = int(time.time())
+        agent_current = (
+            managed is not None
+            and managed["rules"][0]["status"] == "active"
+            and managed["rules"][0]["not_before"] <= now < managed["rules"][0]["not_after"]
         )
-        ready = producer["ready"] and matches and actor_matches
+        ready = producer["key_current"] and agent_current and matches and actor_matches
         return {
             "ready": ready,
             "state": "active" if ready else "inactive_or_mismatched",
-            "operations_authorized": len({r["operation"] for r in producer["policy"]["rules"]})
+            "operations_authorized": len({r["operation"] for r in managed["rules"]})
             if ready
             else 0,
-            "arena_operations_authorized": 4 if ready and _has_arenas(producer["policy"]) else 0,
+            "arena_operations_authorized": 4 if ready and _has_arenas(managed) else 0,
             "receiver_matches": matches,
             "signer_matches": actor_matches,
             "key_current": producer["key_current"],
@@ -486,8 +561,8 @@ def grant_status():
             "policy_version": producer["policy_version"],
             "policy_digest_sha256": producer["policy_digest_sha256"],
             "secs_verifier_key_id": producer["secs_verifier_key_id"],
-            "actor_id": producer["policy"]["rules"][0]["actor_id"],
-            "expires_at": producer["policy"]["rules"][0]["not_after"],
+            "actor_id": _actor(public) if public else None,
+            "expires_at": managed["rules"][0]["not_after"] if managed else None,
         }
     except _STATUS_ERRORS:
         return {"ready": False, "state": "unavailable_or_unsafe", "operations_authorized": 0}
@@ -512,16 +587,16 @@ def _plan(
         raise WorkGrantError(
             "use explicit renew for existing authority, or plan for initial provisioning"
         )
-    if exists and previous["policy"]["rules"][0]["actor_id"] != _actor(public):
-        raise WorkGrantError("saved signer differs from the granted identity")
+    managed_previous = _managed_policy(previous["policy"], public) if exists else None
+    shared = exists and previous["policy"]["schema"] == "secs-devgraph-work-policy.v2"
     now = int(time.time())
     version = previous["policy_version"] + 1 if exists else 1
     if include_arenas is None:
-        include_arenas = exists and _has_arenas(previous["policy"])
+        include_arenas = exists and _has_arenas(managed_previous)
     if include_workflows is None:
-        include_workflows = exists and _has_workflows(previous["policy"])
+        include_workflows = exists and _has_workflows(managed_previous)
     if include_progress is None:
-        include_progress = exists and _has_progress(previous["policy"])
+        include_progress = exists and _has_progress(managed_previous)
     if type(include_progress) is not bool:
         raise WorkGrantError("Progress grant selection must be a boolean")
     if type(include_workflows) is not bool:
@@ -538,8 +613,10 @@ def _plan(
         include_workflows=include_workflows,
         include_progress=include_progress,
     )
-    return {
-        "schema": PLAN_SCHEMA,
+    if shared:
+        policy = _shared_policy(previous["policy"], policy, public)
+    plan = {
+        "schema": SHARED_PLAN_SCHEMA if shared else PLAN_SCHEMA,
         "public_key": public,
         "stable_issuer": STABLE_ISSUER,
         "created_at": now,
@@ -549,6 +626,16 @@ def _plan(
         "policy": policy,
         "policy_digest_sha256": _digest(policy),
     }
+    if shared:
+        plan.update(
+            preserved_rules_sha256=hashlib.sha256(
+                _json(_unmanaged_rules(policy, public))
+            ).hexdigest(),
+            verifier_not_after=max(
+                previous["registry"]["keys"][0]["not_after"], now + ttl_hours * 3600
+            ),
+        )
+    return plan
 
 
 def plan_grant(
@@ -609,7 +696,9 @@ def write_plan(plan: dict, path: Path):
 
 def _validate_plan(plan):
     try:
-        if set(plan) != {
+        shared = plan.get("schema") == SHARED_PLAN_SCHEMA
+        extra = {"preserved_rules_sha256", "verifier_not_after"} if shared else set()
+        if set(plan) != extra | {
             "schema",
             "public_key",
             "stable_issuer",
@@ -621,10 +710,24 @@ def _validate_plan(plan):
             "policy_digest_sha256",
         }:
             raise ValueError()
-        start, end, _ = _validate_policy(plan["policy"], plan["public_key"])
+        managed = _managed_policy(plan["policy"], plan["public_key"])
+        start, end, _ = _validate_policy(managed, plan["public_key"])
+        if shared:
+            _standing_policy(plan["policy"])
+            if (
+                plan["preserved_rules_sha256"]
+                != hashlib.sha256(
+                    _json(_unmanaged_rules(plan["policy"], plan["public_key"]))
+                ).hexdigest()
+                or type(plan["verifier_not_after"]) is not int
+                or not end <= plan["verifier_not_after"] <= 9007199254740991
+            ):
+                raise ValueError()
+        elif plan["policy"]["schema"] != "secs-devgraph-work-policy.v1":
+            raise ValueError()
         created, expires = plan["created_at"], plan["expires_at"]
         if (
-            plan["schema"] != PLAN_SCHEMA
+            plan["schema"] not in {PLAN_SCHEMA, SHARED_PLAN_SCHEMA}
             or plan["stable_issuer"] != STABLE_ISSUER
             or type(plan["rotate_verifier"]) is not bool
         ):
@@ -637,6 +740,8 @@ def _validate_plan(plan):
         ):
             raise ValueError()
         previous = plan["previous_policy_digest_sha256"]
+        if shared and (previous is None or plan["policy"]["policy_version"] <= 1):
+            raise ValueError()
         if previous is not None and (
             not isinstance(previous, str) or not re.fullmatch(r"[0-9a-f]{64}", previous)
         ):
@@ -658,11 +763,45 @@ def _apply(plan):
         raise WorkGrantError("grant plan does not match the verified saved identity")
     previous = _validate_producer(_native("status"))
     current_digest = previous.get("policy_digest_sha256")
+    if plan["schema"] == SHARED_PLAN_SCHEMA and previous.get("state") == "missing":
+        raise WorkGrantError("shared authority requires a separately reviewed native installation")
     finishing = current_digest == plan["policy_digest_sha256"]
     if finishing and _receiver_matches(previous):
         raise WorkGrantError("grant plan has already been applied; renew requires a fresh plan")
     if not finishing and current_digest != plan["previous_policy_digest_sha256"]:
         raise WorkGrantError("grant plan is stale; prepare a new plan")
+    if previous.get("state") != "missing":
+        shared = plan["schema"] == SHARED_PLAN_SCHEMA
+        if shared != (previous["policy"]["schema"] == "secs-devgraph-work-policy.v2"):
+            raise WorkGrantError("grant plan cannot change the native policy format")
+        if shared and (
+            plan["preserved_rules_sha256"]
+            != hashlib.sha256(
+                _json(_unmanaged_rules(previous["policy"], plan["public_key"]))
+            ).hexdigest()
+            or plan["verifier_not_after"]
+            != max(
+                previous["registry"]["keys"][0]["not_after"],
+                _managed_policy(plan["policy"], plan["public_key"])["rules"][0]["not_after"],
+            )
+        ):
+            raise WorkGrantError(
+                "grant plan changes another holder or the reviewed signing-key deadline"
+            )
+    # Check an existing v2 binding before changing shared native authority.
+    activated_v2 = False
+    if plan["schema"] == SHARED_PLAN_SCHEMA:
+        with _receiver_directory(version=2) as directory:
+            activated_v2 = directory is not None
+            if activated_v2 and (
+                _json(_read_at(directory, "receiver.json"))
+                != _json(_receiver_manifest(previous, 2))
+                or _json(_read_at(directory, "secs-public-key-registry.json"))
+                != _json(previous["registry"])
+            ):
+                # Finishing an interrupted producer/pin cutover is deliberately
+                # held for inspection rather than trusting an unrelated binding.
+                raise WorkGrantError("activated Work v2 receiver needs binding reconciliation")
     # Validate/create private receiver storage before native producer mutation.
     with _receiver_directory(create=True) as directory:
         _read_at(directory, "receiver.json")
@@ -690,12 +829,18 @@ def _apply(plan):
                     args += ["--expected-policy-digest", current_digest]
                 if plan["rotate_verifier"]:
                     args += ["--rotate-verifier"]
+                if plan["schema"] == SHARED_PLAN_SCHEMA:
+                    args += ["--verifier-not-after", str(plan["verifier_not_after"])]
                 previous = _validate_producer(_native(*args))
         if previous["policy_digest_sha256"] != plan["policy_digest_sha256"]:
             raise WorkGrantError("native authority differs from the reviewed grant plan")
         _replace_at(directory, "secs-public-key-registry.json", previous["registry"])
         if plan["policy"]["rules"][0]["status"] != "revoked":
             _replace_at(directory, "receiver.json", _receiver_manifest(previous))
+    if activated_v2:
+        with _receiver_directory(version=2) as directory:
+            _replace_at(directory, "secs-public-key-registry.json", previous["registry"])
+            _replace_at(directory, "receiver.json", _receiver_manifest(previous, 2))
     return grant_status()
 
 
@@ -809,15 +954,19 @@ def revoke_grant():
                     with policy_file.open("xb") as file:
                         os.fchmod(file.fileno(), 0o600)
                         file.write(_json(policy))
-                    current = _validate_producer(
-                        _native(
-                            "provision",
-                            "--policy-file",
-                            policy_file,
-                            "--expected-policy-digest",
-                            previous["policy_digest_sha256"],
-                        )
-                    )
+                    args = [
+                        "provision",
+                        "--policy-file",
+                        policy_file,
+                        "--expected-policy-digest",
+                        previous["policy_digest_sha256"],
+                    ]
+                    if policy["schema"] == "secs-devgraph-work-policy.v2":
+                        args += [
+                            "--verifier-not-after",
+                            str(previous["registry"]["keys"][0]["not_after"]),
+                        ]
+                    current = _validate_producer(_native(*args))
                 if current["policy_digest_sha256"] != _digest(policy) or current["ready"]:
                     raise WorkGrantError("producer revocation did not match its policy")
                 with _receiver_directory(create=True) as directory:
