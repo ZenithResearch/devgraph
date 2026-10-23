@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "ontology_version": "0.9.0",
+  "classes": {
+    "service_endpoint": "ServiceEndpoint",
+    "credential_issuer_endpoint": "CredentialIssuerEndpoint",
+    "membership_issuer_endpoint": "MembershipIssuerEndpoint",
+    "receiver_credential_issuer_endpoint": "ReceiverCredentialIssuerEndpoint",
+    "public_verification_method": "PublicVerificationMethod"
+  },
+  "predicates": {
+    "service_to_endpoint": "EXPOSES_ENDPOINT",
+    "issuer_to_verification_method": "USES_VERIFICATION_METHOD"
+  },
+  "public_instance_record": {
+    "schema": "zenith.public-service-identity.v1",
+    "endpoint_kinds": [
+      "service",
+      "membership_issuer",
+      "receiver_credential_issuer"
+    ],
+    "fields": [
+      "id",
+      "endpoint_kind",
+      "service_instance_id",
+      "origin",
+      "route",
+      "contract_id",
+      "protocol_version",
+      "issuer_id",
+      "key_id",
+      "algorithm",
+      "public_key",
+      "audience",
+      "caller_origins",
+      "environment",
+      "state",
+      "source_revision",
+      "policy_digest_sha256",
+      "deployment_evidence"
+    ]
+  },
+  "separation": {
+    "endpoint_is_service_instance": false,
+    "endpoint_record_proves_liveness": false,
+    "endpoint_record_installs_trust": false,
+    "membership_issuer_is_receiver_issuer": false,
+    "receiver_signing_key_is_encryption_recipient_key": false,
+    "public_verification_method_contains_private_key": false,
+    "public_record_grants_authority": false
+  },
+  "forbidden_public_fields": [
+    "private_key",
+    "seed",
+    "recovery_material",
+    "bearer_token",
+    "oidc_token",
+    "deployment_secret",
+    "wallet_custody_path",
+    "secs_verifier_secret",
+    "capability_body",
+    "session_token"
+  ],
+  "runtime": {
+    "graph_labels": false,
+    "work_kinds": false,
+    "storage_migration": false,
+    "mutation_route": false
+  }
+}

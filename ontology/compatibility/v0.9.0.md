@@ -12,3 +12,9 @@ contract. Older clients can ignore the new vocabulary and retain their pinned
 ontology bundle. Registry readers skip unsupported record versions/types and
 never infer ownership or access. Public web publication, installed runtime
 upgrade and owner bootstrap remain separate deployment actions.
+
+Public service identity terms are additive and descriptive. Older consumers may
+ignore them. They do not change issuer transcripts, receiver credential schemas,
+Wallet presentation formats, encryption envelopes, trust policies or endpoint
+behavior. Instance publication and key rotation use separately versioned records;
+editing ontology vocabulary is not an operational key-rotation mechanism.

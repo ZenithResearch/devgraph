@@ -123,3 +123,21 @@ See [todo-progress.md](todo-progress.md) for the canonical three-state model, in
 - A service-instance UUID is not a Wallet key, process ID, access grant or owner signature.
 - Local registration cannot mint authority or silently replace saved issuer/TLS pins.
 - The namespace vocabulary introduces no graph labels, Work kinds or storage migrations.
+
+## Public issuer and receiver identity boundary (v0.9.0)
+
+- A `ServiceEndpoint` is a versioned route, not a `ServiceInstance`, Agent,
+  Organization, credential, Wallet identity, deployment or authority grant.
+- `MembershipIssuerEndpoint` and `ReceiverCredentialIssuerEndpoint` are separate
+  roles. A receiver credential may verify membership without becoming the
+  membership issuer.
+- A receiver signing identity is separate from the recipient encryption key.
+  Signing proves a bounded credential transcript; encryption protects an intake
+  envelope for its named recipient.
+- `PublicVerificationMethod` may contain a public key, key id and algorithm. It
+  must never contain a private key, recovery material, bearer token, deployment
+  secret or custody path.
+- Publishing an endpoint or verification method does not install trust. Clients
+  still require independently reviewed policy pins and exact contract checks.
+- These terms introduce no graph labels, constraints, Work kinds, mutation
+  routes, storage migrations or credential-issuance implementation.

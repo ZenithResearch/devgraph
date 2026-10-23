@@ -17,3 +17,8 @@ the project; see [LICENSE](../LICENSE).
 The [Zenith local space](zenith-local-space.md) vocabulary defines the independent
 `~/.zenith` namespace and its public service registry. Discovery records and
 service-instance identifiers remain separate from Wallet custody and authority.
+
+The [public service identity](public-service-identities.md) vocabulary separates
+service instances, HTTPS routes, membership issuers, receiver credential
+issuers, public verification methods and encryption recipients. The vocabulary
+publishes no private key and grants no authority.

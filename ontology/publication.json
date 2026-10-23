@@ -133,6 +133,16 @@
       "source": "ontology/zenith-local-space.json",
       "target": "zenith-local-space.json",
       "media_type": "application/json"
+    },
+    {
+      "source": "ontology/public-service-identities.md",
+      "target": "public-service-identities.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/public-service-identities.json",
+      "target": "public-service-identities.json",
+      "media_type": "application/json"
     }
   ]
 }

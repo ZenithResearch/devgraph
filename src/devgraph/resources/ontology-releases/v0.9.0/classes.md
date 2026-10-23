@@ -133,6 +133,11 @@ External systems and deliverable-like things are represented with `Artifact`, `E
 | `Agent` | Software, AI, service, or other automated entity. | `subClassOf: Entity`; `runtimeLabel: false`. |
 | `Organization` | Collective entity such as a company, project, institution, or working group. | `subClassOf: Entity`; `runtimeLabel: false`. |
 | `ZenithRepository` | Sovereign Git project conforming to the canonical Zenith filesystem contract. | `runtimeLabel: false`; reference the repository with `ExternalLink`, optional provider metadata with `SyncShadow`, and selected outputs with `Artifact`. |
+| `ServiceEndpoint` | Versioned network route exposed by a configured service instance. | `runtimeLabel: false`; a route record does not prove liveness, ownership, trust, or authority. |
+| `CredentialIssuerEndpoint` | Service endpoint that issues one named credential contract. | `subClassOf: ServiceEndpoint`; `runtimeLabel: false`. |
+| `MembershipIssuerEndpoint` | Credential issuer endpoint for a membership credential contract. | `subClassOf: CredentialIssuerEndpoint`; `runtimeLabel: false`. |
+| `ReceiverCredentialIssuerEndpoint` | Credential issuer endpoint for a short-lived receiver credential bound to an exact request, caller, audience, nonce, and expiry. | `subClassOf: CredentialIssuerEndpoint`; `runtimeLabel: false`. |
+| `PublicVerificationMethod` | Public signature-verification descriptor identified by issuer, key id, algorithm, and public key. | `runtimeLabel: false`; contains no private key or custody claim. |
 
 ### Rolodex boundary
 
@@ -181,3 +186,11 @@ See [todo-progress.md](todo-progress.md) for the canonical three-state model, in
 `ServiceInstance` describe the independent `~/.zenith` namespace and advisory
 service discovery. Each has `runtimeLabel: false`; none is a Work kind or
 authentication subject. See [Zenith local space](zenith-local-space.md).
+
+## Public service identities (v0.9.0)
+
+`ServiceEndpoint`, `CredentialIssuerEndpoint`, `MembershipIssuerEndpoint`,
+`ReceiverCredentialIssuerEndpoint` and `PublicVerificationMethod` describe
+public routes and verification material without treating a URL or key record as
+the service, operator, credential, Wallet identity or authority itself. Each has
+`runtimeLabel: false`. See [Public service identities](public-service-identities.md).
