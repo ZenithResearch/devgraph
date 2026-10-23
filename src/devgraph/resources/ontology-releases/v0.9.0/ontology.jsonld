@@ -5,7 +5,7 @@
       "@id": "https://zenith-research.ca/ontology",
       "@type": "owl:Ontology",
       "label": "Zenith Ontology",
-      "comment": "Canonical vocabulary for Zenith work, arenas, directory entities, evidence, provenance, readiness, repository structure, and transport-neutral Devgraph operations.",
+      "comment": "Canonical vocabulary for Zenith work, arenas, directory entities, evidence, provenance, readiness, repository structure, public service identities, and transport-neutral Devgraph operations.",
       "versionIRI": "https://zenith-research.ca/ontology/v0.9.0/ontology.jsonld",
       "versionInfo": "0.9.0",
       "canonicalAuthority": "https://github.com/ZenithResearch/devgraph"
@@ -450,6 +450,60 @@
       "domain": "zn:LocalResourceRegistration",
       "range": "zn:ServiceInstance",
       "comment": "Describes an advertised service instance. This advisory statement does not prove ownership, liveness, signing identity or permission."
+    },
+    {
+      "@id": "zn:ServiceEndpoint",
+      "@type": "owl:Class",
+      "label": "Service endpoint",
+      "comment": "A versioned network route exposed by a configured ServiceInstance. A route record does not prove liveness, ownership, trust, deployment identity or authority.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:CredentialIssuerEndpoint",
+      "@type": "owl:Class",
+      "label": "Credential issuer endpoint",
+      "comment": "A ServiceEndpoint that issues one named credential contract. Publication does not install issuer trust.",
+      "subClassOf": "zn:ServiceEndpoint",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:MembershipIssuerEndpoint",
+      "@type": "owl:Class",
+      "label": "Membership issuer endpoint",
+      "comment": "A CredentialIssuerEndpoint that issues a membership credential contract.",
+      "subClassOf": "zn:CredentialIssuerEndpoint",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:ReceiverCredentialIssuerEndpoint",
+      "@type": "owl:Class",
+      "label": "Receiver credential issuer endpoint",
+      "comment": "A CredentialIssuerEndpoint that issues a short-lived receiver credential bound to an exact request, holder, caller, audience, nonce and expiry. It is separate from the membership issuer and the encryption recipient.",
+      "subClassOf": "zn:CredentialIssuerEndpoint",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:PublicVerificationMethod",
+      "@type": "owl:Class",
+      "label": "Public verification method",
+      "comment": "Public signature-verification material identified by issuer, key id, algorithm and public key. It contains no private key, custody material or authority grant.",
+      "runtimeLabel": false
+    },
+    {
+      "@id": "zn:EXPOSES_ENDPOINT",
+      "@type": "owl:ObjectProperty",
+      "label": "EXPOSES_ENDPOINT",
+      "domain": "zn:ServiceInstance",
+      "range": "zn:ServiceEndpoint",
+      "comment": "Associates a configured service instance with a versioned route; does not prove liveness or control."
+    },
+    {
+      "@id": "zn:USES_VERIFICATION_METHOD",
+      "@type": "owl:ObjectProperty",
+      "label": "USES_VERIFICATION_METHOD",
+      "domain": "zn:CredentialIssuerEndpoint",
+      "range": "zn:PublicVerificationMethod",
+      "comment": "Names public material for verifying a bounded credential contract; does not grant signing authority or prove private-key custody."
     }
   ]
 }

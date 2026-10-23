@@ -100,3 +100,14 @@ rg "BLOCKS|DEPENDS_ON|HAS_REQUIREMENT|HAS_ACCEPTANCE_CRITERION|ACCEPTED_BY_DECIS
 | `DESCRIBES_SERVICE` | LocalResourceRegistration → ServiceInstance | Advisory configured-service reference. |
 
 These descriptive relationships establish no ownership, liveness, trust or permission.
+
+## Public service identities (v0.9.0)
+
+| Predicate | Shape | Meaning |
+| --- | --- | --- |
+| `EXPOSES_ENDPOINT` | ServiceInstance → ServiceEndpoint | Associates a configured service instance with one versioned route. |
+| `USES_VERIFICATION_METHOD` | CredentialIssuerEndpoint → PublicVerificationMethod | Names public material a client may use to verify that endpoint's credential contract. |
+
+These relationships are descriptive. The endpoint still requires independent
+transport, contract, trust-policy and deployment verification. A public key
+descriptor never grants signing authority or proves custody of its private key.
