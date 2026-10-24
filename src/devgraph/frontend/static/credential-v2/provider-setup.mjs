@@ -30,14 +30,22 @@ export async function prepareProviderSetup({provider,transport,origin,current=()
   if(typeof provider?.getCapabilities!=='function'||typeof provider?.requestConnection!=='function'
     ||typeof provider?.proposeProviderProfile!=='function')throw failure('wallet_upgrade_required');
   const capabilities=await provider.getCapabilities();current();
-  if(!Array.isArray(capabilities)||!['credential_presentation_v2','read_access_v1'].includes(requiredCapability)||![requiredCapability,'provider_profiles_v1','connection_v1']
-    .every(c=>capabilities.includes(c)))throw failure('wallet_upgrade_required');
+  if(!Array.isArray(capabilities)||!['credential_presentation_v2','read_access_v1'].includes(requiredCapability)
+    ||!['provider_profiles_v1','connection_v1'].every(c=>capabilities.includes(c))
+    ||!(capabilities.includes(requiredCapability)||(requiredCapability==='read_access_v1'&&capabilities.includes('graph_access_v2'))))throw failure('wallet_upgrade_required');
   const profile=await transport.getProviderProfile();current();validate(profile,origin);
   // Keep the approved proposal separate from caller-owned display objects.
   const snapshot=structuredClone(profile);
   return Object.freeze({
     accessRequests:capabilities.includes('access_request_v1'),
     graphAccessV2:capabilities.includes('graph_access_v2'),
+    setupStatus:requiredCapability==='read_access_v1'&&capabilities.includes('read_setup_status_v1')?async()=>{
+      current();const result=await provider.readAccess({operation:'setup_status',profile:structuredClone(snapshot)});current();
+      if(!shape(result,['schema','connection_approved','profile_approved'])||result.schema!=='castalia.read-setup-status.v1'
+        ||typeof result.connection_approved!=='boolean'||typeof result.profile_approved!=='boolean'
+        ||result.profile_approved&&!result.connection_approved)throw failure('wallet_setup_status_invalid');
+      return result;
+    }:null,
     get profile(){return structuredClone(snapshot);},
     approve(){
       current();

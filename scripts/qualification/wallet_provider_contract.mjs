@@ -11,7 +11,9 @@ const root=resolve(fileURLToPath(new URL('../../',import.meta.url)));
 if(!process.argv[2])throw Error('Pass a Wallet Git repository containing the pinned candidate revision');
 const repo=resolve(process.argv[2]);
 const sources=JSON.parse(await readFile(join(root,'docs/dev/generic-wallet-source-set.json'),'utf8'));
-const revision=sources.sources.wallet_generic.revision;
+if(process.argv[3]!==undefined&&process.argv[3]!=='--browser')throw Error('Only the optional --browser source role is supported');
+const sourceRole=process.argv[3]==='--browser'?'wallet_browser_public':'wallet_generic';
+const revision=sources.sources[sourceRole].revision;
 assert.match(revision,/^[0-9a-f]{40}$/);
 const source=execFileSync('git',['-C',repo,'show',`${revision}:packages/provider-types/src/provider-profiles.ts`]);
 const scratch=await mkdtemp(join(tmpdir(),'devgraph-wallet-profile-contract-'));
@@ -34,7 +36,7 @@ try{
   }
   const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
   const report={schema:'devgraph.wallet-provider-source-check.v1',status:'passed',
-    wallet_revision:revision,wallet_parser_sha256:hash(source),fixture_sha256:hash(raw),node:process.version,
+    wallet_source_role:sourceRole,wallet_revision:revision,wallet_parser_sha256:hash(source),fixture_sha256:hash(raw),node:process.version,
     devgraph_setup_sha256:hash(await readFile(join(root,'src/devgraph/frontend/static/credential-v2/provider-setup.mjs'))),
     installed_qualification:'not_run',cases:['exact_profile','separate_synchronous_ceremonies','invalid_profile_rejection']};
   await mkdir(join(root,'.sdk-validation'),{recursive:true});

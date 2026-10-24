@@ -160,7 +160,9 @@ def scope_inventory(storage, grants, *, published=None):
         rows[key] = dict(
             resource_path=selected.model_dump(mode="json", by_alias=True),
             resource=key,
-            title=str(record.properties.get("title", identifier)),
+            title=str(
+                record.properties.get("title") or record.properties.get("name") or identifier
+            ),
             parent=selected.path[-2] if len(selected.path) > 1 else None,
         )
         if len(rows) > 2000:
@@ -192,6 +194,30 @@ def scope_inventory(storage, grants, *, published=None):
             paths = intersect_paths(getattr(g, "resource_paths", ()), discovery)
             if discovery and not paths:
                 continue
+            # Authenticated operators may select a whole empty Arena for future
+            # descendants. Exact-object ceilings never imply its whole parent.
+            # Public discovery continues to use explicit published roots only.
+            if (
+                published is None
+                and not g.work_ids
+                and set(g.work_kinds) & {"Initiative", "Project", "Issue", "Task"}
+            ):
+                after_arena = None
+                for _ in range(21):
+                    arenas = storage.query("Arena", archived=False, after_id=after_arena, limit=100)
+                    for arena in arenas:
+                        selected = ResourcePath.model_validate(
+                            dict(schema="devgraph.resource-path.v1", path=["Arena/" + arena.id])
+                        )
+                        if (not g.arena_ids or arena.id in g.arena_ids) and (
+                            not paths or any(selected.contained_by(path) for path in paths)
+                        ):
+                            add(selected, arena)
+                    if len(arenas) < 100:
+                        break
+                    after_arena = arenas[-1].id
+                else:
+                    raise StorageUnavailable("scope inventory capacity exceeded")
             for kind in ("Initiative", "Project"):
                 if kind not in g.work_kinds:
                     continue

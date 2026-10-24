@@ -649,6 +649,13 @@ class AccessOperator:
                                 ).hexdigest()
                             ):
                                 raise UnauthenticatedError("exact_review_required")
+                            check_plan = getattr(
+                                self.provisioning, "require_reviewed_activation", None
+                            )
+                            if check_plan is not None:
+                                check_plan(
+                                    approved.get("plans", {}).get("activation"), plans["activation"]
+                                )
                         state = (
                             "approved_pending_activation"
                             if action.action == "approve"

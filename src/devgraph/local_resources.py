@@ -116,13 +116,15 @@ def validate_connection(value: dict) -> dict:
         and isinstance(pin["public_key"], str)
         and re.fullmatch("[a-f0-9]{64}", pin["public_key"]) is not None
     )
-    _require(value.get("network") in (None, "lan", "tailscale"))
+    _require(value.get("network") in (None, "lan", "tailscale", "local"))
     fingerprint = value.get("tls_certificate_sha256")
     _require(
         (isinstance(fingerprint, str) and re.fullmatch("[a-f0-9]{64}", fingerprint) is not None)
-        if value.get("network") == "lan"
+        if value.get("network") in ("lan", "local")
         else fingerprint is None
     )
+    if value.get("network") == "local":
+        _require(urlsplit(origin).hostname == "127.0.0.1")
     return value
 
 
@@ -242,12 +244,22 @@ def register_resource(
     name: str = "DevGraph on this Mac",
     replace: bool = False,
     home: Path | None = None,
+    expected_registration_sha256: str | None = None,
 ) -> dict:
     home = home or Path.home()
     try:
         with _locked(config_path):
             state = config_path.with_name(REGISTRATION_NAME)
             old = validate_record(_read(state)) if state.exists() or state.is_symlink() else None
+            if expected_registration_sha256 is not None:
+                import hashlib
+
+                _require(re.fullmatch("[a-f0-9]{64}", expected_registration_sha256) is not None)
+                _require(
+                    old is not None
+                    and hashlib.sha256(state.read_bytes()).hexdigest()
+                    == expected_registration_sha256
+                )
             connection = (
                 validate_connection(_read(connection_file, owned=False))
                 if connection_file

@@ -18,7 +18,7 @@ const embedded=await browser.newPage({viewport:{width:390,height:844}});
 embedded.on('pageerror',e=>errors.push(e.message));embedded.on('console',m=>{if(m.type()==='error')console.error('EMBED',m.text());});
 await embedded.route('https://wallet.example/wallet-connect?embed=1',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html><body><h1>Castalia Wallet fixture</h1><p>Unlock or import a recovery file inside Wallet.</p><script>addEventListener('message',e=>{const m=e.data;if(m.channel==='castalia.wallet.embed.v1'&&m.type==='hello')parent.postMessage({channel:m.channel,nonce:m.nonce,type:'ready'},e.origin);if(m.channel==='castalia.wallet.embed.v1'&&m.type==='request'&&m.method==='getCapabilities')parent.postMessage({channel:m.channel,nonce:m.nonce,type:'response',id:m.id,ok:true,value:['read_access_v1','provider_profiles_v1','connection_v1']},e.origin);});</script></body></html>`}));
 await embedded.goto(base+'/monitor');
-await embedded.getByRole('button',{name:'Unlock or import Wallet',exact:true}).click();
+await embedded.getByRole('button',{name:'Open Wallet website',exact:true}).click();
 try{await embedded.getByRole('button',{name:'Review server in Wallet',exact:true}).waitFor({timeout:8000});}catch(e){await embedded.screenshot({path:output+'/embedded-failure.png',fullPage:true});console.error('EMBED STATE',await embedded.locator('[data-wallet-status]').textContent(),embedded.frames().map(f=>f.url()));throw e;}
 const walletFrame=embedded.locator('[data-wallet-embed] iframe');
 assert.equal(await walletFrame.getAttribute('sandbox'),'allow-scripts allow-same-origin allow-downloads');

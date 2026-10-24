@@ -9,12 +9,48 @@
 
 ## [Unreleased]
 
+- Add an owner-bound HTTPS Wallet member endpoint with a separate request inbox,
+  exact receiver policies and opt-in dedicated loopback TLS termination. Preserve
+  the original signed owner and keep operator administration off the member URL.
+
+### Added
+
+- Add strict current-service validation for owner RPC v3 so a replaced or removed
+  HTTPS endpoint cannot silently retain local credential administration.
+
+- Provide a setup-only Wallet monitor shell for replacing the legacy pasted-key
+  graph connection UI before endpoint activation. Keep credential and graph APIs
+  closed, enforce the configured Host, and serve only the exported public UI.
+
+- Add an explicitly configured HTTPS Wallet member entry point for Tailnet, LAN,
+  and public addresses. Reuse signed credential requests and Wallet acceptance,
+  expose public connection discovery, and retain separate owner approval and
+  operator administration. A read-only binding review blocks unconfigured origins.
+
 ### Fixed
+
+- Keep extension/native Wallet connection independent of website configuration:
+  hide the optional website fallback when an injected provider is available, and
+  report missing endpoint setup separately from provider discovery.
 
 - Return constant operator error codes and exercise the matched Wallet WASM in companion acceptance — prevent diagnostic text from crossing the public boundary and refuse a partial skipped credential-flow pass.
 - Emit packed SDK declarations from the staged runtime with its existing module interfaces — keep exported TypeScript paths complete for external consumers. Add least-privilege public source CI rather than leaving the Actions scan without workflow source.
 
 ### Changed
+
+- Reuse an exact approved Wallet provider profile through the optional setup-status
+  capability — returning users avoid repeated setup review while changed profiles,
+  new read consent and server grant checks retain their existing boundaries.
+
+- Detect a compatible app-supplied Wallet through a generic browser provider hook,
+  retain the extension hook, and use Wallet-neutral connection labels. Accept the
+  native graph-v2 two-field identity without legacy membership data; keep read and
+  mutation capabilities distinct. Document the native webview boundary and events.
+
+- Guide browser Wallet access through connection, access review and credential
+  receipt, showing the current origin and recoverable request status. Add setup
+  retry and synthetic public/Tailnet browser checks at phone and desktop widths.
+  Live owner-bound endpoint rollout remains separately gated.
 
 - Reconcile the exact Wallet/secS release pins and seven-file companion inventory — retain byte-matched finite read contracts while promoting the Wallet-key operator flow through explicit source and runtime review gates.
 

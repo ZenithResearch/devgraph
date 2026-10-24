@@ -58,3 +58,26 @@ All tracked Rust lockfiles are audited by `python3 scripts/audit-rust-locks.py`;
 this includes standalone native and retained browser-host workspaces. A new
 lockfile enters the CI gate automatically. Dependency changes require new
 package evidence; previous Wallet Chrome acceptance cannot qualify new bytes.
+
+## Public Chrome extension
+
+The public organization browser package is tracked separately as
+`wallet_browser_public` in `generic-wallet-source-set.json`. It adds the generic
+`readAccess` bridge, `access_request_v1` and `graph_access_v2` to the existing
+provider-profile, connection and generic write-presentation contracts. Do not
+install the historical personal-repository development package as a fallback.
+Chrome 0.0.2 also adds `read_setup_status_v1`: connected sites can reuse an exact
+active provider profile without repeating setup review. Locked or unconnected
+Wallets disclose no stored trust; changed profiles still require review. Read
+consent and server grant checks remain mandatory.
+See [the public Wallet contract and update instructions](https://github.com/ZenithResearch/castalia-wallet/blob/7d81c5b0a9f74271fb5b2d5ea8d2711df40bf485/docs/browser-graph-access.md).
+
+Use `node scripts/qualification/wallet_provider_contract.mjs /path/to/public-wallet --browser`
+to check the pinned public parser and this receiver's profile fixture. The
+existing native/read-authority source roles retain their own historical pins;
+this additive browser role does not silently repin their frozen dependencies.
+The exact public package was also loaded in disposable Chrome with this
+DevGraph client's connect/request/read flow and a synthetic issuer/receiver.
+Real Wallet trust, consent and member-grant decisions remain separate checks.
+This browser bridge preserves existing signed bytes; it does not implement the
+separate canonical-service credential/store migration.

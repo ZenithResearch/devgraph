@@ -61,7 +61,10 @@ def create_app():
     if not path:
         raise RuntimeError("LAN access requires explicit standing configuration")
     config = ReadRuntimeConfiguration.model_validate(private_json(Path(path)))
-    if config.schema_ != "devgraph.signed-read-runtime.v8":
+    if config.schema_ not in (
+        "devgraph.signed-read-runtime.v8",
+        "devgraph.signed-read-runtime.v9",
+    ):
         raise ValueError("LAN access requires explicit runtime v8")
     origin = lan_origin(os.environ["DEVGRAPH_LAN_ORIGIN"])
     root = private_json(config.enrollment_policy_file)

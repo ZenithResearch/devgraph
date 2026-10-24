@@ -208,6 +208,13 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
         require_subset(grant, operator.ceiling)
         native.require(grant)
 
+    def _review_eligible(self, grant, base, operator, native):
+        self._eligible(grant, base, operator, native)
+
+    def _activate_native(self, db, grant, actor, action_id):
+        # Legacy runtimes require prior explicit admission; no authority setup.
+        return None
+
     @classmethod
     def _decode(cls, owner, raw, checksum):
         grant = cls.decode_write_draft(raw)
@@ -225,7 +232,7 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
     def review_write(self, grant):
         with self.inbox._database() as db:
             base, operator, native = self._write_configuration(db)
-            self._eligible(grant, base, operator, native)
+            self._review_eligible(grant, base, operator, native)
         return dict(
             schema="devgraph.write-admission-plan.v1",
             native_policy_digest=native.digest,
@@ -241,7 +248,7 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
         if not isinstance(grant, WriteAccessDraft) or grant.subject_public_key != record[1]:
             raise UnauthenticatedError("write_activation_upgrade_required")
         base, operator, native = self._write_configuration(db)
-        self._eligible(grant, base, operator, native)
+        self._review_eligible(grant, base, operator, native)
         current = self.write_current(db, record[1])
         if previous_digest != (current.digest if current else None):
             raise UnauthenticatedError("assignment_changed")
@@ -275,6 +282,7 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
             return super().activate(db, selection, record, previous_digest, actor, action_id, now)
         plan = self.preview(db, selection, record, previous_digest, now)
         grant = selection.write
+        self._activate_native(db, grant, actor, action_id)
         db.execute(
             "INSERT OR REPLACE INTO write_assignments VALUES(?,?,?,?,?,1)",
             (record[1], record[2], record[0], canonical_json(grant).decode(), grant.digest),

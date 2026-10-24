@@ -300,7 +300,7 @@ FRONTEND_HTML = r"""<!doctype html>
         <div class="check-in-date"><span>Daily check-in</span><time id="check-in-date"></time></div>
         <div class="topbar-preferences"><label class="theme-picker"><span>Theme</span><select data-theme-picker aria-label="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option><option value="aqua">Aqua</option></select></label><div class="connection"><span class="dot" id="connection-dot"></span><span id="connection-label">Disconnected</span></div></div><span class="theme-status" data-theme-status role="status" aria-live="polite"></span>
       </header>
-      <details class="connection-settings" id="connection-settings" open><summary id="connection-summary">Connect to your graph</summary>
+      <details class="connection-settings" id="connection-settings" open><summary id="connection-summary">Connect to your graph with Wallet</summary>
       __WALLET_CONNECTION__<div class="wallet-refresh"><label for="refresh-rate">Refresh</label><select id="refresh-rate"><option value="0">Manual</option><option value="10" selected>10 seconds</option><option value="30">30 seconds</option><option value="60">60 seconds</option></select><button type="button" id="refresh-now">Refresh now</button></div></details>
       <p class="status-line" id="status-line" role="status" aria-live="polite">Connect Wallet to view shared work. Counts and connections cover only your permitted scope.</p>
       <section class="daily-check-in" id="daily-check-in" aria-label="Daily check-in">

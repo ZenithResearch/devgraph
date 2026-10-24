@@ -82,6 +82,9 @@ class PublicReadBoundary:
     get_paths = GET_PATHS
     post_paths = POST_PATHS
     asset_patterns = (ASSET,)
+    concurrency_limit = 8
+    burst_capacity = 60.0
+    refill_per_second = 2
 
     def body_limit(self, path, method):
         return 65536 if method == "POST" else 0
@@ -94,7 +97,7 @@ class PublicReadBoundary:
         self.expires_at, self.clock = expires_at, clock
         self.approved_operator_policy = approved_operator_policy
         self.active = 0
-        self.tokens, self.last = 60.0, time.monotonic()
+        self.tokens, self.last = self.burst_capacity, time.monotonic()
 
     def expired(self):
         return self.clock() >= self.expires_at
@@ -155,9 +158,11 @@ class PublicReadBoundary:
         ):
             return await reject(400, "invalid_request")
         now = time.monotonic()
-        self.tokens = min(60.0, self.tokens + (now - self.last) * 2)
+        self.tokens = min(
+            self.burst_capacity, self.tokens + (now - self.last) * self.refill_per_second
+        )
         self.last = now
-        if self.active >= 8 or self.tokens < 1:
+        if self.active >= self.concurrency_limit or self.tokens < 1:
             return await reject(429, "try_later")
         self.tokens -= 1
         self.active += 1

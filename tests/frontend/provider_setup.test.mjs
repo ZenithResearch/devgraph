@@ -52,3 +52,12 @@ test('legacy locked errors are actionable without disclosing arbitrary provider 
   const setup=await prepareProviderSetup(f);
   await assert.rejects(setup.connect(),{code:'authorization_failed',message:'authorization_failed'});
 });
+
+
+test('graph read capability does not imply mutation presentation capability',async()=>{
+  const f=fixture();f.provider.getCapabilities=async()=>['graph_access_v2','provider_profiles_v1','connection_v1'];
+  const reader=await prepareProviderSetup({...f,requiredCapability:'read_access_v1'});
+  assert.equal(reader.graphAccessV2,true);assert.deepEqual(f.calls,[]);
+  await assert.rejects(prepareProviderSetup(f),{code:'wallet_upgrade_required'});
+  assert.deepEqual(f.calls,[]);
+});

@@ -20,6 +20,31 @@ test('read connection requires provider, site and read approvals before loading 
  await client.read('/monitor/topology/v1');assert.equal(events.at(-1),'present');
  const profile=client.preferenceSeed;client.disconnect();assert.equal(client.sessionKey,'');assert.ok(profile);await assert.rejects(client.read('/monitor/topology/v1'));
 });
+test('returning connected Wallet skips unchanged server review without issuing or approving a credential',async()=>{
+ const {client,provider,events}=fixture();const read=provider.readAccess;
+ provider.getCapabilities=async()=>['read_access_v1','provider_profiles_v1','connection_v1','read_setup_status_v1'];
+ provider.readAccess=async input=>input.operation==='setup_status'?{schema:'castalia.read-setup-status.v1',connection_approved:true,profile_approved:true}:read(input);
+ provider.proposeProviderProfile=()=>{throw Error('repeated profile consent');};provider.requestConnection=()=>{throw Error('repeated site consent');};
+ await client.initialize();await client.useProvider(provider);assert.equal(client.stage,'approval');
+ assert.deepEqual(events,['identity']);assert.equal(client.sessionKey,'');
+ await client.advance();assert.equal(client.stage,'ready');assert.equal(events.filter(x=>x==='approve').length,1);
+});
+test('Wallet setup discovery connects the site before querying saved trust and still reviews changed settings',async()=>{
+ for(const profileApproved of [true,false]){
+  const {client,provider}=fixture();const read=provider.readAccess;let connected=false,reviews=0;
+  provider.getCapabilities=async()=>['read_access_v1','provider_profiles_v1','connection_v1','read_setup_status_v1'];
+  provider.readAccess=async input=>input.operation==='setup_status'?{schema:'castalia.read-setup-status.v1',connection_approved:connected,profile_approved:connected&&profileApproved}:read(input);
+  provider.requestConnection=async()=>{connected=true;return{state:'connected'};};provider.proposeProviderProfile=async()=>{reviews++;return{state:'approved'};};
+  await client.initialize();await client.useProvider(provider);assert.equal(client.stage,'connection');await client.advance();
+  assert.equal(client.stage,profileApproved?'approval':'profile');assert.equal(reviews,0);
+  if(!profileApproved){await client.advance();assert.equal(reviews,1);assert.equal(client.stage,'approval');}
+ }
+});
+test('malformed or stale Wallet setup discovery cannot skip server review',async()=>{
+ const {client,provider}=fixture();provider.getCapabilities=async()=>['read_access_v1','provider_profiles_v1','connection_v1','read_setup_status_v1'];
+ provider.readAccess=async()=>({schema:'castalia.read-setup-status.v1',connection_approved:false,profile_approved:true});
+ await client.initialize();await assert.rejects(client.useProvider(provider),/wallet_setup_status_invalid/);assert.equal(client.identity,null);
+});
 test('scope does not become arbitrary read or write transport',async()=>{
  const {client,provider,events}=fixture();await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();await client.advance();
  for(const path of ['/work-operations/v1','https://evil.example/','/local/config','/todos/v2/Task/one/../../other'])await assert.rejects(client.read(path));
@@ -100,10 +125,10 @@ for(const [origin,hint] of [['https://pilot.ngrok-free.app',true],['https://grap
 
 test('advertised graph v2 uses its separate read API without community membership or metadata leakage',async()=>{
  const {client,provider,events}=fixture();
- provider.getCapabilities=async()=>['read_access_v1','provider_profiles_v1','connection_v1','access_request_v1','graph_access_v2'];
+ provider.getCapabilities=async()=>['provider_profiles_v1','connection_v1','access_request_v1','graph_access_v2'];
  const old=provider.readAccess,network=client.fetchImpl;
  provider.readAccess=async input=>{
-  if(input.operation==='identity')return{subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32),memberships:[]};
+  if(input.operation==='identity')return{subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32)};
   if(input.operation==='request'){assert.equal(input.profileId,undefined);return{approval:{challenge:input.challenge,signature:'x'.repeat(86),proof:{}}};}
   assert.notEqual(input.operation,'approve');assert.notEqual(input.operation,'accept');assert.notEqual(input.operation,'present');
   if(input.operation.endsWith('_graph_v2')){events.push(input.operation);return old({...input,operation:input.operation.replace('_graph_v2','')});}return old(input);
@@ -113,4 +138,13 @@ test('advertised graph v2 uses its separate read API without community membershi
  await client.read('/monitor/topology/v1');assert.ok(events.includes('approve_graph_v2'));assert.ok(events.includes('accept_graph_v2'));assert.ok(events.includes('present_graph_v2'));
  const challenge={receiver:'https://graph.example',subject_public_key:'b'.repeat(64),installation_id:'c'.repeat(32),details:{schema:'devgraph.access-request-action.v2'}};
  assert.deepEqual((await client.approveAccess(challenge)).proof,{});client.disconnect();assert.equal(client.graphAccessV2,false);
+});
+
+
+test('endpoint setup failure is distinguished from provider or website configuration',async()=>{
+ const {client}=fixture();client.fetchImpl=async()=>({ok:false,status:503,json:async()=>({error:'endpoint_wallet_setup_required'})});
+ await assert.rejects(client.initialize(),{code:'endpoint_wallet_setup_required',status:503});
+ assert.equal(client.configuration,null);assert.equal(client.stage,'unavailable');
+ // Only the exact setup response at the public configuration route gets this code.
+ await assert.rejects(client.fetch('/monitor/wallet-access/v1/challenges',{body:{}}),{code:'read_unavailable'});
 });

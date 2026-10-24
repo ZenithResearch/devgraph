@@ -16,6 +16,7 @@ BASE = "/devgraph/access-operator/v1"
 
 def register_access_operator(app: FastAPI, operator):
     app.state.access_operator_enabled = True
+    app.state.access_operator = operator
 
     async def handle(request, challenge=False):
         headers = {"Cache-Control": "no-store"}

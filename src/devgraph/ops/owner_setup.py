@@ -105,13 +105,15 @@ class OwnerContainer(_Closed):
 
 
 class OwnerSetupPlan(_Closed):
-    schema_: Literal["zenith.devgraph-owner-setup.v1", "zenith.devgraph-owner-setup.v2"] = Field(
-        alias="schema"
-    )
+    schema_: Literal[
+        "zenith.devgraph-owner-setup.v1",
+        "zenith.devgraph-owner-setup.v2",
+        "zenith.devgraph-owner-setup.v3",
+    ] = Field(alias="schema")
     status: Literal["prepared_not_applied"]
     resource_id: str
     resource_name: str = Field(min_length=1, max_length=80)
-    local_endpoint: Literal["http://127.0.0.1:8080"]
+    local_endpoint: str
     registration_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     configuration_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     owner_public_key: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -128,6 +130,31 @@ class OwnerSetupPlan(_Closed):
 
     @model_validator(mode="after")
     def valid(self):
+        if self.schema_ == "zenith.devgraph-owner-setup.v3":
+            source = urlsplit(self.local_endpoint)
+            if (
+                source.scheme != "http"
+                or source.hostname != "127.0.0.1"
+                or source.path
+                or source.query
+                or source.fragment
+                or source.username is not None
+                or source.password is not None
+                or source.port is None
+                or not 1024 <= source.port <= 65535
+                or self.local_endpoint != f"http://127.0.0.1:{source.port}"
+                or urlsplit(self.wallet_endpoint).hostname != "127.0.0.1"
+                or self.preset != "project-manager"
+                or self.scope_mode != "global"
+                or self.paths
+                or self.not_after is not None
+                or self.publish_hierarchy
+                or self.write_operations != SHORT_OPERATIONS
+                or self.read_operations != ("list", "get", "relationships")
+            ):
+                raise ValueError("local default-owner upgrade required")
+        elif self.local_endpoint != "http://127.0.0.1:8080":
+            raise ValueError("historical local endpoint changed")
         if self.schema_ == "zenith.devgraph-owner-setup.v1":
             if {"read_operations", "preset_snapshot"} & self.model_fields_set:
                 raise ValueError("v1 setup cannot contain v2 fields")

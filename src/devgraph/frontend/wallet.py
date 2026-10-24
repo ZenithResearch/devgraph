@@ -1,22 +1,27 @@
 """Shared Wallet-owned connection controls; no secret inputs."""
 
 WALLET_CONNECTION_HTML = r'''      <div class="wallet-connection" id="wallet-read-connection">
+        <header class="wallet-connection-heading">
+<strong>Access DevGraph with Wallet</strong>
+<span data-wallet-server aria-label="Current DevGraph server"></span>
+</header>
+<ol class="wallet-connection-steps" aria-label="Wallet access progress">
+<li data-wallet-step="1">Connect Wallet</li>
+<li data-wallet-step="2">Request or check access</li>
+<li data-wallet-step="3">Receive credential</li>
+</ol>
         <p data-wallet-status role="status" aria-live="polite">Preparing Wallet connection…</p>
+<p data-wallet-provider-status role="status" aria-live="polite" hidden></p>
         <div class="wallet-connection-actions">
-<button type="button" class="button" data-wallet-chrome>Use Chrome Wallet</button>
-<button type="button" data-wallet-web>Unlock or import Wallet</button>
+<button type="button" class="button" data-wallet-chrome>Use Wallet</button>
 <button type="button" data-wallet-advance hidden>Continue in Wallet</button>
 <button type="button" data-wallet-request hidden>Request access</button>
+<button type="button" data-wallet-retry hidden>Retry connection setup</button>
 <button type="button" data-wallet-disconnect hidden>Disconnect</button>
 </div>
 <p data-wallet-request-status role="status" aria-live="polite" hidden></p>
 <section data-wallet-request-options hidden aria-label="Access request preferences"></section>
 <button type="button" data-wallet-new-request hidden>Request different access</button>
-        <section class="wallet-embedded" data-wallet-embed hidden
-aria-label="Embedded Castalia Wallet">
-<header><strong>Castalia Wallet</strong><span data-wallet-origin></span></header>
-<div data-wallet-frame></div>
-</section>
         <label data-wallet-membership-label hidden>Membership<select data-wallet-membership>
 <option value="">Choose membership</option>
 </select>
@@ -31,13 +36,17 @@ and do not grant access.</p>
 </details>
         <details class="wallet-connection-settings" data-wallet-settings>
 <summary>Wallet connection help</summary>
-<p>The installed Chrome Wallet is selected automatically. In other browsers, unlock
-or import your Wallet below in the embedded Castalia Wallet.
-Your file, password and keys stay in Wallet.</p>
-<label>Wallet website<input data-wallet-url type="url" inputmode="url" autocomplete="url"
-placeholder="https://wallet.example" spellcheck="false">
-</label>
-<p>Use the address supplied by your Wallet provider.
-Your server and Wallet provider must both enable this embedded connection.</p>
+<p>A compatible Wallet supplied by your browser or its host app is detected
+automatically. This includes a native Wallet connected by an app’s browser.
+An extension or native Wallet connects directly.
+Your file, password and keys stay in your chosen Wallet.</p>
+<p>Wallet checks existing access before you need to request anything.
+Request access only when no current grant is available or you need different permissions.
+The service owner’s approval remains until its expiry or revocation; signing in
+again does not require another owner review. Wallet reviews the read scope and
+verifies the returned credential automatically.</p>
+<p>If Wallet is not detected, use the Chrome profile where Castalia is installed
+and enable it for this site. Choose Check for Wallet to detect it again.
+This page never asks you to enter a Wallet website or recovery password.</p>
 </details>
       </div>'''
