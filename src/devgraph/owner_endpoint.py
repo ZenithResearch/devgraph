@@ -18,11 +18,17 @@ from devgraph.signed_read_runtime import ReadRuntimeConfiguration, private_json
 def endpoint_operator_policy(config, *, data_root):
     from devgraph.signed_read_runtime import owner_operator_policy
 
-    if config.schema_ != "devgraph.signed-read-runtime.v10" or data_root is None:
+    if (
+        config.schema_
+        not in ("devgraph.signed-read-runtime.v10", "devgraph.signed-read-runtime.v11")
+        or data_root is None
+    ):
         raise ValueError("explicit published endpoint required")
     parent = ReadRuntimeConfiguration.model_validate(private_json(config.owner_parent_runtime_file))
     if (
-        parent.schema_ != "devgraph.signed-read-runtime.v9"
+        parent.schema_
+        not in ("devgraph.signed-read-runtime.v9", "devgraph.signed-read-runtime.v11")
+        or parent.owner_parent_runtime_file is not None
         or parent.owner_bootstrap_database_file is None
         or parent.owner_install_review_file is None
     ):

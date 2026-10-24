@@ -45,6 +45,8 @@ class SecsReadAuthority:
 
     @staticmethod
     def policy_for(policy: EnrollmentPolicy, *, key_id: str, public_key: str) -> dict:
+        from devgraph.auth.arena_access import permission_operation, read_operations
+
         return {
             "schema": "castalia.read-policy.v1",
             "issuer": policy.issuer,
@@ -55,14 +57,14 @@ class SecsReadAuthority:
             "max_lifetime_seconds": policy.lifetime_seconds,
             "permissions": [
                 {
-                    "operation": "devgraph.work." + operation,
+                    "operation": permission_operation(grant, operation),
                     "resource": RESOURCE,
                     "constraints": grant.model_dump(
                         mode="json", by_alias=True, exclude_defaults=True
                     ),
                 }
                 for grant in policy.grants
-                for operation in grant.operations
+                for operation in read_operations(grant)
             ],
         }
 
@@ -117,6 +119,9 @@ class SignedReadEnrollment(NativeReadEnrollment):
                 "CREATE TABLE IF NOT EXISTS read_replay (credential_id TEXT, nonce TEXT, "
                 "expires INTEGER NOT NULL, PRIMARY KEY(credential_id,nonce))"
             )
+
+    def _verified_grants(self, verified, credential):
+        return self._decode_grants(verified["permissions"])
 
     def _authority_policy(self, policy: EnrollmentPolicy) -> dict:
         configured = self.authority.policy()
@@ -178,7 +183,8 @@ class SignedReadEnrollment(NativeReadEnrollment):
         return tuple(
             WorkReadGrant.model_validate(p["constraints"]).model_copy(
                 update={"operations": (p["operation"].removeprefix("devgraph.work."),)}
-            ) for p in permissions
+            )
+            for p in permissions
         )
 
     def _manifest_current(self, manifest: dict, current: int) -> bool:
@@ -210,7 +216,8 @@ class SignedReadEnrollment(NativeReadEnrollment):
                     and self.membership_check(membership, manifest["subject_public_key"])
                 )
                 verified = self._invoke(
-                    authority_policy, "verify",
+                    authority_policy,
+                    "verify",
                     credential=credential,
                     call=call,
                     proof=proof,
@@ -219,7 +226,7 @@ class SignedReadEnrollment(NativeReadEnrollment):
                 )
                 # Only typed Work constraints from the verified operation become
                 # selectors. Filtering still happens inside DelegatedReadService.
-                grants = self._decode_grants(verified["permissions"])
+                grants = self._verified_grants(verified, credential)
                 if verified["credential_id"] != manifest["credential_id"]:
                     raise UnauthenticatedError("invalid_credential")
                 db.execute("DELETE FROM read_replay WHERE expires <= ?", (current,))
@@ -244,7 +251,7 @@ class SignedReadEnrollment(NativeReadEnrollment):
                 actor_id=identifier,
                 session_id=identifier,
                 correlation_id=identifier,
-                scopes=frozenset({"devgraph.work.read"}),
+                scopes=frozenset(g.scope for g in grants),
                 expires_at=datetime.fromtimestamp(verified["expires_at"], timezone.utc),
                 issuer=policy.issuer,
                 audience="devgraph",

@@ -453,9 +453,14 @@ def prepare(
             .hex()
         )
     ceiling = policy.ceiling.model_dump(mode="json", by_alias=True, exclude_defaults=True)
-    root_policy = PathEnrollmentPolicy.model_validate(
+    from devgraph.auth.arena_access import ArenaEnrollmentPolicy, ArenaMemberPolicy
+
+    arena = policy.ceiling.schema_ == "devgraph.access-draft.v6"
+    policy_type = ArenaEnrollmentPolicy if arena else PathEnrollmentPolicy
+    member_type = ArenaMemberPolicy if arena else StandingMemberPolicy
+    root_policy = policy_type.model_validate(
         dict(
-            schema="devgraph.native-read-policy.v3",
+            schema="devgraph.native-read-policy.v4" if arena else "devgraph.native-read-policy.v3",
             issuer=policy.ceiling.issuer,
             receiver=plan.wallet_endpoint,
             grants=ceiling["read_grants"],
@@ -469,9 +474,11 @@ def prepare(
     )
     documents = {
         "operators.json": policy.model_dump(mode="json", by_alias=True, exclude_defaults=True),
-        "members.json": StandingMemberPolicy.model_validate(
+        "members.json": member_type.model_validate(
             dict(
-                schema="devgraph.member-access-policy.v4",
+                schema="devgraph.member-access-policy.v5"
+                if arena
+                else "devgraph.member-access-policy.v4",
                 revision=1,
                 ceiling=ceiling,
                 assignments=[],
@@ -493,7 +500,7 @@ def prepare(
 
     copy_package(Path(devgraph.__file__).parent, root / "source/devgraph")
     runtime = dict(
-        schema="devgraph.signed-read-runtime.v9",
+        schema="devgraph.signed-read-runtime.v11" if arena else "devgraph.signed-read-runtime.v9",
         membership_requirement="optional",
         owner_native_admission_directory=str(root / "state/native-admission"),
         access_inbox_database_file=str(root / "state/inbox.sqlite"),

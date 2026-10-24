@@ -14,7 +14,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, TypeAdapter, field_validator, model_validator
 
 from devgraph.auth.access_catalog import DEFAULT_PRESETS, PublishedPath
 from devgraph.auth.access_policy import _Closed
@@ -224,6 +224,21 @@ class OwnerSetupPlan(_Closed):
         return self
 
 
+class ArenaOwnerSetupPlan(OwnerSetupPlan):
+    schema_: Literal["zenith.devgraph-owner-setup.v4"] = Field(alias="schema")
+    arena_read_ids: tuple[str, ...] = Field(min_length=1, max_length=256)
+
+    @field_validator("arena_read_ids", mode="before")
+    @classmethod
+    def identifiers(cls, value):
+        from devgraph.auth.delegated_contract import ArenaReadGrant
+
+        ids = ArenaReadGrant(scope="devgraph.arena.read", arena_ids=value).arena_ids
+        for identifier in ids:
+            validate_work_object_id(identifier)
+        return ids
+
+
 def decode_plan(raw: bytes) -> OwnerSetupPlan:
     if not isinstance(raw, bytes) or not 0 < len(raw) <= 65536:
         raise ValueError("invalid owner setup size")
@@ -236,7 +251,9 @@ def decode_plan(raw: bytes) -> OwnerSetupPlan:
             value[key] = item
         return value
 
-    return OwnerSetupPlan.model_validate(json.loads(raw, object_pairs_hook=unique))
+    return TypeAdapter(ArenaOwnerSetupPlan | OwnerSetupPlan).validate_python(
+        json.loads(raw, object_pairs_hook=unique)
+    )
 
 
 def compile_operator_policy(
@@ -284,21 +301,33 @@ def compile_operator_policy(
         read.update(schema="devgraph.path-read-grant.v1", resource_paths=paths)
         for item in writes:
             item.update(schema="devgraph.path-write-grant.v1", resource_paths=paths)
-    ceiling = StandingAccessDraft.model_validate(
+    draft_type, operator_type = StandingAccessDraft, StandingOperatorPolicy
+    draft_schema, operator_schema = "devgraph.access-draft.v5", "devgraph.access-operator-policy.v4"
+    reads = [read] if read["operations"] else []
+    if isinstance(plan, ArenaOwnerSetupPlan):
+        from devgraph.auth.arena_access import ArenaAccessDraft, ArenaOperatorPolicy
+
+        draft_type, operator_type = ArenaAccessDraft, ArenaOperatorPolicy
+        draft_schema, operator_schema = (
+            "devgraph.access-draft.v6",
+            "devgraph.access-operator-policy.v5",
+        )
+        reads.append(dict(scope="devgraph.arena.read", arena_ids=plan.arena_read_ids))
+    ceiling = draft_type.model_validate(
         dict(
-            schema="devgraph.access-draft.v5",
+            schema=draft_schema,
             issuer=issuer,
             receiver=plan.wallet_endpoint,
             validity=json.loads(validity.to_json()),
             lifetime_seconds=900,
-            read_grants=[read] if read["operations"] else [],
+            read_grants=reads,
             write_grants=writes,
             write_audience="devgraph://receiver-local",
         )
     )
-    return StandingOperatorPolicy.model_validate(
+    return operator_type.model_validate(
         dict(
-            schema="devgraph.access-operator-policy.v4",
+            schema=operator_schema,
             revision=1,
             operator_public_keys=[plan.owner_public_key],
             ceiling=ceiling,

@@ -125,9 +125,22 @@ def test_installed_evidence_requires_all_three_exact_source_revisions():
             check_candidate_sources(changed, "c" * 40, sources)
 
 
-def test_private_history_is_fetched_by_immutable_lockfile_revisions():
-    assert wallet_revisions()
-    assert all(len(revision) == 40 for revision in wallet_revisions())
+def test_public_wallet_builds_have_no_private_history_dependencies():
+    # The active SDKs and their transitive compatibility dependency have moved
+    # together. Reintroducing a private source must fail this admission gate.
+    assert wallet_revisions() == []
+    import re
+
+    pin = json.loads((ROOT / "docs/dev/generic-wallet-source-set.json").read_text())["sources"][
+        "wallet_shared"
+    ]["revision"]
+    for name in ("devgraph-client-native", "devgraph-browser-host"):
+        raw = (ROOT / "crates" / name / "Cargo.lock").read_text()
+        refs = re.findall(
+            r"git\+https://github.com/ZenithResearch/castalia-wallet\.git\?rev=([0-9a-f]{40})#([0-9a-f]{40})",
+            raw,
+        )
+        assert refs and set(refs) == {(pin, pin)}
 
 
 def test_manual_pipelines_do_not_publish_private_source_or_fixture_logs():

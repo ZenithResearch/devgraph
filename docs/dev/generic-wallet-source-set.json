@@ -15,7 +15,13 @@
     },
     "wallet_legacy_decoder": {
       "revision": "3216144e8df04582e921810462845efc8c2cf390",
-      "scope": "Frozen compatibility decoder dependency, not a supported Wallet install or fallback signer. Removal remains gated by Devgraph installed qualification."
+      "scope": "Frozen compatibility decoder dependency, not a supported Wallet install or fallback signer. Removal remains gated by Devgraph installed qualification.",
+      "active_source": {
+        "repository": "https://github.com/ZenithResearch/castalia-wallet",
+        "revision": "575895f70e4cbdc982b7c9271b468470271dbb0b",
+        "path": "compat/castalia-wallet-devgraph-presentation",
+        "compatibility": "Legacy implementation bytes unchanged; SOURCE.json retains original hashes. Transitive old source is redirected by an explicit Cargo patch, not retired."
+      }
     },
     "secs_legacy_contracts": {
       "revision": "11e7128e49c6df57f53e4c8b05e72d4bc78d798c",
@@ -23,10 +29,16 @@
     },
     "wallet_browser_public": {
       "repository": "https://github.com/ZenithResearch/castalia-wallet",
-      "revision": "7d81c5b0a9f74271fb5b2d5ea8d2711df40bf485",
+      "revision": "575895f70e4cbdc982b7c9271b468470271dbb0b",
       "pr": "https://github.com/ZenithResearch/castalia-wallet/pull/6",
       "status": "Public application-neutral browser access-request/read bridge and read_setup_status_v1; local exact-package Chrome/client qualification passed, including reload without repeated setup consent, with synthetic service. Real-user acceptance separate.",
-      "scope": "Browser package only. Historical native/read-authority compatibility pins remain unchanged."
+      "scope": "Public shared Wallet producer. Native compatibility is retained from the same public source."
+    },
+    "wallet_shared": {
+      "repository": "https://github.com/ZenithResearch/castalia-wallet",
+      "revision": "575895f70e4cbdc982b7c9271b468470271dbb0b",
+      "core_version": "0.2.0",
+      "scope": "Shared current producer for native, extension, Web custody and consumer contracts. Exact artifact qualification is recorded separately."
     }
   },
   "read_authority": {

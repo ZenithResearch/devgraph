@@ -56,7 +56,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 [[package]]
 name = "castalia-wallet-devgraph-presentation"
 version = "0.1.0"
-source = "git+https://github.com/bananawalnut/castalia-wallet.git?rev=3216144e8df04582e921810462845efc8c2cf390#3216144e8df04582e921810462845efc8c2cf390"
+source = "git+https://github.com/ZenithResearch/castalia-wallet.git?rev=575895f70e4cbdc982b7c9271b468470271dbb0b#575895f70e4cbdc982b7c9271b468470271dbb0b"
 dependencies = [
  "base64 0.22.1",
  "devgraph-work-protocol",
@@ -68,7 +68,7 @@ dependencies = [
 [[package]]
 name = "castalia-wallet-presentation"
 version = "0.1.0"
-source = "git+https://github.com/bananawalnut/castalia-wallet.git?rev=6c9c2e5819547ed6a2170c129ca6dc1d6c501516#6c9c2e5819547ed6a2170c129ca6dc1d6c501516"
+source = "git+https://github.com/ZenithResearch/castalia-wallet.git?rev=575895f70e4cbdc982b7c9271b468470271dbb0b#575895f70e4cbdc982b7c9271b468470271dbb0b"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",

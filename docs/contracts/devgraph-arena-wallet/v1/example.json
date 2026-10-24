@@ -1,0 +1,552 @@
+{
+  "schema": "devgraph.arena-wallet-fixture.v1",
+  "qualification": "Synthetic contract examples only. No user keys, live grants, or installed configuration.",
+  "owner_plan": {
+    "arena_read_ids": [
+      "research"
+    ],
+    "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "local_endpoint": "http://127.0.0.1:8080",
+    "not_before": 100,
+    "owner_public_key": "1111111111111111111111111111111111111111111111111111111111111111",
+    "paths": [],
+    "preset": "project-manager",
+    "publish_hierarchy": false,
+    "read_operations": [
+      "list",
+      "get",
+      "relationships"
+    ],
+    "registration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "resource_id": "5b4e45ac-6e51-43ee-aad0-f1818a43f252",
+    "resource_name": "Local DevGraph",
+    "schema": "zenith.devgraph-owner-setup.v4",
+    "scope_mode": "global",
+    "status": "prepared_not_applied",
+    "wallet_endpoint": "https://127.0.0.1:18443",
+    "write_operations": [
+      "create",
+      "patch",
+      "progress.set",
+      "dependency.add",
+      "dependency.remove",
+      "blocker.add",
+      "blocker.remove",
+      "parent.set",
+      "workflow.assign",
+      "workflow.transition",
+      "archive",
+      "restore"
+    ]
+  },
+  "operator_policy": {
+    "ceiling": {
+      "issuer": "devgraph-5b4e45ac-6e51-43ee-aad0-f1818a43f252",
+      "lifetime_seconds": 900,
+      "read_grants": [
+        {
+          "include_archived": false,
+          "operations": [
+            "list",
+            "get",
+            "relationships"
+          ],
+          "relationship_types": [
+            "children",
+            "parent",
+            "dependencies",
+            "dependents",
+            "blockers",
+            "blocked"
+          ],
+          "scope": "devgraph.work.read",
+          "work_kinds": [
+            "Initiative",
+            "Project",
+            "Issue",
+            "Task"
+          ]
+        },
+        {
+          "arena_ids": [
+            "research"
+          ],
+          "scope": "devgraph.arena.read"
+        }
+      ],
+      "receiver": "https://127.0.0.1:18443",
+      "schema": "devgraph.access-draft.v6",
+      "validity": {
+        "mode": "until_revoked",
+        "not_before": 100,
+        "schema": "castalia.grant-validity.v1"
+      },
+      "write_audience": "devgraph://receiver-local",
+      "write_grants": [
+        {
+          "operation": "devgraph.work.create.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.patch.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.progress.set.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.dependency.add.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.dependency.remove.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.blocker.add.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.blocker.remove.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.parent.set.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.workflow.assign.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.workflow.transition.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.archive.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.restore.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        }
+      ]
+    },
+    "operator_public_keys": [
+      "1111111111111111111111111111111111111111111111111111111111111111"
+    ],
+    "revision": 1,
+    "schema": "devgraph.access-operator-policy.v5"
+  },
+  "member_policy": {
+    "schema": "devgraph.member-access-policy.v5",
+    "revision": 1,
+    "ceiling": {
+      "issuer": "devgraph-5b4e45ac-6e51-43ee-aad0-f1818a43f252",
+      "lifetime_seconds": 900,
+      "read_grants": [
+        {
+          "include_archived": false,
+          "operations": [
+            "list",
+            "get",
+            "relationships"
+          ],
+          "relationship_types": [
+            "children",
+            "parent",
+            "dependencies",
+            "dependents",
+            "blockers",
+            "blocked"
+          ],
+          "scope": "devgraph.work.read",
+          "work_kinds": [
+            "Initiative",
+            "Project",
+            "Issue",
+            "Task"
+          ]
+        },
+        {
+          "arena_ids": [
+            "research"
+          ],
+          "scope": "devgraph.arena.read"
+        }
+      ],
+      "receiver": "https://127.0.0.1:18443",
+      "schema": "devgraph.access-draft.v6",
+      "validity": {
+        "mode": "until_revoked",
+        "not_before": 100,
+        "schema": "castalia.grant-validity.v1"
+      },
+      "write_audience": "devgraph://receiver-local",
+      "write_grants": [
+        {
+          "operation": "devgraph.work.create.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.patch.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.progress.set.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.dependency.add.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.dependency.remove.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.blocker.add.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.blocker.remove.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.parent.set.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.workflow.assign.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.workflow.transition.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.archive.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        },
+        {
+          "operation": "devgraph.work.restore.v2",
+          "resources": [
+            {
+              "kind": "Initiative"
+            },
+            {
+              "kind": "Project"
+            },
+            {
+              "kind": "Issue"
+            },
+            {
+              "kind": "Task"
+            }
+          ]
+        }
+      ]
+    },
+    "assignments": []
+  }
+}
