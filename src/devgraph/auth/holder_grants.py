@@ -225,6 +225,10 @@ class HolderGrantHost:
         if provider.path.resolve() != self.enrollment.path.resolve():
             db.execute("ATTACH DATABASE ? AS holder_provider", (str(provider.path),))
             namespace = "holder_provider"
+        if db.execute(f"PRAGMA {namespace}.journal_mode").fetchone() != ("delete",) or db.execute(
+            f"PRAGMA {namespace}.synchronous"
+        ).fetchone() != (2,):
+            raise UnauthenticatedError("canonical_durability_required")
         snapshot = provider._registry()
         row = db.execute(
             f"SELECT revision,digest FROM {namespace}.member_policy_revision WHERE id=1"
