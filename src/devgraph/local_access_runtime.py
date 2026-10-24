@@ -30,7 +30,12 @@ def local_origin(value):
 
 class LocalAccessBoundary(LanAccessBoundary):
     get_paths = frozenset(
-        ("/.well-known/devgraph-connection.json", "/live", "/devgraph/access-requests/v2/catalog")
+        (
+            "/.well-known/devgraph-connection.json",
+            "/live",
+            "/devgraph/access-requests/v2/catalog",
+            "/monitor/wallet-access/v1",
+        )
     )
     asset_patterns = ()
 

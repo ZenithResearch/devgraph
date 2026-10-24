@@ -29,11 +29,11 @@ def _unique(pairs):
     return value
 
 
-async def _body(request: Request, fields: set[str]) -> dict:
+async def _body(request: Request, fields: set[str], *, maximum_bytes=65536) -> dict:
     data = bytearray()
     async for part in request.stream():
         data.extend(part)
-        if len(data) > 65536:
+        if len(data) > maximum_bytes:
             raise UnauthenticatedError("invalid_request")
     try:
         value = json.loads(

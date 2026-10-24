@@ -320,3 +320,36 @@ def test_runtime_selects_one_explicit_canonical_provider_and_rejects_chains(tmp_
     save(canonical, dict(provider, issuer_key_file=str(tmp_path / "different-key")))
     with pytest.raises(ValueError, match="ownership or eligibility"):
         runtime.create_app()
+
+
+def test_opt_in_holder_transport_budget_preserves_legacy_body_limit():
+    import asyncio
+
+    from starlette.requests import Request
+
+    from devgraph.api.native_read import _body
+    from devgraph.lan_access_runtime import LanAccessBoundary
+    from devgraph.public_read_runtime import PublicReadBoundary
+
+    raw = json.dumps(dict(credential={"padding": "x" * 70000}, call={}, proof={})).encode()
+
+    def request(data):
+        async def receive():
+            return {"type": "http.request", "body": data, "more_body": False}
+
+        return Request({"type": "http", "method": "POST", "path": "/"}, receive)
+
+    with pytest.raises(UnauthenticatedError):
+        asyncio.run(_body(request(raw), {"credential", "call", "proof"}))
+    assert (
+        asyncio.run(_body(request(raw), {"credential", "call", "proof"}, maximum_bytes=131072))[
+            "call"
+        ]
+        == {}
+    )
+    with pytest.raises(UnauthenticatedError):
+        asyncio.run(_body(request(raw * 2), {"credential", "call", "proof"}, maximum_bytes=131072))
+    for boundary in [PublicReadBoundary, LanAccessBoundary]:
+        instance = object.__new__(boundary)
+        assert instance.body_limit("/monitor/wallet-access/v1/requests", "POST") == 131072
+        assert instance.body_limit("/monitor/wallet-access/v1/challenges", "POST") == 65536

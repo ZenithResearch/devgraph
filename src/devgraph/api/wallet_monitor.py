@@ -208,7 +208,13 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
 
     @app.post(BASE + "/requests")
     async def request_read(request: Request):
-        body = await _body(request, {"credential", "call", "proof"})
+        body = await _body(
+            request,
+            {"credential", "call", "proof"},
+            maximum_bytes=(
+                131072 if getattr(enrollment, "holder_grants", None) is not None else 65536
+            ),
+        )
         try:
             return await run_in_threadpool(read, body)
         except (UnauthenticatedError, ForbiddenError):

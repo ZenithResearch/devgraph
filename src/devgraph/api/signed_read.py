@@ -122,7 +122,13 @@ def create_signed_read_app(
 
     @app.post("/devgraph/native-read/v2/requests")
     async def request_read(request: Request):
-        body = await _body(request, {"credential", "call", "proof"})
+        body = await _body(
+            request,
+            {"credential", "call", "proof"},
+            maximum_bytes=(
+                131072 if getattr(enrollment, "holder_grants", None) is not None else 65536
+            ),
+        )
         if any(not isinstance(v, dict) for v in body.values()):
             raise UnauthenticatedError("invalid_request")
         return await run_in_threadpool(read, body)

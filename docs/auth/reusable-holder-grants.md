@@ -49,6 +49,10 @@ signed path prefixes; opaque conditions stay exact. Receiver projection still
 checks actual current graph ancestry before exposing objects or relationships.
 Changing the URL cannot widen a scope, evade a revoked root or reuse a nonce.
 
+## Transport budgets
+
+Root claims reserve room for an equal-scope child:61,440 canonical bytes maximum, with nesting reserved for the full chain. Complete presentation envelopes fit130,000 bytes; the native command and opt-in read HTTP body are bounded at131,072 bytes. Legacy enrollment and non-opt-in read parsers keep their64KiB limit. The loopback Wallet interface exposes fixed public negotiation metadata as well as its existing protected read routes; it exposes no browser administration UI.
+
 ## Release gates
 
 - Preserve issuer keys, policies, grants, request bytes and existing replay records.
