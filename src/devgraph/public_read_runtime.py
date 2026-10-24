@@ -22,8 +22,8 @@ from devgraph.signed_read_runtime import ReadRuntimeConfiguration, private_json
 POST_PATHS = frozenset(
     base + suffix
     for base, suffixes in (
-        ("/devgraph/native-read/v2", ("/challenges", "/enrollments", "/requests")),
-        ("/monitor/wallet-access/v1", ("/challenges", "/enrollments", "/requests")),
+        ("/devgraph/native-read/v2", ("/challenges", "/enrollments", "/grants", "/requests")),
+        ("/monitor/wallet-access/v1", ("/challenges", "/enrollments", "/grants", "/requests")),
         ("/devgraph/access-requests/v2", ("/challenges", "/actions")),
     )
     for suffix in suffixes

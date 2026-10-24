@@ -156,6 +156,17 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
             **(
+                {
+                    "holder_grants": {
+                        "schema": "secs.holder-grant.v1",
+                        "service": enrollment.holder_grants.service,
+                        "endpoint": BASE + "/grants",
+                    }
+                }
+                if getattr(enrollment, "holder_grants", None) is not None
+                else {}
+            ),
+            **(
                 {"access_catalog_endpoint": "/devgraph/access-requests/v2/catalog"}
                 if getattr(app.state, "access_catalog_enabled", False)
                 else {}
@@ -184,6 +195,13 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
     async def enroll(request: Request):
         body = await _body(request, {"challenge", "proof", "signature"})
         return await run_in_threadpool(enrollment.enroll, **body)
+
+    if getattr(enrollment, "holder_grants", None) is not None:
+
+        @app.post(BASE + "/grants")
+        async def holder_grant(request: Request):
+            body = await _body(request, {"challenge", "proof", "signature"})
+            return await run_in_threadpool(enrollment.holder_grants.issue, **body)
 
     def read(body):
         return wallet_monitor_read(storage, enrollment, audit_log, body)

@@ -77,6 +77,13 @@ def create_signed_read_app(
         body = await _body(request, {"challenge", "proof", "signature"})
         return await run_in_threadpool(enrollment.enroll, **body)
 
+    if getattr(enrollment, "holder_grants", None) is not None:
+
+        @app.post("/devgraph/native-read/v2/grants")
+        async def holder_grant(request: Request):
+            body = await _body(request, {"challenge", "proof", "signature"})
+            return await run_in_threadpool(enrollment.holder_grants.issue, **body)
+
     def read(body):
         call = body["call"]
         if (

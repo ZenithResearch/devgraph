@@ -142,7 +142,20 @@ class SignedReadEnrollment(NativeReadEnrollment):
     def _invoke(self, policy: dict, operation: str, **fields) -> dict:
         return self.authority.invoke(operation, **fields)
 
+    def _stored_credential_proof(self, credential, proof):
+        host = getattr(self, "holder_grants", None)
+        if host is not None and host.issuing.get() is not None:
+            return dict(
+                schema="devgraph.holder-grant-record.v1",
+                membership=proof,
+                grant=json.loads(credential),
+            )
+        return super()._stored_credential_proof(credential, proof)
+
     def _mint(self, manifest: dict, current: int) -> str:
+        host = getattr(self, "holder_grants", None)
+        if host is not None and host.issuing.get() is not None:
+            return host.mint(manifest, current)
         selected = self._policy_for(
             manifest["subject_public_key"], manifest["installation_id"], current
         )

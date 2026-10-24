@@ -63,6 +63,10 @@ class ReadRuntimeConfiguration(BaseModel):
         "devgraph.signed-read-runtime.v10",
         "devgraph.signed-read-runtime.v11",
     ] = Field(alias="schema")
+    holder_grant_binary: Path | None = None
+    holder_grant_binary_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    canonical_service_id: str | None = Field(default=None, min_length=1, max_length=256)
+    holder_grant_provider_runtime_file: Path | None = None
     owner_parent_runtime_file: Path | None = None
     owner_endpoint_profile_file: Path | None = None
     endpoint_tls_proxy_port: int | None = Field(default=None, strict=True, ge=1024, le=65535)
@@ -86,6 +90,17 @@ class ReadRuntimeConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def paths(self):
+        holder = (
+            self.holder_grant_binary,
+            self.holder_grant_binary_sha256,
+            self.canonical_service_id,
+        )
+        if any(v is not None for v in holder) and not all(v is not None for v in holder):
+            raise ValueError("holder grants require explicit binary, digest and canonical service")
+        if self.holder_grant_binary is not None and self.member_policy_file is None:
+            raise ValueError("holder grants require durable member policy")
+        if self.holder_grant_provider_runtime_file is not None and self.holder_grant_binary is None:
+            raise ValueError("canonical holder provider requires the explicit grant authority")
         if self.endpoint_tls_proxy_port is not None and self.schema_ not in (
             "devgraph.signed-read-runtime.v10",
             "devgraph.signed-read-runtime.v11",
@@ -568,6 +583,48 @@ def create_app():
     config = ReadRuntimeConfiguration.model_validate(private_json(Path(path)))
     audit = RetainedAuditLog(Path(data_root))
     enrollment = load_enrollment(config, data_root=Path(data_root))
+    if config.holder_grant_binary is not None:
+        from devgraph.auth.holder_grants import HolderGrantHost
+
+        provider = enrollment
+        provider_path = (
+            config.holder_grant_provider_runtime_file or config.owner_parent_runtime_file
+        )
+        if provider_path is not None and provider_path.resolve() != Path(path).resolve():
+            parent = ReadRuntimeConfiguration.model_validate(private_json(provider_path))
+            if (
+                parent.canonical_service_id != config.canonical_service_id
+                or parent.holder_grant_binary != config.holder_grant_binary
+                or parent.holder_grant_binary_sha256 != config.holder_grant_binary_sha256
+            ):
+                raise ValueError("published holder grants require the unchanged canonical provider")
+            next_provider = (
+                parent.holder_grant_provider_runtime_file or parent.owner_parent_runtime_file
+            )
+            if next_provider is not None and next_provider.resolve() != provider_path.resolve():
+                raise ValueError(
+                    "holder provider must select one canonical registry without chaining"
+                )
+            if any(
+                getattr(parent, field) != getattr(config, field)
+                for field in (
+                    "issuer_key_file",
+                    "owner_bootstrap_database_file",
+                    "owner_install_review_file",
+                    "membership_requirement",
+                    "membership_trust_file",
+                    "revoked_memberships_file",
+                )
+            ):
+                raise ValueError("canonical holder provider ownership or eligibility changed")
+            provider = load_enrollment(parent, data_root=Path(data_root))
+        HolderGrantHost(
+            enrollment=enrollment,
+            provider_enrollment=provider,
+            binary=config.holder_grant_binary,
+            binary_sha256=config.holder_grant_binary_sha256,
+            service=config.canonical_service_id,
+        )
     # Same storage implementation/configuration as the production composition
     # root; no database migrations or direct ad-hoc queries are performed here.
     operator = None
