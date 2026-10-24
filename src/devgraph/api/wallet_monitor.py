@@ -21,6 +21,42 @@ from devgraph.topology import InvalidTopologyFilter
 BASE = "/monitor/wallet-access/v1"
 
 
+def wallet_monitor_read(storage, enrollment, audit_log, body):
+    if any(not isinstance(body[k], dict) for k in ("call", "credential", "proof")):
+        raise UnauthenticatedError("invalid_request")
+    call = body["call"]
+    if (
+        set(call) != {"operation", "resource", "parameters"}
+        or call["resource"] != RESOURCE
+        or not isinstance(call["parameters"], dict)
+        or set(call["parameters"]) != {"path"}
+    ):
+        raise UnauthenticatedError("unsupported_read")
+    try:
+        operation, _, _ = monitor_target(call["parameters"]["path"])
+    except (ValueError, TypeError):
+        raise UnauthenticatedError("unsupported_read") from None
+    expected = (
+        "devgraph." + operation if operation.startswith("arena.") else "devgraph.work." + operation
+    )
+    if call["operation"] != expected:
+        raise UnauthenticatedError("unsupported_read")
+    context = enrollment.verify_request(**body)
+    try:
+        result = project_monitor_read(storage, context.read_grants, call["parameters"]["path"])
+    except (InvalidTopologyFilter, InvalidBoardFilter, ValueError):
+        return JSONResponse({"error": "invalid_read_filter"}, status_code=400)
+    audit_log.record(
+        actor_id=context.actor_id,
+        session_id=context.session_id,
+        correlation_id=context.correlation_id,
+        category="delegated.read",
+        operation="wallet_monitor_read",
+        safe_summary={},
+    )
+    return result
+
+
 def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web_wallet_url=None):
     register_topology_assets(app)
 
@@ -119,8 +155,11 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return {
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
-            **({"access_catalog_endpoint": "/devgraph/access-requests/v2/catalog"}
-               if getattr(app.state, "access_catalog_enabled", False) else {}),
+            **(
+                {"access_catalog_endpoint": "/devgraph/access-requests/v2/catalog"}
+                if getattr(app.state, "access_catalog_enabled", False)
+                else {}
+            ),
             "access_requests_endpoint": "/devgraph/access-requests/v2"
             if getattr(app.state, "access_requests_enabled", False)
             else None,
@@ -147,36 +186,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return await run_in_threadpool(enrollment.enroll, **body)
 
     def read(body):
-        if any(not isinstance(body[k], dict) for k in ("call", "credential", "proof")):
-            raise UnauthenticatedError("invalid_request")
-        call = body["call"]
-        if (
-            set(call) != {"operation", "resource", "parameters"}
-            or call["resource"] != RESOURCE
-            or not isinstance(call["parameters"], dict)
-            or set(call["parameters"]) != {"path"}
-        ):
-            raise UnauthenticatedError("unsupported_read")
-        try:
-            operation, _, _ = monitor_target(call["parameters"]["path"])
-        except (ValueError, TypeError):
-            raise UnauthenticatedError("unsupported_read") from None
-        if call["operation"] != "devgraph.work." + operation:
-            raise UnauthenticatedError("unsupported_read")
-        context = enrollment.verify_request(**body)
-        try:
-            result = project_monitor_read(storage, context.read_grants, call["parameters"]["path"])
-        except (InvalidTopologyFilter, InvalidBoardFilter, ValueError):
-            return JSONResponse({"error": "invalid_read_filter"}, status_code=400)
-        audit_log.record(
-            actor_id=context.actor_id,
-            session_id=context.session_id,
-            correlation_id=context.correlation_id,
-            category="delegated.read",
-            operation="wallet_monitor_read",
-            safe_summary={},
-        )
-        return result
+        return wallet_monitor_read(storage, enrollment, audit_log, body)
 
     @app.post(BASE + "/requests")
     async def request_read(request: Request):

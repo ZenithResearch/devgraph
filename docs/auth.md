@@ -201,3 +201,6 @@ uv run pytest tests/auth tests/api/test_route_boundaries.py -q
 See [issuer-controlled member access](contracts/devgraph-access-draft/v1/README.md)
 for offline grant narrowing and opt-in per-member signed reads. These source tools
 do not activate live authority or implement holder-created child credentials.
+
+
+Arena metadata has a separate, opt-in Wallet contract. See [Arena Wallet access](contracts/devgraph-arena-wallet/v1/README.md) for the versioned grant and its independent intersection with Work reads.

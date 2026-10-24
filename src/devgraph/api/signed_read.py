@@ -120,6 +120,22 @@ def create_signed_read_app(
             raise UnauthenticatedError("invalid_request")
         return await run_in_threadpool(read, body)
 
+    from devgraph.auth.arena_activation import ArenaMonitorReadEnrollment
+
+    if isinstance(enrollment, ArenaMonitorReadEnrollment):
+        # The Work-only native v2 transport retains its closed parameter shape.
+        app.post("/devgraph/native-read/v3/challenges")(challenge)
+        app.post("/devgraph/native-read/v3/enrollments")(enroll)
+
+        @app.post("/devgraph/native-read/v3/requests")
+        async def arena_request_read(request: Request):
+            from devgraph.api.wallet_monitor import wallet_monitor_read
+
+            body = await _body(request, {"credential", "call", "proof"})
+            return await run_in_threadpool(
+                wallet_monitor_read, storage, enrollment, audit_log, body
+            )
+
     from devgraph.auth.monitor_read import MemberMonitorReadEnrollment
 
     if isinstance(enrollment, MemberMonitorReadEnrollment):

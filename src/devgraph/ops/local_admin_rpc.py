@@ -89,10 +89,11 @@ def selected(configuration, request):
     if runtime.schema_ not in (
         "devgraph.signed-read-runtime.v9",
         "devgraph.signed-read-runtime.v10",
+        "devgraph.signed-read-runtime.v11",
     ):
         raise ValueError("owner runtime required")
     review = private_json(runtime.owner_install_review_file, maximum_bytes=262144)
-    published = runtime.schema_ == "devgraph.signed-read-runtime.v10"
+    published = runtime.owner_parent_runtime_file is not None
     if configuration.get("schema") == "secs.local-admin-config.v3" and not published:
         raise ValueError("secondary HTTPS RPC requires published owner runtime")
     profile = (

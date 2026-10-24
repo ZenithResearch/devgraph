@@ -110,3 +110,28 @@ def test_global_publication_cannot_silently_publish_an_unreviewed_hierarchy():
     )
     policy = compile_operator_policy(plan, now=1000, published_global_roots=(root,))
     assert [p.resource_path for p in policy.published_paths] == [root]
+
+
+def test_arena_metadata_requires_explicit_versioned_owner_plan():
+    raw = good()
+    raw.update(
+        schema="zenith.devgraph-owner-setup.v4",
+        read_operations=["list", "get", "relationships"],
+        arena_read_ids=["research"],
+    )
+    plan = decode_plan(json.dumps(raw).encode())
+    policy = compile_operator_policy(plan, now=1000)
+    assert policy.schema_ == "devgraph.access-operator-policy.v5"
+    assert policy.ceiling.schema_ == "devgraph.access-draft.v6"
+    assert policy.ceiling.read_grants[-1].scope == "devgraph.arena.read"
+    assert policy.ceiling.read_grants[-1].arena_ids == ("research",)
+    for schema in (
+        "zenith.devgraph-owner-setup.v1",
+        "zenith.devgraph-owner-setup.v2",
+        "zenith.devgraph-owner-setup.v3",
+    ):
+        with pytest.raises(ValueError):
+            decode_plan(json.dumps(dict(raw, schema=schema)).encode())
+    for ids in ([], ["research", "research"], ["../../private"]):
+        with pytest.raises(ValueError):
+            decode_plan(json.dumps(dict(raw, arena_read_ids=ids)).encode())

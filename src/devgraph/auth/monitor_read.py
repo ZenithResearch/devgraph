@@ -213,6 +213,11 @@ def monitor_target(target):
     ):
         raise ValueError("unsupported_read_target")
     path, _, query = target.partition("?")
+    from devgraph.auth.arena_projection import arena_target
+
+    arena = arena_target(target)
+    if arena is not None:
+        return arena
     if path in (
         "/monitor/topology/v1",
         "/monitor/snapshot",
@@ -243,6 +248,11 @@ def monitor_target(target):
 
 
 def project_monitor_read(storage, grants, target):
+    from devgraph.auth.arena_projection import project_arena_read
+
+    if monitor_target(target)[0].startswith("arena."):
+        return project_arena_read(storage, grants, target)
+    grants = [g for g in grants if g.scope == "devgraph.work.read"]
     if any(getattr(g, "resource_paths", ()) for g in grants):
         # Capture every page and relationship in one serialized graph interval.
         # A concurrent move cannot slip between permission check and disclosure.

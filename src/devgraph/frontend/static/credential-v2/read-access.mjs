@@ -11,6 +11,8 @@ async function cancellable(pending,signal){
 export function monitorReadOperation(target){
  if(typeof target!=='string'||target.length>4096||target.includes('#')||target.split('?')[0].includes('%'))throw failure('read_not_granted',403);
  const path=target.split('?')[0];
+ if(path==='/arenas')return'devgraph.arena.list';
+ if(/^\/arenas\/[a-z0-9][a-z0-9-]{0,255}(?:\/members)?$/.test(path))return'devgraph.arena.get';
  if(['/monitor/topology/v1','/monitor/snapshot','/monitor/kanban/v2','/workflows/v1','/todos/v2','/todos/v2/classification-report'].includes(path))return'devgraph.work.list';
  if(/^\/todos\/v2\/(Todo|Proposal|Initiative|Project|Issue|Task)\/[a-z0-9][a-z0-9-]{0,255}$/.test(path))return'devgraph.work.get';
  if(/^\/work\/(Todo|Proposal|Initiative|Project|Issue|Task)\/[a-z0-9][a-z0-9-]{0,255}\/relationships\/(children|parent|dependencies|dependents|blockers|blocked)$/.test(path))return'devgraph.work.relationships';
@@ -93,7 +95,7 @@ export class WalletReadClient{
   try{
    this.readPhase='issuing_credential';this.notify();
    const result=await this.fetch(BASE+'/enrollments',{body:approved.enrollment});current();
-   if(!['devgraph.native-read-result.v3','devgraph.native-read-result.v4'].includes(result?.schema)||!plain(result.credential))throw failure('read_credential_invalid');
+   if(!['devgraph.native-read-result.v3','devgraph.native-read-result.v4','devgraph.native-read-result.v5'].includes(result?.schema)||!plain(result.credential))throw failure('read_credential_invalid');
    this.readPhase='accepting_credential';this.notify();
    const accepted=await this.provider.readAccess({operation:this.graphAccessV2?'accept_graph_v2':'accept',accessId:this.accessId,credential:result.credential});current();
    if(accepted?.accessId!==this.accessId||accepted.receiver!==this.challenge.receiver||!Number.isSafeInteger(accepted.expires_at)||accepted.expires_at<=this.now())throw failure('read_credential_invalid');

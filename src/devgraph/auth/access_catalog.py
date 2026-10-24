@@ -99,7 +99,7 @@ class CatalogOperatorPolicy(OperatorPolicy):
 
 def catalog(policy):
     ceiling = policy.ceiling
-    reads = {op for grant in ceiling.read_grants for op in grant.operations}
+    reads = {op for grant in ceiling.read_grants for op in getattr(grant, "operations", ())}
     writes = {g.operation for g in ceiling.write_grants}
     result = dict(
         schema="devgraph.access-catalog.v1",
@@ -134,7 +134,10 @@ def validate_preset(draft, policy):
     if (
         ref.catalog_digest_sha256 != available["catalog_digest_sha256"]
         or preset is None
-        or any(set(g.operations) - set(preset["read_operations"]) for g in draft.read_grants)
+        or any(
+            g.scope != "devgraph.work.read" or set(g.operations) - set(preset["read_operations"])
+            for g in draft.read_grants
+        )
         or any(g.operation not in preset["write_operations"] for g in draft.write_grants)
     ):
         raise ValueError("preset changed or selection exceeds the template")
@@ -189,6 +192,8 @@ def scope_inventory(storage, grants, *, published=None):
         else:
             discovery = ()
         for g in grants:
+            if g.scope != "devgraph.work.read":
+                continue
             if not set(g.operations) & {"list", "get"}:
                 continue
             paths = intersect_paths(getattr(g, "resource_paths", ()), discovery)
