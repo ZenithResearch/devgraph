@@ -250,3 +250,73 @@ def test_root_and_challenge_roll_back_together(tmp_path, monkeypatch):
         ).fetchone() == (0,)
     monkeypatch.setattr(h, "retain", retain)
     assert h.issue(**args)["grant"]
+
+
+def test_runtime_selects_one_explicit_canonical_provider_and_rejects_chains(tmp_path, monkeypatch):
+    import devgraph.auth.holder_grants as adapter
+    import devgraph.signed_read_runtime as runtime
+
+    class Selected(Exception):
+        pass
+
+    fields = (
+        "member_policy_file",
+        "enrollment_policy_file",
+        "authority_policy_file",
+        "membership_trust_file",
+        "revoked_memberships_file",
+        "enrollment_database_file",
+        "secs_binary",
+        "issuer_key_file",
+        "holder_grant_binary",
+    )
+    base = dict(
+        schema="devgraph.signed-read-runtime.v2",
+        **{k: str(tmp_path / k) for k in fields},
+        secs_binary_sha256="a" * 64,
+        holder_grant_binary_sha256="b" * 64,
+        canonical_service_id="service:fixture",
+    )
+    canonical, endpoint = tmp_path / "canonical.json", tmp_path / "endpoint.json"
+    provider = dict(base, holder_grant_provider_runtime_file=str(canonical))
+    selected = dict(
+        base,
+        holder_grant_provider_runtime_file=str(canonical),
+        enrollment_database_file=str(tmp_path / "endpoint.sqlite"),
+    )
+
+    def save(path, value):
+        path.write_text(json.dumps(value))
+        path.chmod(0o600)
+
+    save(canonical, provider)
+    save(endpoint, selected)
+    monkeypatch.setenv("DEVGRAPH_SIGNED_READ_CONFIG", str(endpoint))
+    monkeypatch.setenv("DEVGRAPH_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(runtime, "RetainedAuditLog", lambda _: object())
+    loaded = []
+
+    def load(config, **_):
+        loaded.append(config.enrollment_database_file)
+        return config.enrollment_database_file
+
+    monkeypatch.setattr(runtime, "load_enrollment", load)
+
+    def host(**options):
+        assert options["enrollment"] == Path(selected["enrollment_database_file"])
+        assert options["provider_enrollment"] == Path(provider["enrollment_database_file"])
+        raise Selected()
+
+    monkeypatch.setattr(adapter, "HolderGrantHost", host)
+    with pytest.raises(Selected):
+        runtime.create_app()
+    assert loaded == [
+        Path(selected["enrollment_database_file"]),
+        Path(provider["enrollment_database_file"]),
+    ]
+    save(canonical, dict(provider, holder_grant_provider_runtime_file=str(tmp_path / "other.json")))
+    with pytest.raises(ValueError, match="without chaining"):
+        runtime.create_app()
+    save(canonical, dict(provider, issuer_key_file=str(tmp_path / "different-key")))
+    with pytest.raises(ValueError, match="ownership or eligibility"):
+        runtime.create_app()
