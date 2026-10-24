@@ -81,3 +81,19 @@ DevGraph client's connect/request/read flow and a synthetic issuer/receiver.
 Real Wallet trust, consent and member-grant decisions remain separate checks.
 This browser bridge preserves existing signed bytes; it does not implement the
 separate canonical-service credential/store migration.
+
+## Shared portable identities producer
+
+Active SDK presentation dependencies and the browser producer now use public
+`ZenithResearch/castalia-wallet` revision
+`054b372d686e2f8dba0ad8bbd166adbde9ebab38` (shared core 0.3.0). This is the
+same frozen Rust input used by Transfer 37, iOS 33 and the Chrome 0.0.3
+identity preview. The native/browser SDK standalone locks move together.
+Historical named-v1/read-authority qualification pins remain explicitly recorded;
+they are not silently rewritten as new installed evidence.
+
+Portable Matrix/Nostr/GitHub/X records are encrypted Castaway descriptors.
+They do not prove ownership, enroll membership, copy sessions, change grants or
+raise an existing Arena policy ceiling. Devgraph uses the selected Wallet
+provider; it does not receive or maintain this private identity collection.
+A source alignment does not replace the live HTTPS/native runtime.

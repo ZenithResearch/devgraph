@@ -18,7 +18,7 @@
       "scope": "Frozen compatibility decoder dependency, not a supported Wallet install or fallback signer. Removal remains gated by Devgraph installed qualification.",
       "active_source": {
         "repository": "https://github.com/ZenithResearch/castalia-wallet",
-        "revision": "575895f70e4cbdc982b7c9271b468470271dbb0b",
+        "revision": "054b372d686e2f8dba0ad8bbd166adbde9ebab38",
         "path": "compat/castalia-wallet-devgraph-presentation",
         "compatibility": "Legacy implementation bytes unchanged; SOURCE.json retains original hashes. Transitive old source is redirected by an explicit Cargo patch, not retired."
       }
@@ -29,15 +29,15 @@
     },
     "wallet_browser_public": {
       "repository": "https://github.com/ZenithResearch/castalia-wallet",
-      "revision": "575895f70e4cbdc982b7c9271b468470271dbb0b",
-      "pr": "https://github.com/ZenithResearch/castalia-wallet/pull/6",
-      "status": "Public application-neutral browser access-request/read bridge and read_setup_status_v1; local exact-package Chrome/client qualification passed, including reload without repeated setup consent, with synthetic service. Real-user acceptance separate.",
+      "revision": "054b372d686e2f8dba0ad8bbd166adbde9ebab38",
+      "pr": "https://github.com/ZenithResearch/castalia-wallet/pull/7",
+      "status": "Public shared core 0.3.0 / Chrome 0.0.3 source with portable Wallet identities. Hosted Wallet source gates and isolated encrypted native/Chrome roundtrip passed; these do not qualify an installed Devgraph host or grant authority.",
       "scope": "Public shared Wallet producer. Native compatibility is retained from the same public source."
     },
     "wallet_shared": {
       "repository": "https://github.com/ZenithResearch/castalia-wallet",
-      "revision": "575895f70e4cbdc982b7c9271b468470271dbb0b",
-      "core_version": "0.2.0",
+      "revision": "054b372d686e2f8dba0ad8bbd166adbde9ebab38",
+      "core_version": "0.3.0",
       "scope": "Shared current producer for native, extension, Web custody and consumer contracts. Exact artifact qualification is recorded separately."
     }
   },
