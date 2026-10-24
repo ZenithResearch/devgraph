@@ -57,7 +57,7 @@ try{
   catch(error){console.error({origin,width,scenario,status:await page.locator('[data-wallet-status]').textContent(),calls:await page.evaluate(()=>window.fixtureCalls),errors});throw error;}
   assert.equal(enrollments,1);assert.deepEqual(errors,[]);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-  if(scenario==='returning')await page.screenshot({path:join(output,`returning-${origin.includes('ts.net')?'tailnet':'public'}-${width}.png`),fullPage:true});
+  if(scenario==='returning')await page.screenshot({path:join(output,`returning-${origin === 'https://graph-example.tail123abc.ts.net:9443'?'tailnet':'public'}-${width}.png`),fullPage:true});
   results.push({origin,width,scenario,setup_clicks:expected,read_approval_clicks:1});
   await context.close();
  }

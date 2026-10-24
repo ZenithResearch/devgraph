@@ -13,7 +13,7 @@ const origins=['https://graph.example','https://graph-example.tail123abc.ts.net:
 const browser=await chromium.launch({headless:true});
 try{
  for(const providerMode of ['legacy','host'])for(const origin of origins)for(const width of [1280,375]){
-  const label=providerMode+'-'+(origin.includes('.ts.net')?'tailnet-':'public-');
+  const label=providerMode+'-'+(origin === 'https://graph-example.tail123abc.ts.net:9443'?'tailnet-':'public-');
   const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage(),errors=[];page.setDefaultTimeout(8000);page.on('pageerror',e=>errors.push(e.message));
   let now=Math.floor(Date.now()/1000),challenges=0,enrollments=0,presentations=0,setupAttempts=0,denyChallenges=false,requestResult='pending',requestActions=[];
   await page.clock.install({time:new Date(now*1000)});

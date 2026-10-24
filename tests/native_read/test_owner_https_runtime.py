@@ -50,7 +50,7 @@ def endpoint(s, monkeypatch, origin):
     monkeypatch.setattr(socket, "socket", real_socket)
     profile = copy.deepcopy(profile)
     old = profile["receiver"]
-    profile.update(receiver=origin, network="tailscale" if ".ts.net" in origin else None)
+    profile.update(receiver=origin, network="tailscale" if origin == ORIGINS[0] else None)
     profile.pop("tls_certificate_sha256")
     profile["authority"]["receiver"] = origin
     s.store(config.owner_endpoint_profile_file, profile)

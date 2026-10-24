@@ -29,6 +29,9 @@
 
 ### Fixed
 
+- Match complete synthetic endpoint origins in browser and owner tests — avoid
+  ambiguous URL substring classification and keep security analysis meaningful.
+
 - Keep extension/native Wallet connection independent of website configuration:
   hide the optional website fallback when an injected provider is available, and
   report missing endpoint setup separately from provider discovery.

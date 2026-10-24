@@ -69,7 +69,7 @@ try{
   assert.equal(await connection.locator('[data-wallet-website-settings]').isVisible(),false);
   assert.equal(await connection.locator('[data-wallet-url]').isVisible(),false);
   assert.match(await connection.locator('[data-wallet-provider-status]').textContent(),['late-host','manual-extension'].includes(providerMode)?/No Wallet detected/:/Wallet provider found/);
-  const label=providerMode+'-'+(origin.includes('.ts.net')?'tailnet':'public');
+  const label=providerMode+'-'+(origin === 'https://graph-example.tail123abc.ts.net:9443'?'tailnet':'public');
   await page.screenshot({path:join(output,`${label}-setup-${width}.png`),fullPage:true});
   configured=true;await connection.getByRole('button',{name:'Retry connection setup',exact:true}).click();
   if(providerMode==='late-host'){await connection.getByText('Connect your Wallet to request access or view the work shared with you.',{exact:true}).waitFor();await page.clock.fastForward(3000);await page.evaluate(()=>{window.devgraphWalletProvider=window.fixtureWallet;window.dispatchEvent(new CustomEvent('devgraph:wallet-provider-ready'));});}
