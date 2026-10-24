@@ -1,5 +1,9 @@
 # Changelog
 
+## Shared Wallet core 0.3.0
+
+- Align active native/browser SDK Wallet inputs to public core 0.3.0 (`054b372`) so portable identities use the same producer as Transfer, iOS and the extension. Preserve historical signing/decoder source records and all existing authority. Dependency alignment alone does not update a running host or approve Arena access.
+
 ## Todo progress, archive and daily check-in
 
 - Add canonical three-state progress for base Todo and every subtype, preserving legacy signed requests. Base Todos can complete without a subtype workflow.

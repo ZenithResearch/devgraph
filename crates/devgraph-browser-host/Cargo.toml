@@ -9,7 +9,7 @@ publish = false
 devgraph-client-native = { path = "../devgraph-client-native" }
 devgraph-client-core = { path = "../devgraph-client-core" }
 devgraph-work-protocol = { path = "../devgraph-work-protocol" }
-castalia-wallet-devgraph-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "575895f70e4cbdc982b7c9271b468470271dbb0b" }
+castalia-wallet-devgraph-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "054b372d686e2f8dba0ad8bbd166adbde9ebab38" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-util", "io-std", "sync", "time"] }
@@ -31,4 +31,4 @@ devgraph-work-protocol = { path = "../devgraph-work-protocol" }
 
 # Keep the retained secS compatibility dependency on the same public source.
 [patch."https://github.com/bananawalnut/castalia-wallet.git"]
-castalia-wallet-devgraph-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "575895f70e4cbdc982b7c9271b468470271dbb0b" }
+castalia-wallet-devgraph-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "054b372d686e2f8dba0ad8bbd166adbde9ebab38" }

@@ -6,10 +6,10 @@ license = "AGPL-3.0-only"
 publish = false
 
 [dependencies]
-castalia-wallet-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "575895f70e4cbdc982b7c9271b468470271dbb0b" }
+castalia-wallet-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "054b372d686e2f8dba0ad8bbd166adbde9ebab38" }
 devgraph-client-core = { path = "../devgraph-client-core" }
 devgraph-work-protocol = { path = "../devgraph-work-protocol" }
-castalia-wallet-devgraph-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "575895f70e4cbdc982b7c9271b468470271dbb0b" }
+castalia-wallet-devgraph-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "054b372d686e2f8dba0ad8bbd166adbde9ebab38" }
 secs-devgraph-work-contract = { git = "https://github.com/ZenithResearch/secS-magik.git", rev = "11e7128e49c6df57f53e4c8b05e72d4bc78d798c" }
 secs-native-private-files = { git = "https://github.com/ZenithResearch/secS-magik.git", rev = "11e7128e49c6df57f53e4c8b05e72d4bc78d798c" }
 serde = { version = "1", features = ["derive"] }
@@ -39,4 +39,4 @@ devgraph-work-protocol = { path = "../devgraph-work-protocol" }
 
 # Keep the retained secS compatibility dependency on the same public source.
 [patch."https://github.com/bananawalnut/castalia-wallet.git"]
-castalia-wallet-devgraph-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "575895f70e4cbdc982b7c9271b468470271dbb0b" }
+castalia-wallet-devgraph-presentation = { git = "https://github.com/ZenithResearch/castalia-wallet.git", rev = "054b372d686e2f8dba0ad8bbd166adbde9ebab38" }
