@@ -12,6 +12,7 @@ from devgraph.api.topology import register_topology_assets
 from devgraph.auth.errors import ForbiddenError, UnauthenticatedError
 from devgraph.auth.monitor_read import monitor_target, project_monitor_read
 from devgraph.auth.native_read import RESOURCE
+from devgraph.auth.resource_membership import ResourceMembershipAdmission
 from devgraph.frontend.app import FRONTEND_HTML
 from devgraph.frontend.wallet import WALLET_CONNECTION_HTML
 from devgraph.kanban import BoardChanged, InvalidBoardFilter
@@ -155,6 +156,12 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return {
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
+            # Explicit resource admission disclosure. A missing field on older
+            # services retains their clients' previous membership-proof behavior.
+            "membership_requirement": "optional"
+            if isinstance(enrollment.membership_check, ResourceMembershipAdmission)
+            and not enrollment.membership_check.required
+            else "required",
             **(
                 {
                     "holder_grants": {

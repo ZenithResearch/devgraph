@@ -59,7 +59,7 @@ def test_explicit_access_listener_admits_only_guarded_routes_and_keeps_host_boun
         assert client.post("/credential-work/v2/execute?x=1", json={}).status_code == 400
         assert client.post("/credential-work/v2/execute", content=b"x" * 262145).status_code == 413
         assert (
-            client.post("/devgraph/access-operator/v1/actions", content=b"x" * 65537).status_code
+            client.post("/devgraph/access-operator/v1/actions", content=b"x" * 524289).status_code
             == 413
         )
         assert len(calls) == count

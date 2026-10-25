@@ -12,6 +12,8 @@ from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.errors import UnauthenticatedError
 
 DOMAIN = b"castalia/access-request-approval/v1\0"
+MAX_OPERATOR_CHALLENGE_BYTES = 131072
+MAX_MEMBER_CHALLENGE_BYTES = 16384
 OPERATIONS = ("access.request", "access.status", "access.inbox", "access.review", "access.decide")
 
 
@@ -49,7 +51,12 @@ class WalletAccessChallenge(Closed):
     @model_validator(mode="after")
     def valid(self):
         value = self.model_dump(mode="json", by_alias=True)
-        if not portable(value) or len(canonical_json(value)) > 16384:
+        maximum = (
+            MAX_MEMBER_CHALLENGE_BYTES
+            if self.operation in ("access.request", "access.status")
+            else MAX_OPERATOR_CHALLENGE_BYTES
+        )
+        if not portable(value) or len(canonical_json(value)) > maximum:
             raise ValueError("invalid access request")
         return self
 

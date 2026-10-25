@@ -47,6 +47,8 @@ class LanAccessBoundary(PublicReadBoundary):
     def body_limit(self, path, method):
         if method != "POST":
             return 0
+        if path in OPERATOR_POST_PATHS:
+            return 524288
         if path in CREDENTIAL_PATHS:
             return 262144
         if path in NAMED_PATHS:

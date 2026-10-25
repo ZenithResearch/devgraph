@@ -212,6 +212,17 @@ def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(
     assert "Read access key" not in http.get("/monitor").text
     config = http.get(base).json()
     assert config["provider_profile"]["membership"] is None
+    assert config["membership_requirement"] == "required"
+    from devgraph.auth.resource_membership import ResourceMembershipAdmission
+
+    original_membership = service.membership_check
+    service.membership_check = ResourceMembershipAdmission(original_membership, required=False)
+    assert http.get(base).json()["membership_requirement"] == "optional"
+    # Disclosure never relaxes validation of an actually supplied proof.
+    assert not service.membership_check({"untrusted": True}, public)
+    service.membership_check = ResourceMembershipAdmission(original_membership, required=True)
+    assert http.get(base).json()["membership_requirement"] == "required"
+    service.membership_check = original_membership
     challenge = http.post(
         base + "/challenges", json={"subject_public_key": public, "installation_id": "a" * 32}
     ).json()

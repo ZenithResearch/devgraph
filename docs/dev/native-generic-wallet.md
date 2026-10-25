@@ -48,3 +48,18 @@ on `/work-operations/v2` or `/arena-operations/v2`. Each has a `/status` sibling
 Python terminal users choose `devgraph work <operation> --credential-v2` and add
 `--reconcile` for recovery. The old explicit compatibility clients remain until
 the separate installed qualification/removal gate is satisfied.
+
+## Membership disclosure and operator consent budgets
+
+Public Wallet configuration adds `membership_requirement` (`optional` or
+`required`) independently of the provider-profile membership trust section.
+An optional receiver accepts an empty membership proof while still requiring
+valid holder signatures and an approved grant. Invalid supplied membership
+proofs remain rejected. Older clients/configurations remain readable.
+
+Operator consent envelopes permit up to 131072 canonical UTF-8 bytes; member
+request/status envelopes retain their 16384-byte limit. The enclosing operator
+HTTP/local RPC request is bounded to 524288 bytes. Every existing identity,
+origin, expiry, operation, signature and scope check still applies. Deploy a
+matched Wallet Core revision before using larger selections; older signers
+continue to reject them. No saved credential or grant format changes.

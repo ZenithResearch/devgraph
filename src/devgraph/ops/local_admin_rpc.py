@@ -16,7 +16,7 @@ from devgraph.auth.errors import UnauthenticatedError
 from devgraph.local_services import instance_id
 from devgraph.signed_read_runtime import ReadRuntimeConfiguration, private_json
 
-MAXIMUM = 65536
+MAXIMUM = 524288
 RESPONSE_MAXIMUM = 1048576
 
 

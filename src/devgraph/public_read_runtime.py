@@ -87,6 +87,8 @@ class PublicReadBoundary:
     refill_per_second = 2
 
     def body_limit(self, path, method):
+        if method == "POST" and path in OPERATOR_POST_PATHS:
+            return 524288
         if method == "POST" and path in (
             "/monitor/wallet-access/v1/requests",
             "/devgraph/native-read/v2/requests",
