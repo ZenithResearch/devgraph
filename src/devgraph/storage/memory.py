@@ -214,8 +214,6 @@ class MemoryGraphStorage:
             after_id=None,
             limit=limit,
         )
-        if any(selector.resource_paths for selector in selectors):
-            raise ValueError("resource paths require the versioned monitor projection")
         with self._transaction_lock:
             admitted = self._delegated_selector_predicate(selectors)
             keys = sorted(
@@ -583,6 +581,23 @@ class MemoryGraphStorage:
                 and (e.to_label, e.to_id) in allowed
             ),
             key=lambda e: (e.from_label, e.from_id, e.relationship, e.to_label, e.to_id),
+        )[:limit]
+
+    def delegated_arena_edges(self, arena_ids, keys, *, limit):
+        from devgraph.storage.delegated import validate_arena_edge_selection
+
+        validate_arena_edge_selection(arena_ids, keys, limit)
+        allowed, visible = set(arena_ids), set(keys)
+        return sorted(
+            (
+                e
+                for e in self._edges
+                if e.relationship == "CONTAINS_WORK"
+                and e.from_label == "Arena"
+                and e.from_id in allowed
+                and (e.to_label, e.to_id) in visible
+            ),
+            key=lambda e: (e.from_id, e.to_label, e.to_id),
         )[:limit]
 
     def delete_edge(

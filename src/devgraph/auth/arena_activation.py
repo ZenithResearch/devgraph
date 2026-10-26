@@ -122,6 +122,8 @@ class ArenaMonitorReadEnrollment(PathMonitorReadEnrollment):
         return tuple(ReadGrants.validate_python(g) for g in grants)
 
     def _decode_grants(self, permissions):
+        from devgraph.auth.arena_access import VerifiedArenaReadGrant
+
         grants = self._decode_enrollment_ceiling([p["constraints"] for p in permissions])
         if any(
             p["operation"] not in {permission_operation(g, op) for op in read_operations(g)}
@@ -131,7 +133,9 @@ class ArenaMonitorReadEnrollment(PathMonitorReadEnrollment):
         # A constraint can describe multiple operations, while a credential may
         # retain only one permission. Do not borrow list from a get permission.
         narrowed = [
-            g
+            VerifiedArenaReadGrant(
+                **g.model_dump(), operations=(p["operation"].removeprefix("devgraph.arena."),)
+            )
             if g.scope == "devgraph.arena.read"
             else g.model_copy(
                 update={"operations": (p["operation"].removeprefix("devgraph.work."),)}

@@ -138,7 +138,7 @@
 
   // Containment alone owns neighborhoods. Dependencies never reparent a node.
   // Pack each subtree as a block, then pack Arena blocks with a generous gutter.
-  function hierarchy(nodes, edges) {
+  function hierarchy(nodes, edges, options = {}) {
     const ordered = [...nodes].sort((a,b)=>(a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
     const byKey = new Map(ordered.map(n=>[n.key,n])), parents = new Map(), children = new Map();
     for (const e of [...edges].sort((a,b)=>a.source.localeCompare(b.source)||a.target.localeCompare(b.target))) {
@@ -190,7 +190,7 @@
     for(const node of work){let key=node.key;const trail=[];while(!arenaOf.has(key)&&byKey.get(key)?.kind!=='Arena'&&parents.has(key)){trail.push(key);key=parents.get(key);}
       const arena=arenaOf.get(key) || (byKey.get(key)?.kind==='Arena'?key:'unassigned');arenaOf.set(node.key,arena);for(const k of trail)arenaOf.set(k,arena);}
     const arenas=ordered.filter(n=>n.kind==='Arena').map(n=>({key:n.key,title:n.title||n.key}));
-    if(work.some(n=>arenaOf.get(n.key)==='unassigned'))arenas.push({key:'unassigned',title:'Outside an Arena'});
+    if(work.some(n=>arenaOf.get(n.key)==='unassigned'))arenas.push({key:'unassigned',title:options.arenaMembershipComplete === false ? 'Arena not shared or unassigned' : 'Outside an Arena'});
     const blocks=arenas.map(arena=>{const roots=work.filter(n=>arenaOf.get(n.key)===arena.key&&(!parents.has(n.key)||byKey.get(parents.get(n.key))?.kind==='Arena'));const packed=pack(roots.map(n=>trees.get(n.key)),90);return {...arena,width:Math.max(540,packed.width+128),height:packed.height+160,packed,keys:work.filter(n=>arenaOf.get(n.key)===arena.key).map(n=>n.key)};});
     const world=pack(blocks,gutter);
     for(const item of world.items){const b=item.block,x=item.x-world.width/2,y=item.y-world.height/2;

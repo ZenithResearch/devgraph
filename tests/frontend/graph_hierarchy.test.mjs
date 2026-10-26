@@ -177,3 +177,14 @@ test('250 and 1500 revealed children preserve all overview anchors and their loc
     assert.ok(performance.now()-start<2000,'reveal remains bounded without running global physics');
   }
 });
+
+test('scoped responses do not claim unshared Arena membership is absent',()=>{
+  const task=node('Task','visible');
+  const scoped=T.hierarchy([task],[],{arenaMembershipComplete:false});
+  assert.equal(scoped.groups.find(g=>g.key==='unassigned').title,'Arena not shared or unassigned');
+  assert.equal(T.hierarchy([task],[]).groups.find(g=>g.key==='unassigned').title,'Outside an Arena');
+  const arena=node('Arena','shared');
+  const actual=T.hierarchy([arena,task],[edge(arena,task,'CONTAINS_WORK')],{arenaMembershipComplete:false});
+  assert.equal(actual.arenaOf.get(task.key),arena.key);
+  assert.equal(actual.groups.some(g=>g.key==='unassigned'),false);
+});

@@ -35,6 +35,7 @@ def project_arena_read(storage, grants, target):
                 identifier
                 for g in grants
                 if isinstance(g, ArenaReadGrant)
+                and operation.removeprefix("arena.") in getattr(g, "operations", ("list", "get"))
                 for identifier in g.arena_ids
             }
         )

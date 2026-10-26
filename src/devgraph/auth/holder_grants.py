@@ -62,13 +62,23 @@ def constraint(value):
     v = json.loads(canonical_json(value))
     scope = v.pop("scope")
     if scope["mode"] == "paths":
-        v["constraints"]["resource_paths"] = [
-            {
-                "schema": "devgraph.resource-path.v1",
-                "path": [n["kind"] + "/" + n["id"] for n in root],
-            }
-            for root in scope["roots"]
-        ]
+        if v["constraints"].get("scope") == "devgraph.arena.read":
+            roots = scope["roots"]
+            if not roots or any(len(root) != 1 or root[0]["kind"] != "Arena" for root in roots):
+                raise UnauthenticatedError("unsupported_holder_scope")
+            selected = {root[0]["id"] for root in roots}
+            ids = v["constraints"]["arena_ids"]
+            if not selected.issubset(ids):
+                raise UnauthenticatedError("unsupported_holder_scope")
+            v["constraints"]["arena_ids"] = sorted(selected)
+        else:
+            v["constraints"]["resource_paths"] = [
+                {
+                    "schema": "devgraph.resource-path.v1",
+                    "path": [n["kind"] + "/" + n["id"] for n in root],
+                }
+                for root in scope["roots"]
+            ]
     elif scope != {"mode": "all"}:
         raise UnauthenticatedError("unsupported_holder_scope")
     return v

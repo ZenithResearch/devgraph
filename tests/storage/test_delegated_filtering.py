@@ -139,3 +139,43 @@ def test_neo4j_scoped_edge_query_filters_targets_before_pagination():
         {"label": "Task", "id": "source"},
         {"label": "Task", "id": "target"},
     ]
+
+
+def test_arena_edges_require_both_explicit_endpoints_before_limit():
+    import pytest
+
+    storage = MemoryGraphStorage()
+    for arena in ("a-hidden", "z-visible"):
+        storage.create_node("Arena", arena, {"kind": "Arena"})
+    for task in ("a-hidden", "z-visible"):
+        create(storage, Task(id=task, title=task))
+        for arena in ("a-hidden", "z-visible"):
+            storage.create_edge("Arena", arena, "CONTAINS_WORK", "Task", task)
+    rows = storage.delegated_arena_edges(("z-visible",), (("Task", "z-visible"),), limit=1)
+    assert [(r.from_id, r.to_id) for r in rows] == [("z-visible", "z-visible")]
+    with pytest.raises(ValueError):
+        storage.delegated_work_edges((("Arena", "z-visible"),), ("CONTAINS_WORK",), limit=1)
+    with pytest.raises(ValueError):
+        storage.delegated_arena_edges(("z-visible", "z-visible"), (), limit=1)
+
+
+def test_neo4j_arena_edge_filters_both_endpoints_before_limit():
+    from tests.storage.test_neo4j_persistence_contract import _storage_with_rows
+
+    storage, calls = _storage_with_rows([])
+    assert storage.delegated_arena_edges(("visible",), (("Task", "allowed"),), limit=1) == []
+    query, params = calls[0]
+    assert query.index("key.label IN labels(target)") < query.index("LIMIT $limit")
+    assert query.index("source.id IN $arena_ids") < query.index("LIMIT $limit")
+    assert params["arena_ids"] == ["visible"]
+    assert params["keys"] == [dict(label="Task", id="allowed")]
+
+
+def test_arena_edge_bound_supports_union_of_distinct_valid_grants():
+    import pytest
+
+    from devgraph.storage.delegated import validate_arena_edge_selection
+    ids = tuple(f"arena-{i}" for i in range(4096))
+    validate_arena_edge_selection(ids, (), 1)
+    with pytest.raises(ValueError):
+        validate_arena_edge_selection((*ids, "overflow"), (), 1)

@@ -1092,7 +1092,7 @@ FRONTEND_HTML = r"""<!doctype html>
       const context = state.snapshot?.layout_context || {nodes:overview,edges:hierarchyEdges};
       const projection = Topology.overviewProjection(overview, hierarchyEdges, context, [graphView.hoverRoot,graphView.focusRoot,graphView.selectedRoot]);
       graphView.revealModel = projection;
-      graphView.layoutPlan = Topology.hierarchy(projection.context.nodes, projection.context.edges);
+      graphView.layoutPlan = Topology.hierarchy(projection.context.nodes, projection.context.edges, {arenaMembershipComplete: !state.snapshot?.access_scope});
       graphView.layoutPlan.groups = graphView.layoutPlan.groups.map(group => ({...group,keys:group.keys.filter(key=>overviewKeys.has(key))})).filter(group=>group.keys.length || overviewKeys.has(group.key));
       let { nodes, edges } = filterGraph(projection.nodes.filter(node => node.kind !== 'Arena'), projection.edges, graphView.visibleCategories);
       if (graphView.neighborhood && state.snapshot?.schema !== 'devgraph.topology.v1') {

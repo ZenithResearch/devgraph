@@ -284,6 +284,10 @@ class GraphStorage(Protocol):
         self, keys: tuple[tuple[str, str], ...], relationships: tuple[str, ...], *, limit: int
     ) -> list[EdgeRecord]: ...
 
+    def delegated_arena_edges(
+        self, arena_ids: tuple[str, ...], keys: tuple[tuple[str, str], ...], *, limit: int
+    ) -> list[EdgeRecord]: ...
+
     def delete_edge(
         self, from_label: str, from_id: str, relationship: str, to_label: str, to_id: str
     ) -> None: ...

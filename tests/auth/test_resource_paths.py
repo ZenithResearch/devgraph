@@ -286,11 +286,14 @@ def test_neo4j_filters_paths_before_limit_and_unsupported_views_fail_closed():
     assert query.index("selector.resource_paths") < query.index("ORDER BY n.id")
     assert "COUNT { MATCH ()-[:HAS_CHILD]->(item) } = 1" in query
     assert params["selectors"][0]["resource_paths"][0]["path"] == ["Arena/a", "Project/p"]
-    with pytest.raises(ValueError, match="versioned monitor projection"):
-        storage.delegated_arena_member_page(
-            "a", selectors=(selected,), work_kinds=("Task",), include_archived=False
-        )
-    assert len(calls) == 1
+    storage.delegated_arena_member_page(
+        "a", selectors=(selected,), work_kinds=("Task",), include_archived=False, limit=1
+    )
+    member_query, member_params = calls[1]
+    assert member_query.index("selector.resource_paths") < member_query.index("LIMIT $limit")
+    assert "COUNT { MATCH ()-[:HAS_CHILD]->(item) } = 1" in member_query
+    assert member_params["selectors"] == params["selectors"]
+    assert member_params["arena_id"] == "a"
 
 
 def test_published_path_schemas_examples_and_old_object_parsers_match():

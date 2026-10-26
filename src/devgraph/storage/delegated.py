@@ -75,8 +75,15 @@ class DelegatedWorkSelector:
             "arena_ids": list(self.arena_ids),
             "work_kinds": list(self.work_kinds),
             "include_archived": self.include_archived,
-            **({"resource_paths": [p.model_dump(mode="json", by_alias=True)
-                                    for p in self.resource_paths]} if self.resource_paths else {}),
+            **(
+                {
+                    "resource_paths": [
+                        p.model_dump(mode="json", by_alias=True) for p in self.resource_paths
+                    ]
+                }
+                if self.resource_paths
+                else {}
+            ),
         }
 
 
@@ -123,6 +130,7 @@ def validate_edge_selection(keys, relationships, limit):
         or not 1 <= limit <= 10001
     ):
         raise ValueError("invalid scoped edge selection")
+
     for key in keys:
         if not isinstance(key, tuple) or len(key) != 2 or key[0] not in CANONICAL_WORK_KINDS:
             raise ValueError("invalid scoped edge selection")
@@ -132,3 +140,16 @@ def validate_edge_selection(keys, relationships, limit):
         for r in relationships
     ):
         raise ValueError("invalid scoped edge selection")
+
+
+def validate_arena_edge_selection(arena_ids, keys, limit):
+    validate_edge_selection(keys, (), limit)
+    if (
+        not isinstance(arena_ids, tuple)
+        or not arena_ids
+        or len(arena_ids) > 4096
+        or len(set(arena_ids)) != len(arena_ids)
+    ):
+        raise ValueError("invalid scoped Arena edge selection")
+    for identifier in arena_ids:
+        validate_work_object_id(identifier)

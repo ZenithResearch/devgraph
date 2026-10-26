@@ -595,6 +595,27 @@ class Neo4jGraphStorage:
         )
         return [self._edge_from_row(row) for row in rows]
 
+    def delegated_arena_edges(self, arena_ids, keys, *, limit):
+        from devgraph.storage.delegated import validate_arena_edge_selection
+
+        validate_arena_edge_selection(arena_ids, keys, limit)
+        if not keys:
+            return []
+        rows = self._run_graph(
+            "UNWIND $keys AS key MATCH (target {id:key.id}) "
+            "WHERE key.label IN labels(target) "
+            "MATCH (source:Arena)-[edge:CONTAINS_WORK]->(target) "
+            "WHERE source.id IN $arena_ids "
+            "RETURN labels(source) AS from_labels, source.id AS from_id, "
+            "type(edge) AS relationship, labels(target) AS to_labels, "
+            "target.id AS to_id, properties(edge) AS properties "
+            "ORDER BY source.id, key.label, target.id LIMIT $limit",
+            keys=[{"label": kind, "id": identifier} for kind, identifier in keys],
+            arena_ids=list(arena_ids),
+            limit=limit,
+        )
+        return [self._edge_from_row(row) for row in rows]
+
     def delete_edge(
         self, from_label: str, from_id: str, relationship: str, to_label: str, to_id: str
     ) -> None:
@@ -815,8 +836,11 @@ class Neo4jGraphStorage:
             after_id=None,
             limit=limit,
         )
-        if any(selector.resource_paths for selector in selectors):
-            raise ValueError("resource paths require the versioned monitor projection")
+        path_filter = (
+            " AND " + path_predicate_cypher()
+            if any(selector.resource_paths for selector in selectors)
+            else ""
+        )
         rows = self._run_graph(
             "MATCH (:Arena {id: $arena_id})-[:CONTAINS_WORK]->(n) "
             "WHERE n.id IS NULL OR size(labels(n)) <> 1 OR ("
@@ -829,13 +853,18 @@ class Neo4jGraphStorage:
             "labels(n)[0] + '/' + n.id IN selector.work_ids) AND "
             "(size(selector.arena_ids) = 0 OR EXISTS { "
             "MATCH (a:Arena)-[:CONTAINS_WORK]->(root)-[:HAS_CHILD*0..]->(n) "
-            "WHERE a.id IN selector.arena_ids })) "
+            f"WHERE a.id IN selector.arena_ids }})){path_filter}) "
             "WITH DISTINCT n ORDER BY labels(n)[0], n.id LIMIT $limit " + _containment_projection(),
             arena_id=arena_id,
             kinds=list(work_kinds),
             include_archived=include_archived,
             after_resource=after_resource,
             selectors=[selector.as_parameters() for selector in selectors],
+            **(
+                {"path_arena_kind": self._generic_properties({"kind": "Arena"})["kind"]}
+                if path_filter
+                else {}
+            ),
             limit=limit,
         )
         result = [self._containment_from_row(row) for row in rows]
@@ -1270,9 +1299,11 @@ class Neo4jGraphStorage:
         comparison = "<" if descending else ">"
         direction = "DESC" if descending else "ASC"
         cursor = "" if after_id is None else f" AND n.id {comparison} $after_id"
-        path_filter = " AND " + path_predicate_cypher() if any(
-            selector.resource_paths for selector in selectors
-        ) else ""
+        path_filter = (
+            " AND " + path_predicate_cypher()
+            if any(selector.resource_paths for selector in selectors)
+            else ""
+        )
         rows = self._run_graph(
             f"MATCH (n:`{node_label}`) WHERE ($include_archived OR n.archived = false)"
             f"{cursor} AND any(selector IN $selectors WHERE "
@@ -1288,8 +1319,11 @@ class Neo4jGraphStorage:
             include_archived=include_archived,
             after_id=after_id,
             selectors=[selector.as_parameters() for selector in selectors],
-            **({"path_arena_kind": self._generic_properties({"kind": "Arena"})["kind"]}
-               if path_filter else {}),
+            **(
+                {"path_arena_kind": self._generic_properties({"kind": "Arena"})["kind"]}
+                if path_filter
+                else {}
+            ),
             limit=limit,
         )
         return [self._node_from_row(row, node_label) for row in rows]

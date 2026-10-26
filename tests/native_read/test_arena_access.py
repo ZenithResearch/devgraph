@@ -134,7 +134,8 @@ def test_credential_permission_operations_are_not_borrowed_from_constraints():
     assert grants[0].operations == ("get",)
 
 
-def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeypatch):
+@pytest.mark.parametrize("reusable", [False, True])
+def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeypatch, reusable):
     import hashlib
     from types import SimpleNamespace
 
@@ -153,6 +154,7 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
 
     monkeypatch.setattr("devgraph.auth.native_read._seconds", lambda _: int(NOW.timestamp()))
     monkeypatch.setattr("devgraph.auth.signed_read._seconds", lambda _: int(NOW.timestamp()))
+    monkeypatch.setattr("devgraph.auth.holder_grants._seconds", lambda _: int(NOW.timestamp()))
     old, owner, _, policies, _ = signed_setup(tmp_path)
     public = owner.public_key().public_bytes_raw().hex()
     raw = dict(
@@ -204,6 +206,46 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
     storage = MemoryGraphStorage()
     add_arena(ArenaMutations(storage), "arena-one")
     add_arena(ArenaMutations(storage), "private-arena")
+    if reusable:
+        import os
+        from pathlib import Path
+
+        from devgraph.auth.holder_grants import HolderGrantHost, checksum_bytes
+
+        binary = os.environ.get("SECS_HOLDER_GRANT_TEST_BINARY")
+        if not binary:
+            pytest.skip("actual native holder grant authority required")
+        # This fixture supplies assignments directly, without an operator
+        # activation journal. Keep its empty journal in a distinct SQLite file,
+        # matching production's attached-database transaction boundary.
+        import sqlite3
+        from contextlib import contextmanager
+
+        journal = tmp_path / "fixture-inbox.sqlite"
+
+        @contextmanager
+        def journal_database():
+            db = sqlite3.connect(journal)
+            try:
+                with db:
+                    yield db
+            finally:
+                db.close()
+
+        with journal_database() as db:
+            db.execute(
+                "CREATE TABLE access_assignments "
+                "(owner TEXT, device TEXT, request_id TEXT, active INTEGER)"
+            )
+            db.execute("CREATE TABLE access_provisioning_head (id INTEGER, revision INTEGER)")
+            db.execute("INSERT INTO access_provisioning_head VALUES(1,1)")
+        service.provisioning.inbox = SimpleNamespace(path=journal, _database=journal_database)
+        HolderGrantHost(
+            enrollment=service,
+            binary=Path(binary),
+            binary_sha256=checksum_bytes(Path(binary)),
+            service="service:arena-fixture",
+        )
     http = TestClient(
         create_signed_read_app(storage=storage, enrollment=service, audit_log=AuditLog())
     )
@@ -212,14 +254,26 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
         base + "/challenges", json=dict(subject_public_key=public, installation_id="a" * 32)
     ).json()
     assert challenge["details"]["schema"] == "devgraph.native-read-scope.v5"
-    result = http.post(
-        base + "/enrollments",
-        json=dict(challenge=challenge, proof=membership, signature=sign(owner, challenge)),
-    )
-    assert result.status_code == 200, result.text
-    assert result.json()["schema"] == "devgraph.native-read-result.v5"
-    credential = result.json()["credential"]
-    assert credential["claims"]["expires_at"] - credential["claims"]["issued_at"] == 900
+    if reusable:
+        from tests.native_read.test_holder_grants import credential_request
+
+        issued_root = http.post(
+            base + "/grants",
+            json=dict(challenge=challenge, proof=membership, signature=sign(owner, challenge)),
+        )
+        assert issued_root.status_code == 200, issued_root.text
+        credential = credential_request(owner, issued_root.json()["grant"])["credential"]
+        assert credential["claims"]["permissions"][0]["constraints"]["arena_ids"] == ["arena-one"]
+        assert credential["grant"]["claims"]["onward_delegation"] is False
+    else:
+        result = http.post(
+            base + "/enrollments",
+            json=dict(challenge=challenge, proof=membership, signature=sign(owner, challenge)),
+        )
+        assert result.status_code == 200, result.text
+        assert result.json()["schema"] == "devgraph.native-read-result.v5"
+        credential = result.json()["credential"]
+        assert credential["claims"]["expires_at"] - credential["claims"]["issued_at"] == 900
     counter = 0
 
     def read(path, endpoint=base + "/requests", operation="devgraph.arena.list"):
@@ -238,9 +292,13 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
             nonce=f"{counter:032x}",
             issued_at=int(NOW.timestamp()),
         )
-        proof["signature"] = owner.sign(
-            b"castalia.read-presentation.v1/signature\0" + canonical_json(proof)
-        ).hex()
+        domain = b"castalia.read-presentation.v1/signature\0"
+        if reusable:
+            proof["schema"] = "secs.holder-presentation.v1"
+            proof.pop("receiver")
+            proof["expires_at"] = int(NOW.timestamp()) + 60
+            domain = b"secs.holder-presentation.v1/signature\0"
+        proof["signature"] = owner.sign(domain + canonical_json(proof)).hex()
         body = dict(credential=credential, call=call, proof=proof)
         return http.post(endpoint, json=body), body
 
@@ -364,3 +422,91 @@ def test_arena_activation_retains_exact_review_and_old_assignment_compatibility(
         reason="synthetic revoke",
     )
     assert not provisioning.registry().assignments
+
+
+def test_scoped_topology_carries_only_explicit_arena_records_and_real_edges():
+    from tests.model.test_arena_runtime import add_arena, assign
+    from tests.model.test_named_work import create, ref
+
+    from devgraph.arenas import ArenaMutations
+    from devgraph.auth.monitor_read import MonitorWorkGrant, project_monitor_read
+    from devgraph.named_work import NamedWorkMutations
+    from devgraph.storage.memory import MemoryGraphStorage
+
+    storage = MemoryGraphStorage()
+    arenas, work = ArenaMutations(storage), NamedWorkMutations(storage)
+    for name in ("visible-arena", "private-arena"):
+        add_arena(arenas, name)
+    for name in ("visible", "private"):
+        create(work, "Task", name)
+        assign(
+            arenas,
+            "Task",
+            name,
+            1,
+            arena=ref("Arena", "visible-arena", 1 if name == "visible" else 2),
+        )
+    grant = MonitorWorkGrant(
+        scope="devgraph.work.read",
+        operations=["list", "get"],
+        work_kinds=["Task"],
+        work_ids=["Task/visible"],
+        relationship_types=["parent"],
+        include_archived=False,
+    )
+    metadata = ArenaReadGrant(scope="devgraph.arena.read", arena_ids=["visible-arena"])
+    for target in ("/monitor/topology/v1", "/monitor/snapshot"):
+        result = project_monitor_read(storage, [metadata, grant], target)
+        text = json.dumps(result)
+        assert "visible-arena" in text and "CONTAINS_WORK" in text
+        assert "private-arena" not in text and '"private"' not in text
+        assert result["access_scope"]["arena_metadata"] is True
+        old = project_monitor_read(storage, [grant], target)
+        assert "visible-arena" not in json.dumps(old)
+        assert "CONTAINS_WORK" not in json.dumps(old)
+
+
+def test_narrowed_arena_get_cannot_list_or_disclose_topology_metadata():
+    from tests.model.test_arena_runtime import add_arena
+
+    from devgraph.arenas import ArenaMutations
+    from devgraph.auth.arena_activation import ArenaMonitorReadEnrollment
+    from devgraph.auth.errors import ForbiddenError
+    from devgraph.auth.monitor_read import project_monitor_read
+    from devgraph.auth.native_read import RESOURCE
+    from devgraph.storage.memory import MemoryGraphStorage
+
+    storage = MemoryGraphStorage()
+    add_arena(ArenaMutations(storage), "arena-one")
+    service = object.__new__(ArenaMonitorReadEnrollment)
+    grants = service._decode_grants(
+        [
+            dict(
+                operation="devgraph.arena.get",
+                resource=RESOURCE,
+                constraints=dict(scope="devgraph.arena.read", arena_ids=["arena-one"]),
+            )
+        ]
+    )
+    assert project_monitor_read(storage, grants, "/arenas/arena-one")["id"] == "arena-one"
+    with pytest.raises(ForbiddenError):
+        project_monitor_read(storage, grants, "/arenas")
+
+
+def test_holder_arena_path_intersects_metadata_without_work_scope_conversion():
+    from devgraph.auth.errors import UnauthenticatedError
+    from devgraph.auth.holder_grants import constraint
+
+    permission = dict(
+        operation="devgraph.arena.get",
+        resource="fixture",
+        constraints=dict(scope="devgraph.arena.read", arena_ids=["one", "two"]),
+        scope=dict(mode="paths", roots=[[dict(kind="Arena", id="one")]]),
+    )
+    assert constraint(permission)["constraints"] == dict(
+        scope="devgraph.arena.read", arena_ids=["one"]
+    )
+    for root in ([dict(kind="Arena", id="hidden")], [dict(kind="Project", id="one")]):
+        permission["scope"]["roots"] = [root]
+        with pytest.raises(UnauthenticatedError):
+            constraint(permission)

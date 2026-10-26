@@ -144,7 +144,7 @@ def create_signed_read_app(
         async def arena_request_read(request: Request):
             from devgraph.api.wallet_monitor import wallet_monitor_read
 
-            body = await _body(request, {"credential", "call", "proof"})
+            body = await _body(request, {"credential", "call", "proof"}, maximum_bytes=131072)
             return await run_in_threadpool(
                 wallet_monitor_read, storage, enrollment, audit_log, body
             )

@@ -252,8 +252,8 @@ def project_monitor_read(storage, grants, target):
 
     if monitor_target(target)[0].startswith("arena."):
         return project_arena_read(storage, grants, target)
-    grants = [g for g in grants if g.scope == "devgraph.work.read"]
-    if any(getattr(g, "resource_paths", ()) for g in grants):
+    grants = tuple(grants)
+    if any(getattr(g, "resource_paths", ()) or g.scope == "devgraph.arena.read" for g in grants):
         # Capture every page and relationship in one serialized graph interval.
         # A concurrent move cannot slip between permission check and disclosure.
         with storage.work_mutation_transaction():
@@ -263,7 +263,8 @@ def project_monitor_read(storage, grants, target):
 
 def _project_monitor_read(storage, grants, target):
     operation, path, query = monitor_target(target)
-    grants = [g for g in grants if operation in g.operations]
+    arena_grants = [g for g in grants if g.scope == "devgraph.arena.read"]
+    grants = [g for g in grants if g.scope == "devgraph.work.read" and operation in g.operations]
     if not grants:
         raise ForbiddenError("scope_not_granted", correlation_id="monitor-read")
     by_key = {}
@@ -326,6 +327,39 @@ def _project_monitor_read(storage, grants, target):
         if permits((e.from_label, e.from_id), directions[e.relationship][0])
         or permits((e.to_label, e.to_id), directions[e.relationship][1])
     ]
+    arena_ids = ()
+    if path in ("/monitor/topology/v1", "/monitor/snapshot", "/monitor/kanban/v2"):
+        # Arena metadata never follows from a Work selector. Both endpoints of
+        # each real membership edge must already be independently authorized.
+        arena_ids = tuple(
+            sorted(
+                {
+                    identifier
+                    for grant in arena_grants
+                    if "list" in getattr(grant, "operations", ("list", "get"))
+                    for identifier in grant.arena_ids
+                }
+            )
+        )
+        if arena_ids:
+            after = None
+            arena_nodes = []
+            while True:
+                page = storage.delegated_arena_page(arena_ids, after_id=after, limit=100)
+                arena_nodes.extend(page)
+                if len(page) < 100:
+                    break
+                after = page[-1].id
+            disclosed_ids = tuple(n.id for n in arena_nodes)
+            if disclosed_ids:
+                edges.extend(
+                    storage.delegated_arena_edges(
+                        disclosed_ids, tuple((n.label, n.id) for n in nodes), limit=10001
+                    )
+                )
+            nodes.extend(arena_nodes)
+            if len(nodes) > 10000 or len(edges) > 10000:
+                raise StorageUnavailable("scoped Arena projection capacity exceeded")
     captured = ReadProjectionStorage(nodes, edges, storage.health())
     if path == "/workflows/v1":
         from devgraph.workflow_contract import catalog
@@ -389,7 +423,8 @@ def _project_monitor_read(storage, grants, target):
         "observations": False,
         "receipts": False,
         "supporting_material": False,
-        "relationship_data": bool(relationships),
+        "relationship_data": bool(relationships or arena_ids),
+        "arena_metadata": bool(arena_ids),
         "complete": True,
     }
     return result

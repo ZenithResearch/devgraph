@@ -19,8 +19,14 @@ from devgraph.auth.write_provisioning import WriteAccessDraft
 ArenaRead = ArenaReadGrant | PathReadGrant | MonitorWorkGrant
 
 
+class VerifiedArenaReadGrant(ArenaReadGrant):
+    """Internal verified permission, never an enrollment/policy wire format."""
+
+    operations: tuple[Literal["list", "get"], ...]
+
+
 def read_operations(grant):
-    return ("list", "get") if isinstance(grant, ArenaReadGrant) else grant.operations
+    return getattr(grant, "operations", ("list", "get"))
 
 
 def permission_operation(grant, operation):
