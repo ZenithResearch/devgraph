@@ -40,6 +40,7 @@ def review_endpoint(config_path, origin):
         "devgraph.signed-read-runtime.v7",
         "devgraph.signed-read-runtime.v8",
         "devgraph.signed-read-runtime.v9",
+        "devgraph.signed-read-runtime.v11",
     }:
         blockers.append("A request-enabled signed-read configuration is required.")
     if root["receiver"] != origin or authority["receiver"] != origin:

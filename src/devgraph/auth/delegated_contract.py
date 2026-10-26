@@ -299,9 +299,12 @@ def _grant_is_subset(granted: ReadGrant, requested: ReadGrant) -> bool:
             and (not granted.include_archived or requested.include_archived)
             and _selector_subset(granted.work_ids, requested.work_ids)
             and _selector_subset(granted.arena_ids, requested.arena_ids)
-            and paths_subset(getattr(granted, "resource_paths", ()),
-                             getattr(requested, "resource_paths", ()))
+            and paths_subset(
+                getattr(granted, "resource_paths", ()), getattr(requested, "resource_paths", ())
+            )
         )
+    if isinstance(granted, ArenaReadGrant) and getattr(requested, "all_arenas", False):
+        return True
     if isinstance(granted, ArenaReadGrant) and isinstance(requested, ArenaReadGrant):
         return set(granted.arena_ids).issubset(requested.arena_ids)
     return type(granted) is type(requested)

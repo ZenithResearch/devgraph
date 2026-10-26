@@ -135,7 +135,10 @@ def test_credential_permission_operations_are_not_borrowed_from_constraints():
 
 
 @pytest.mark.parametrize("reusable", [False, True])
-def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeypatch, reusable):
+@pytest.mark.parametrize("owner_all", [False, True])
+def test_real_secs_arena_enrollment_read_replay_and_revocation(
+    tmp_path, monkeypatch, reusable, owner_all
+):
     import hashlib
     from types import SimpleNamespace
 
@@ -185,6 +188,22 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
             )
         )
     ]
+    if owner_all:
+        from devgraph.auth.arena_access import OwnerArenaAccessDraft, OwnerArenaMemberPolicy
+
+        raw["schema"] = "devgraph.access-draft.v7"
+        raw["read_grants"] = [dict(scope="devgraph.arena.read", all_arenas=True)]
+        root = OwnerArenaAccessDraft.model_validate(raw)
+        registry = [
+            OwnerArenaMemberPolicy.model_validate(
+                dict(
+                    schema="devgraph.member-access-policy.v6",
+                    revision=1,
+                    ceiling=root,
+                    assignments=[assignment],
+                )
+            )
+        ]
     policy = compile_arena_read(root)
     configured = old.authority.policy()
     old.authority.policy_file.write_text(
@@ -317,8 +336,8 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
     assert read("/arenas/private-arena", operation="devgraph.arena.get")[0].status_code == 404
     assert read("/todos/v2", operation="devgraph.work.list")[0].status_code == 401
     assert read("/arenas/arena-one/members", operation="devgraph.arena.get")[0].status_code == 403
-    registry[0] = ArenaMemberPolicy.model_validate(
-        dict(schema="devgraph.member-access-policy.v5", revision=2, ceiling=root, assignments=[])
+    registry[0] = type(registry[0]).model_validate(
+        dict(schema=registry[0].schema_, revision=2, ceiling=root, assignments=[])
     )
     assert read("/arenas")[0].status_code == 401
 

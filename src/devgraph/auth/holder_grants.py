@@ -84,6 +84,42 @@ def constraint(value):
     return v
 
 
+def invoke_native(binary, binary_sha256, pin_value, operation, *, issuer_key_file=None, **fields):
+    """Exact native crypto boundary, also usable for route-only recovery.
+
+    The caller supplies its independently validated pin. This never constructs
+    a grant/assignment or substitutes Python signature verification.
+    """
+    if checksum_bytes(binary) != binary_sha256:
+        raise UnauthenticatedError("holder_authority_changed")
+    with tempfile.TemporaryDirectory(prefix="devgraph-holder-authority-") as d:
+        pin = Path(d).resolve() / "pin.json"
+        fd = os.open(pin, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(canonical_json(pin_value))
+        args = [str(binary), "--issuer-pin-file", str(pin)]
+        if operation in ("issue", "issue_access_point"):
+            args += ["--issuer-key-file", str(issuer_key_file)]
+        elif operation not in ("verify", "verify_access_point"):
+            raise UnauthenticatedError("unsupported_operation")
+        try:
+            result = subprocess.run(
+                args,
+                input=canonical_json(dict(operation=operation, **fields)),
+                capture_output=True,
+                timeout=5,
+                check=True,
+            )
+            if len(result.stdout) > 131072:
+                raise ValueError()
+            value = json.loads(result.stdout)
+            if value.get("ok") is not True or not isinstance(value.get("value"), dict):
+                raise ValueError()
+            return value["value"]
+        except (OSError, ValueError, subprocess.SubprocessError):
+            raise UnauthenticatedError("holder_authority_denied") from None
+
+
 class HolderGrantHost:
     def __init__(
         self,
@@ -134,34 +170,14 @@ class HolderGrantHost:
 
     def invoke(self, operation, **fields):
         self._pin_current()
-        if checksum_bytes(self.binary) != self.binary_sha256:
-            raise UnauthenticatedError("holder_authority_changed")
-        with tempfile.TemporaryDirectory(prefix="devgraph-holder-authority-") as d:
-            pin = Path(d).resolve() / "pin.json"
-            fd = os.open(pin, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, "wb") as f:
-                f.write(canonical_json(self.pin))
-            args = [str(self.binary), "--issuer-pin-file", str(pin)]
-            if operation in ("issue", "issue_access_point"):
-                args += ["--issuer-key-file", str(self.enrollment.authority.issuer_key_file)]
-            elif operation not in ("verify", "verify_access_point"):
-                raise UnauthenticatedError("unsupported_operation")
-            try:
-                result = subprocess.run(
-                    args,
-                    input=canonical_json(dict(operation=operation, **fields)),
-                    capture_output=True,
-                    timeout=5,
-                    check=True,
-                )
-                if len(result.stdout) > 131072:
-                    raise ValueError()
-                value = json.loads(result.stdout)
-                if value.get("ok") is not True or not isinstance(value.get("value"), dict):
-                    raise ValueError()
-                return value["value"]
-            except (OSError, ValueError, subprocess.SubprocessError):
-                raise UnauthenticatedError("holder_authority_denied") from None
+        return invoke_native(
+            self.binary,
+            self.binary_sha256,
+            self.pin,
+            operation,
+            issuer_key_file=self.enrollment.authority.issuer_key_file,
+            **fields,
+        )
 
     def revision(self, owner, device, current):
         e = self.provider

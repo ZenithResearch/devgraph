@@ -150,3 +150,10 @@ class ArenaMonitorReadEnrollment(PathMonitorReadEnrollment):
         # granted Work list authority from the same signed credential, never the
         # server ceiling or another credential.
         return self._decode_grants(credential["claims"]["permissions"])
+
+
+class OwnerArenaGrantProvisioning(ArenaGrantProvisioning):
+    from devgraph.auth.arena_access import OwnerArenaMemberPolicy
+
+    registry_type = OwnerArenaMemberPolicy
+    registry_schema = "devgraph.member-access-policy.v6"
