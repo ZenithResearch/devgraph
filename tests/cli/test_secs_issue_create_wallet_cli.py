@@ -147,14 +147,18 @@ def test_wallet_composition_accepts_owner_search_only_install_directory(
         lambda command: subprocess.CompletedProcess(command, 2),
     )
 
-    with pytest.raises(
-        wallet.LocalSecSWalletIssueCreateError,
-        match="ceremony did not complete",
-    ):
-        wallet.execute_local_wallet_secs_issue_create_v1(
-            request_file=tmp_path / "request.json",
-            idempotency_key_file=tmp_path / "idempotency-key.txt",
-        )
+    try:
+        with pytest.raises(
+            wallet.LocalSecSWalletIssueCreateError,
+            match="ceremony did not complete",
+        ):
+            wallet.execute_local_wallet_secs_issue_create_v1(
+                request_file=tmp_path / "request.json",
+                idempotency_key_file=tmp_path / "idempotency-key.txt",
+            )
+    finally:
+        # pytest must be able to enumerate and remove this disposable fixture.
+        (install_root / "secS").chmod(0o700)
 
 
 @pytest.mark.parametrize("mode", (0o600, 0o720))
@@ -305,13 +309,21 @@ def test_wallet_composition_accepts_darwin_deny_only_directory_acl(
         lambda command: subprocess.CompletedProcess(command, 2),
     )
 
-    with pytest.raises(
-        wallet.LocalSecSWalletIssueCreateError,
-        match="ceremony did not complete",
-    ):
-        wallet.execute_local_wallet_secs_issue_create_v1(
-            request_file=tmp_path / "request.json",
-            idempotency_key_file=tmp_path / "idempotency-key.txt",
+    try:
+        with pytest.raises(
+            wallet.LocalSecSWalletIssueCreateError,
+            match="ceremony did not complete",
+        ):
+            wallet.execute_local_wallet_secs_issue_create_v1(
+                request_file=tmp_path / "request.json",
+                idempotency_key_file=tmp_path / "idempotency-key.txt",
+            )
+    finally:
+        subprocess.run(
+            ["chmod", "-a", "everyone deny delete", os.fspath(install_root / "secS")],
+            check=True,
+            capture_output=True,
+            text=True,
         )
 
 
