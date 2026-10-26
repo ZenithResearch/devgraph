@@ -1,6 +1,13 @@
-# Devgraph on Buildkite
+# Devgraph Buildkite history and manual qualification
 
-Buildkite owns repository, Python/package, frontend, Rust/protocol/MSRV, WASM,
+Public PR/main checks have moved to [GitHub Actions](github-actions-ci.md).
+The public `devgraph` Buildkite pipeline is retired; its configuration remains
+for historical reproducibility. The manual companion/installed pipelines below
+remain separate qualification tools and are not required public source checks.
+
+## Historical configuration
+
+The previous Buildkite configuration owned repository, Python/package, frontend, Rust/protocol/MSRV, WASM,
 SDK/browser, CodeQL, companion source and installed-evidence admission jobs.
 Repository tests run as an unprivileged user so Linux root cannot bypass permission tests.
 GitHub remains the source/review host. These pipelines never deploy Devgraph,
@@ -94,7 +101,7 @@ implicitly and no protection is disabled by these scripts.
 
 Buildkite [build #2](https://buildkite.com/bananawalnut/devgraph/builds/2) passed
 all four public lanes at `4489e0be2df382daabbff38f12d331e43b3cbdf3`. The three
-Actions workflow files are retired in this candidate. Require `buildkite/devgraph`
+Actions workflow files are retired in this candidate. The former migration required `buildkite/devgraph`
 with strict up-to-date checking before removing the former `Repository verification`
 requirement; never leave a merge window with neither set required. Preserve historical Actions results as
 evidence. CodeQL Actions-language analysis becomes inapplicable once executable
