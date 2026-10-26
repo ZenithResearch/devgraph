@@ -63,6 +63,7 @@ class ReadRuntimeConfiguration(BaseModel):
         "devgraph.signed-read-runtime.v10",
         "devgraph.signed-read-runtime.v11",
     ] = Field(alias="schema")
+    canonical_access_points: bool = False
     holder_grant_binary: Path | None = None
     holder_grant_binary_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     canonical_service_id: str | None = Field(default=None, min_length=1, max_length=256)
@@ -97,6 +98,8 @@ class ReadRuntimeConfiguration(BaseModel):
         )
         if any(v is not None for v in holder) and not all(v is not None for v in holder):
             raise ValueError("holder grants require explicit binary, digest and canonical service")
+        if self.canonical_access_points and self.holder_grant_binary is None:
+            raise ValueError("canonical service routes require explicit native holder authority")
         if self.holder_grant_binary is not None and self.member_policy_file is None:
             raise ValueError("holder grants require durable member policy")
         if self.holder_grant_provider_runtime_file is not None and self.holder_grant_binary is None:
@@ -573,8 +576,12 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
     )
 
 
-def create_app():
-    path = os.environ.get("DEVGRAPH_SIGNED_READ_CONFIG")
+def create_app(*, config_path=None, canonical_routes=True):
+    path = (
+        str(config_path)
+        if config_path is not None
+        else os.environ.get("DEVGRAPH_SIGNED_READ_CONFIG")
+    )
     if not path:
         raise RuntimeError("signed read receiver requires explicit reviewed configuration")
     data_root = os.environ.get("DEVGRAPH_DATA_ROOT")
@@ -583,6 +590,7 @@ def create_app():
     config = ReadRuntimeConfiguration.model_validate(private_json(Path(path)))
     audit = RetainedAuditLog(Path(data_root))
     enrollment = load_enrollment(config, data_root=Path(data_root))
+    provider_path = None
     if config.holder_grant_binary is not None:
         from devgraph.auth.holder_grants import HolderGrantHost
 
@@ -722,12 +730,16 @@ def create_app():
             ),
         )
 
+    canonical_children = []
+
     @asynccontextmanager
     async def lifespan(_app):
         try:
             yield
         finally:
             storage.close()
+            for child in canonical_children:
+                child.state.service_storage.close()
 
     app = create_signed_read_app(
         storage=storage,
@@ -777,4 +789,19 @@ def create_app():
     if operator is not None:
         register_access_request_routes(app, inbox)
         register_access_operator(app, operator)
+    app.state.service_storage = storage
+    app.state.service_authority_receiver = enrollment.policy().receiver
+    if canonical_routes and config.canonical_access_points:
+        from devgraph.api.canonical_service import register_service_routes
+
+        canonical_app = create_app(config_path=provider_path or Path(path), canonical_routes=False)
+        canonical_children.append(canonical_app)
+        app.state.canonical_service_app = canonical_app
+        app.state.canonical_service_host = enrollment.holder_grants
+        register_service_routes(
+            app,
+            canonical_app=canonical_app,
+            host=enrollment.holder_grants,
+            origin=enrollment.policy().receiver,
+        )
     return app

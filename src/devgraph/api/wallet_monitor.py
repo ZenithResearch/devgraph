@@ -131,6 +131,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
     def read_setup_asset(name: str):
         if name not in (
             "provider-setup.mjs",
+            "service-route.mjs",
             "result.mjs",
             "subject.mjs",
             "wallet-errors.mjs",
@@ -156,6 +157,11 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return {
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
+            **(
+                {"service_access_point_endpoint": "/.well-known/devgraph-service.json"}
+                if getattr(app.state, "canonical_service_app", None) is not None
+                else {}
+            ),
             # Explicit resource admission disclosure. A missing field on older
             # services retains their clients' previous membership-proof behavior.
             "membership_requirement": "optional"

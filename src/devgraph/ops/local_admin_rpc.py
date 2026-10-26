@@ -146,37 +146,57 @@ def run():
     # This factory composes the canonical handler/storage but opens no listener.
     from devgraph.signed_read_runtime import create_app, owner_operator_policy
 
-    if request["operation"] == "inspect":
-        runtime = ReadRuntimeConfiguration.model_validate(
-            private_json(Path(configuration["runtime"]))
-        )
-        owner_operator_policy(runtime, data_root=configuration["data_root"])
-        value = dict(
-            transport="local-secs-rpc",
-            owner_registered=True,
-            credential_administration=True,
-            service_configuration=False,
-            https_hosted_by_transfer=False,
-        )
-        result = dict(
-            schema="secs.local-admin-response.v1",
-            request_id=request["request_id"],
-            resource_id=request["resource_id"],
-            instance_id=request["instance_id"],
-            receiver=request["receiver"],
-            status=200,
-            body=value,
-        )
-        sys.stdout.buffer.write(canonical_json(result) + b"\n")
-        return
     app = create_app()
-    operator = app.state.access_operator
     try:
-        status, value = dispatch(operator, request["operation"], request["body"])
+        canonical = getattr(app.state, "canonical_service_app", None)
+        if request["operation"] == "inspect":
+            runtime = ReadRuntimeConfiguration.model_validate(
+                private_json(Path(configuration["runtime"]))
+            )
+            owner_operator_policy(runtime, data_root=configuration["data_root"])
+            value = dict(
+                transport="local-secs-rpc",
+                owner_registered=True,
+                credential_administration=True,
+                service_configuration=False,
+                https_hosted_by_transfer=False,
+            )
+            if canonical is not None:
+                from devgraph.api.canonical_service import access_point_binding
+
+                value["service_access_point"] = access_point_binding(
+                    app.state.canonical_service_host,
+                    origin=configuration["receiver"],
+                    authority_receiver=canonical.state.service_authority_receiver,
+                )
+            status = 200
+        else:
+            operation, body = request["operation"], request["body"]
+            target = app
+            if operation in ("service_challenge", "service_execute"):
+                if canonical is None or set(body) != {"service_access_point", "request"}:
+                    raise ValueError("canonical service unavailable")
+                import time
+
+                claims = app.state.canonical_service_host.invoke(
+                    "verify_access_point",
+                    binding=body["service_access_point"],
+                    origin=configuration["receiver"],
+                    now=int(time.time()),
+                )
+                if claims["authority_receiver"] != canonical.state.service_authority_receiver:
+                    raise ValueError("canonical receiver changed")
+                target = canonical
+                operation = {"service_challenge": "challenge", "service_execute": "execute"}[
+                    operation
+                ]
+                body = body["request"]
+            status, value = dispatch(target.state.access_operator, operation, body)
     finally:
-        storage = getattr(operator, "storage", None)
-        if storage is not None:
-            storage.close()
+        app.state.service_storage.close()
+        canonical = getattr(app.state, "canonical_service_app", None)
+        if canonical is not None:
+            canonical.state.service_storage.close()
     result = dict(
         schema="secs.local-admin-response.v1",
         request_id=request["request_id"],

@@ -132,9 +132,9 @@ class HolderGrantHost:
             with os.fdopen(fd, "wb") as f:
                 f.write(canonical_json(self.pin))
             args = [str(self.binary), "--issuer-pin-file", str(pin)]
-            if operation == "issue":
+            if operation in ("issue", "issue_access_point"):
                 args += ["--issuer-key-file", str(self.enrollment.authority.issuer_key_file)]
-            elif operation != "verify":
+            elif operation not in ("verify", "verify_access_point"):
                 raise UnauthenticatedError("unsupported_operation")
             try:
                 result = subprocess.run(
