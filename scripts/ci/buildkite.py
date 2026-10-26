@@ -113,7 +113,8 @@ def main():
                     "job_id": os.environ.get("BUILDKITE_JOB_ID"),
                     "files": {
                         str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
-                        for p in sorted((ROOT / ".buildkite").glob("*"))
+                        for p in sorted([*(ROOT / ".buildkite").glob("*"),
+                                         *(ROOT / "scripts/ci").glob("*.sh")])
                         if p.is_file()
                     },
                     "tools": {

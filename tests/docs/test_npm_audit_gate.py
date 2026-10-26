@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 @pytest.mark.parametrize("failing_audit", [1, 2])
 def test_sdk_audit_failure_stops_the_lane_before_the_affected_consumer(tmp_path, failing_audit):
-    source = (ROOT / ".buildkite/run.sh").read_text()
+    source = (ROOT / "scripts/ci/run.sh").read_text()
     sdk_function = source[source.index("sdk_checks() {") : source.index("\n}\n\ncase") + 2]
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
@@ -38,7 +38,7 @@ def test_sdk_audit_failure_stops_the_lane_before_the_affected_consumer(tmp_path,
     web.mkdir(parents=True)
     version = json.loads((ROOT / "packages/web/package.json").read_text())["version"]
     (web / f"devgraph-web-{version}.tgz").touch()
-    (tmp_path / "build/buildkite/sdk").mkdir(parents=True)
+    (tmp_path / "build/ci/sdk").mkdir(parents=True)
     ci_tmp = tmp_path / "ci"
     ci_tmp.mkdir()
     count = tmp_path / "audit-count"
@@ -52,6 +52,7 @@ def test_sdk_audit_failure_stops_the_lane_before_the_affected_consumer(tmp_path,
             **os.environ,
             "PATH": str(fake_bin) + os.pathsep + os.environ["PATH"],
             "DG_CI_TMP": str(ci_tmp),
+            "DG_CI_OUTPUT_ROOT": str(tmp_path / "build/ci"),
             "DG_NPM_CALLS": str(calls),
             "DG_AUDIT_COUNT": str(count),
             "DG_FAILING_AUDIT": str(failing_audit),
