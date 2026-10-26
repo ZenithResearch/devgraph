@@ -22,8 +22,8 @@ from devgraph.signed_read_runtime import ReadRuntimeConfiguration, private_json
 POST_PATHS = frozenset(
     base + suffix
     for base, suffixes in (
-        ("/devgraph/native-read/v2", ("/challenges", "/enrollments", "/requests")),
-        ("/monitor/wallet-access/v1", ("/challenges", "/enrollments", "/requests")),
+        ("/devgraph/native-read/v2", ("/challenges", "/enrollments", "/grants", "/requests")),
+        ("/monitor/wallet-access/v1", ("/challenges", "/enrollments", "/grants", "/requests")),
         ("/devgraph/access-requests/v2", ("/challenges", "/actions")),
     )
     for suffix in suffixes
@@ -87,11 +87,26 @@ class PublicReadBoundary:
     refill_per_second = 2
 
     def body_limit(self, path, method):
+        if method == "POST" and path in OPERATOR_POST_PATHS:
+            return 524288
+        if method == "POST" and path in (
+            "/monitor/wallet-access/v1/requests",
+            "/devgraph/native-read/v2/requests",
+        ):
+            return 131072
         return 65536 if method == "POST" else 0
 
     def __init__(
-        self, app, *, origin: str, expires_at: int, clock=time.time, approved_operator_policy=None
+        self,
+        app,
+        *,
+        origin: str,
+        expires_at: int,
+        clock=time.time,
+        approved_operator_policy=None,
+        canonical_paths=False,
     ):
+        self.canonical_paths = canonical_paths
         self.app, self.origin = app, public_origin(origin)
         self.host = urlsplit(origin).netloc.encode("ascii")
         self.expires_at, self.clock = expires_at, clock
@@ -130,6 +145,11 @@ class PublicReadBoundary:
         if self.expired():
             return await reject(503, "pilot_window_closed")
         path, method = scope["path"], scope["method"]
+        # Apply the SAME route, method, body and abuse limits inside the opt-in
+        # canonical namespace. Never forward an unrestricted prefixed path.
+        if self.canonical_paths and path.startswith("/service/v1/"):
+            path = path[len("/service/v1") :]
+
         operator_route = (method == "POST" and path in OPERATOR_POST_PATHS) or (
             method == "GET" and (path in OPERATOR_GET_PATHS or OPERATOR_ASSET.fullmatch(path))
         )
@@ -143,7 +163,12 @@ class PublicReadBoundary:
         if not (
             (
                 method == "GET"
-                and (path in self.get_paths or any(p.fullmatch(path) for p in self.asset_patterns))
+                and (
+                    path in self.get_paths
+                    or any(p.fullmatch(path) for p in self.asset_patterns)
+                    or self.canonical_paths
+                    and path == "/.well-known/devgraph-service.json"
+                )
             )
             or (method == "POST" and path in self.post_paths)
             or operator_allowed
@@ -267,5 +292,9 @@ def create_app():
         return dict(live=True, mode="read-only-public-pilot")
 
     return PublicReadBoundary(
-        app, origin=origin, expires_at=expiry, approved_operator_policy=approved_operator_policy
+        app,
+        origin=origin,
+        expires_at=expiry,
+        approved_operator_policy=approved_operator_policy,
+        canonical_paths=config.canonical_access_points,
     )

@@ -28,7 +28,11 @@ def register_access_operator(app: FastAPI, operator):
             ):
                 raise UnauthenticatedError("operator_required")
             if challenge:
-                body = await _body(request, {"subject_public_key", "installation_id", "action"})
+                body = await _body(
+                    request,
+                    {"subject_public_key", "installation_id", "action"},
+                    maximum_bytes=524288,
+                )
                 result = await run_in_threadpool(
                     operator.challenge,
                     body["subject_public_key"],
@@ -36,7 +40,7 @@ def register_access_operator(app: FastAPI, operator):
                     operator.parse_action(body["action"]),
                 )
             else:
-                body = await _body(request, {"challenge", "signature"})
+                body = await _body(request, {"challenge", "signature"}, maximum_bytes=524288)
                 result = await run_in_threadpool(
                     operator.execute, body["challenge"], body["signature"]
                 )

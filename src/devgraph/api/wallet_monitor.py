@@ -12,6 +12,7 @@ from devgraph.api.topology import register_topology_assets
 from devgraph.auth.errors import ForbiddenError, UnauthenticatedError
 from devgraph.auth.monitor_read import monitor_target, project_monitor_read
 from devgraph.auth.native_read import RESOURCE
+from devgraph.auth.resource_membership import ResourceMembershipAdmission
 from devgraph.frontend.app import FRONTEND_HTML
 from devgraph.frontend.wallet import WALLET_CONNECTION_HTML
 from devgraph.kanban import BoardChanged, InvalidBoardFilter
@@ -130,6 +131,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
     def read_setup_asset(name: str):
         if name not in (
             "provider-setup.mjs",
+            "service-route.mjs",
             "result.mjs",
             "subject.mjs",
             "wallet-errors.mjs",
@@ -155,6 +157,28 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return {
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
+            **(
+                {"service_access_point_endpoint": "/.well-known/devgraph-service.json"}
+                if getattr(app.state, "canonical_service_app", None) is not None
+                else {}
+            ),
+            # Explicit resource admission disclosure. A missing field on older
+            # services retains their clients' previous membership-proof behavior.
+            "membership_requirement": "optional"
+            if isinstance(enrollment.membership_check, ResourceMembershipAdmission)
+            and not enrollment.membership_check.required
+            else "required",
+            **(
+                {
+                    "holder_grants": {
+                        "schema": "secs.holder-grant.v1",
+                        "service": enrollment.holder_grants.service,
+                        "endpoint": BASE + "/grants",
+                    }
+                }
+                if getattr(enrollment, "holder_grants", None) is not None
+                else {}
+            ),
             **(
                 {"access_catalog_endpoint": "/devgraph/access-requests/v2/catalog"}
                 if getattr(app.state, "access_catalog_enabled", False)
@@ -185,12 +209,25 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         body = await _body(request, {"challenge", "proof", "signature"})
         return await run_in_threadpool(enrollment.enroll, **body)
 
+    if getattr(enrollment, "holder_grants", None) is not None:
+
+        @app.post(BASE + "/grants")
+        async def holder_grant(request: Request):
+            body = await _body(request, {"challenge", "proof", "signature"})
+            return await run_in_threadpool(enrollment.holder_grants.issue, **body)
+
     def read(body):
         return wallet_monitor_read(storage, enrollment, audit_log, body)
 
     @app.post(BASE + "/requests")
     async def request_read(request: Request):
-        body = await _body(request, {"credential", "call", "proof"})
+        body = await _body(
+            request,
+            {"credential", "call", "proof"},
+            maximum_bytes=(
+                131072 if getattr(enrollment, "holder_grants", None) is not None else 65536
+            ),
+        )
         try:
             return await run_in_threadpool(read, body)
         except (UnauthenticatedError, ForbiddenError):

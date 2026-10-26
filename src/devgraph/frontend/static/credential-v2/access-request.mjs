@@ -2,7 +2,8 @@ import{validateCatalog,preferenceFor}from'./scope-picker.mjs';
 const stable=v=>v===null||typeof v!=='object'?JSON.stringify(v):Array.isArray(v)?'['+v.map(stable).join(',')+']':'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
 export class AccessRequestClient{
  constructor({wallet,storage=globalThis.sessionStorage,origin=location.origin,fetchImpl=fetch}){
-  Object.assign(this,{wallet,storage,origin,fetchImpl,prepared:null});
+  Object.assign(this,{wallet,storage,origin:wallet.authorityOrigin??origin,fetchImpl,prepared:null,prefix:wallet.routePrefix??''});
+  origin=this.origin;
   const identity=wallet.requestIdentity;if(!identity)throw Error('wallet_connection_required');
   this.identity=structuredClone(identity);this.key='devgraph.access-request.v1:'+origin+':'+identity.subject_public_key+':'+identity.installation_id;
   const saved=storage?.getItem(this.key);this.original=saved?JSON.parse(saved):null;
@@ -12,9 +13,9 @@ export class AccessRequestClient{
   if(!this.original||!this.lastResult||!['active','denied','expired','revoked','superseded','partially_active'].includes(this.lastResult.status))throw Error('recover_original_request_first');
   this.storage.setItem(this.key+':history:'+this.original.request_id,JSON.stringify(this.original));this.storage.removeItem(this.key);this.original=null;this.action=null;this.prepared=null;this.attempted=false;this.lastResult=null;
  }
- async post(suffix,body){const fetchImpl=this.fetchImpl;const r=await fetchImpl('/devgraph/access-requests/v2/'+suffix,{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'},credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'});const data=await r.json();if(!r.ok)throw Error(data.error??'access_request_failed');return data;}
+ async post(suffix,body){const fetchImpl=this.fetchImpl;const r=await fetchImpl(this.prefix+'/devgraph/access-requests/v2/'+suffix,{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'application/json'},credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'});const data=await r.json();if(!r.ok)throw Error(data.error??'access_request_failed');return data;}
  async loadCatalog(){
-  const fetchImpl=this.fetchImpl;const response=await fetchImpl('/devgraph/access-requests/v2/catalog',{credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'});if(!response.ok)throw Error('access_catalog_unavailable');
+  const fetchImpl=this.fetchImpl;const response=await fetchImpl(this.prefix+'/devgraph/access-requests/v2/catalog',{credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'});if(!response.ok)throw Error('access_catalog_unavailable');
   const value=validateCatalog(await response.json(),this.origin),body=structuredClone(value);delete body.scopes;delete body.scope_semantics;delete body.catalog_digest_sha256;const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(stable(body))))].map(x=>x.toString(16).padStart(2,'0')).join('');if(digest!==value.catalog_digest_sha256)throw Error('invalid_access_catalog');this.catalog=value;return this.catalog;
  }
  async prepare({presetID='',resourcePaths=[],catalog=null}={}){

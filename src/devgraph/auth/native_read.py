@@ -298,8 +298,9 @@ class NativeReadEnrollment:
                 identifier = manifest["credential_id"]
                 db.execute(
                     "UPDATE credentials SET status='superseded' "
-                    "WHERE owner=? AND device=? AND status='active'",
-                    (owner, device),
+                    "WHERE owner=? AND device=? AND status='active' "
+                    "AND (substr(id,1,5) = 'dgrg_') = ?",
+                    (owner, device, identifier.startswith("dgrg_")),
                 )
                 db.execute(
                     "INSERT INTO credentials VALUES(?,?,?,?,?,?,?)",
@@ -309,16 +310,22 @@ class NativeReadEnrollment:
                         owner,
                         device,
                         canonical_json(manifest).decode(),
-                        canonical_json(proof).decode(),
+                        canonical_json(self._stored_credential_proof(credential, proof)).decode(),
                         "active",
                     ),
                 )
                 db.execute("UPDATE challenges SET used=1 WHERE id=?", (challenge["request_id"],))
+                host = getattr(self, "holder_grants", None)
+                if host is not None and host.issuing.get() is not None:
+                    host.retain(db, manifest, credential, proof, current)
                 db.execute("COMMIT")
             except BaseException:
                 db.execute("ROLLBACK")
                 raise
         return self._result(credential, manifest)
+
+    def _stored_credential_proof(self, credential, proof):
+        return proof
 
     def _prepare_enrollment(self, db, owner, device, policy):
         pass  # Versioned member runtimes may observe a new approved assignment.
@@ -387,6 +394,9 @@ class NativeReadEnrollment:
 
     def revoke(self, credential_id: str) -> None:
         """Explicit operator operation; no public HTTP revocation or grant admin route."""
+        host = getattr(self, "holder_grants", None)
+        if host is not None:
+            host.revoke(credential_id)
         with self._database() as db:
             db.execute("BEGIN IMMEDIATE")
             try:

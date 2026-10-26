@@ -173,6 +173,15 @@ class MemberReadEnrollment(SignedReadEnrollment):
             return super().enroll(challenge, proof, signature, now=now)
 
     def verify_request(self, *, credential, call, proof, now=None):
+        if (
+            isinstance(credential, dict)
+            and isinstance(credential.get("claims"), dict)
+            and credential["claims"].get("schema") == "secs.holder-credential.v1"
+        ):
+            host = getattr(self, "holder_grants", None)
+            if host is None:
+                raise UnauthenticatedError("holder_grants_not_enabled")
+            return host.verify_request(credential=credential, call=call, proof=proof, now=now)
         with self._using_registry():
             return super().verify_request(credential=credential, call=call, proof=proof, now=now)
 
