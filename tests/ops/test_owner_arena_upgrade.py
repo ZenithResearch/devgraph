@@ -325,3 +325,54 @@ def test_status_closes_unendorsed_action_before_any_late_original_execution(tmp_
     )
     with pytest.raises(ValueError):
         service.endorse(original, original_signature)
+
+
+def test_restart_waits_for_removed_job_and_retries_only_exact_absent_target(tmp_path, monkeypatch):
+    import hashlib
+    import subprocess
+
+    path = tmp_path / "fixture.plist"
+    path.write_bytes(b"reviewed fixture")
+    job = dict(
+        path=str(path),
+        label="ca.zenith.devgraph.fixture",
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+    )
+    codes = iter([0, 0, 113, 5, 113, 0])
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, next(codes), b"", b"")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    OwnerArenaUpgrade._restart(job)
+    starts = [command for command in calls if command[1] == "bootstrap"]
+    assert len(starts) == 2
+    assert starts[0] == starts[1]
+    assert starts[0][-1] == str(path)
+
+
+def test_restart_never_replaces_unexpected_loaded_job_after_bootstrap_error(tmp_path, monkeypatch):
+    import hashlib
+    import subprocess
+
+    path = tmp_path / "fixture.plist"
+    path.write_bytes(b"reviewed fixture")
+    job = dict(
+        path=str(path),
+        label="ca.zenith.devgraph.fixture",
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+    )
+    codes = iter([0, 113, 5, 0])
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, next(codes), b"", b"")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(ValueError, match="restart unconfirmed"):
+        OwnerArenaUpgrade._restart(job)
+    assert len([command for command in calls if command[1] == "bootstrap"]) == 1

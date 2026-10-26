@@ -565,6 +565,7 @@ class OwnerArenaUpgrade:
     def _restart(job):
         import os
         import subprocess
+        import time
 
         # Exact labels and immutable plist digests are included in the signed
         # proposal. A status recovery may repeat this bounded same-job restart.
@@ -589,14 +590,45 @@ class OwnerArenaUpgrade:
             )
             if state.returncode == 0:
                 raise ValueError("Wallet service stop unconfirmed")
-        started = subprocess.run(
-            ["/bin/launchctl", "bootstrap", target, job["path"]],
-            capture_output=True,
-            timeout=10,
-            env={},
-        )
-        if started.returncode != 0:
-            raise ValueError("Wallet service restart unconfirmed")
+        # launchd can acknowledge bootout before the removal has drained. A
+        # same-job bootstrap may then return EIO even though the label is absent.
+        # Wait for confirmed absence and retry only that exact signed plist;
+        # never replace an unexpected loaded job or infer a different target.
+        for attempt in range(20):
+            state = subprocess.run(
+                ["/bin/launchctl", "print", target + "/" + job["label"]],
+                capture_output=True,
+                timeout=5,
+                env={},
+            )
+            if state.returncode == 113:
+                break
+            if state.returncode != 0 or attempt == 19:
+                raise ValueError("Wallet service stop unconfirmed")
+            time.sleep(0.25)
+        for attempt in range(20):
+            if (
+                hashlib.sha256(files.read(Path(job["path"]), private=False)).hexdigest()
+                != job["sha256"]
+            ):
+                raise ValueError("Wallet service changed")
+            started = subprocess.run(
+                ["/bin/launchctl", "bootstrap", target, job["path"]],
+                capture_output=True,
+                timeout=10,
+                env={},
+            )
+            if started.returncode == 0:
+                return
+            state = subprocess.run(
+                ["/bin/launchctl", "print", target + "/" + job["label"]],
+                capture_output=True,
+                timeout=5,
+                env={},
+            )
+            if state.returncode != 113 or attempt == 19:
+                raise ValueError("Wallet service restart unconfirmed")
+            time.sleep(0.25)
 
     def status_challenge(self, owner, device, action, *, now=None):
         if set(action) != {"schema", "action", "action_id", "original_action_id"}:
