@@ -9,8 +9,10 @@ continue reading old records. Old-only readers do not see newly typed refs until
 they adopt the generic contract; no automatic migration or dual-write is implied.
 
 Migrations 29/30 add uniqueness constraints. All prior migrations and ontology
-bundles v0.1.0–v0.10.0 are unchanged. No named Work/Arena operation, credential,
-signature domain or admitted receiver permission changes. Local capture does not
+bundles v0.1.0–v0.10.0 are unchanged. Existing Work/Arena operations, credential bytes, signature domains and admitted
+receiver permissions retain their meaning. The new Work v2 session.attach operation
+requires separately admitted exact Work/SessionRef/SessionLink resources; no existing
+grant automatically acquires it. New authenticated metadata reads are additive. Local capture does not
 write the graph. A source runtime with only 28 supported migrations cannot safely
 run against a host after applying 29/30. Deployment and rollback must use the
 normal reviewed migration procedure; no live migration ran for this candidate.

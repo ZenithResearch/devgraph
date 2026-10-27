@@ -425,6 +425,16 @@
       ],
       "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
       "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
+    },
+    {
+      "name": "devgraph.work.session.attach.v2",
+      "id": "urn:zenith:devgraph:operation:devgraph.work.session.attach.v2",
+      "mutation": true,
+      "required_scopes": [
+        "devgraph.write"
+      ],
+      "request_schema_id": "urn:zenith:devgraph:schema:devgraph-work-request:v2",
+      "response_schema_id": "urn:zenith:devgraph:schema:work-result:v2"
     }
   ]
 }

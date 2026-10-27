@@ -29,7 +29,12 @@ def test_session_specializations_agree_with_common_source_owned_contract():
     assert terms["zn:SessionLink"]["runtimeLabel"] is True
     assert SESSION_REF_LABEL not in CANONICAL_WORK_KINDS
     assert not any(profile["authority"].values())
-    assert profile["http_operations"] == []
+    assert profile["http_operations"] == [
+        "GET /session-refs/v1",
+        "GET /session-refs/v1/{id}",
+        "devgraph.work.session.attach.v2",
+    ]
+    assert profile["relations"]["uses_runtime"] == "harness-to-native-runtime"
     assert terms["zn:SESSION_LINK_ORIGIN"]["domain"] == "zn:SessionLink"
     assert terms["zn:SESSION_LINK_TARGET"]["range"] == "zn:SessionRef"
 
@@ -46,6 +51,10 @@ def test_generalization_preserves_legacy_bundle_and_operational_contracts():
         new = json.loads((ONTOLOGY / name).read_text())
         assert old.pop("ontology_version") == "0.10.0"
         assert new.pop("ontology_version") == "0.11.0"
+        if name == "operations.json":
+            added = [op for op in new["operations"] if op not in old["operations"]]
+            assert [op["name"] for op in added] == ["devgraph.work.session.attach.v2"]
+            new["operations"] = [op for op in new["operations"] if op not in added]
         assert new == old
     prior_terms = {
         x["@id"]: x for x in json.loads((previous / "ontology.jsonld").read_text())["@graph"]

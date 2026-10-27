@@ -36,6 +36,12 @@ def configure(subcommands: argparse._SubParsersAction) -> None:
     events.add_argument("--journal-dir", type=Path, required=True)
     events.add_argument("--after", type=int, default=0)
     events.add_argument("--limit", type=int, default=50)
+    prepare = commands.add_parser("prepare-import", help="prepare exact signed session attribution")
+    prepare.add_argument("--config", type=Path, required=True)
+    prepare.add_argument("--ref", required=True)
+    prepare.add_argument("--work", required=True)
+    prepare.add_argument("--link-ref")
+    prepare.add_argument("--output-dir", type=Path, required=True)
 
 
 def _arguments(application: str, arguments: list[str]) -> list[str]:
@@ -97,6 +103,16 @@ def capture_process(dispatch: Dispatch, arguments: list[str], journal: SessionJo
 def execute(args: argparse.Namespace) -> int:
     journal = None
     try:
+        if args.sessions_command == "prepare-import":
+            from devgraph.observability.session_prepare import prepare, write_bundle
+            from devgraph.observability.session_read_runtime import SessionReader
+            from devgraph.observability.session_sources import owned
+
+            owned(args.config, private=True)
+            reader = SessionReader(json.loads(args.config.read_text()))
+            request = prepare(reader, args.ref, args.work, link_ref=args.link_ref)
+            print(json.dumps(write_bundle(request, args.output_dir)))
+            return 0
         if args.sessions_command == "events":
             if not (args.journal_dir / "session-events.sqlite3").is_file():
                 raise ValueError("session_journal_unavailable")

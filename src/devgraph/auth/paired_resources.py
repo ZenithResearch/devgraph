@@ -70,6 +70,8 @@ def _contract(service, operation):
                 "Decision",
                 "ReviewPacket",
                 "ExternalLink",
+                "SessionRef",
+                "SessionLink",
                 *RECORD_KINDS.values(),
             ]
         )
@@ -167,6 +169,7 @@ class PairedGuard:
                     "proposal.reject",
                     "progress.set",
                     "workflow.review",
+                    "session.attach",
                 ):
                     raise SecSWorkDenied("missing_effect_resource")
                 prospective.add((kind, identifier))

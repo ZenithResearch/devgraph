@@ -132,6 +132,9 @@ def create_app(services: ApiServices, *, lifespan: Lifespan[FastAPI] | None = No
     register_credential_work(app, services)
     register_arenas(app, services)
     register_cypher_read(app, services)
+    from devgraph.api.session_refs import register_session_refs
+
+    register_session_refs(app, services)
     if services.web_sdk_dir is not None:
         from devgraph.frontend.sdk_assets import register_sdk_assets
 

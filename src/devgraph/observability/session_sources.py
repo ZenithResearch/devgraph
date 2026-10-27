@@ -116,12 +116,57 @@ class NativeSources:
                         "bounded": True,
                     }
                 )
+        # A native backend is a runtime relationship, not an extra delegated agent.
+        # Resolve the persisted ID in admitted stores; a model/provider name proves nothing.
+        index = {r["id"]: r for r in items}
+        for parent in list(items):
+            native_id = parent.pop("_codex_thread_id", None)
+            if not native_id:
+                continue
+            candidates = []
+            for source in self.sources:
+                if source["application"] != "codex":
+                    continue
+                candidate = row(source, native_id)
+                if self.resolve(candidate) == "available":
+                    candidates.append(candidate)
+            if len(candidates) != 1:
+                parent["unresolved_native_binding"] = {
+                    "application": "codex",
+                    "external_session_id": native_id,
+                    "reason": "ambiguous_store" if candidates else "source_unavailable",
+                }
+                continue
+            target = index.get(candidates[0]["id"])
+            if target is None:
+                target = candidates[0]
+                items.append(target)
+                index[target["id"]] = target
+            origin_identity = {
+                k: parent[k] for k in ("application", "source_instance_id", "external_session_id")
+            }
+            target_identity = {k: target[k] for k in origin_identity}
+            evidence = {
+                "basis": "hermes_model_config.codex_thread_id",
+                "origin": origin_identity,
+                "target": target_identity,
+            }
+            parent["links"].append({"id": target["id"], "relation": "uses_runtime", **evidence})
+            target["links"].append({"id": parent["id"], "relation": "runtime_for", **evidence})
         return items, coverage
 
     def hermes(self, source):
         with readonly(Path(source["root"]) / "state.db") as db:
+            columns = {r[1] for r in db.execute("PRAGMA table_info(sessions)")}
+            binding = (
+                "CASE WHEN json_valid(model_config) AND length(model_config)<=65536 "
+                "THEN json_extract(model_config,'$.codex_thread_id') END"
+                if "model_config" in columns
+                else "NULL"
+            )
             rows = db.execute(
                 "SELECT id,parent_session_id,started_at,ended_at,last_activity_at,cwd "
+                f", {binding} AS codex_thread_id "
                 # Hermes indexes started_at, not COALESCE(last_activity_at,...).
                 # Bound the source window before touching wide historical rows.
                 "FROM sessions ORDER BY started_at DESC LIMIT ?",
@@ -137,6 +182,12 @@ class NativeSources:
                 cwd=r["cwd"],
                 status="ended" if r["ended_at"] else "unknown",
             )
+            if isinstance(r["codex_thread_id"], str):
+                try:
+                    SessionIdentity("codex", "pending", r["codex_thread_id"])
+                    item["_codex_thread_id"] = r["codex_thread_id"]
+                except ValueError:
+                    item["unresolved_native_binding"] = {"reason": "invalid_stored_identity"}
             if r["parent_session_id"]:
                 parent = SessionIdentity("hermes", source["id"], r["parent_session_id"])
                 item["links"].append(

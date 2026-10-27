@@ -63,13 +63,37 @@ model, but automatic fork-parent extraction is not implemented by the launcher.
 
 ## Admission and deployment
 
-This release implements models, storage seams, constraints, a local capture CLI,
-and an outbox consumer. It does **not** register session mutation/read HTTP routes,
-expand Wallet/secS permissions, add a background history scanner, enable a Hermes
-plugin observer, or deploy/migrate an installed host. Existing signed Work/Arena
-operations cannot be used to smuggle session writes. Receiver authorization,
-bounded scope-aware reads, installed source resolution and Pulse wiring require
-the coordinated runtime integration before this can be called connected.
+The source candidate includes models, storage constraints, native capture,
+a standalone Hermes observer and an authenticated companion reader. Deployment
+of the canonical write path remains separate from source observation. Existing
+Work/Arena operations keep their original payloads and cannot smuggle session
+writes; existing grants are not extended by adding this operation.
+
+The additive `devgraph.work.session.attach.v2` operation is the public signed
+admission path. It names one existing Work subject and expected version, one
+source identity, and optionally one exact witnessed SessionLink with both endpoints.
+Every derived SessionRef/SessionLink ID must be authorized together with the Work
+subject. Importing actor, authentication session and correlation come from the
+verified receiver context. Old signed contracts and grants keep their original
+meaning; no existing grant acquires this operation. A committed attachment bumps
+Work version, preserves progress and emits the normal replayable EventReceipt.
+GET `/session-refs/v1` and `/{id}` expose bounded canonical metadata through the
+existing read facade; they do not open source transcripts.
+
+Hermes upstream persists App Server `thread_id` in
+`sessions.model_config.codex_thread_id`. The reader joins only when that ID resolves
+to exactly one retained Codex source record. `uses_runtime` points Hermes → Codex;
+it is distinct from delegation. Its witness time is the collector's first sighting
+of that persisted binding, not the original native thread creation time. The
+private source journal retains this time across reader restarts. Missing bindings
+in older Hermes installs and historical sessions are never guessed.
+
+`devgraph sessions prepare-import` requires an exact resolved source and an actual
+recorded Work inspection or explicit dispatch scope. It reads current Work version
+and creates private request, idempotency and review files. An optional `--link-ref`
+selects a witnessed runtime relationship. It never signs, grants or submits.
+Canonical graph status is unavailable when the running host lacks the new API;
+a source observation alone is not evidence of canonical import.
 
 The new migrations are forward-only. They add SessionRef/SessionLink uniqueness
 without modifying legacy Hermes constraints or historical release bytes. Take

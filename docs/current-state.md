@@ -205,3 +205,14 @@ This repository can be correct while a private host is stopped, configured
 differently, or running another commit. Runtime health must be established by
 probing that host's own `/live`, `/ready`, and protected routes; repository
 tests do not prove a private service is running.
+
+## Session runtime source candidate (2026-10-27)
+
+The session provenance branch adds a signed Work v2 `session.attach` operation,
+canonical read routes and private exact request preparation. It consumes the
+existing upstream Hermes App Server `codex_thread_id` binding and keeps runtime
+use distinct from delegation. These are source capabilities; activating a new
+receiver/projection adapter and a narrowly scoped owner-approved attachment grant
+is separate from the metadata reader deployment. Existing read capability and
+signed grants retain their original permissions. Historical bindings are not
+inferred and a missing canonical API is reported as unavailable.

@@ -73,6 +73,40 @@ class MemoryGraphStorage:
         validate_work_object_id(node_id)
         return self._nodes.get((label, node_id))
 
+    def session_ref_context(self, ref_id, *, limit=50):
+        from devgraph.model.validation import validate_page_limit
+        from devgraph.observability.session_reads import REF_ID
+
+        validate_page_limit(limit)
+        if not REF_ID.fullmatch(ref_id):
+            raise ValueError("invalid_session_reference")
+        with self.transaction():
+            work = sorted(
+                (
+                    e
+                    for e in self._edges
+                    if e.relationship == "ATTRIBUTED_TO_SESSION"
+                    and (e.to_label, e.to_id) == ("SessionRef", ref_id)
+                ),
+                key=lambda e: (e.from_label, e.from_id),
+            )
+            links = sorted(
+                (
+                    n
+                    for n in self._nodes.values()
+                    if n.label == "SessionLink"
+                    and ref_id in (n.properties.get("origin_id"), n.properties.get("target_id"))
+                ),
+                key=lambda n: n.id,
+            )
+            return {
+                "work_refs": [
+                    {"key": e.from_label + "/" + e.from_id, **e.properties} for e in work[:limit]
+                ],
+                "links": [{"id": n.id, **n.properties} for n in links[:limit]],
+                "context_bounded": len(work) >= limit or len(links) >= limit,
+            }
+
     def _work_containment(self, keys: list[tuple[str, str]]) -> list[WorkContainment]:
         # One inventory pass for the whole page, retaining duplicate witnesses.
         incoming: dict[tuple[str, str], dict[str, list[EdgeRecord]]] = {

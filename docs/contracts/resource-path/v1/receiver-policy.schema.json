@@ -184,7 +184,9 @@
             "Decision",
             "ReviewPacket",
             "Handoff",
-            "ExternalLink"
+            "ExternalLink",
+            "SessionRef",
+            "SessionLink"
           ],
           "title": "Kind",
           "type": "string"

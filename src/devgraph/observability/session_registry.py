@@ -1,7 +1,7 @@
 """Private canonical storage seam, not an HTTP admission or authority bypass.
 
 Authorization belongs to the invoking receiver, as with legacy Hermes attachment.
-No installed CLI/API endpoint calls this mutation service in this change.
+The signed session.attach receiver is the public admission path.
 """
 
 from __future__ import annotations
@@ -39,7 +39,8 @@ class SessionRegistry:
         with self.storage.transaction():
             previous = self.storage.get_node(SESSION_LINK_LABEL, link.id)
             if previous is not None:
-                if previous.properties != link.to_node_properties():
+                old = {"kind": SESSION_LINK_LABEL, **previous.properties}
+                if old != link.to_node_properties():
                     raise ValueError("session_event_conflict")
                 return
             self._put(origin)
@@ -52,9 +53,25 @@ class SessionRegistry:
                 SESSION_LINK_LABEL, link.id, "SESSION_LINK_TARGET", SESSION_REF_LABEL, target.id
             )
 
-    def attach(self, ref: SessionRef, *, work: str, expected_version: int) -> None:
+    def attach(
+        self,
+        ref: SessionRef,
+        *,
+        work: str,
+        expected_version: int,
+        basis: str = "explicit",
+        observed_at: str | None = None,
+    ) -> None:
         kind, node_id = work_ref(work)
         validate_version(expected_version)
+        if basis not in {"explicit", "inspected", "declared_scope", "source_observed"}:
+            raise ValueError("invalid_session_attribution_basis")
+        properties = {"basis": basis, "work_version": expected_version}
+        if observed_at is not None:
+            from devgraph.observability.session_contract import observed_time
+
+            observed_time(observed_at)
+            properties["observed_at"] = observed_at
         with self.storage.transaction():
             node = self.storage.get_node(kind, node_id)
             if node is None:
@@ -62,11 +79,16 @@ class SessionRegistry:
             if node.properties.get("version") != expected_version:
                 raise ValueError("session_work_version_conflict")
             self._put(ref)
+            context = self.storage.session_ref_context(ref.id, limit=100)
+            if any(binding["key"] == work for binding in context["work_refs"]):
+                return  # Retain the first admitted attribution basis and observation.
+            if context["context_bounded"]:
+                raise ValueError("session_attribution_capacity")
             self.storage.create_edge(
                 kind,
                 node_id,
                 "ATTRIBUTED_TO_SESSION",
                 SESSION_REF_LABEL,
                 ref.id,
-                {"basis": "explicit", "work_version": expected_version},
+                properties,
             )

@@ -23,7 +23,8 @@
   "work_edge": "ATTRIBUTED_TO_SESSION",
   "relations": {
     "delegated_to": "parent-to-child",
-    "forked_from": "new-to-original"
+    "forked_from": "new-to-original",
+    "uses_runtime": "harness-to-native-runtime"
   },
   "link_basis": [
     "declared",
@@ -35,11 +36,18 @@
     "executes_resume": false,
     "proves_completion": false
   },
-  "http_operations": [],
+  "http_operations": [
+    "GET /session-refs/v1",
+    "GET /session-refs/v1/{id}",
+    "devgraph.work.session.attach.v2"
+  ],
   "capture_adapters": [
     "codex-exec-json",
     "claude-code-print-stream-json"
   ],
   "raw_content_retained": false,
-  "automatic_legacy_migration": false
+  "automatic_legacy_migration": false,
+  "source_bindings": {
+    "hermes_codex": "sessions.model_config.codex_thread_id; exact retained native record required; no historical inference"
+  }
 }

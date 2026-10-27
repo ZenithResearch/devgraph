@@ -216,6 +216,15 @@
         "verified_hierarchy"
       ],
       "resource_requirements": "Authorize the Work item and both prior and destination Arena records. Scope is checked before and after the move."
+    },
+    {
+      "operation": "devgraph.work.session.attach.v2",
+      "label": "Attach session provenance",
+      "classification": "recipient_rule",
+      "selectors": [
+        "exact_ids"
+      ],
+      "resource_requirements": "Exact Work subject and every derived SessionRef and SessionLink ID must be admitted together; native source IDs supply no authority."
     }
   ],
   "other_ontology_operations": [

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from devgraph.observability.session_ref import (
     SessionIdentity,
+    SessionLink,
     opaque,
     timestamp,
     work_ref,
@@ -213,6 +214,49 @@ class SessionJournal:
                 "returncode": returncode,
             },
         )
+
+    def observe_link(
+        self,
+        origin: SessionIdentity,
+        target: SessionIdentity,
+        *,
+        relation: str,
+        source_instance_id: str,
+        event_id: str,
+    ) -> dict:
+        """Retain first observation of an exact persisted source binding, across restarts."""
+        key = "source-link:" + source_instance_id + ":" + event_id
+        observed = datetime.now(timezone.utc)
+        link = SessionLink(
+            source_instance_id,
+            event_id,
+            event_id,
+            relation,
+            origin,
+            target,
+            observed,
+            "source_observed",
+        )
+        value = {
+            "schema": "devgraph.session-link-observation.v1",
+            "type": "source_link",
+            **asdict(link),
+            "observed_at": timestamp(observed),
+        }
+        raw = json.dumps(value, sort_keys=True, separators=(",", ":"))
+        with self.db:
+            self.db.execute(
+                "INSERT INTO events(event_key,payload) VALUES (?,?) "
+                "ON CONFLICT(event_key) DO NOTHING",
+                (key, raw),
+            )
+            stored = self.db.execute(
+                "SELECT payload FROM events WHERE event_key=?", (key,)
+            ).fetchone()
+            previous = json.loads(stored[0])
+            if any(previous[k] != value[k] for k in value if k != "observed_at"):
+                raise ValueError("session_event_conflict")
+        return previous
 
     def page(self, *, after: int = 0, limit: int = 50) -> dict:
         if type(after) is not int or after < 0 or type(limit) is not int or not 1 <= limit <= 100:

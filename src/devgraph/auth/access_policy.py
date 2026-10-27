@@ -27,6 +27,7 @@ WRITE_OPERATIONS = frozenset(
         "progress.set",
         "restore",
         "proposal.reject",
+        "session.attach",
     )
 ) | frozenset(f"devgraph.arena.{op}.v1" for op in ("create", "patch", "archive", "member.set"))
 ResourceKind = Literal[
@@ -41,6 +42,8 @@ ResourceKind = Literal[
     "ReviewPacket",
     "Handoff",
     "ExternalLink",
+    "SessionRef",
+    "SessionLink",
 ]
 
 

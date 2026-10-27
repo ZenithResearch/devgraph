@@ -631,6 +631,40 @@ class Neo4jGraphStorage:
             to_id=to_id,
         )
 
+    def session_ref_context(self, ref_id, *, limit=50):
+        from devgraph.observability.session_reads import REF_ID
+
+        validate_page_limit(limit)
+        if not REF_ID.fullmatch(ref_id):
+            raise ValueError("invalid_session_reference")
+        with self.transaction():
+            work = self._run_graph(
+                "MATCH (w)-[r:ATTRIBUTED_TO_SESSION]->(s:SessionRef {id: $ref_id}) "
+                "WHERE size(labels(w))=1 AND labels(w)[0] IN $kinds "
+                "WITH w,r ORDER BY labels(w)[0],w.id LIMIT $limit "
+                "RETURN labels(w)[0]+'/' +w.id AS key, r.basis AS basis, "
+                "r.work_version AS work_version, r.observed_at AS observed_at",
+                ref_id=ref_id,
+                kinds=sorted(CANONICAL_WORK_KINDS),
+                limit=limit,
+            )
+            links = self._run_graph(
+                "MATCH (s:SessionRef {id: $ref_id})<-[:SESSION_LINK_ORIGIN|SESSION_LINK_TARGET]"
+                "-(l:SessionLink) WITH DISTINCT l ORDER BY l.id LIMIT $limit "
+                "RETURN labels(l) AS labels, l.id AS id, l.archived AS archived, "
+                "properties(l) AS properties",
+                ref_id=ref_id,
+                limit=limit,
+            )
+            return {
+                "work_refs": [dict(r) for r in work],
+                "links": [
+                    {"id": r["id"], **self._node_from_row(r, "SessionLink").properties}
+                    for r in links
+                ],
+                "context_bounded": len(work) >= limit or len(links) >= limit,
+            }
+
     def related_work_nodes(
         self,
         label: str,

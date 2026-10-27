@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import re
@@ -36,21 +37,35 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class SessionReader:
-    def __init__(self, config, *, work_reader=None):
+    def __init__(self, config, *, work_reader=None, graph_reader=None):
         self.config = config
         self.sources = NativeSources(config["sources"])
         self.lock = threading.Lock()
         self.scanned = 0.0
         self.value = {"items": [], "coverage": []}
         self.work_reader = work_reader or self.read_work
+        self.graph_reader = graph_reader or self.read_graph
 
     def read_work(self, key):
         work_ref(key)
+        value = self.graph_reader("/work/" + urllib.parse.quote(key, safe="/"))
+        if value is None:
+            return None
+        try:
+            if type(value["version"]) is not int or value["version"] < 1:
+                return None
+            return {"key": key, "title": value["title"], "version": value["version"]}
+        except (KeyError, TypeError):
+            return None
+
+    def read_graph(self, path):
+        if not path.startswith(("/work/", "/session-refs/v1")):
+            raise ValueError("unsupported_graph_read")
         token_path = Path(self.config["data_root"]) / "devgraph/credentials/devgraph.read"
         owned(token_path, private=True)
         token = token_path.read_text().strip()
         request = urllib.request.Request(
-            "http://127.0.0.1:8080/todos/v2/" + urllib.parse.quote(key, safe="/"),
+            "http://127.0.0.1:8080" + path,
             headers={"Authorization": "Bearer " + token},
             method="GET",
         )
@@ -60,8 +75,7 @@ class SessionReader:
                 raw = response.read(262_145)
             if len(raw) > 262_144:
                 return None
-            value = json.loads(raw)
-            return {"key": key, "title": value["title"], "version": value["version"]}
+            return json.loads(raw)
         except urllib.error.HTTPError as error:
             if error.code in (401, 403):
                 raise PermissionError("work_access_denied") from None
@@ -75,6 +89,58 @@ class SessionReader:
                 return
             items, coverage = self.sources.scan()
             index = {r["id"]: r for r in items}
+            canonical = {}
+            graph_status = {"status": "not_connected", "bounded": True}
+            if self.config.get("canonical_reads"):
+                after = None
+                for _ in range(12):
+                    path = "/session-refs/v1?limit=100"
+                    if after:
+                        path += "&after=" + after
+                    page = self.graph_reader(path)
+                    if not page or page.get("schema") != "devgraph.session-refs.v1":
+                        graph_status = {"status": "unavailable", "bounded": True}
+                        break
+                    canonical.update((r["id"], r) for r in page["items"])
+                    after = page.get("next_after")
+                    graph_status = {
+                        "status": "available",
+                        "bounded": bool(after),
+                        "loaded": len(canonical),
+                    }
+                    if not after:
+                        break
+                for item in items:
+                    item["canonical"] = (
+                        True
+                        if item["id"] in canonical
+                        else None
+                        if graph_status["bounded"]
+                        else False
+                    )
+            if self.config.get("observer_journal"):
+                journal = SessionJournal(Path(self.config["observer_journal"]))
+                try:
+                    for item in items:
+                        for link in item["links"]:
+                            if link.get("basis") != "hermes_model_config.codex_thread_id":
+                                continue
+                            origin, target = (
+                                SessionIdentity(**link[k]) for k in ("origin", "target")
+                            )
+                            event = (
+                                "binding-"
+                                + hashlib.sha256((origin.id + ":" + target.id).encode()).hexdigest()
+                            )
+                            link["witness"] = journal.observe_link(
+                                origin,
+                                target,
+                                relation="uses_runtime",
+                                source_instance_id=origin.source_instance_id,
+                                event_id=event,
+                            )
+                finally:
+                    journal.close()
             inspection_path = self.config.get("inspection_file")
             if inspection_path:
                 try:
@@ -106,7 +172,11 @@ class SessionReader:
                             item["last_observer_hook"] = event["hook"]
                             last_hooks.add(identity.id)
                         if event.get("work_ref"):
-                            binding = {"key": event["work_ref"], "basis": event["basis"]}
+                            binding = {
+                                "key": event["work_ref"],
+                                "basis": event["basis"],
+                                "observed_at": event["observed_at"],
+                            }
                             if binding not in item["work_refs"]:
                                 item["work_refs"].append(binding)
                         if event.get("parent_session_id"):
@@ -201,7 +271,11 @@ class SessionReader:
                                 index[item["id"]] = item
                             dispatch = attempt["dispatch"]
                             for key in dispatch["work_refs"]:
-                                binding = {"key": key, "basis": "declared_dispatch_scope"}
+                                binding = {
+                                    "key": key,
+                                    "basis": "declared_dispatch_scope",
+                                    "observed_at": attempt["observed_at"],
+                                }
                                 if binding not in item["work_refs"]:
                                     item["work_refs"].append(binding)
                             if dispatch["parent"]:
@@ -225,7 +299,8 @@ class SessionReader:
                     items, key=lambda r: (r["last_activity_at"] or "", r["id"]), reverse=True
                 ),
                 "coverage": coverage,
-                "canonical_graph_imported": False,
+                "canonical_graph_imported": any(r.get("canonical") is True for r in items),
+                "canonical_graph": graph_status,
             }
             self.scanned = time.monotonic()
 
@@ -252,6 +327,60 @@ class SessionReader:
         if item is None:
             return None
         item["source_resolution"] = self.sources.resolve(item)
+        item["canonical_status"] = "not_connected"
+        if self.config.get("canonical_reads"):
+            with self.lock:
+                status = self.value["canonical_graph"]
+            item["canonical_status"] = status["status"]
+            if status["status"] == "available":
+                canonical = self.graph_reader("/session-refs/v1/" + ref_id + "?limit=100")
+                item["canonical_status"] = (
+                    "imported"
+                    if canonical
+                    else "not_imported"
+                    if item.get("canonical") is False
+                    else "unavailable"
+                )
+                if canonical:
+                    item["canonical"] = True
+                    item["canonical_import"] = canonical
+                    for binding in canonical["work_refs"]:
+                        existing = next(
+                            (b for b in item["work_refs"] if b["key"] == binding["key"]), None
+                        )
+                        if existing:
+                            existing.update(canonical=True, canonical_basis=binding["basis"])
+                        else:
+                            item["work_refs"].append({**binding, "canonical": True})
+                    for binding in canonical["links"]:
+                        forward = binding["origin_id"] == ref_id
+                        target = binding["target_id"] if forward else binding["origin_id"]
+                        relation = binding["relation"]
+                        if not forward:
+                            relation = {
+                                "uses_runtime": "runtime_for",
+                                "delegated_to": "delegated_from",
+                                "forked_from": "fork_origin_for",
+                            }[relation]
+                        existing = next(
+                            (
+                                link
+                                for link in item["links"]
+                                if link["id"] == target and link["relation"] == relation
+                            ),
+                            None,
+                        )
+                        if existing:
+                            existing["canonical"] = True
+                        else:
+                            item["links"].append(
+                                {
+                                    "id": target,
+                                    "relation": relation,
+                                    "basis": binding["basis"],
+                                    "canonical": True,
+                                }
+                            )
         item["related_work"] = []
         for binding in item["work_refs"][:32]:
             work = self.work_reader(binding["key"])

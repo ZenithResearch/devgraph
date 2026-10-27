@@ -90,6 +90,7 @@ class SessionRef:
 
     def to_node_properties(self) -> dict[str, Any]:
         return {
+            "kind": SESSION_REF_LABEL,
             "schema_version": 1,
             **asdict(self.identity),
             "ref_type": self.identity.ref_type,
@@ -101,6 +102,9 @@ class SessionRef:
 
     @classmethod
     def from_node_properties(cls, ref_id: str, properties: dict[str, Any]) -> SessionRef:
+        properties = dict(properties)
+        if properties.pop("kind", SESSION_REF_LABEL) != SESSION_REF_LABEL:
+            raise ValueError("session_identity_conflict")
         expected = {
             "schema_version",
             "application",
@@ -168,7 +172,7 @@ class SessionLink:
     def __post_init__(self) -> None:
         for value in (self.source_instance_id, self.event_id, self.attempt_id):
             opaque(value)
-        if self.relation not in {"delegated_to", "forked_from"}:
+        if self.relation not in {"delegated_to", "forked_from", "uses_runtime"}:
             raise ValueError("invalid_session_relation")
         if self.basis not in {"declared", "source_observed"}:
             raise ValueError("invalid_session_link_basis")
@@ -187,6 +191,7 @@ class SessionLink:
 
     def to_node_properties(self) -> dict[str, Any]:
         return {
+            "kind": SESSION_LINK_LABEL,
             "schema_version": 1,
             "source_instance_id": self.source_instance_id,
             "event_id": self.event_id,
