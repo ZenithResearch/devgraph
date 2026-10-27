@@ -103,22 +103,46 @@ def create_signed_read_app(
             raise UnauthenticatedError("invalid_request") from None
         context = enrollment.verify_request(**body)
 
-        class VerifiedRequest:
-            def verify(self, credential, *, audience):
-                if credential is not None or audience != "devgraph":
-                    raise UnauthenticatedError("invalid_request")
-                return context
+        def project(context):
+            class VerifiedRequest:
+                def verify(self, credential, *, audience):
+                    if credential is not None or audience != "devgraph":
+                        raise UnauthenticatedError("invalid_request")
+                    return context
 
-        service = DelegatedReadService(
-            storage=storage, verifier=VerifiedRequest(), audience="devgraph", audit_log=audit_log
-        )
-        if isinstance(parameters, ListParameters):
-            return WorkObjectListEnvelope(
-                items=[
-                    _envelope(item) for item in service.list_work(None, **parameters.model_dump())
-                ]
+            service = DelegatedReadService(
+                storage=storage,
+                verifier=VerifiedRequest(),
+                audience="devgraph",
+                audit_log=audit_log,
             )
-        return _envelope(service.get_work(None, **parameters.model_dump()))
+            if isinstance(parameters, ListParameters):
+                return WorkObjectListEnvelope(
+                    items=[
+                        _envelope(item)
+                        for item in service.list_work(None, **parameters.model_dump())
+                    ]
+                )
+            return _envelope(service.get_work(None, **parameters.model_dump()))
+
+        from devgraph.auth.selector_grants import SelectorGrant, materialize
+
+        if any(isinstance(g, SelectorGrant) for g in context.read_grants):
+            from dataclasses import replace
+
+            with (
+                audit_log.transaction(),
+                storage.work_mutation_transaction(),
+                enrollment.holder_grants.current_read(body["credential"], body["proof"]),
+            ):
+                context = replace(
+                    context,
+                    envelope=replace(
+                        context.envelope, read_grants=materialize(storage, context.read_grants)
+                    ),
+                )
+                return project(context)
+        return project(context)
 
     @app.post("/devgraph/native-read/v2/requests")
     async def request_read(request: Request):

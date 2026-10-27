@@ -41,7 +41,7 @@ export class WalletReadClient{
   const config=await this.fetch(BASE,{signal});
   if(!plain(config)||config.schema!=='devgraph.wallet-read-configuration.v1'||config.endpoint!==BASE)throw failure('wallet_read_setup_required');
   if(config.web_wallet_url!==null&&config.web_wallet_url!==undefined){const u=new URL(config.web_wallet_url);if(u.protocol!=='https:'||u.username||u.password||u.hash||u.search)throw failure('wallet_read_setup_required');}
-  if(config.holder_grants!==undefined){const h=config.holder_grants;if(!plain(h)||Object.keys(h).sort().join(',')!=='endpoint,schema,service'||h.schema!=='secs.holder-grant.v1'||typeof h.service!=='string'||!h.service||h.service.length>256||h.endpoint!==BASE+'/grants')throw failure('wallet_read_setup_required');}
+  if(config.holder_grants!==undefined){const h=config.holder_grants;if(!plain(h)||Object.keys(h).sort().join(',')!=='endpoint,schema,service'||!['secs.holder-grant.v1','secs.holder-grant.v2'].includes(h.schema)||typeof h.service!=='string'||!h.service||h.service.length>256||h.endpoint!==BASE+'/grants')throw failure('wallet_read_setup_required');}
   if(config.service_access_point_endpoint!==undefined){
    if(config.service_access_point_endpoint!=='/.well-known/devgraph-service.json'||!config.holder_grants)throw failure('invalid_service_binding');
    const response=await this.fetchImpl(config.service_access_point_endpoint,{credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
@@ -59,7 +59,7 @@ export class WalletReadClient{
   if(!this.configuration)await this.initialize();current();
   this.setup=await prepareProviderSetup({provider,origin:this.origin,current,requiredCapability:'read_access_v1',transport:{getProviderProfile:async()=>structuredClone(this.configuration.provider_profile)}});current();
   if(this.serviceBinding&&!this.setup.serviceAccessPoints)throw failure('wallet_upgrade_required');
-  this.holderGrants=!!this.configuration.holder_grants&&this.setup.holderGrants===true;this.usingHolderGrant=false;this.supportsRequests=this.setup.accessRequests===true;this.graphAccessV2=this.setup.graphAccessV2===true;this.provider=provider;
+  this.holderGrants=!!this.configuration.holder_grants&&this.setup.holderGrants===true;if(this.configuration.holder_grants?.schema==='secs.holder-grant.v2'&&!this.setup.holderGrantV2)throw failure('wallet_update_required');this.usingHolderGrant=false;this.supportsRequests=this.setup.accessRequests===true;this.graphAccessV2=this.setup.graphAccessV2===true;this.provider=provider;
   if(this.setup.setupStatus){
    const status=await this.setup.setupStatus();current();this.connectionApproved=status.connection_approved;
    if(this.connectionApproved&&status.profile_approved){await this.identifyAndCheckAccess(current);return;}

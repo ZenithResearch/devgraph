@@ -176,7 +176,8 @@ class MemberReadEnrollment(SignedReadEnrollment):
         if (
             isinstance(credential, dict)
             and isinstance(credential.get("claims"), dict)
-            and credential["claims"].get("schema") == "secs.holder-credential.v1"
+            and credential["claims"].get("schema")
+            in ("secs.holder-credential.v1", "secs.holder-credential.v2")
         ):
             host = getattr(self, "holder_grants", None)
             if host is None:

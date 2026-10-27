@@ -13,6 +13,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in scoped holder v2 readers and issuance, current-state selector intersections and fenced read capture — preserve existing v1 grants while keeping exact identities separate from hierarchy placement.
+- Shared paired pre/post effect checks on the existing signed Work/Arena path — prevent combining independent grants into a cross-hierarchy mutation and roll back denied postconditions.
+
+
 - Add explicit current-and-future Arena collection coverage to ordinary member grants — allow later-created Arena records without widening fixed-ID assignments, Work permissions or delegation.
 
 - Add an owner-bound HTTPS Wallet member endpoint with a separate request inbox,

@@ -39,7 +39,7 @@ export async function prepareProviderSetup({provider,transport,origin,current=()
   return Object.freeze({
     accessRequests:capabilities.includes('access_request_v1'),
     graphAccessV2:capabilities.includes('graph_access_v2'),
-    holderGrants:capabilities.includes('holder_grant_v1'),
+    holderGrants:capabilities.includes('holder_grant_v1'),holderGrantV2:capabilities.includes('holder_grant_v2'),
     serviceAccessPoints:capabilities.includes('service_access_point_v1'),
     setupStatus:requiredCapability==='read_access_v1'&&capabilities.includes('read_setup_status_v1')?async()=>{
       current();const result=await provider.readAccess({operation:'setup_status',profile:structuredClone(snapshot)});current();

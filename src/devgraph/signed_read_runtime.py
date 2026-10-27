@@ -69,6 +69,9 @@ class ReadRuntimeConfiguration(BaseModel):
     holder_grant_binary: Path | None = None
     holder_grant_binary_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     canonical_service_id: str | None = Field(default=None, min_length=1, max_length=256)
+    holder_grant_schema: Literal["secs.holder-grant.v1", "secs.holder-grant.v2"] = (
+        "secs.holder-grant.v1"
+    )
     holder_grant_provider_runtime_file: Path | None = None
     owner_parent_runtime_file: Path | None = None
     owner_endpoint_profile_file: Path | None = None
@@ -672,6 +675,7 @@ def create_app(*, config_path=None, canonical_routes=True):
             binary=config.holder_grant_binary,
             binary_sha256=config.holder_grant_binary_sha256,
             service=config.canonical_service_id,
+            grant_schema=config.holder_grant_schema,
         )
     # Same storage implementation/configuration as the production composition
     # root; no database migrations or direct ad-hoc queries are performed here.
@@ -816,6 +820,9 @@ def create_app(*, config_path=None, canonical_routes=True):
                 data_root=Path(data_root), storage=storage, audit_log=audit
             ),
             provisioning=enrollment.provisioning,
+            compound_host=getattr(enrollment, "holder_grants", None)
+            if config.holder_grant_schema.endswith(".v2")
+            else None,
         )
         services = SimpleNamespace(
             named_work=None,

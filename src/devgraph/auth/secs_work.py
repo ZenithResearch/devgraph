@@ -99,7 +99,11 @@ class SecSWorkVerifier:
         self.config = config
 
     def verify(
-        self, *, request_json: bytes, projection_json: bytes, idempotency_key: str,
+        self,
+        *,
+        request_json: bytes,
+        projection_json: bytes,
+        idempotency_key: str,
         receiver_profile: str | None = None,
     ):
         config = self.config
@@ -109,9 +113,13 @@ class SecSWorkVerifier:
             if receiver_profile is not None and (
                 not isinstance(receiver_profile, str)
                 or _LOWER_HEX_64.fullmatch(receiver_profile) is None
-                or not hmac.compare_digest(receiver_profile, receiver_profile_digest(
-                    stable_issuer=config.stable_issuer, audience=config.audience,
-                ))
+                or not hmac.compare_digest(
+                    receiver_profile,
+                    receiver_profile_digest(
+                        stable_issuer=config.stable_issuer,
+                        audience=config.audience,
+                    ),
+                )
             ):
                 raise SecSWorkDenied("sdk_receiver_profile_mismatch")
             request = parse_named_request(request_json)
@@ -262,7 +270,11 @@ class SecSWorkAdapter:
         return None
 
     def execute(
-        self, *, request_json: bytes, projection_json: bytes, idempotency_key: str,
+        self,
+        *,
+        request_json: bytes,
+        projection_json: bytes,
+        idempotency_key: str,
         receiver_profile: str | None = None,
     ):
         arguments = dict(
@@ -314,11 +326,21 @@ class SecSWorkAdapter:
                 def mutate(_):
                     work = (
                         self.arena_mutations.execute(request)
-                        if isinstance(request, ArenaRequest) else
-                        self.mutations.execute(request, actor_id=verified.principal.actor_id)
+                        if isinstance(request, ArenaRequest)
+                        else self.mutations.execute(request, actor_id=verified.principal.actor_id)
                     )
                     if scoped_mutation is not None:
                         scoped_mutation.check_after(self.storage)
+                    if scope is not None and getattr(
+                        scope, "repeat_admission_before_commit", False
+                    ):
+                        final = self.verifier.verify(**arguments)
+                        if (
+                            final.principal != verified.principal
+                            or final.request != request
+                            or final.idempotency_digest != verified.idempotency_digest
+                        ):
+                            raise SecSWorkDenied("named_work_final_admission_changed")
                     return work
 
                 work, receipt = self.outbox.record_named_work_v1_with_receipt(
