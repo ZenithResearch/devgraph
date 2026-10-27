@@ -1,13 +1,13 @@
 {
-  "@context": "https://zenith-research.ca/ontology/v0.10.0/context.jsonld",
+  "@context": "https://zenith-research.ca/ontology/v0.11.0/context.jsonld",
   "@graph": [
     {
       "@id": "https://zenith-research.ca/ontology",
       "@type": "owl:Ontology",
       "label": "Zenith Ontology",
       "comment": "Canonical vocabulary for Zenith work, arenas, directory entities, evidence, provenance, readiness, repository structure, and transport-neutral Devgraph operations.",
-      "versionIRI": "https://zenith-research.ca/ontology/v0.10.0/ontology.jsonld",
-      "versionInfo": "0.10.0",
+      "versionIRI": "https://zenith-research.ca/ontology/v0.11.0/ontology.jsonld",
+      "versionInfo": "0.11.0",
       "canonicalAuthority": "https://github.com/ZenithResearch/devgraph"
     },
     {
@@ -167,7 +167,8 @@
       "@type": "owl:Class",
       "label": "Hermes Session Reference",
       "comment": "Reference and safe metrics for an external Hermes session, never a raw transcript.",
-      "runtimeLabel": true
+      "runtimeLabel": true,
+      "subClassOf": "zn:SessionRef"
     },
     {
       "@id": "zn:ReadinessAssessment",
@@ -533,6 +534,68 @@
       "domain": "zn:CredentialPreset",
       "range": "zn:CredentialPresetRevision",
       "comment": "Names an immutable permission recipe revision. Revocation is a separate receiver decision."
+    },
+    {
+      "@id": "zn:SessionRef",
+      "@type": "owl:Class",
+      "label": "Session Reference",
+      "comment": "Source-owned conversation identity qualified by application and host/install/profile/store; not a transcript or Work object.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:SessionLink",
+      "@type": "owl:Class",
+      "label": "Session Link",
+      "comment": "Immutable source-event witness relating sessions through a delegation attempt or fork; not authority.",
+      "runtimeLabel": true
+    },
+    {
+      "@id": "zn:CodexSessionRef",
+      "@type": "owl:Class",
+      "label": "Codex Session Reference",
+      "comment": "Codex-owned conversation, direct or delegated; common SessionRef storage.",
+      "runtimeLabel": false,
+      "subClassOf": "zn:SessionRef"
+    },
+    {
+      "@id": "zn:ClaudeSessionRef",
+      "@type": "owl:Class",
+      "label": "Claude Session Reference",
+      "comment": "Claude-owned conversation, direct or delegated; common SessionRef storage.",
+      "runtimeLabel": false,
+      "subClassOf": "zn:SessionRef"
+    },
+    {
+      "@id": "zn:GrokSessionRef",
+      "@type": "owl:Class",
+      "label": "Grok Session Reference",
+      "comment": "Grok-app-owned conversation; using a Grok model in another harness does not create this type.",
+      "runtimeLabel": false,
+      "subClassOf": "zn:SessionRef"
+    },
+    {
+      "@id": "zn:ATTRIBUTED_TO_SESSION",
+      "@type": "owl:ObjectProperty",
+      "label": "attributed to session",
+      "domain": "zn:Todo",
+      "range": "zn:SessionRef",
+      "comment": "Explicit declared Work/session attribution, not execution or completion proof."
+    },
+    {
+      "@id": "zn:SESSION_LINK_ORIGIN",
+      "@type": "owl:ObjectProperty",
+      "label": "session link origin",
+      "domain": "zn:SessionLink",
+      "range": "zn:SessionRef",
+      "comment": "Origin endpoint: delegating parent or new fork child, according to relation."
+    },
+    {
+      "@id": "zn:SESSION_LINK_TARGET",
+      "@type": "owl:ObjectProperty",
+      "label": "session link target",
+      "domain": "zn:SessionLink",
+      "range": "zn:SessionRef",
+      "comment": "Target endpoint: delegated child or original fork parent, according to relation."
     }
   ]
 }

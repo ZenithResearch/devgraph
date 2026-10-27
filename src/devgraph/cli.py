@@ -580,6 +580,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
 
+    from devgraph.observability.session_cli import configure as configure_sessions
+
+    configure_sessions(subcommands)
+
     auth = subcommands.add_parser("auth", help="configure an existing signer and local credentials")
     auth_commands = auth.add_subparsers(dest="auth_command", required=True)
     key = auth_commands.add_parser(
@@ -922,6 +926,10 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command == "sessions":
+            from devgraph.observability.session_cli import execute as execute_sessions
+
+            return execute_sessions(args)
         if args.command == "auth":
             if args.auth_command == "access":
                 from devgraph.ops.access_plans import execute

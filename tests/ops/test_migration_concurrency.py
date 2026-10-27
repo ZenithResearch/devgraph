@@ -40,7 +40,7 @@ def test_two_contenders_have_one_winner_and_loser_has_zero_mutation() -> None:
         thread.join()
 
     assert sorted(result.reason for result in results) == ["clean", "migration_lock_busy"]
-    assert len(store.ddl_calls) == 25
+    assert len(store.ddl_calls) == sum(m.kind == "schema_ddl" for m in manifest.migrations)
 
 
 def test_state_is_reread_after_acquisition_before_any_new_mutation() -> None:

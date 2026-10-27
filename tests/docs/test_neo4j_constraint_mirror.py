@@ -18,7 +18,8 @@ def test_generated_constraint_mirror_has_exact_order_names_set_and_bytes() -> No
     ]
     assert mirror.startswith("// GENERATED; NOT EXECUTED")
     assert mirror == render_constraint_mirror(manifest)
-    assert len(names) == 24
+    assert len(names) == len(expected)
+    assert names[-2:] == ["session_ref_id", "session_link_id"]
     assert names == expected
     assert set(names) == set(expected)
     assert "WorkMutationGuard" not in mirror

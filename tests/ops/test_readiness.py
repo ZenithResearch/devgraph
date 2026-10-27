@@ -100,7 +100,11 @@ def test_readiness_fails_closed_when_canonical_storage_is_unavailable() -> None:
         ),
         (
             lambda store, manifest: store.journal.__setitem__(
-                29, replace(store.journal[28], version=29)
+                manifest.migrations[-1].version + 1,
+                replace(
+                    store.journal[manifest.migrations[-1].version],
+                    version=manifest.migrations[-1].version + 1,
+                ),
             ),
             "operator_hold_journal_version_out_of_range",
         ),
@@ -174,5 +178,5 @@ def test_readiness_is_true_only_for_clean_migrations_and_canonical_storage() -> 
 
     assert status.ready is True
     assert status.reason == "clean"
-    assert status.current_applied_version == 28
+    assert status.current_applied_version == manifest.migrations[-1].version
     assert store.mutations == mutations_before

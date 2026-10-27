@@ -191,3 +191,7 @@ authentication subject. See [Zenith local space](zenith-local-space.md).
 - `CredentialPresetRevision`: An immutable exact revision of a permission recipe, optionally associated with SeatTypes. A granted credential retains its approved permission snapshot; editing a preset never widens existing authority.
 
 All five classes have `runtimeLabel: false`. They are not Work kinds. See [seats.md](seats.md).
+
+## Session provenance (v0.11.0)
+
+SessionRef generalizes source-owned conversations; SessionLink retains witnessed delegation/fork relationships. HermesSessionRef remains compatible. CodexSessionRef, ClaudeSessionRef and GrokSessionRef specialize the common contract without new specialized storage labels. See [session-references.md](session-references.md).

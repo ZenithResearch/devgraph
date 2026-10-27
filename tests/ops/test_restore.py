@@ -18,6 +18,7 @@ from devgraph.ops.backup import (
     create_manifest,
     write_manifest,
 )
+from devgraph.ops.migrate import load_manifest
 from devgraph.ops.restore import (
     PostRestoreChecks,
     RestoreCapability,
@@ -28,6 +29,7 @@ from devgraph.ops.restore import (
 )
 
 ROOT = Path(__file__).parents[2]
+MIGRATION_MAXIMUM = load_manifest(ROOT / "migrations/manifest.json").migrations[-1].version
 
 
 def capability(**changes) -> RestoreCapability:
@@ -114,9 +116,9 @@ def metadata(*, created_hour: int = 20) -> BackupMetadata:
         restore_size_bytes=1000,
         neo4j_edition="community",
         neo4j_version="5.26.28",
-        migration_current_version=28,
+        migration_current_version=MIGRATION_MAXIMUM,
         migration_minimum_version=1,
-        migration_maximum_version=28,
+        migration_maximum_version=MIGRATION_MAXIMUM,
         backend_id=BACKEND_ID,
         backend_version="1",
         consistency_mode="offline_consistent",
@@ -140,7 +142,7 @@ def plan(root: Path, *, target_value=None, capability_value=None):
         target_value or target(),
         capability_value or capability(),
         supported_migration_minimum=1,
-        supported_migration_maximum=28,
+        supported_migration_maximum=MIGRATION_MAXIMUM,
     )
 
 

@@ -153,8 +153,8 @@ def manifest() -> Manifest:
 def test_empty_first_run_applies_all_and_second_run_is_noop() -> None:
     store = MemoryMigrationStore()
     first = apply_migrations(manifest(), store, attempt_id="attempt-a")
-    assert first == MigrationStatus.clean(28, manifest())
-    assert len(store.ddl_calls) == 25
+    assert first == MigrationStatus.clean(manifest().migrations[-1].version, manifest())
+    assert len(store.ddl_calls) == sum(m.kind == "schema_ddl" for m in manifest().migrations)
     assert store.transactional_calls == [
         "canonical_work_object_persistence_v1",
         "workflow_metadata_v1",
@@ -168,7 +168,7 @@ def test_empty_first_run_applies_all_and_second_run_is_noop() -> None:
     ]
     second = apply_migrations(manifest(), store, attempt_id="attempt-b")
     assert second == first
-    assert len(store.ddl_calls) == 25
+    assert len(store.ddl_calls) == sum(m.kind == "schema_ddl" for m in manifest().migrations)
     assert store.transactional_calls == [
         "canonical_work_object_persistence_v1",
         "workflow_metadata_v1",

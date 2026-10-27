@@ -23,3 +23,10 @@ do not establish those integrations.
 ```bash
 uv run pytest tests/observability -q
 ```
+
+## General session-reference candidate
+
+The additive SessionRef/SessionLink model, local metadata capture CLI and private
+receiver-side outbox consumer are described in [session provenance](dev/session-provenance.md).
+Legacy Hermes ingestion remains unchanged. No collector, graph-ingestion HTTP
+route, new authority, or installed runtime integration is enabled by this source.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "ontology_version": "0.10.0",
+  "ontology_version": "0.11.0",
   "terms_base": "https://zenith-research.ca/ontology/terms/",
   "seat": {
     "class": "Seat",

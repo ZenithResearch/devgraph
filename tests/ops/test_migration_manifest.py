@@ -42,13 +42,15 @@ EXPECTED = [
     "arena_id",
     "workflow_metadata_v1",
     "todo_progress_v1",
+    "session_ref_id",
+    "session_link_id",
 ]
 
 
 def test_manifest_pins_schema_payloads_transactional_v23_and_claim_constraint_v24() -> None:
     manifest = load_manifest(ROOT / "migrations/manifest.json")
     assert manifest.schema_version == 1
-    assert [item.version for item in manifest.migrations] == list(range(1, 29))
+    assert [item.version for item in manifest.migrations] == list(range(1, 31))
     assert [item.name for item in manifest.migrations] == EXPECTED
     assert [item.kind for item in manifest.migrations[:22]] == ["schema_ddl"] * 22
     assert manifest.migrations[22].kind == "transactional_data"

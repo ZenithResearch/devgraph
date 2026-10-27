@@ -109,3 +109,7 @@ These descriptive relationships establish no ownership, liveness, trust or permi
 - `HAS_SEAT_OCCUPANT`: `SeatAssignment` → `Actor`. The Person or Agent occupying a seat. Organization is not an allowed occupant in the seat profile.
 - `SUGGESTS_CREDENTIAL_PRESET`: `SeatType` → `CredentialPreset`. Suggests a permission recipe. Does not issue authority or silently update existing grants.
 - `HAS_PRESET_REVISION`: `CredentialPreset` → `CredentialPresetRevision`. Names an immutable permission recipe revision. Revocation is a separate receiver decision.
+
+## Session provenance (v0.11.0)
+
+ATTRIBUTED_TO_SESSION links declared Work scope to SessionRef. SESSION_LINK_ORIGIN and SESSION_LINK_TARGET retain SessionLink endpoints. Legacy ATTRIBUTED_TO_HERMES_SESSION is unchanged. See [session-references.md](session-references.md).

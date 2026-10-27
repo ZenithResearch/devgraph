@@ -224,6 +224,22 @@
       "checksum": "08a37e1d8029b4070452266c394113649e09d23222b0f3dc62eb4eb5f81620d7",
       "posture": "forward_only",
       "kind": "transactional_data"
+    },
+    {
+      "version": 29,
+      "name": "session_ref_id",
+      "payload_path": "migrations/0029_session_ref_id.cypher",
+      "checksum": "815b88ad3f8a9bf8d1b5f484f02d3182f679041293a2b79219e44100f1394586",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
+    },
+    {
+      "version": 30,
+      "name": "session_link_id",
+      "payload_path": "migrations/0030_session_link_id.cypher",
+      "checksum": "73692b0ff0260b725806e5982cfd82ea4c7530833c89f17e1ccf98325b73132d",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
     }
   ]
 }

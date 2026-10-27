@@ -13,6 +13,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- General source-owned session references, witnessed delegation/fork links and opt-in Codex/Claude metadata capture — connect direct and delegated conversations to explicit Work without confusing process handles, model providers or importing authority; preserve legacy Hermes records and leave installed authority unchanged.
+
 - Add an owner-bound HTTPS Wallet member endpoint with a separate request inbox,
   exact receiver policies and opt-in dedicated loopback TLS termination. Preserve
   the original signed owner and keep operator administration off the member URL.
