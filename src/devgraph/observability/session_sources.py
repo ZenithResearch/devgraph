@@ -98,6 +98,11 @@ class NativeSources:
                         "status": "available",
                         "loaded": len(rows),
                         "bounded": partial,
+                        "window_basis": {
+                            "hermes": "recently_started",
+                            "codex": "recently_updated",
+                            "claude-code": "file_modified",
+                        }[source["application"]],
                     }
                 )
             except (OSError, ValueError, sqlite3.Error, KeyError, TypeError):
@@ -117,7 +122,9 @@ class NativeSources:
         with readonly(Path(source["root"]) / "state.db") as db:
             rows = db.execute(
                 "SELECT id,parent_session_id,started_at,ended_at,last_activity_at,cwd "
-                "FROM sessions ORDER BY COALESCE(last_activity_at,started_at) DESC LIMIT ?",
+                # Hermes indexes started_at, not COALESCE(last_activity_at,...).
+                # Bound the source window before touching wide historical rows.
+                "FROM sessions ORDER BY started_at DESC LIMIT ?",
                 (LIMIT + 1,),
             ).fetchall()
         result = []
