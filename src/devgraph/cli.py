@@ -409,6 +409,10 @@ def query_work_snapshot(
                 kind=kind,
                 work_id=work_id,
             )
+            if owns_transport and config_path == DEFAULT_CONFIG_PATH:
+                from devgraph.observability.session_associations import record_work_inspection
+
+                record_work_inspection(kind, work_id)
             return {"item": result.model_dump(mode="json")}
         result = client.list_work(
             context,

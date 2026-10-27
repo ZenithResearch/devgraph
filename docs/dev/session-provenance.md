@@ -123,3 +123,22 @@ Qualification includes synthetic native stores, exact/missing/mismatched source
 resolution, duplicate Claude sources, redaction, real loopback authorization and
 revocation tests, write rejection, explicit Work binding and unknown outcomes.
 Live source checks must report actual coverage separately from these fixtures.
+
+### Session-aware Work CLI
+
+The optional installed session-aware launcher enables
+`DEVGRAPH_SESSION_OBSERVATION=1` for its own CLI process. After a successful exact
+`query work Kind id` using the configured canonical host, it records an
+owner-private `work-inspections.sqlite3` metadata witness. Failed reads, list
+reads, injected test transports and alternate host configurations do not record
+associations. Ordinary CLI processes are unchanged. The receiver config's
+`inspection_file` admits this specific observation file.
+
+The caller's `CODEX_THREAD_ID` or `CLAUDE_SESSION_ID` must resolve to an actual
+retained session in exactly one configured native store. Mixed caller environments
+are rejected. This is a resolved environment claim, not a signed caller identity.
+Pulse labels the relationship `successful_cli_work_read`; it resolves the Work
+record again through the canonical HTTP API. It never represents this as graph
+attribution, delegation evidence or completed work. No Work body or transcript is
+copied into the journal. Retained inspection timestamps can order source activity
+without claiming a running process.

@@ -22,6 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from devgraph.auth.local_read import LocalReadCredentialVerifier
+from devgraph.observability.session_associations import read_inspections
 from devgraph.observability.session_capture import SessionJournal
 from devgraph.observability.session_ref import SessionIdentity, work_ref
 from devgraph.observability.session_sources import NativeSources, hook_evidence, owned, row
@@ -74,6 +75,21 @@ class SessionReader:
                 return
             items, coverage = self.sources.scan()
             index = {r["id"]: r for r in items}
+            inspection_path = self.config.get("inspection_file")
+            if inspection_path:
+                try:
+                    for binding in read_inspections(Path(inspection_path)):
+                        item = index.get(binding["ref_id"])
+                        if item:
+                            item["work_refs"].append(
+                                {k: v for k, v in binding.items() if k != "ref_id"}
+                            )
+                            if binding["observed_at"] > (item["last_activity_at"] or ""):
+                                item["native_last_activity_at"] = item["last_activity_at"]
+                                item["last_activity_at"] = binding["observed_at"]
+                                item["activity_basis"] = "observed_work_inspection"
+                except (OSError, ValueError, sqlite3.Error):
+                    coverage.append({"label": "CLI Work inspections", "status": "unavailable"})
             for source in self.config["sources"]:
                 if source["application"] != "hermes":
                     continue
