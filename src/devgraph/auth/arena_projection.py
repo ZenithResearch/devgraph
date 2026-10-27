@@ -29,6 +29,13 @@ def project_arena_read(storage, grants, target):
     if parsed is None:
         raise ValueError("unsupported_read_target")
     operation, path, query = parsed
+    eligible = [
+        g
+        for g in grants
+        if g.scope == "devgraph.arena.read"
+        and operation.removeprefix("arena.") in getattr(g, "operations", ("list", "get"))
+    ]
+    dynamic = any(getattr(g, "all_arenas", False) is True for g in eligible)
     allowed = tuple(
         sorted(
             {
@@ -40,7 +47,7 @@ def project_arena_read(storage, grants, target):
             }
         )
     )
-    if not allowed:
+    if not dynamic and not allowed:
         raise ForbiddenError("scope_not_granted", correlation_id="arena-read")
     fields = parse_qs(query, strict_parsing=True, max_num_fields=3) if query else {}
     names = {"limit", "after_id"} if operation == "arena.list" else {"limit", "after_resource"}
@@ -59,11 +66,18 @@ def project_arena_read(storage, grants, target):
             return {
                 "items": [
                     ArenaRepository._from_node(n).model_dump(mode="json")
-                    for n in storage.delegated_arena_page(allowed, after_id=after, limit=limit)
+                    for n in storage.delegated_arena_page(
+                        () if dynamic else allowed,
+                        all_resources=dynamic,
+                        after_id=after,
+                        limit=limit,
+                    )
                 ]
             }
         identifier = path.split("/")[2]
-        if identifier not in allowed or storage.get_node("Arena", identifier) is None:
+        if (not dynamic and identifier not in allowed) or storage.get_node(
+            "Arena", identifier
+        ) is None:
             raise KeyError("not_found")
         if not path.endswith("/members"):
             return ArenaRepository(storage).get(identifier).model_dump(mode="json")

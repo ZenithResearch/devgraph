@@ -196,3 +196,14 @@ is complementary identity/authentication assurance, not a substitute for system
 access controls. This plan claims no conformance, assurance level, government
 accreditation or military approval. Contract security screening and any applicable
 controlled-goods requirements are separate procurement obligations.
+
+
+## Current-and-future Arena collection selector
+
+The ordinary credential editor now supports explicit all-current/future Arena
+metadata coverage through a v8 member draft. Fixed-ID v6 grants remain fixed.
+See [the versioned contract](../contracts/devgraph-arena-wallet/v2/README.md).
+Whole-graph Work rules already cover subsequently created matching Work objects;
+branch rules cover their future descendants. Selecting all Arena records alone
+does not select their Work or enable creation. Write actions remain independently
+paired with their selected resource scopes.

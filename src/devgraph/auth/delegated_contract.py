@@ -303,6 +303,8 @@ def _grant_is_subset(granted: ReadGrant, requested: ReadGrant) -> bool:
                 getattr(granted, "resource_paths", ()), getattr(requested, "resource_paths", ())
             )
         )
+    if getattr(granted, "all_arenas", False):
+        return getattr(requested, "all_arenas", False) is True
     if isinstance(granted, ArenaReadGrant) and getattr(requested, "all_arenas", False):
         return True
     if isinstance(granted, ArenaReadGrant) and isinstance(requested, ArenaReadGrant):

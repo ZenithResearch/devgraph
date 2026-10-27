@@ -1,0 +1,579 @@
+{
+  "$defs": {
+    "ArenaReadGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "const": "devgraph.arena.read",
+          "title": "Scope",
+          "type": "string"
+        },
+        "arena_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Arena Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "scope",
+        "arena_ids"
+      ],
+      "title": "ArenaReadGrant",
+      "type": "object"
+    },
+    "CollectionArenaReadGrant": {
+      "additionalProperties": false,
+      "description": "Explicit all-current/future collection selector, admitted by v8 drafts.",
+      "properties": {
+        "scope": {
+          "const": "devgraph.arena.read",
+          "title": "Scope",
+          "type": "string"
+        },
+        "all_arenas": {
+          "const": true,
+          "title": "All Arenas",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scope",
+        "all_arenas"
+      ],
+      "title": "CollectionArenaReadGrant",
+      "type": "object"
+    },
+    "GrantValidity": {
+      "properties": {
+        "not_before": {
+          "title": "Not Before",
+          "type": "integer"
+        },
+        "not_after": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Not After"
+        }
+      },
+      "required": [
+        "not_before",
+        "not_after"
+      ],
+      "title": "GrantValidity",
+      "type": "object"
+    },
+    "MonitorWorkGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "const": "devgraph.work.read",
+          "title": "Scope",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "enum": [
+              "list",
+              "get",
+              "relationships",
+              "children",
+              "blockers"
+            ],
+            "type": "string"
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "relationship_types": {
+          "items": {
+            "enum": [
+              "children",
+              "parent",
+              "dependencies",
+              "dependents",
+              "blockers",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "title": "Relationship Types",
+          "type": "array"
+        },
+        "work_kinds": {
+          "items": {
+            "enum": [
+              "Todo",
+              "Proposal",
+              "Initiative",
+              "Project",
+              "Issue",
+              "Task"
+            ],
+            "type": "string"
+          },
+          "title": "Work Kinds",
+          "type": "array"
+        },
+        "work_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Work Ids",
+          "type": "array"
+        },
+        "arena_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Arena Ids",
+          "type": "array"
+        },
+        "include_archived": {
+          "title": "Include Archived",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scope",
+        "operations",
+        "relationship_types",
+        "work_kinds",
+        "include_archived"
+      ],
+      "title": "MonitorWorkGrant",
+      "type": "object"
+    },
+    "PathReadGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "const": "devgraph.work.read",
+          "title": "Scope",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "enum": [
+              "list",
+              "get",
+              "relationships",
+              "children",
+              "blockers"
+            ],
+            "type": "string"
+          },
+          "title": "Operations",
+          "type": "array"
+        },
+        "relationship_types": {
+          "items": {
+            "enum": [
+              "children",
+              "parent",
+              "dependencies",
+              "dependents",
+              "blockers",
+              "blocked"
+            ],
+            "type": "string"
+          },
+          "title": "Relationship Types",
+          "type": "array"
+        },
+        "work_kinds": {
+          "items": {
+            "enum": [
+              "Todo",
+              "Proposal",
+              "Initiative",
+              "Project",
+              "Issue",
+              "Task"
+            ],
+            "type": "string"
+          },
+          "title": "Work Kinds",
+          "type": "array"
+        },
+        "work_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Work Ids",
+          "type": "array"
+        },
+        "arena_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Arena Ids",
+          "type": "array"
+        },
+        "include_archived": {
+          "title": "Include Archived",
+          "type": "boolean"
+        },
+        "schema": {
+          "const": "devgraph.path-read-grant.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "resource_paths": {
+          "items": {
+            "$ref": "#/$defs/ResourcePath"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Resource Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "scope",
+        "operations",
+        "relationship_types",
+        "work_kinds",
+        "include_archived",
+        "schema",
+        "resource_paths"
+      ],
+      "title": "PathReadGrant",
+      "type": "object"
+    },
+    "PathWriteGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/WriteResource"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Resources",
+          "type": "array"
+        },
+        "arena_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arena Ids"
+        },
+        "schema": {
+          "const": "devgraph.path-write-grant.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "resource_paths": {
+          "items": {
+            "$ref": "#/$defs/ResourcePath"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Resource Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "operation",
+        "resources",
+        "schema",
+        "resource_paths"
+      ],
+      "title": "PathWriteGrant",
+      "type": "object"
+    },
+    "PresetReference": {
+      "additionalProperties": false,
+      "properties": {
+        "catalog_digest_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Catalog Digest Sha256",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "catalog_digest_sha256",
+        "id",
+        "version"
+      ],
+      "title": "PresetReference",
+      "type": "object"
+    },
+    "ResourcePath": {
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "devgraph.resource-path.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Path",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "path"
+      ],
+      "title": "ResourcePath",
+      "type": "object"
+    },
+    "ScopedWriteGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/WriteResource"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Resources",
+          "type": "array"
+        },
+        "arena_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arena Ids"
+        }
+      },
+      "required": [
+        "operation",
+        "resources"
+      ],
+      "title": "ScopedWriteGrant",
+      "type": "object"
+    },
+    "WriteResource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "Todo",
+            "Proposal",
+            "Initiative",
+            "Project",
+            "Issue",
+            "Task",
+            "Arena",
+            "Decision",
+            "ReviewPacket",
+            "Handoff",
+            "ExternalLink"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ids"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "WriteResource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "devgraph.access-draft.v8",
+      "title": "Schema",
+      "type": "string"
+    },
+    "issuer": {
+      "title": "Issuer",
+      "type": "string"
+    },
+    "receiver": {
+      "title": "Receiver",
+      "type": "string"
+    },
+    "write_audience": {
+      "const": "devgraph://receiver-local",
+      "title": "Write Audience",
+      "type": "string"
+    },
+    "subject_public_key": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subject Public Key"
+    },
+    "installation_id": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Installation Id"
+    },
+    "lifetime_seconds": {
+      "maximum": 3600,
+      "minimum": 60,
+      "title": "Lifetime Seconds",
+      "type": "integer"
+    },
+    "read_grants": {
+      "default": [],
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/CollectionArenaReadGrant"
+          },
+          {
+            "$ref": "#/$defs/ArenaReadGrant"
+          },
+          {
+            "$ref": "#/$defs/PathReadGrant"
+          },
+          {
+            "$ref": "#/$defs/MonitorWorkGrant"
+          }
+        ]
+      },
+      "maxItems": 16,
+      "title": "Read Grants",
+      "type": "array"
+    },
+    "write_grants": {
+      "default": [],
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/PathWriteGrant"
+          },
+          {
+            "$ref": "#/$defs/ScopedWriteGrant"
+          }
+        ]
+      },
+      "maxItems": 64,
+      "title": "Write Grants",
+      "type": "array"
+    },
+    "previous_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Digest"
+    },
+    "preset": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PresetReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "validity": {
+      "$ref": "#/$defs/GrantValidity"
+    }
+  },
+  "required": [
+    "schema",
+    "issuer",
+    "receiver",
+    "write_audience",
+    "lifetime_seconds",
+    "validity"
+  ],
+  "title": "CollectionArenaAccessDraft",
+  "type": "object"
+}

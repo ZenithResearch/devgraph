@@ -13,6 +13,8 @@
 
 ## [Unreleased]
 
+- Add explicit current-and-future Arena collection coverage to ordinary member grants — allow later-created Arena records without widening fixed-ID assignments, Work permissions or delegation.
+
 - Add an owner-bound HTTPS Wallet member endpoint with a separate request inbox,
   exact receiver policies and opt-in dedicated loopback TLS termination. Preserve
   the original signed owner and keep operator administration off the member URL.

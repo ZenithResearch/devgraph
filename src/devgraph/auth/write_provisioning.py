@@ -270,7 +270,12 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
             expires_at=grant.not_after,
             **(
                 {"validity": json.loads(grant.validity.to_json())}
-                if grant.schema_ in ("devgraph.access-draft.v5", "devgraph.access-draft.v6")
+                if grant.schema_
+                in (
+                    "devgraph.access-draft.v5",
+                    "devgraph.access-draft.v6",
+                    "devgraph.access-draft.v8",
+                )
                 else {}
             ),
             replaces_existing=current is not None,
@@ -338,7 +343,11 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
                         **(
                             {"validity": json.loads(grant.validity.to_json())}
                             if grant.schema_
-                            in ("devgraph.access-draft.v5", "devgraph.access-draft.v6")
+                            in (
+                                "devgraph.access-draft.v5",
+                                "devgraph.access-draft.v6",
+                                "devgraph.access-draft.v8",
+                            )
                             else {}
                         ),
                         version=2,

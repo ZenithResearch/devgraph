@@ -4,11 +4,13 @@ import json
 
 from devgraph.auth.arena_access import (
     ArenaAccessDraft,
-    ArenaGrantSelection,
     ArenaMemberPolicy,
     ArenaOperatorAction,
+    CollectionArenaGrantSelection,
+    CollectionArenaOperatorAction,
     ReadAssignment,
     ReadGrants,
+    VerifiedCollectionArenaReadGrant,
     WriteAssignment,
     compile_arena_read,
     permission_operation,
@@ -29,7 +31,7 @@ class ArenaAccessRequestInbox(StandingAccessRequestInbox):
 
 
 class ArenaGrantProvisioning(OwnerGrantProvisioning):
-    selection_type = ArenaGrantSelection
+    selection_type = CollectionArenaGrantSelection
     registry_type = ArenaMemberPolicy
     registry_schema = "devgraph.member-access-policy.v5"
 
@@ -71,10 +73,16 @@ class ArenaAccessOperator(StandingAccessOperator):
     write_action_schemas = (
         *StandingAccessOperator.write_action_schemas,
         "devgraph.access-operator-action.v9",
+        "devgraph.access-operator-action.v13",
     )
 
     @staticmethod
     def parse_action(value):
+        if value.get("schema") in (
+            "devgraph.access-operator-action.v12",
+            "devgraph.access-operator-action.v13",
+        ):
+            return CollectionArenaOperatorAction.model_validate(value)
         if value.get("schema") in (
             "devgraph.access-operator-action.v8",
             "devgraph.access-operator-action.v9",
@@ -89,10 +97,11 @@ class ArenaAccessOperator(StandingAccessOperator):
     def decorate_inbox(self, result, policy):
         super().decorate_inbox(result, policy)
         result["activation"].update(
-            schema="devgraph.access-activation-capabilities.v5",
+            schema="devgraph.access-activation-capabilities.v6",
+            future_arena_reads=True,
             arena_reads=True,
-            read_action_schema="devgraph.access-operator-action.v8",
-            write_action_schema="devgraph.access-operator-action.v9",
+            read_action_schema="devgraph.access-operator-action.v12",
+            write_action_schema="devgraph.access-operator-action.v13",
         )
         return result
 
@@ -103,7 +112,9 @@ class ArenaMonitorReadEnrollment(PathMonitorReadEnrollment):
 
     def _details(self, policy):
         value = super()._details(policy)
-        if policy.schema_ == "devgraph.native-read-policy.v4":
+        if policy.schema_ == "devgraph.native-read-policy.v6":
+            value["schema"] = "devgraph.native-read-scope.v6"
+        elif policy.schema_ == "devgraph.native-read-policy.v4":
             value["schema"] = "devgraph.native-read-scope.v5"
         return value
 
@@ -116,6 +127,8 @@ class ArenaMonitorReadEnrollment(PathMonitorReadEnrollment):
             ArenaAccessDraft,
         ):
             value["schema"] = "devgraph.native-read-result.v5"
+        if any(g.get("all_arenas") is True for g in manifest.get("read_grants", ())):
+            value["schema"] = "devgraph.native-read-result.v6"
         return value
 
     def _decode_enrollment_ceiling(self, grants):
@@ -133,9 +146,11 @@ class ArenaMonitorReadEnrollment(PathMonitorReadEnrollment):
         # A constraint can describe multiple operations, while a credential may
         # retain only one permission. Do not borrow list from a get permission.
         narrowed = [
-            VerifiedArenaReadGrant(
-                **g.model_dump(), operations=(p["operation"].removeprefix("devgraph.arena."),)
-            )
+            (
+                VerifiedCollectionArenaReadGrant
+                if getattr(g, "all_arenas", False)
+                else VerifiedArenaReadGrant
+            )(**g.model_dump(), operations=(p["operation"].removeprefix("devgraph.arena."),))
             if g.scope == "devgraph.arena.read"
             else g.model_copy(
                 update={"operations": (p["operation"].removeprefix("devgraph.work."),)}

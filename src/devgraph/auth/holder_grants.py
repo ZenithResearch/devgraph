@@ -67,9 +67,11 @@ def constraint(value):
             if not roots or any(len(root) != 1 or root[0]["kind"] != "Arena" for root in roots):
                 raise UnauthenticatedError("unsupported_holder_scope")
             selected = {root[0]["id"] for root in roots}
-            ids = v["constraints"]["arena_ids"]
-            if not selected.issubset(ids):
+            dynamic = v["constraints"].get("all_arenas") is True
+            ids = v["constraints"].get("arena_ids", ())
+            if not dynamic and not selected.issubset(ids):
                 raise UnauthenticatedError("unsupported_holder_scope")
+            v["constraints"].pop("all_arenas", None)
             v["constraints"]["arena_ids"] = sorted(selected)
         else:
             v["constraints"]["resource_paths"] = [
