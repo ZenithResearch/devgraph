@@ -51,7 +51,8 @@ def create_app():
         raise RuntimeError("explicit owner configuration required")
     config = ReadRuntimeConfiguration.model_validate(private_json(Path(path)))
     if (
-        config.schema_ != "devgraph.signed-read-runtime.v9"
+        config.schema_
+        not in ("devgraph.signed-read-runtime.v9", "devgraph.signed-read-runtime.v11")
         or config.owner_bootstrap_database_file is None
     ):
         raise ValueError("owner-registered runtime required")

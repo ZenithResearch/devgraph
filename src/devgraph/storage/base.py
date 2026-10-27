@@ -201,6 +201,7 @@ class GraphStorage(Protocol):
         self,
         arena_ids: tuple[str, ...],
         *,
+        all_resources: bool = False,
         after_id: str | None = None,
         limit: int = 50,
     ) -> list[NodeRecord]: ...

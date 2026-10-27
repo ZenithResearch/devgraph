@@ -9,9 +9,11 @@ const codes = new Map([
   ['origin_not_approved', 'wallet_connection_required'],
   ['wallet_connection_required', 'wallet_connection_required'],
   ['approval_required', 'approval_required'],
+  ['wallet_update_required', 'wallet_update_required'],
 ]);
 /** @type {Record<string,string>} */
 const messages = {
+  wallet_update_required: 'Update Castalia Wallet to use this service’s resource selections. Existing grants are preserved.',
   user_denied: 'Wallet approval was cancelled.',
   wallet_unlock_required: 'Unlock Castalia Wallet, then continue with this request.',
   wallet_connection_required: 'Connect Castalia Wallet to this site, then continue with this request.',

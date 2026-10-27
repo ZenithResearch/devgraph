@@ -270,7 +270,12 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
             expires_at=grant.not_after,
             **(
                 {"validity": json.loads(grant.validity.to_json())}
-                if grant.schema_ in ("devgraph.access-draft.v5", "devgraph.access-draft.v6")
+                if grant.schema_
+                in (
+                    "devgraph.access-draft.v5",
+                    "devgraph.access-draft.v6",
+                    "devgraph.access-draft.v8",
+                )
                 else {}
             ),
             replaces_existing=current is not None,
@@ -338,7 +343,11 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
                         **(
                             {"validity": json.loads(grant.validity.to_json())}
                             if grant.schema_
-                            in ("devgraph.access-draft.v5", "devgraph.access-draft.v6")
+                            in (
+                                "devgraph.access-draft.v5",
+                                "devgraph.access-draft.v6",
+                                "devgraph.access-draft.v8",
+                            )
                             else {}
                         ),
                         version=2,
@@ -408,8 +417,8 @@ class WriteGrantProvisioning(ReadGrantProvisioning):
 
 
 class ProvisionedWriteReceiver:
-    def __init__(self, *, receiver, provisioning):
-        self.receiver, self.provisioning = receiver, provisioning
+    def __init__(self, *, receiver, provisioning, compound_host=None):
+        self.receiver, self.provisioning, self.compound_host = receiver, provisioning, compound_host
 
     def _load_verifier(self):
         return self.receiver._load_verifier()
@@ -426,6 +435,7 @@ class ProvisionedWriteReceiver:
                 verifier=_CurrentReceiverVerifier(self._load_verifier),
                 policy=lambda: policy,
                 clock=current.clock,
+                compound_host=self.compound_host,
             )
             return getattr(adapter, operation)(**arguments)
 
@@ -456,6 +466,10 @@ class ProvisionedWriteReceiver:
                 ),
             )
             scope = policy.authorize(verified, now=current.clock())
+            if self.compound_host is not None:
+                from devgraph.auth.paired_resources import PairedGuard
+
+                scope = PairedGuard(scope, self.compound_host)
             with self.receiver.storage.work_mutation_transaction():
                 scope.prepare(self.receiver.storage, request)
             yield

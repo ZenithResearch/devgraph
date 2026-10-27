@@ -1,0 +1,311 @@
+{
+  "schema": "devgraph.permission-operation-inventory.v1",
+  "authority": false,
+  "named_mutations": [
+    {
+      "operation": "devgraph.work.create.v2",
+      "label": "Create Work",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids"
+      ],
+      "resource_requirements": "Creation requires an explicit new resource ID or all permitted resources; a hierarchy alone cannot authorize unattached creation."
+    },
+    {
+      "operation": "devgraph.work.patch.v2",
+      "label": "Edit Work",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Change permitted fields of matching Work items."
+    },
+    {
+      "operation": "devgraph.work.progress.set.v2",
+      "label": "Set progress",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Completion may also require a separately authorized ReviewPacket and evidence links."
+    },
+    {
+      "operation": "devgraph.work.dependency.add.v2",
+      "label": "Add dependency",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Both ends of the relationship must be authorized for this action."
+    },
+    {
+      "operation": "devgraph.work.dependency.remove.v2",
+      "label": "Remove dependency",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Both ends of the relationship must be authorized for this action."
+    },
+    {
+      "operation": "devgraph.work.blocker.add.v2",
+      "label": "Add blocker",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Both Task endpoints must be authorized for this action."
+    },
+    {
+      "operation": "devgraph.work.blocker.remove.v2",
+      "label": "Remove blocker",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Both Task endpoints must be authorized for this action."
+    },
+    {
+      "operation": "devgraph.work.parent.set.v2",
+      "label": "Move Work",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Current and destination containers must be authorized; the receiver checks before and after the move."
+    },
+    {
+      "operation": "devgraph.work.workflow.assign.v2",
+      "label": "Assign workflow",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Assign a workflow to matching Work items."
+    },
+    {
+      "operation": "devgraph.work.workflow.transition.v2",
+      "label": "Transition workflow",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Workflow gates still apply to matching Work items."
+    },
+    {
+      "operation": "devgraph.work.archive.v2",
+      "label": "Archive Work",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Archive matching Work items."
+    },
+    {
+      "operation": "devgraph.work.restore.v2",
+      "label": "Restore Work",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Restore matching archived Work items."
+    },
+    {
+      "operation": "devgraph.work.accept.v2",
+      "label": "Accept proposal",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids"
+      ],
+      "resource_requirements": "Authorize the Proposal and the new Decision separately, using exact IDs or all permitted resources."
+    },
+    {
+      "operation": "devgraph.work.convert.v2",
+      "label": "Convert proposal",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids"
+      ],
+      "resource_requirements": "Authorize the Proposal, Issue and new Decision. Proposal and Decision records cannot inherit a Work hierarchy wildcard."
+    },
+    {
+      "operation": "devgraph.work.proposal.reject.v2",
+      "label": "Reject proposal",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids"
+      ],
+      "resource_requirements": "Authorize the Proposal and new Decision separately."
+    },
+    {
+      "operation": "devgraph.work.workflow.review.v2",
+      "label": "Review workflow",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Authorize the Work item and each ReviewPacket, Handoff or evidence link touched by the review."
+    },
+    {
+      "operation": "devgraph.arena.create.v1",
+      "label": "Create Arena",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids"
+      ],
+      "resource_requirements": "Authorize the new Arena ID or all permitted Arena resources. This does not grant credential administration."
+    },
+    {
+      "operation": "devgraph.arena.patch.v1",
+      "label": "Edit Arena",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Change the selected Arena records; no sibling Work access is implied."
+    },
+    {
+      "operation": "devgraph.arena.archive.v1",
+      "label": "Archive Arena",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Archive the selected Arena records subject to the receiver's lifecycle checks."
+    },
+    {
+      "operation": "devgraph.arena.member.set.v1",
+      "label": "Move Work between Arenas",
+      "classification": "recipient_rule",
+      "selectors": [
+        "all_permitted",
+        "exact_ids",
+        "verified_hierarchy"
+      ],
+      "resource_requirements": "Authorize the Work item and both prior and destination Arena records. Scope is checked before and after the move."
+    }
+  ],
+  "other_ontology_operations": [
+    {
+      "operation": "get_work_object",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "query_work_objects",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "create_work_object",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "devgraph.issue.create.v1",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "update_work_object_content",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "archive_work_object",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "transition_work_object_status",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "accept_proposal",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "convert_accepted_proposal_to_issue",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "children_of",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "blockers_for",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "export_internal_by_ids",
+      "classification": "separate_export_scope_not_in_editor"
+    },
+    {
+      "operation": "export_redacted_by_ids",
+      "classification": "separate_export_scope_not_in_editor"
+    },
+    {
+      "operation": "export_public_safe_summary_by_ids",
+      "classification": "separate_export_scope_not_in_editor"
+    },
+    {
+      "operation": "health_live",
+      "classification": "public_health"
+    },
+    {
+      "operation": "health_ready",
+      "classification": "public_health"
+    },
+    {
+      "operation": "devgraph.work.workflow.assign.v1",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "devgraph.work.workflow.review.v1",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "devgraph.work.workflow.transition.v1",
+      "classification": "legacy_compatibility_not_an_additional_grant"
+    },
+    {
+      "operation": "kanban",
+      "classification": "private_metadata_not_in_editor"
+    },
+    {
+      "operation": "workflows",
+      "classification": "private_metadata_not_in_editor"
+    },
+    {
+      "operation": "work_workflow",
+      "classification": "private_metadata_not_in_editor"
+    }
+  ]
+}

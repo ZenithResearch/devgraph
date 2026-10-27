@@ -1,9 +1,13 @@
 """Versioned Arena metadata reads; earlier Work-only contracts stay closed."""
 
+from __future__ import annotations
+
+import json
 from typing import Literal
 
-from pydantic import Field, TypeAdapter, model_validator
+from pydantic import Field, TypeAdapter, field_validator, model_validator
 
+from devgraph.auth.access_policy import _Closed
 from devgraph.auth.delegated_contract import ArenaReadGrant, canonical_json
 from devgraph.auth.monitor_read import AccessDraftV2, MonitorWorkGrant
 from devgraph.auth.path_access import PathAccessDraft, PathEnrollmentPolicy, PathReadGrant
@@ -30,7 +34,7 @@ def read_operations(grant):
 
 
 def permission_operation(grant, operation):
-    prefix = "devgraph.arena." if isinstance(grant, ArenaReadGrant) else "devgraph.work."
+    prefix = "devgraph.arena." if grant.scope == "devgraph.arena.read" else "devgraph.work."
     return prefix + operation
 
 
@@ -108,7 +112,12 @@ class ArenaMemberPolicy(StandingMemberPolicy):
     schema_: Literal["devgraph.member-access-policy.v5"] = Field(alias="schema")
     ceiling: ArenaAccessDraft
     assignments: tuple[
-        ArenaAccessDraft | StandingAccessDraft | PathAccessDraft | AccessDraftV2, ...
+        CollectionArenaAccessDraft
+        | ArenaAccessDraft
+        | StandingAccessDraft
+        | PathAccessDraft
+        | AccessDraftV2,
+        ...,
     ] = Field(max_length=128)
 
 
@@ -139,16 +148,25 @@ class ArenaOperatorAction(StandingOperatorAction):
         return self
 
 
-ReadAssignment = TypeAdapter(
-    ArenaAccessDraft | StandingAccessDraft | PathAccessDraft | AccessDraftV2
-)
-WriteAssignment = TypeAdapter(
-    ArenaAccessDraft | StandingAccessDraft | PathAccessDraft | WriteAccessDraft
-)
-ReadGrants = TypeAdapter(ArenaRead)
-
-
 def compile_arena_read(draft):
+    if isinstance(draft, CollectionArenaAccessDraft):
+        return CollectionArenaEnrollmentPolicy.model_validate(
+            dict(
+                schema="devgraph.native-read-policy.v6",
+                issuer=draft.issuer,
+                receiver=draft.receiver,
+                grants=draft.read_grants,
+                lifetime_seconds=draft.lifetime_seconds,
+            )
+        )
+    if isinstance(draft, OwnerArenaAccessDraft):
+        return OwnerArenaEnrollmentPolicy(
+            schema="devgraph.native-read-policy.v5",
+            issuer=draft.issuer,
+            receiver=draft.receiver,
+            grants=draft.read_grants,
+            lifetime_seconds=draft.lifetime_seconds,
+        )
     if isinstance(draft, ArenaAccessDraft):
         return ArenaEnrollmentPolicy.model_validate(
             dict(
@@ -162,3 +180,185 @@ def compile_arena_read(draft):
     from devgraph.auth.path_access import compile_path_read
 
     return compile_path_read(draft)
+
+
+class OwnerAllArenaRead(_Closed):
+    """Owner ceiling only. Never accepted by the member draft/credential parser."""
+
+    scope: Literal["devgraph.arena.read"]
+    all_arenas: Literal[True]
+
+
+class OwnerArenaEnrollmentPolicy(ArenaEnrollmentPolicy):
+    schema_: Literal["devgraph.native-read-policy.v5"] = Field(alias="schema")
+    grants: tuple[OwnerAllArenaRead | ArenaRead, ...] = Field(min_length=1, max_length=16)
+
+    @model_validator(mode="after")
+    def validate_policy(self):
+        raw = json.loads(canonical_json(self))
+        raw["schema"] = "devgraph.native-read-policy.v4"
+        raw["grants"] = [g for g in raw["grants"] if not g.get("all_arenas")]
+        if not raw["grants"]:
+            raw["grants"] = [
+                dict(scope="devgraph.arena.read", arena_ids=["owner-validation-placeholder"])
+            ]
+        ArenaEnrollmentPolicy.model_validate(raw)
+        if sum(isinstance(g, OwnerAllArenaRead) for g in self.grants) != 1:
+            raise ValueError("one explicit all-Arena owner ceiling required")
+        return self
+
+
+class OwnerArenaAccessDraft(ArenaAccessDraft):
+    schema_: Literal["devgraph.access-draft.v7"] = Field(alias="schema")
+    read_grants: tuple[OwnerAllArenaRead | ArenaRead, ...] = Field(default=(), max_length=16)
+
+    @model_validator(mode="after")
+    def valid(self):
+        raw = json.loads(canonical_json(self))
+        raw["schema"] = "devgraph.access-draft.v6"
+        raw["read_grants"] = [g for g in raw["read_grants"] if not g.get("all_arenas")]
+        if not raw["read_grants"] and not raw.get("write_grants"):
+            raw["read_grants"] = [
+                dict(scope="devgraph.arena.read", arena_ids=["owner-validation-placeholder"])
+            ]
+        ArenaAccessDraft.model_validate(raw)
+        if sum(isinstance(g, OwnerAllArenaRead) for g in self.read_grants) != 1:
+            raise ValueError("one explicit all-Arena owner ceiling required")
+        return self
+
+
+class OwnerArenaOperatorPolicy(ArenaOperatorPolicy):
+    schema_: Literal["devgraph.access-operator-policy.v6"] = Field(alias="schema")
+    ceiling: OwnerArenaAccessDraft
+
+
+class OwnerArenaMemberPolicy(ArenaMemberPolicy):
+    schema_: Literal["devgraph.member-access-policy.v6"] = Field(alias="schema")
+    ceiling: OwnerArenaAccessDraft
+
+
+class CollectionArenaReadGrant(_Closed):
+    """Explicit all-current/future collection selector, admitted by v8 drafts."""
+
+    scope: Literal["devgraph.arena.read"]
+    all_arenas: Literal[True]
+
+    @field_validator("all_arenas", mode="before")
+    @classmethod
+    def explicit_all(cls, value):
+        if value is not True:
+            raise ValueError("all collection selection must be explicit true")
+        return value
+
+
+class VerifiedCollectionArenaReadGrant(CollectionArenaReadGrant):
+    operations: tuple[Literal["list", "get"], ...]
+
+
+CollectionArenaRead = CollectionArenaReadGrant | ArenaRead
+
+
+class CollectionArenaEnrollmentPolicy(ArenaEnrollmentPolicy):
+    schema_: Literal["devgraph.native-read-policy.v6"] = Field(alias="schema")
+    grants: tuple[CollectionArenaRead, ...] = Field(min_length=1, max_length=16)
+
+    @model_validator(mode="after")
+    def validate_policy(self):
+        raw = json.loads(canonical_json(self))
+        raw["schema"] = "devgraph.native-read-policy.v4"
+        raw["grants"] = [g for g in raw["grants"] if not g.get("all_arenas")]
+        if not raw["grants"]:
+            raw["grants"] = [
+                dict(scope="devgraph.arena.read", arena_ids=["validation-placeholder"])
+            ]
+        ArenaEnrollmentPolicy.model_validate(raw)
+        if sum(len(read_operations(g)) for g in self.grants) > 32:
+            raise ValueError("too many read permissions")
+        if len({canonical_json(g) for g in self.grants}) != len(self.grants):
+            raise ValueError("duplicate grant")
+        return self
+
+
+class CollectionArenaAccessDraft(ArenaAccessDraft):
+    schema_: Literal["devgraph.access-draft.v8"] = Field(alias="schema")
+    read_grants: tuple[CollectionArenaRead, ...] = Field(default=(), max_length=16)
+
+    @model_validator(mode="after")
+    def valid(self):
+        if not (self.read_grants or self.write_grants):
+            raise ValueError("a nonempty grant is required")
+        if self.installation_id is not None and self.subject_public_key is None:
+            raise ValueError("installation binding requires a holder")
+        if self.read_grants:
+            CollectionArenaEnrollmentPolicy.model_validate(
+                dict(
+                    schema="devgraph.native-read-policy.v6",
+                    issuer=self.issuer,
+                    receiver=self.receiver,
+                    grants=self.read_grants,
+                    lifetime_seconds=self.lifetime_seconds,
+                )
+            )
+        if any(
+            len({canonical_json(g) for g in rows}) != len(rows)
+            for rows in (self.read_grants, self.write_grants)
+        ):
+            raise ValueError("duplicate grant")
+        return self
+
+
+class CollectionArenaGrantSelection(ArenaGrantSelection):
+    read: (
+        CollectionArenaAccessDraft
+        | ArenaAccessDraft
+        | StandingAccessDraft
+        | PathAccessDraft
+        | AccessDraftV2
+        | None
+    ) = None
+    write: (
+        CollectionArenaAccessDraft
+        | ArenaAccessDraft
+        | StandingAccessDraft
+        | PathAccessDraft
+        | WriteAccessDraft
+        | None
+    ) = None
+
+
+class CollectionArenaOperatorAction(ArenaOperatorAction):
+    schema_: Literal[
+        "devgraph.access-operator-action.v12", "devgraph.access-operator-action.v13"
+    ] = Field(alias="schema")
+    scoped_write_schema = "devgraph.access-operator-action.v13"
+    selection: CollectionArenaGrantSelection | None = None
+
+    @model_validator(mode="after")
+    def collection_precondition(self):
+        if (
+            self.schema_.endswith(".v12")
+            and "previous_write_assignment_digest" in self.model_fields_set
+        ):
+            raise ValueError("read action cannot carry a write precondition")
+        return self
+
+
+ReadAssignment = TypeAdapter(
+    CollectionArenaAccessDraft
+    | ArenaAccessDraft
+    | StandingAccessDraft
+    | PathAccessDraft
+    | AccessDraftV2
+)
+WriteAssignment = TypeAdapter(
+    CollectionArenaAccessDraft
+    | ArenaAccessDraft
+    | StandingAccessDraft
+    | PathAccessDraft
+    | WriteAccessDraft
+)
+ReadGrants = TypeAdapter(CollectionArenaRead)
+
+# New nested v8 assignments are additive; old registry bytes/digests stay exact.
+ArenaMemberPolicy.model_rebuild()
+OwnerArenaMemberPolicy.model_rebuild()

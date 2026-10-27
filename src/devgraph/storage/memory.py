@@ -124,12 +124,18 @@ class MemoryGraphStorage:
         self,
         arena_ids: tuple[str, ...],
         *,
+        all_resources: bool = False,
         after_id: str | None = None,
         limit: int = 50,
     ) -> list[NodeRecord]:
         validate_page_limit(limit)
         allowed = set(arena_ids)
-        if not arena_ids or len(allowed) != len(arena_ids):
+        if (
+            type(all_resources) is not bool
+            or (all_resources and arena_ids)
+            or (not all_resources and not arena_ids)
+            or len(allowed) != len(arena_ids)
+        ):
             raise ValueError("invalid delegated Arena selectors")
         for arena_id in arena_ids:
             validate_work_object_id(arena_id)
@@ -140,7 +146,7 @@ class MemoryGraphStorage:
                 node
                 for (label, node_id), node in self._nodes.items()
                 if label == "Arena"
-                and node_id in allowed
+                and (all_resources or node_id in allowed)
                 and not node.archived
                 and (after_id is None or node_id > after_id)
             ),

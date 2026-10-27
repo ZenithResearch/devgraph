@@ -210,18 +210,23 @@ class ScopedSecSWorkAdapter(SecSWorkAdapter):
     No caller-supplied policy or credential can select this loader.
     """
 
-    def __init__(self, *, policy, clock, **kwargs):
+    def __init__(self, *, policy, clock, compound_host=None, **kwargs):
         if not callable(policy) or not callable(clock):
             raise TypeError("current policy and clock required")
         super().__init__(**kwargs)
-        self.policy, self.clock = policy, clock
+        self.policy, self.clock, self.compound_host = policy, clock, compound_host
 
     def _resource_scope(self, verified):
         try:
             policy = self.policy()
             if not isinstance(policy, ReceiverWritePolicy):
                 raise ValueError()
-            return policy.authorize(verified, now=self.clock())
+            guard = policy.authorize(verified, now=self.clock())
+            if self.compound_host is not None:
+                from devgraph.auth.paired_resources import PairedGuard
+
+                return PairedGuard(guard, self.compound_host)
+            return guard
         except (ValueError, TypeError, KeyError, OSError):
             raise SecSWorkDenied("write_scope_unavailable") from None
 

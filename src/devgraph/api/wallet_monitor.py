@@ -44,7 +44,17 @@ def wallet_monitor_read(storage, enrollment, audit_log, body):
         raise UnauthenticatedError("unsupported_read")
     context = enrollment.verify_request(**body)
     try:
-        result = project_monitor_read(storage, context.read_grants, call["parameters"]["path"])
+        from devgraph.auth.selector_grants import SelectorGrant, materialize
+
+        if any(isinstance(g, SelectorGrant) for g in context.read_grants):
+            with (
+                storage.work_mutation_transaction(),
+                enrollment.holder_grants.current_read(body["credential"], body["proof"]),
+            ):
+                grants = materialize(storage, context.read_grants)
+                result = project_monitor_read(storage, grants, call["parameters"]["path"])
+        else:
+            result = project_monitor_read(storage, context.read_grants, call["parameters"]["path"])
     except (InvalidTopologyFilter, InvalidBoardFilter, ValueError):
         return JSONResponse({"error": "invalid_read_filter"}, status_code=400)
     audit_log.record(
@@ -171,7 +181,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             **(
                 {
                     "holder_grants": {
-                        "schema": "secs.holder-grant.v1",
+                        "schema": enrollment.holder_grants.grant_schema,
                         "service": enrollment.holder_grants.service,
                         "endpoint": BASE + "/grants",
                     }

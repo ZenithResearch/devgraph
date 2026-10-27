@@ -66,6 +66,7 @@ def create_app():
     if config.schema_ not in (
         "devgraph.signed-read-runtime.v8",
         "devgraph.signed-read-runtime.v9",
+        "devgraph.signed-read-runtime.v11",
     ):
         raise ValueError("LAN access requires explicit runtime v8")
     origin = lan_origin(os.environ["DEVGRAPH_LAN_ORIGIN"])

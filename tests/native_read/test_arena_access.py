@@ -135,7 +135,10 @@ def test_credential_permission_operations_are_not_borrowed_from_constraints():
 
 
 @pytest.mark.parametrize("reusable", [False, True])
-def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeypatch, reusable):
+@pytest.mark.parametrize("owner_all,future", [(False, False), (True, False), (True, True)])
+def test_real_secs_arena_enrollment_read_replay_and_revocation(
+    tmp_path, monkeypatch, reusable, owner_all, future
+):
     import hashlib
     from types import SimpleNamespace
 
@@ -185,6 +188,34 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
             )
         )
     ]
+    if owner_all:
+        from devgraph.auth.arena_access import OwnerArenaAccessDraft, OwnerArenaMemberPolicy
+
+        raw["schema"] = "devgraph.access-draft.v7"
+        raw["read_grants"] = [dict(scope="devgraph.arena.read", all_arenas=True)]
+        root = OwnerArenaAccessDraft.model_validate(raw)
+        registry = [
+            OwnerArenaMemberPolicy.model_validate(
+                dict(
+                    schema="devgraph.member-access-policy.v6",
+                    revision=1,
+                    ceiling=root,
+                    assignments=[assignment],
+                )
+            )
+        ]
+    if future:
+        from devgraph.auth.arena_access import CollectionArenaAccessDraft
+
+        raw_assignment = json.loads(canonical_json(assignment))
+        raw_assignment.update(
+            schema="devgraph.access-draft.v8",
+            read_grants=[dict(scope="devgraph.arena.read", all_arenas=True)],
+        )
+        assignment = CollectionArenaAccessDraft.model_validate(raw_assignment)
+        raw_registry = json.loads(canonical_json(registry[0]))
+        raw_registry["assignments"] = [json.loads(canonical_json(assignment))]
+        registry[0] = type(registry[0]).model_validate(raw_registry)
     policy = compile_arena_read(root)
     configured = old.authority.policy()
     old.authority.policy_file.write_text(
@@ -253,7 +284,9 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
     challenge = http.post(
         base + "/challenges", json=dict(subject_public_key=public, installation_id="a" * 32)
     ).json()
-    assert challenge["details"]["schema"] == "devgraph.native-read-scope.v5"
+    assert challenge["details"]["schema"] == (
+        "devgraph.native-read-scope.v6" if future else "devgraph.native-read-scope.v5"
+    )
     if reusable:
         from tests.native_read.test_holder_grants import credential_request
 
@@ -263,7 +296,12 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
         )
         assert issued_root.status_code == 200, issued_root.text
         credential = credential_request(owner, issued_root.json()["grant"])["credential"]
-        assert credential["claims"]["permissions"][0]["constraints"]["arena_ids"] == ["arena-one"]
+        if future:
+            assert credential["claims"]["permissions"][0]["constraints"]["all_arenas"] is True
+        else:
+            assert credential["claims"]["permissions"][0]["constraints"]["arena_ids"] == [
+                "arena-one"
+            ]
         assert credential["grant"]["claims"]["onward_delegation"] is False
     else:
         result = http.post(
@@ -271,7 +309,9 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
             json=dict(challenge=challenge, proof=membership, signature=sign(owner, challenge)),
         )
         assert result.status_code == 200, result.text
-        assert result.json()["schema"] == "devgraph.native-read-result.v5"
+        assert result.json()["schema"] == (
+            "devgraph.native-read-result.v6" if future else "devgraph.native-read-result.v5"
+        )
         credential = result.json()["credential"]
         assert credential["claims"]["expires_at"] - credential["claims"]["issued_at"] == 900
     counter = 0
@@ -304,7 +344,24 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
 
     response, body = read("/arenas")
     assert response.status_code == 200, response.text
-    assert [a["id"] for a in response.json()["items"]] == ["arena-one"]
+    assert [a["id"] for a in response.json()["items"]] == (
+        ["arena-one", "private-arena"] if future else ["arena-one"]
+    )
+    if future:
+        # Keep exactly the issued root and derived credential; creation changes
+        # neither assignment, current revision nor signed permission bytes.
+        retained = canonical_json(credential)
+        add_arena(ArenaMutations(storage), "created-after-issuance")
+        assert [a["id"] for a in read("/arenas")[0].json()["items"]] == [
+            "arena-one",
+            "created-after-issuance",
+            "private-arena",
+        ]
+        assert (
+            read("/arenas/created-after-issuance", operation="devgraph.arena.get")[0].status_code
+            == 200
+        )
+        assert canonical_json(credential) == retained
     assert http.post(base + "/requests", json=body).status_code == 401
     assert (
         read(
@@ -314,11 +371,13 @@ def test_real_secs_arena_enrollment_read_replay_and_revocation(tmp_path, monkeyp
         )[0].status_code
         == 200
     )
-    assert read("/arenas/private-arena", operation="devgraph.arena.get")[0].status_code == 404
+    assert read("/arenas/private-arena", operation="devgraph.arena.get")[0].status_code == (
+        200 if future else 404
+    )
     assert read("/todos/v2", operation="devgraph.work.list")[0].status_code == 401
     assert read("/arenas/arena-one/members", operation="devgraph.arena.get")[0].status_code == 403
-    registry[0] = ArenaMemberPolicy.model_validate(
-        dict(schema="devgraph.member-access-policy.v5", revision=2, ceiling=root, assignments=[])
+    registry[0] = type(registry[0]).model_validate(
+        dict(schema=registry[0].schema_, revision=2, ceiling=root, assignments=[])
     )
     assert read("/arenas")[0].status_code == 401
 
@@ -466,7 +525,8 @@ def test_scoped_topology_carries_only_explicit_arena_records_and_real_edges():
         assert "CONTAINS_WORK" not in json.dumps(old)
 
 
-def test_narrowed_arena_get_cannot_list_or_disclose_topology_metadata():
+@pytest.mark.parametrize("dynamic", [False, True])
+def test_narrowed_arena_get_cannot_list_or_disclose_topology_metadata(dynamic):
     from tests.model.test_arena_runtime import add_arena
 
     from devgraph.arenas import ArenaMutations
@@ -484,7 +544,11 @@ def test_narrowed_arena_get_cannot_list_or_disclose_topology_metadata():
             dict(
                 operation="devgraph.arena.get",
                 resource=RESOURCE,
-                constraints=dict(scope="devgraph.arena.read", arena_ids=["arena-one"]),
+                constraints=(
+                    dict(scope="devgraph.arena.read", all_arenas=True)
+                    if dynamic
+                    else dict(scope="devgraph.arena.read", arena_ids=["arena-one"])
+                ),
             )
         ]
     )

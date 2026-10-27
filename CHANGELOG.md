@@ -15,7 +15,13 @@
 
 ### Added
 
+- Authenticated native-session source reads, lifecycle observations and exact Work-inspection witnesses — surface real sessions in Pulse while preserving read-only authority and unresolved provenance.
 - General source-owned session references, witnessed delegation/fork links and opt-in Codex/Claude metadata capture — connect direct and delegated conversations to explicit Work without confusing process handles, model providers or importing authority; preserve legacy Hermes records and leave installed authority unchanged.
+- Opt-in scoped holder v2 readers and issuance, current-state selector intersections and fenced read capture — preserve existing v1 grants while keeping exact identities separate from hierarchy placement.
+- Shared paired pre/post effect checks on the existing signed Work/Arena path — prevent combining independent grants into a cross-hierarchy mutation and roll back denied postconditions.
+
+
+- Add explicit current-and-future Arena collection coverage to ordinary member grants — allow later-created Arena records without widening fixed-ID assignments, Work permissions or delegation.
 
 - Add an owner-bound HTTPS Wallet member endpoint with a separate request inbox,
   exact receiver policies and opt-in dedicated loopback TLS termination. Preserve

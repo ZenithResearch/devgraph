@@ -144,8 +144,29 @@ def run():
     request = json.loads(raw, object_pairs_hook=_unique)
     selected(configuration, request)
     # This factory composes the canonical handler/storage but opens no listener.
+    from devgraph.ops.owner_arena_upgrade import recover_local, recovery_inspection
     from devgraph.signed_read_runtime import create_app, owner_operator_policy
 
+    recovered = (
+        recovery_inspection(configuration)
+        if request["operation"] == "inspect"
+        else recover_local(configuration, request)
+    )
+    if recovered is not None:
+        result = dict(
+            schema="secs.local-admin-response.v1",
+            request_id=request["request_id"],
+            resource_id=request["resource_id"],
+            instance_id=request["instance_id"],
+            receiver=request["receiver"],
+            status=200,
+            body=recovered,
+        )
+        encoded = canonical_json(result)
+        if len(encoded) > RESPONSE_MAXIMUM:
+            raise ValueError("result too large")
+        sys.stdout.buffer.write(encoded + b"\n")
+        return
     app = create_app()
     try:
         canonical = getattr(app.state, "canonical_service_app", None)
@@ -191,7 +212,29 @@ def run():
                     operation
                 ]
                 body = body["request"]
-            status, value = dispatch(target.state.access_operator, operation, body)
+            from devgraph.ops.owner_arena_upgrade import OwnerArenaOperator, OwnerArenaUpgrade
+
+            runtime = ReadRuntimeConfiguration.model_validate(
+                private_json(Path(configuration["runtime"]))
+            )
+            upgrade = OwnerArenaUpgrade(
+                runtime_file=(
+                    runtime.holder_grant_provider_runtime_file or Path(configuration["runtime"])
+                )
+                if target is canonical
+                else Path(configuration["runtime"]),
+                data_root=configuration["data_root"],
+                storage=target.state.service_storage,
+            )
+            from devgraph.ops.owner_arena_commands import OwnerArenaCommands
+            from devgraph.ops.retained_audit import RetainedAuditLog
+
+            commands = OwnerArenaCommands(
+                upgrade, RetainedAuditLog(Path(configuration["data_root"]))
+            )
+            status, value = dispatch(
+                OwnerArenaOperator(target.state.access_operator, upgrade, commands), operation, body
+            )
     finally:
         app.state.service_storage.close()
         canonical = getattr(app.state, "canonical_service_app", None)

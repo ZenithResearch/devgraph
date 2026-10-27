@@ -794,22 +794,29 @@ class Neo4jGraphStorage:
         self,
         arena_ids: tuple[str, ...],
         *,
+        all_resources: bool = False,
         after_id: str | None = None,
         limit: int = 50,
     ) -> list[NodeRecord]:
         validate_page_limit(limit)
-        if not arena_ids or len(set(arena_ids)) != len(arena_ids):
+        if (
+            type(all_resources) is not bool
+            or (all_resources and arena_ids)
+            or (not all_resources and not arena_ids)
+            or len(set(arena_ids)) != len(arena_ids)
+        ):
             raise ValueError("invalid delegated Arena selectors")
         for arena_id in arena_ids:
             validate_work_object_id(arena_id)
         if after_id is not None:
             validate_work_object_id(after_id)
         rows = self._run_graph(
-            "MATCH (n:Arena) WHERE n.id IN $arena_ids AND n.archived = false "
+            "MATCH (n:Arena) WHERE ($all_resources OR n.id IN $arena_ids) AND n.archived = false "
             "AND ($after_id IS NULL OR n.id > $after_id) "
             "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
             "properties(n) AS properties ORDER BY n.id LIMIT $limit",
             arena_ids=list(arena_ids),
+            all_resources=all_resources,
             after_id=after_id,
             limit=limit,
         )

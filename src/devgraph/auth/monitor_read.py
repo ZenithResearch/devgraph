@@ -337,15 +337,25 @@ def _project_monitor_read(storage, grants, target):
                     identifier
                     for grant in arena_grants
                     if "list" in getattr(grant, "operations", ("list", "get"))
-                    for identifier in grant.arena_ids
+                    for identifier in getattr(grant, "arena_ids", ())
                 }
             )
         )
-        if arena_ids:
+        dynamic_arenas = any(
+            getattr(g, "all_arenas", False) is True
+            and "list" in getattr(g, "operations", ("list", "get"))
+            for g in arena_grants
+        )
+        if arena_ids or dynamic_arenas:
             after = None
             arena_nodes = []
             while True:
-                page = storage.delegated_arena_page(arena_ids, after_id=after, limit=100)
+                page = storage.delegated_arena_page(
+                    () if dynamic_arenas else arena_ids,
+                    all_resources=dynamic_arenas,
+                    after_id=after,
+                    limit=100,
+                )
                 arena_nodes.extend(page)
                 if len(page) < 100:
                     break

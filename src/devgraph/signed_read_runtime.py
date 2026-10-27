@@ -63,10 +63,15 @@ class ReadRuntimeConfiguration(BaseModel):
         "devgraph.signed-read-runtime.v10",
         "devgraph.signed-read-runtime.v11",
     ] = Field(alias="schema")
+    owner_arena_upgrade_file: Path | None = None
+    owner_arena_administration: bool = Field(default=False, strict=True)
     canonical_access_points: bool = False
     holder_grant_binary: Path | None = None
     holder_grant_binary_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     canonical_service_id: str | None = Field(default=None, min_length=1, max_length=256)
+    holder_grant_schema: Literal["secs.holder-grant.v1", "secs.holder-grant.v2"] = (
+        "secs.holder-grant.v1"
+    )
     holder_grant_provider_runtime_file: Path | None = None
     owner_parent_runtime_file: Path | None = None
     owner_endpoint_profile_file: Path | None = None
@@ -91,6 +96,13 @@ class ReadRuntimeConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def paths(self):
+        if self.owner_arena_upgrade_file is not None and (
+            self.schema_ != "devgraph.signed-read-runtime.v11"
+            or self.owner_bootstrap_database_file is None
+        ):
+            raise ValueError("Arena endorsement requires a registered owner runtime v11")
+        if self.owner_arena_administration and self.owner_arena_upgrade_file is None:
+            raise ValueError("all-Arena role requires owner endorsement")
         holder = (
             self.holder_grant_binary,
             self.holder_grant_binary_sha256,
@@ -270,6 +282,12 @@ def owner_operator_policy(config: ReadRuntimeConfiguration, *, data_root):
         grant_id=digest,
         public_key=review["owner_public_key"],
     )
+    endorsed = config.owner_arena_upgrade_file is not None
+    if endorsed:
+        from devgraph.auth.owner_arena_policy import verify_endorsement
+
+        endorsement = private_json(config.owner_arena_upgrade_file, maximum_bytes=262144)
+        verify_endorsement(endorsement, review=review, actual_policy=raw)
     if (
         data_root is None
         or Path(review["graph_data_root"]) != Path(data_root)
@@ -278,8 +296,11 @@ def owner_operator_policy(config: ReadRuntimeConfiguration, *, data_root):
         or raw.get("operator_public_keys") != [review["owner_public_key"]]
         or raw.get("ceiling", {}).get("receiver") != review["connection"]["receiver"]
         or raw.get("ceiling", {}).get("issuer") != review["connection"]["issuer"]
-        or hashlib.sha256(canonical_json(raw)).hexdigest()
-        != review["staged"]["authority/operators.json"]
+        or (
+            not endorsed
+            and hashlib.sha256(canonical_json(raw)).hexdigest()
+            != review["staged"]["authority/operators.json"]
+        )
     ):
         raise ValueError("registered owner policy changed")
     return raw
@@ -373,6 +394,16 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
             from devgraph.auth.arena_access import ArenaEnrollmentPolicy, ArenaMemberPolicy
 
             PathEnrollmentPolicy, PathMemberPolicy = ArenaEnrollmentPolicy, ArenaMemberPolicy
+            if config.owner_arena_administration:
+                from devgraph.auth.arena_access import (
+                    OwnerArenaEnrollmentPolicy,
+                    OwnerArenaMemberPolicy,
+                )
+
+                PathEnrollmentPolicy, PathMemberPolicy = (
+                    OwnerArenaEnrollmentPolicy,
+                    OwnerArenaMemberPolicy,
+                )
         policy_type = PathEnrollmentPolicy
         extra["members"] = lambda: PathMemberPolicy.model_validate(
             private_json(config.member_policy_file)
@@ -425,6 +456,10 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
                     ArenaOperatorPolicy,
                     ArenaAccessRequestInbox,
                 )
+                if config.owner_arena_administration:
+                    from devgraph.auth.arena_access import OwnerArenaOperatorPolicy
+
+                    CatalogOperatorPolicy = OwnerArenaOperatorPolicy
             inbox_type = PathAccessRequestInbox
             # Bind the selected decoder now: provisioning imports below also
             # use CatalogOperatorPolicy and must not reset a v8 inbox to v3.
@@ -536,6 +571,14 @@ def load_enrollment(config: ReadRuntimeConfiguration, *, data_root=None) -> Sign
                 from devgraph.auth.arena_activation import ArenaGrantProvisioning
 
                 provisioning_type, operator_type = ArenaGrantProvisioning, ArenaOperatorPolicy
+                if config.owner_arena_administration:
+                    from devgraph.auth.arena_access import OwnerArenaOperatorPolicy
+                    from devgraph.auth.arena_activation import OwnerArenaGrantProvisioning
+
+                    provisioning_type, operator_type = (
+                        OwnerArenaGrantProvisioning,
+                        OwnerArenaOperatorPolicy,
+                    )
             provisioning = provisioning_type(
                 **owner_admission,
                 inbox=inbox,
@@ -632,6 +675,7 @@ def create_app(*, config_path=None, canonical_routes=True):
             binary=config.holder_grant_binary,
             binary_sha256=config.holder_grant_binary_sha256,
             service=config.canonical_service_id,
+            grant_schema=config.holder_grant_schema,
         )
     # Same storage implementation/configuration as the production composition
     # root; no database migrations or direct ad-hoc queries are performed here.
@@ -720,6 +764,10 @@ def create_app(*, config_path=None, canonical_routes=True):
             from devgraph.auth.arena_activation import ArenaAccessOperator
 
             CatalogOperatorPolicy, PathAccessOperator = ArenaOperatorPolicy, ArenaAccessOperator
+            if config.owner_arena_administration:
+                from devgraph.auth.arena_access import OwnerArenaOperatorPolicy
+
+                CatalogOperatorPolicy = OwnerArenaOperatorPolicy
         inbox.storage = storage
         operator = PathAccessOperator(
             inbox=inbox,
@@ -772,6 +820,9 @@ def create_app(*, config_path=None, canonical_routes=True):
                 data_root=Path(data_root), storage=storage, audit_log=audit
             ),
             provisioning=enrollment.provisioning,
+            compound_host=getattr(enrollment, "holder_grants", None)
+            if config.holder_grant_schema.endswith(".v2")
+            else None,
         )
         services = SimpleNamespace(
             named_work=None,

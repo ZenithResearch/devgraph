@@ -379,3 +379,21 @@ def test_path_constraints_are_preserved_by_real_secs_signature(tmp_path):
         service.authority.invoke_under_policy(
             policy, "verify", **request(owner, altered), active=True, now=current
         )
+
+
+def test_read_arena_a_and_write_project_b_are_independent_receiver_rules():
+    adapter, storage, audit, state = fixture([grant()])
+    hierarchy(storage)
+    create(storage, "Task", "writable")
+    storage.create_edge("Project", "project-b", "HAS_CHILD", "Task", "writable")
+    selected_read = read("Arena/a")
+    state[0] = path_policy([write("Arena/b", "Project/project-b")])
+    visible, _ = ids(storage, selected_read)
+    assert "Task/child" in visible
+    assert "Task/writable" not in visible
+    execute(adapter, command(identifier="writable"))
+    with pytest.raises(SecSWorkDenied, match="write_resource_not_granted"):
+        execute(adapter, command(identifier="child"), "denied-read-only")
+    assert storage.get_node("Task", "child").properties["version"] == 1
+    assert storage.get_node("Task", "writable").properties["version"] == 2
+    assert len(audit.records) == 1

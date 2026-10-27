@@ -11,7 +11,7 @@ import json
 import os
 import subprocess
 import tempfile
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,9 +67,11 @@ def constraint(value):
             if not roots or any(len(root) != 1 or root[0]["kind"] != "Arena" for root in roots):
                 raise UnauthenticatedError("unsupported_holder_scope")
             selected = {root[0]["id"] for root in roots}
-            ids = v["constraints"]["arena_ids"]
-            if not selected.issubset(ids):
+            dynamic = v["constraints"].get("all_arenas") is True
+            ids = v["constraints"].get("arena_ids", ())
+            if not dynamic and not selected.issubset(ids):
                 raise UnauthenticatedError("unsupported_holder_scope")
+            v["constraints"].pop("all_arenas", None)
             v["constraints"]["arena_ids"] = sorted(selected)
         else:
             v["constraints"]["resource_paths"] = [
@@ -84,6 +86,48 @@ def constraint(value):
     return v
 
 
+def invoke_native(binary, binary_sha256, pin_value, operation, *, issuer_key_file=None, **fields):
+    """Exact native crypto boundary, also usable for route-only recovery.
+
+    The caller supplies its independently validated pin. This never constructs
+    a grant/assignment or substitutes Python signature verification.
+    """
+    if checksum_bytes(binary) != binary_sha256:
+        raise UnauthenticatedError("holder_authority_changed")
+    with tempfile.TemporaryDirectory(prefix="devgraph-holder-authority-") as d:
+        pin = Path(d).resolve() / "pin.json"
+        fd = os.open(pin, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(canonical_json(pin_value))
+        args = [str(binary), "--issuer-pin-file", str(pin)]
+        if operation in ("issue", "issue_v2", "issue_access_point"):
+            args += ["--issuer-key-file", str(issuer_key_file)]
+        elif operation not in (
+            "verify",
+            "verify_v2",
+            "verify_access_point",
+            "check_selector",
+            "check_effect",
+        ):
+            raise UnauthenticatedError("unsupported_operation")
+        try:
+            result = subprocess.run(
+                args,
+                input=canonical_json(dict(operation=operation, **fields)),
+                capture_output=True,
+                timeout=5,
+                check=True,
+            )
+            if len(result.stdout) > 131072:
+                raise ValueError()
+            value = json.loads(result.stdout)
+            if value.get("ok") is not True or not isinstance(value.get("value"), dict):
+                raise ValueError()
+            return value["value"]
+        except (OSError, ValueError, subprocess.SubprocessError):
+            raise UnauthenticatedError("holder_authority_denied") from None
+
+
 class HolderGrantHost:
     def __init__(
         self,
@@ -93,11 +137,15 @@ class HolderGrantHost:
         binary_sha256: str,
         service: str,
         provider_enrollment=None,
+        grant_schema="secs.holder-grant.v1",
     ):
         if not binary.is_absolute() or not binary.is_file() or not service or len(service) > 256:
             raise ValueError("explicit native grant authority and canonical service required")
         if not hasattr(enrollment, "_using_registry"):
             raise ValueError("holder grants require a durable member assignment registry")
+        if grant_schema not in ("secs.holder-grant.v1", "secs.holder-grant.v2"):
+            raise ValueError("unsupported grant version")
+        self.grant_schema = grant_schema
         self.enrollment, self.binary, self.service = enrollment, binary, service
         self.provider = provider_enrollment or enrollment
         self.binary_sha256 = binary_sha256
@@ -134,34 +182,14 @@ class HolderGrantHost:
 
     def invoke(self, operation, **fields):
         self._pin_current()
-        if checksum_bytes(self.binary) != self.binary_sha256:
-            raise UnauthenticatedError("holder_authority_changed")
-        with tempfile.TemporaryDirectory(prefix="devgraph-holder-authority-") as d:
-            pin = Path(d).resolve() / "pin.json"
-            fd = os.open(pin, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, "wb") as f:
-                f.write(canonical_json(self.pin))
-            args = [str(self.binary), "--issuer-pin-file", str(pin)]
-            if operation in ("issue", "issue_access_point"):
-                args += ["--issuer-key-file", str(self.enrollment.authority.issuer_key_file)]
-            elif operation not in ("verify", "verify_access_point"):
-                raise UnauthenticatedError("unsupported_operation")
-            try:
-                result = subprocess.run(
-                    args,
-                    input=canonical_json(dict(operation=operation, **fields)),
-                    capture_output=True,
-                    timeout=5,
-                    check=True,
-                )
-                if len(result.stdout) > 131072:
-                    raise ValueError()
-                value = json.loads(result.stdout)
-                if value.get("ok") is not True or not isinstance(value.get("value"), dict):
-                    raise ValueError()
-                return value["value"]
-            except (OSError, ValueError, subprocess.SubprocessError):
-                raise UnauthenticatedError("holder_authority_denied") from None
+        return invoke_native(
+            self.binary,
+            self.binary_sha256,
+            self.pin,
+            operation,
+            issuer_key_file=self.enrollment.authority.issuer_key_file,
+            **fields,
+        )
 
     def revision(self, owner, device, current):
         e = self.provider
@@ -208,7 +236,7 @@ class HolderGrantHost:
         if original_assignment != canonical_assignment:
             raise UnauthenticatedError("canonical_assignment_required")
         claims = dict(
-            schema="secs.holder-grant.v1",
+            schema=self.grant_schema,
             grant_id=original["id"],
             revision=self.revision(owner, device, current),
             issuer=self.pin["issuer"],
@@ -221,7 +249,15 @@ class HolderGrantHost:
             onward_delegation=False,
             permissions=[permission(p) for p in authority["permissions"]],
         )
-        grant = self.invoke("issue", claims=claims, now=current)
+        if self.grant_schema == "secs.holder-grant.v2":
+            from devgraph.auth.selector_grants import permission_v2
+
+            claims["permissions"] = [
+                permission_v2(p, self.service) for p in authority["permissions"]
+            ]
+        grant = self.invoke(
+            "issue_v2" if self.grant_schema.endswith(".v2") else "issue", claims=claims, now=current
+        )
         manifest.update(
             credential_id="dgrg_" + original["id"],
             holder_request_digest=original["digest"],
@@ -348,9 +384,64 @@ class HolderGrantHost:
         if not self.provider.membership_check(json.loads(row[7]), row[1]):
             raise UnauthenticatedError("membership_required")
 
+    @contextmanager
+    def current_read(self, credential, proof, *, now=None):
+        """Fence policy/revocation until the already-verified result is captured.
+
+        Proof consumption happens first. This second check holds a shared
+        DELETE-journal lock so revocation cannot commit during disclosure.
+        """
+        current = _seconds(now)
+        with self._provider_context(), self.provider._database() as db:
+            db.execute("BEGIN")
+            self.provider._check_policy_snapshot(db)
+            provisioning = getattr(self.provider, "provisioning", None)
+            if provisioning is not None:
+                db.execute(
+                    "ATTACH DATABASE ? AS holder_read_policy", (str(provisioning.inbox.path),)
+                )
+                if db.execute("PRAGMA holder_read_policy.journal_mode").fetchone() != ("delete",):
+                    raise UnauthenticatedError("canonical_durability_required")
+                head = db.execute(
+                    "SELECT revision FROM holder_read_policy.access_provisioning_head WHERE id=1"
+                ).fetchone()
+                if head != (self.provider._registry().revision,):
+                    raise UnauthenticatedError("canonical_policy_changed")
+
+            def check_clock():
+                selected = _seconds(now)
+                claims = credential["claims"]
+                if not (
+                    claims["issued_at"] <= selected < claims["expires_at"]
+                    and proof["issued_at"] <= selected < proof["expires_at"]
+                ):
+                    raise UnauthenticatedError("holder_credential_expired")
+
+            check_clock()
+            grant = credential["grant"]
+            row = db.execute(
+                "SELECT service,owner,device,revision,digest,request_digest,"
+                "grant,membership,status "
+                "FROM holder_roots WHERE id=?",
+                (grant["claims"]["grant_id"],),
+            ).fetchone()
+            if row is None or row[4] != checksum(grant):
+                raise UnauthenticatedError("unknown_holder_grant")
+            self._current(row, current)
+            yield
+            check_clock()
+            self._current(row, _seconds(now))
+
     def verify_request(self, *, credential, call, proof, now=None):
         current, e = _seconds(now), self.provider
-        verified = self.invoke("verify", credential=credential, call=call, proof=proof, now=current)
+        v2 = credential.get("claims", {}).get("schema") == "secs.holder-credential.v2"
+        verified = self.invoke(
+            "verify_v2" if v2 else "verify",
+            credential=credential,
+            call=call,
+            proof=proof,
+            now=current,
+        )
         owner, device = verified["holder_public_key"], verified["installation_id"]
         with self._provider_context(), e._database() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -367,10 +458,19 @@ class HolderGrantHost:
                 if row[1:3] != (owner, device):
                     raise UnauthenticatedError("holder_binding_changed")
                 self._current(row, current)
-                permissions = [constraint(p) for p in credential["claims"]["permissions"]]
+                permissions = (
+                    verified["permissions"]
+                    if v2
+                    else [constraint(p) for p in credential["claims"]["permissions"]]
+                )
                 narrowed = []
                 for permission_record in permissions:
-                    for typed in e._decode_grants([permission_record]):
+                    decoder_record = (
+                        {k: v for k, v in permission_record.items() if k != "roles"}
+                        if v2
+                        else permission_record
+                    )
+                    for typed in e._decode_grants([decoder_record]):
                         if typed.scope == "devgraph.work.read":
                             typed = typed.model_copy(
                                 update={
@@ -381,8 +481,17 @@ class HolderGrantHost:
                                     )
                                 }
                             )
-                        narrowed.append(typed)
-                grants = tuple({canonical_json(g): g for g in narrowed}.values())
+                        if v2:
+                            from devgraph.auth.selector_grants import wrap_permission
+
+                            narrowed.extend(wrap_permission(self, permission_record, [typed]))
+                        else:
+                            narrowed.append(typed)
+                grants = (
+                    tuple(narrowed)
+                    if v2
+                    else tuple({canonical_json(g): g for g in narrowed}.values())
+                )
                 db.execute("DELETE FROM holder_replay WHERE expires<=?", (current,))
                 if db.execute("SELECT COUNT(*) FROM holder_replay").fetchone()[0] >= 10000:
                     raise UnauthenticatedError("try_later")
