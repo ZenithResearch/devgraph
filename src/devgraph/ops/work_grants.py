@@ -83,6 +83,10 @@ ARENA_SCOPES = {
     "member.set": ("Arena", "Initiative", "Task"),
 }
 MAX_BYTES = 65536
+# A native status descriptor includes the complete shared policy plus its
+# registry and binding metadata. Keep its bound separate from private plans and
+# receiver files; a valid composed policy alone may exceed 64 KiB.
+ADMIN_DESCRIPTOR_MAX_BYTES = 524288
 
 
 class WorkGrantError(RuntimeError):
@@ -147,7 +151,7 @@ def _native(*arguments):
             timeout=60,
             check=False,
         )
-        if result.returncode != 0 or len(result.stdout) > MAX_BYTES:
+        if result.returncode != 0 or len(result.stdout) > ADMIN_DESCRIPTOR_MAX_BYTES:
             raise WorkGrantError(
                 "secS administration failed; authority may be busy, unsafe, or stale"
             )
@@ -538,7 +542,15 @@ def grant_status():
             return {"ready": False, "state": "missing", "operations_authorized": 0}
         matches = _receiver_matches(producer)
         public = signer_profile.signer_status(check=False).get("public_key")
-        managed = _managed_policy(producer["policy"], public) if public else None
+        try:
+            managed = _managed_policy(producer["policy"], public) if public else None
+        except WorkGrantError:
+            # Producer validation above already checked every standing rule and
+            # its native digest/key bindings. A valid custom policy is not a
+            # managed profile and must never be renewed or flattened as one.
+            if producer["policy"].get("schema") != "secs-devgraph-work-policy.v2":
+                raise
+            return _custom_policy_status(producer, public, matches)
         actor_matches = managed is not None
         now = int(time.time())
         agent_current = (
@@ -566,6 +578,39 @@ def grant_status():
         }
     except _STATUS_ERRORS:
         return {"ready": False, "state": "unavailable_or_unsafe", "operations_authorized": 0}
+
+
+def _custom_policy_status(producer, public, matches):
+    """Describe valid custom admission without claiming request authorization."""
+    policy = _standing_policy(producer["policy"])
+    actor = _actor(public) if public else None
+    selected = [rule for rule in policy.rules if rule.actor_id == actor]
+    now = int(time.time())
+    active_allow = any(
+        rule.effect == "allow" and rule.status == "active" and rule.validity.contains(now)
+        for rule in selected
+    )
+    evaluate = bool(matches and producer["key_current"] and active_allow)
+    return {
+        "ready": False,
+        "state": "request_evaluation_required" if evaluate else "inactive_or_mismatched",
+        # Allow/deny, exact/prefix resources and independent validity intervals
+        # require an actual request. Counting operations would imply more access
+        # than has been verified, especially for paired effects or deny rules.
+        "operations_authorized": 0,
+        "arena_operations_authorized": 0,
+        "managed_profile": False,
+        "request_evaluation_required": True,
+        "receiver_matches": matches,
+        "signer_matches": bool(selected),
+        "key_current": producer["key_current"],
+        "policy_id": producer["policy_id"],
+        "policy_version": producer["policy_version"],
+        "policy_digest_sha256": producer["policy_digest_sha256"],
+        "secs_verifier_key_id": producer["secs_verifier_key_id"],
+        "actor_id": actor,
+        "expires_at": None,
+    }
 
 
 def _plan(

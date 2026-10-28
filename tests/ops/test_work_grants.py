@@ -13,6 +13,7 @@ from devgraph.ops import signer_profile
 from devgraph.ops import work_grants as grants
 
 PUBLIC = "11" * 32
+REAL_NATIVE = grants._native
 
 
 def descriptor(policy, now, key_id="test-secs-1"):
@@ -448,6 +449,100 @@ def test_shared_status_tracks_saved_agent_instead_of_first_holder(shared_install
         result["expires_at"]
         == grants._managed_policy(i.state["current"]["policy"], PUBLIC)["rules"][0]["not_after"]
     )
+
+
+def custom_agent_policy(i):
+    """A valid scoped session addition is not the legacy managed profile."""
+    policy = i.state["current"]["policy"]
+    rule = copy.deepcopy(policy["rules"][-1])
+    rule.update(operation="devgraph.work.session.state.v2", resource="SessionRef/example")
+    rule["resource_match"] = "exact"
+    policy["rules"].append(rule)
+    current = i.native("status")
+    for version in (1, 2):
+        path = i.data / f"secrets/secs-magik/devgraph.work.v{version}/receiver.json"
+        path.write_bytes(grants._json(grants._receiver_manifest(current, version)))
+    return current
+
+
+def test_custom_agent_status_is_diagnostic_not_an_authorization_claim(shared_installation):
+    i = shared_installation
+    custom_agent_policy(i)
+    before = len(i.state["calls"])
+    result = grants.grant_status()
+    assert result["state"] == "request_evaluation_required"
+    assert result["ready"] is False
+    assert result["operations_authorized"] == 0
+    assert result["signer_matches"] is True
+    assert result["receiver_matches"] is True
+    assert result["managed_profile"] is False
+    assert result["request_evaluation_required"] is True
+    assert result["expires_at"] is None  # Custom rule validity must not be flattened.
+    assert all(call[0] == "status" for call in i.state["calls"][before:])
+
+
+@pytest.mark.parametrize("change", ["receiver", "expired", "no_actor", "invalid"])
+def test_custom_agent_status_does_not_mask_bad_bindings(shared_installation, monkeypatch, change):
+    i = shared_installation
+    custom_agent_policy(i)
+    if change == "receiver":
+        (i.receiver / "receiver.json").write_text("{}")
+    elif change == "expired":
+        i.now[0] += 720 * 3600
+    elif change == "no_actor":
+        monkeypatch.setattr(signer_profile, "signer_status", lambda **_: {"public_key": "44" * 32})
+    else:
+        original = i.native
+
+        def invalid(*args):
+            value = original(*args)
+            value["policy_digest_sha256"] = "0" * 64
+            return value
+
+        monkeypatch.setattr(grants, "_native", invalid)
+    result = grants.grant_status()
+    assert result["ready"] is False
+    assert result["operations_authorized"] == 0
+    assert result["state"] != "request_evaluation_required"
+
+
+def test_custom_agent_profile_cannot_be_renewed_as_a_managed_grant(shared_installation):
+    i = shared_installation
+    custom_agent_policy(i)
+    before = len(i.state["calls"])
+    with pytest.raises(grants.WorkGrantError, match="outside the managed scope"):
+        grants.plan_grant(renew=True)
+    assert all(call[0] == "status" for call in i.state["calls"][before:])
+
+
+def test_native_status_accepts_a_large_valid_descriptor_with_a_separate_limit(
+    shared_installation, monkeypatch
+):
+    i = shared_installation
+    custom_agent_policy(i)
+    policy = i.state["current"]["policy"]
+    for index in range(230):
+        rule = copy.deepcopy(policy["rules"][-1])
+        rule["resource"] = f"SessionRef/session-{index}"
+        policy["rules"].append(rule)
+    value = i.native("status")
+    raw = grants._json(value)
+    assert len(raw) > 65536
+    monkeypatch.setattr(grants, "_require_fixed_executable", lambda *a, **k: ([], None))
+    monkeypatch.setattr(grants, "_close_wallet_binary_descriptors", lambda *a: None)
+    monkeypatch.setattr(
+        grants.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout=raw)
+    )
+    assert grants._validate_producer(REAL_NATIVE("status")) == value
+    # Do not widen the independent plan and receiver-file limits.
+    assert grants.MAX_BYTES == 65536
+    monkeypatch.setattr(
+        grants.subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout=b" " * 524289),
+    )
+    with pytest.raises(grants.WorkGrantError):
+        REAL_NATIVE("status")
 
 
 def test_shared_agent_expiry_is_not_masked_by_standing_holder(shared_installation):

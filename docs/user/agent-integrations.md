@@ -102,6 +102,22 @@ adapter uses the existing Devgraph CLI; it does not query Neo4j directly.
 
 ## Verify access in stages
 
+`auth work status` reports the historical managed agent profile separately from
+custom standing policies. A validated custom policy returns
+`state: request_evaluation_required`, `ready: false`, and
+`operations_authorized: 0` when the selected identity, receiver pins and service
+key match and an allow rule is current. This means an exact request still needs
+native secS evaluation; it does not mean the signer has no grant or that a request
+is authorized. Deny rules, related resources and independent rule validity must
+be evaluated together for each operation. Expired/missing admission or mismatched
+pins remain inactive; malformed descriptors remain unavailable/unsafe.
+
+Status inspection never converts a custom policy into a managed profile.
+Managed renewal and provisioning continue to reject nonmatching profiles rather
+than replacing scoped session rules. The native administration descriptor has a
+separate 512 KiB bound because it contains the whole shared policy; private plan
+and receiver-file limits remain 64 KiB.
+
 ### Generic Wallet candidate and agent approval
 
 The supported replacement uses generic Wallet credentials. See
