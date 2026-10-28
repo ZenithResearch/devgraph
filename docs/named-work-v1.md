@@ -185,6 +185,17 @@ validation budget. This is an explicit current capacity limit. The private
 mutex is excluded from the public ontology constraint mirror; published
 ontology release bytes remain immutable.
 
+Nested Work scopes reuse the guard already acquired by their exact active
+database transaction. A new transaction checks the guard constraint and acquires
+the singleton lock again. A caught nested failure still prevents outer commit.
+On failure only, storage logs bounded query counts and elapsed milliseconds for
+guard schema/lock, receipt lookup/claim and other graph queries, plus the Work
+scope duration. These diagnostics contain no query text, parameters, request
+contents, identity, digest or exception message. The duration covers the Work
+scope and any rollback/cleanup completed before it exits; an enclosing plain
+transaction may finish later. It does not establish lock contention or a timeout
+cause by itself.
+
 Responses use the existing `work`/`receipt` envelope. A new create returns 201;
 other operations and duplicate retries return 200. Duplicate `work` is null and
 its receipt ID is unchanged, including retries from fresh Wallet sessions.

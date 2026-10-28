@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -60,6 +62,22 @@ _GENERIC_ENCODING_PROPERTY = "__devgraph_generic_encoding"
 _GENERIC_ENCODING_VALUE = "json-v1"
 _CREATE_NONCE_PROPERTY = "__devgraph_create_nonce"
 _EDGE_IDENTITY_PROPERTY = "__devgraph_edge_identity"
+_LOGGER = logging.getLogger(__name__)
+
+
+def _work_query_phase(query: str) -> str:
+    """Closed diagnostics vocabulary; never retain query text or parameters."""
+    if query.startswith("SHOW CONSTRAINTS"):
+        return "guard_schema"
+    if query.startswith("MERGE (guard:WorkMutationGuard"):
+        return "guard_lock"
+    if query.startswith("MERGE (n:`EventReceipt`"):
+        return "receipt_claim"
+    if query.startswith("MATCH (n:`EventReceipt`) WHERE n.`idempotency_claim_digest`"):
+        return "receipt_claim_lookup"
+    if query.startswith("MATCH (n:`EventReceipt`) WHERE n.`idempotency_key_digest`"):
+        return "receipt_legacy_lookup"
+    return "graph"
 
 
 def _containment_projection() -> str:
@@ -203,6 +221,8 @@ class Neo4jGraphStorage:
             raise StorageUnavailable("malformed generic node property") from exc
 
     def _run_graph(self, query: str, **parameters: object) -> list[dict[str, Any]]:
+        timings = getattr(self._transaction_state, "work_timings", None)
+        started = time.monotonic() if timings is not None else None
         try:
             active = getattr(self._transaction_state, "transaction", None)
             if active is not None:
@@ -211,6 +231,12 @@ class Neo4jGraphStorage:
                 return [record.data() for record in session.run(query, **parameters)]
         except (Neo4jError, ServiceUnavailable) as exc:
             raise StorageUnavailable("canonical storage operation failed") from exc
+        finally:
+            if timings is not None:
+                phase = _work_query_phase(query)
+                entry = timings.setdefault(phase, {"count": 0, "elapsed_ms": 0.0})
+                entry["count"] += 1
+                entry["elapsed_ms"] += (time.monotonic() - started) * 1000
 
     @contextmanager
     def transaction(self) -> Iterator[None]:
@@ -254,6 +280,8 @@ class Neo4jGraphStorage:
             raise
         finally:
             if state_set:
+                if hasattr(self._transaction_state, "work_guard_transaction"):
+                    del self._transaction_state.work_guard_transaction
                 del self._transaction_state.transaction
                 del self._transaction_state.rollback_only
             for resource in (transaction, session):
@@ -267,13 +295,43 @@ class Neo4jGraphStorage:
     def work_mutation_transaction(self) -> Iterator[None]:
         """Serialize named Work graph changes across processes, within the DB transaction."""
         prior = getattr(self._transaction_state, "work_timeout", None)
+        owns_timings = not hasattr(self._transaction_state, "work_timings")
+        if owns_timings:
+            self._transaction_state.work_timings = {}
+            started = time.monotonic()
         self._transaction_state.work_timeout = 10.0
         try:
             with self.transaction():
-                self._lock_named_work()
+                active = self._transaction_state.transaction
+                if getattr(self._transaction_state, "work_guard_transaction", None) is not active:
+                    self._lock_named_work()
+                    # The DB retains this lock until the outer transaction ends.
+                    # Nested scopes must still enter transaction() for rollback-only.
+                    self._transaction_state.work_guard_transaction = active
                 yield
+        except BaseException:
+            if owns_timings:
+                _LOGGER.warning(
+                    "named_work_transaction_failed %s",
+                    json.dumps(
+                        {
+                            "work_scope_ms": round((time.monotonic() - started) * 1000, 3),
+                            "queries": {
+                                phase: {
+                                    "count": entry["count"],
+                                    "elapsed_ms": round(entry["elapsed_ms"], 3),
+                                }
+                                for phase, entry in self._transaction_state.work_timings.items()
+                            },
+                        },
+                        sort_keys=True,
+                    ),
+                )
+            raise
         finally:
             self._transaction_state.work_timeout = prior
+            if owns_timings:
+                del self._transaction_state.work_timings
 
     def _lock_named_work(self):
         constraints = self._run_graph(
