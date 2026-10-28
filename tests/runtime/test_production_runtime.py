@@ -24,6 +24,9 @@ from devgraph.storage.base import HealthStatus
 
 
 class StubNeo4jStorage:
+    def link_new_event_receipt(self, subject_label, subject_id, receipt_id):
+        raise AssertionError("runtime stub must not perform a mutation")
+
     def health(self) -> HealthStatus:
         return HealthStatus(live=True, ready=False, detail="stub")
 

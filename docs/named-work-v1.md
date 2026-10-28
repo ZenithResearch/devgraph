@@ -189,7 +189,7 @@ Nested Work scopes reuse the guard already acquired by their exact active
 database transaction. A new transaction checks the guard constraint and acquires
 the singleton lock again. A caught nested failure still prevents outer commit.
 On failure only, storage logs bounded query counts and elapsed milliseconds for
-guard schema/lock, receipt lookup/claim, recognized node reads/creates/writes and
+guard schema/lock, receipt lookup/claim/link, recognized node reads/creates/writes and
 edge merges, plus the Work scope duration. Unknown query shapes retain the
 generic graph category. Failed queries and result consumption are included.
 These diagnostics contain no query text, parameters, request

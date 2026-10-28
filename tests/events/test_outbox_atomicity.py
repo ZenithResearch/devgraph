@@ -38,6 +38,14 @@ def _emitted_edges(storage: MemoryGraphStorage):
     return storage.list_edges(EMITTED_EVENT)
 
 
+def test_outbox_rejects_missing_capability_before_any_mutation():
+    storage = MemoryGraphStorage()
+    storage.link_new_event_receipt = None
+    with pytest.raises(TypeError, match="fresh receipt link capability required"):
+        EventOutbox(storage)
+    assert not storage.query()
+
+
 def test_success_persists_mutation_receipt_and_edge_in_one_transaction() -> None:
     storage = MemoryGraphStorage()
     outbox = EventOutbox(storage, receipt_id_factory=lambda: "receipt-1")

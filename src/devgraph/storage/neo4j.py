@@ -68,6 +68,8 @@ _LOGGER = logging.getLogger(__name__)
 def _work_query_phase(query: str) -> str:
     """Closed diagnostics vocabulary; never retain query text or parameters."""
     if query.startswith("SHOW CONSTRAINTS"):
+        if "labelsOrTypes IN $labels" in query:
+            return "receipt_link_schema"
         return "guard_schema"
     if query.startswith("MERGE (guard:WorkMutationGuard"):
         return "guard_lock"
@@ -77,6 +79,12 @@ def _work_query_phase(query: str) -> str:
         return "receipt_claim_lookup"
     if query.startswith("MATCH (n:`EventReceipt`) WHERE n.`idempotency_key_digest`"):
         return "receipt_legacy_lookup"
+    if query.startswith("MATCH (source:`") and "AS subject_element_id" in query:
+        return "receipt_link_lookup"
+    if query.startswith("MATCH (source) WHERE elementId(source) = $subject_element_id ") and (
+        "CREATE (source)-[edge:EMITTED_EVENT " in query
+    ):
+        return "receipt_link"
     if (
         query.startswith("MATCH (source:`")
         and "{id: $from_id}" in query
@@ -283,6 +291,7 @@ class Neo4jGraphStorage:
             )
             self._transaction_state.transaction = transaction
             self._transaction_state.rollback_only = False
+            self._transaction_state.fresh_receipt_claims = {}
             state_set = True
             yield
             if self._transaction_state.rollback_only:
@@ -306,6 +315,7 @@ class Neo4jGraphStorage:
                     del self._transaction_state.work_guard_transaction
                 del self._transaction_state.transaction
                 del self._transaction_state.rollback_only
+                del self._transaction_state.fresh_receipt_claims
             for resource in (transaction, session):
                 if resource is not None:
                     try:
@@ -1494,7 +1504,7 @@ class Neo4jGraphStorage:
             "AS created "
             f"REMOVE n.{_CREATE_NONCE_PROPERTY} "
             "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
-            "properties(n) AS properties, created AS created",
+            "properties(n) AS properties, created AS created, elementId(n) AS element_id",
             claim_digest=encoded_digest,
             node_id=node_id,
             properties=encoded,
@@ -1502,10 +1512,136 @@ class Neo4jGraphStorage:
         )
         if len(rows) != 1 or not isinstance(rows[0].get("created"), bool):
             raise StorageUnavailable("idempotency claim failed")
-        return EventReceiptClaim(
-            rows[0]["created"],
-            self._node_from_row(rows[0], "EventReceipt"),
+        node = self._node_from_row(rows[0], "EventReceipt")
+        state = getattr(self, "_transaction_state", None)
+        active = getattr(state, "transaction", None)
+        if rows[0]["created"] and active is not None:
+            element_id = rows[0].get("element_id")
+            if not isinstance(element_id, str) or not element_id:
+                state.rollback_only = True
+                raise StorageUnavailable("invalid fresh receipt claim")
+            state.fresh_receipt_claims[node.id] = (
+                active,
+                element_id,
+                node.properties.get("subject_label"),
+                node.properties.get("subject_id"),
+            )
+        return EventReceiptClaim(rows[0]["created"], node)
+
+    def link_new_event_receipt(
+        self, subject_label: str, subject_id: str, receipt_id: str
+    ) -> EdgeRecord:
+        """CREATE is safe only for a receipt newly claimed by this physical transaction."""
+        label = self._node_label(subject_label)
+        validate_work_object_id(subject_id)
+        validate_work_object_id(receipt_id)
+        state = self._transaction_state
+        active = getattr(state, "transaction", None)
+        proof = getattr(state, "fresh_receipt_claims", {}).get(receipt_id)
+        if (
+            active is None
+            or proof is None
+            or proof[0] is not active
+            or proof[2:]
+            != (
+                label,
+                subject_id,
+            )
+        ):
+            raise StorageUnavailable("fresh receipt claim required")
+        encoded = self._generic_properties({"subject_label": label, "subject_id": subject_id})
+        try:
+            self._require_receipt_link_schema(label)
+            endpoints = self._run_graph(
+                f"MATCH (source:`{label}` {{id: $subject_id}}), "
+                "(target:EventReceipt {id: $receipt_id}) "
+                f"USING INDEX source:`{label}`(id) USING INDEX target:EventReceipt(id) "
+                "RETURN labels(source) AS subject_labels, source.id AS subject_id, "
+                "elementId(source) AS subject_element_id, labels(target) AS receipt_labels, "
+                "target.id AS receipt_id, elementId(target) AS receipt_element_id LIMIT 2",
+                subject_id=subject_id,
+                receipt_id=receipt_id,
+            )
+            if len(endpoints) != 1:
+                raise StorageUnavailable("fresh receipt endpoints unavailable")
+            endpoint = endpoints[0]
+            if not isinstance(endpoint, dict):
+                raise StorageUnavailable("invalid fresh receipt endpoints")
+            subject_element_id = endpoint.get("subject_element_id")
+            if (
+                endpoint.get("subject_labels") != [label]
+                or endpoint.get("subject_id") != subject_id
+                or not isinstance(subject_element_id, str)
+                or not subject_element_id
+                or endpoint.get("receipt_labels") != ["EventReceipt"]
+                or endpoint.get("receipt_id") != receipt_id
+                or endpoint.get("receipt_element_id") != proof[1]
+            ):
+                raise StorageUnavailable("invalid fresh receipt endpoints")
+            rows = self._run_graph(
+                "MATCH (source) WHERE elementId(source) = $subject_element_id "
+                "MATCH (target) WHERE elementId(target) = $receipt_element_id "
+                "AND labels(source) = [$subject_label] AND source.id = $subject_id "
+                "AND labels(target) = ['EventReceipt'] AND target.id = $receipt_id "
+                "AND target.archived = false "
+                "AND target.subject_label = $encoded_subject_label "
+                "AND target.subject_id = $encoded_subject_id "
+                "AND NOT (target)<-[:EMITTED_EVENT]-() "
+                "CREATE (source)-[edge:EMITTED_EVENT "
+                f"{{{_EDGE_IDENTITY_PROPERTY}: $edge_identity}}]->(target) "
+                "RETURN labels(source) AS from_labels, source.id AS from_id, "
+                "type(edge) AS relationship, labels(target) AS to_labels, "
+                "target.id AS to_id, properties(edge) AS properties",
+                subject_id=subject_id,
+                receipt_id=receipt_id,
+                subject_label=label,
+                subject_element_id=subject_element_id,
+                receipt_element_id=proof[1],
+                encoded_subject_label=encoded["subject_label"],
+                encoded_subject_id=encoded["subject_id"],
+                edge_identity=hashlib.sha256(b"{}").hexdigest(),
+            )
+            if len(rows) != 1:
+                raise StorageUnavailable("fresh receipt endpoints unavailable")
+            edge = self._edge_from_row(rows[0])
+            if (
+                edge.from_label,
+                edge.from_id,
+                edge.relationship,
+                edge.to_label,
+                edge.to_id,
+                edge.properties,
+            ) != (label, subject_id, "EMITTED_EVENT", "EventReceipt", receipt_id, {}):
+                raise StorageUnavailable("invalid fresh receipt link")
+        except BaseException:
+            state.rollback_only = True
+            raise
+        del state.fresh_receipt_claims[receipt_id]
+        return edge
+
+    def _require_receipt_link_schema(self, subject_label: str) -> None:
+        """Admitted concurrent writers cannot introduce a second logical endpoint."""
+        rows = self._run_graph(
+            "SHOW CONSTRAINTS YIELD type, labelsOrTypes, properties "
+            "WHERE type = 'UNIQUENESS' AND properties = ['id'] AND labelsOrTypes IN $labels "
+            "RETURN type, labelsOrTypes, properties",
+            labels=[[subject_label], ["EventReceipt"]],
         )
+        found = set()
+        for row in rows:
+            if (
+                not isinstance(row, dict)
+                or row.get("type") != "UNIQUENESS"
+                or row.get("properties") != ["id"]
+                or not isinstance(row.get("labelsOrTypes"), list)
+                or len(row["labelsOrTypes"]) != 1
+                or not isinstance(row["labelsOrTypes"][0], str)
+                or row["labelsOrTypes"][0] not in {subject_label, "EventReceipt"}
+            ):
+                raise StorageUnavailable("receipt endpoint schema unavailable")
+            found.add(tuple(row["labelsOrTypes"]))
+        if found != {(subject_label,), ("EventReceipt",)}:
+            raise StorageUnavailable("receipt endpoint schema unavailable")
 
     def inspect_canonical_persistence(self) -> None:
         rows = self._run_graph(

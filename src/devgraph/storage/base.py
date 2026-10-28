@@ -346,6 +346,12 @@ class EventReceiptClaimStorage(Protocol):
         properties: dict[str, Any],
     ) -> EventReceiptClaim: ...
 
+    def link_new_event_receipt(
+        self, subject_label: str, subject_id: str, receipt_id: str
+    ) -> EdgeRecord:
+        """Consume this transaction's fresh claim proof to link exactly one subject."""
+        ...
+
 
 class EventOutboxStorage(GraphStorage, EventReceiptClaimStorage, Protocol):
     """Graph storage with the atomic claim primitive needed by EventOutbox."""
