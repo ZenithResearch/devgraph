@@ -226,3 +226,12 @@ mutations, denials, retries, and a disposable Neo4j restart. Complete retained
 read/denial audit, scheduled backup/retention, an independent restore drill for
 the new release, storage alerts, and installed identity/grant acceptance remain
 production release gates. Source implementation alone does not close them.
+
+### Session attribution (additive Work v2)
+
+`session.attach` is available only with `devgraph.work-request.v2`, for existing
+Proposal, Initiative, Project, Issue or Task subjects. See
+[session references](../ontology/session-references.md) for its closed payload,
+source identity and receiver authority boundaries. The session's three identity
+fields and optional witnessed link derive exact related resources; no metadata
+can grant authority. V1 requests and base Todo reject this operation.

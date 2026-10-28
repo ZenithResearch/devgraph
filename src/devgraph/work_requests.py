@@ -29,6 +29,7 @@ from devgraph.auth.secs_issue_create import (
     _strict_json_object,
 )
 from devgraph.model.validation import validate_version, validate_work_object_id
+from devgraph.observability.session_contract import SessionAttach
 from devgraph.progress_contract import ProgressSet, ProposalReject
 from devgraph.workflow_contract import (
     PARENTS,
@@ -74,6 +75,7 @@ WorkOperation = Literal[
     "progress.set",
     "restore",
     "proposal.reject",
+    "session.attach",
 ]
 
 
@@ -135,9 +137,11 @@ WORK_OPERATIONS_V2 = tuple(op for op in WORK_OPERATIONS if op != "status") + (
     "progress.set",
     "restore",
     "proposal.reject",
+    "session.attach",
 )
 
 _PAYLOAD_TYPES = {
+    "session.attach": SessionAttach,
     "progress.set": ProgressSet,
     "restore": _Strict,
     "proposal.reject": ProposalReject,
@@ -243,6 +247,8 @@ class WorkRequest:
                 for evidence in payload["evidence"]:
                     if evidence["url"]:
                         resources.add(f"ExternalLink/{evidence['id']}")
+            if envelope.operation == "session.attach":
+                resources.update(payload_model.resources())
             if envelope.operation == "progress.set":
                 resources.add(f"ReviewPacket/{payload['record_id']}")
                 for evidence in payload["evidence"]:

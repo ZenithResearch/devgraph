@@ -336,6 +336,16 @@ class AuthorizedWorkGraph:
         self._audit(context, CATEGORY_READ, "read_arenas")
         return result
 
+    def session_references(self, credential, *, ref_id=None, after=None, limit=50):
+        context = self._authorize(credential, CATEGORY_READ)
+        if self._monitor_storage is None:
+            raise RuntimeError("session metadata storage is not configured")
+        from devgraph.observability.session_reads import read_references
+
+        result = read_references(self._monitor_storage, ref_id=ref_id, after=after, limit=limit)
+        self._audit(context, CATEGORY_READ, "session_references")
+        return result
+
     def arena_members(self, credential, arena_id, *, after_resource=None, limit=50):
         context = self._authorize(credential, CATEGORY_READ)
         from devgraph.arenas import ArenaRepository

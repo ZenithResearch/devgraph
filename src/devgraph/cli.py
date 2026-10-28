@@ -409,6 +409,10 @@ def query_work_snapshot(
                 kind=kind,
                 work_id=work_id,
             )
+            if owns_transport and config_path == DEFAULT_CONFIG_PATH:
+                from devgraph.observability.session_associations import record_work_inspection
+
+                record_work_inspection(kind, work_id)
             return {"item": result.model_dump(mode="json")}
         result = client.list_work(
             context,
@@ -579,6 +583,10 @@ def _parser() -> argparse.ArgumentParser:
         description="Operate the private local Devgraph host",
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
+
+    from devgraph.observability.session_cli import configure as configure_sessions
+
+    configure_sessions(subcommands)
 
     auth = subcommands.add_parser("auth", help="configure an existing signer and local credentials")
     auth_commands = auth.add_subparsers(dest="auth_command", required=True)
@@ -922,6 +930,10 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command == "sessions":
+            from devgraph.observability.session_cli import execute as execute_sessions
+
+            return execute_sessions(args)
         if args.command == "auth":
             if args.auth_command == "access":
                 from devgraph.ops.access_plans import execute

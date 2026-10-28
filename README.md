@@ -105,7 +105,7 @@ dependency-aware scenario. Its inputs and saved drafts are local to the browser
 tab; exports are local files. It does not update canonical Work or promise a
 schedule or hard-budget solution. See [project selection](docs/user/project-selection.md).
 
-Ontology bundles through `v0.7.0` are packaged with the application.
+Ontology bundles through `v0.11.0` are packaged with this source candidate.
 `devgraph ontology` identifies the canonical release. `Entity`, `Person`,
 `Agent`, and `Organization` are directory vocabulary with no admitted runtime
 CRUD; `Actor` remains a compatibility alias.

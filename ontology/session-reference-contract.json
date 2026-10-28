@@ -1,0 +1,53 @@
+{
+  "schema": "devgraph.session-reference-contract.v1",
+  "ontology_version": "0.11.0",
+  "identity_fields": [
+    "application",
+    "source_instance_id",
+    "external_session_id"
+  ],
+  "application_is_extensible": true,
+  "specializations": {
+    "hermes": "HermesSessionRef",
+    "codex": "CodexSessionRef",
+    "claude-code": "ClaudeSessionRef",
+    "grok": "GrokSessionRef"
+  },
+  "default_type": "SessionRef",
+  "storage_labels": [
+    "SessionRef",
+    "SessionLink"
+  ],
+  "legacy_storage_label": "HermesSessionRef",
+  "legacy_edge": "ATTRIBUTED_TO_HERMES_SESSION",
+  "work_edge": "ATTRIBUTED_TO_SESSION",
+  "relations": {
+    "delegated_to": "parent-to-child",
+    "forked_from": "new-to-original",
+    "uses_runtime": "harness-to-native-runtime"
+  },
+  "link_basis": [
+    "declared",
+    "source_observed"
+  ],
+  "authority": {
+    "mints_credentials": false,
+    "delegates_permissions": false,
+    "executes_resume": false,
+    "proves_completion": false
+  },
+  "http_operations": [
+    "GET /session-refs/v1",
+    "GET /session-refs/v1/{id}",
+    "devgraph.work.session.attach.v2"
+  ],
+  "capture_adapters": [
+    "codex-exec-json",
+    "claude-code-print-stream-json"
+  ],
+  "raw_content_retained": false,
+  "automatic_legacy_migration": false,
+  "source_bindings": {
+    "hermes_codex": "sessions.model_config.codex_thread_id; exact retained native record required; no historical inference"
+  }
+}

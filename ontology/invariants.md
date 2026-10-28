@@ -130,3 +130,7 @@ A seat is independent of its occupant. Only Person or Agent may occupy a seat;
 organization membership, appointment and reports-to never issue credentials.
 Preset revisions are immutable and existing grants retain their approved exact
 permission snapshots. All seat and recipe vocabulary is descriptive only.
+
+## Source-owned session boundary (v0.11.0)
+
+SessionRef and SessionLink are provenance storage labels, never generic Work kinds. No session ref stores raw content, executes a resume or grants authority. Source application and model provider are distinct. Direct sessions have no invented parent. Legacy Hermes refs require explicit source qualification before normalization. See [session-references.md](session-references.md).

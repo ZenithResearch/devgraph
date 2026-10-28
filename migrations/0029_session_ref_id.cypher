@@ -1,0 +1,1 @@
+CREATE CONSTRAINT session_ref_id IF NOT EXISTS FOR (n:SessionRef) REQUIRE n.id IS UNIQUE;

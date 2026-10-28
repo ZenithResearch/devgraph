@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "ontology_id": "https://zenith-research.ca/ontology",
-  "version": "0.10.0",
-  "release": "v0.10.0",
-  "published_at": "2026-10-22T02:42:43Z",
-  "canonical_base_url": "https://zenith-research.ca/ontology/v0.10.0",
+  "version": "0.11.0",
+  "release": "v0.11.0",
+  "published_at": "2026-10-27T20:42:46Z",
+  "canonical_base_url": "https://zenith-research.ca/ontology/v0.11.0",
   "supported_versions": [
     "0.1.0",
     "0.2.0",
@@ -15,14 +15,15 @@
     "0.7.0",
     "0.8.0",
     "0.9.0",
-    "0.10.0"
+    "0.10.0",
+    "0.11.0"
   ],
   "discovery_url": "https://zenith-research.ca/.well-known/zenith-ontology",
   "authority": {
     "name": "Devgraph",
     "repository": "https://github.com/ZenithResearch/devgraph",
     "source_path": "ontology/",
-    "release_tag": "ontology-v0.10.0"
+    "release_tag": "ontology-v0.11.0"
   },
   "compatibility": {
     "mode": "additive",
@@ -31,7 +32,7 @@
   },
   "files": [
     {
-      "source": "ontology/release-notes/v0.10.0.md",
+      "source": "ontology/release-notes/v0.11.0.md",
       "target": "README.md",
       "media_type": "text/markdown"
     },
@@ -86,7 +87,7 @@
       "media_type": "text/markdown"
     },
     {
-      "source": "ontology/compatibility/v0.10.0.md",
+      "source": "ontology/compatibility/v0.11.0.md",
       "target": "compatibility.md",
       "media_type": "text/markdown"
     },
@@ -143,6 +144,16 @@
     {
       "source": "ontology/seats.json",
       "target": "seats.json",
+      "media_type": "application/json"
+    },
+    {
+      "source": "ontology/session-references.md",
+      "target": "session-references.md",
+      "media_type": "text/markdown"
+    },
+    {
+      "source": "ontology/session-reference-contract.json",
+      "target": "session-reference-contract.json",
       "media_type": "application/json"
     }
   ]

@@ -16,7 +16,7 @@ def test_every_named_mutation_has_one_reviewed_editor_mapping():
     canonical = {f"devgraph.work.{op}.v2" for op in WORK_OPERATIONS_V2}
     canonical |= {f"devgraph.arena.{op}.v1" for op in ARENA_OPERATIONS}
     assert ids == canonical == WRITE_OPERATIONS
-    assert len(ids) == len(rows) == 20
+    assert len(ids) == len(rows) == 21
     assert inventory["authority"] is False
     for row in rows:
         assert row["classification"] == "recipient_rule"

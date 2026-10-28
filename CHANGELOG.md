@@ -14,7 +14,14 @@
 ## [Unreleased]
 
 ### Added
+- Add an exact signed Work v2 session attachment, authenticated canonical metadata reads and private import preparation — source observations need an authorized path into canonical provenance without expanding existing grants.
+- Resolve Hermes's persisted App Server Codex thread binding as `uses_runtime` with a stable first-observation witness — model names and session recency cannot establish a delegation or native session join.
 
+
+### Added
+
+- Authenticated native-session source reads, lifecycle observations and exact Work-inspection witnesses — surface real sessions in Pulse while preserving read-only authority and unresolved provenance.
+- General source-owned session references, witnessed delegation/fork links and opt-in Codex/Claude metadata capture — connect direct and delegated conversations to explicit Work without confusing process handles, model providers or importing authority; preserve legacy Hermes records and leave installed authority unchanged.
 - Opt-in scoped holder v2 readers and issuance, current-state selector intersections and fenced read capture — preserve existing v1 grants while keeping exact identities separate from hierarchy placement.
 - Shared paired pre/post effect checks on the existing signed Work/Arena path — prevent combining independent grants into a cross-hierarchy mutation and roll back denied postconditions.
 

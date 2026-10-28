@@ -327,7 +327,12 @@ class SecSWorkAdapter:
                     work = (
                         self.arena_mutations.execute(request)
                         if isinstance(request, ArenaRequest)
-                        else self.mutations.execute(request, actor_id=verified.principal.actor_id)
+                        else self.mutations.execute(
+                            request,
+                            actor_id=verified.principal.actor_id,
+                            session_id=verified.principal.session_id,
+                            correlation_id=verified.principal.correlation_id,
+                        )
                     )
                     if scoped_mutation is not None:
                         scoped_mutation.check_after(self.storage)

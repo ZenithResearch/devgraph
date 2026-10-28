@@ -32,12 +32,21 @@ class NamedWorkMutations:
         self.repository = WorkObjectRepository(storage)
         self.lifecycle = ProposalLifecycle(storage)
 
-    def execute(self, request: WorkRequest, *, actor_id: str = ""):
+    def execute(
+        self,
+        request: WorkRequest,
+        *,
+        actor_id: str = "",
+        session_id: str = "",
+        correlation_id: str = "",
+    ):
 
         # Reparse immutable bytes; caller-supplied derived fields never select execution.
         request = WorkRequest.from_json(request.canonical)
         with self.storage.work_mutation_transaction():
-            return self._execute(request, actor_id=actor_id)
+            return self._execute(
+                request, actor_id=actor_id, session_id=session_id, correlation_id=correlation_id
+            )
 
     def _current(self, kind, work_id, version):
         current = self.repository.get_by_id(kind, work_id)
@@ -63,7 +72,7 @@ class NamedWorkMutations:
     def _bump(self, work):
         return self.repository.update(work, expected_version=work.version)
 
-    def _execute(self, request, *, actor_id=""):
+    def _execute(self, request, *, actor_id="", session_id="", correlation_id=""):
         operation, payload = request.operation, request.payload
         if operation == "create":
             values = dict(payload)
@@ -86,6 +95,34 @@ class NamedWorkMutations:
             self.storage.restore_node(subject.kind, subject.id, restored.to_node_properties())
             return restored
         self._active(subject)
+        if operation == "session.attach":
+            from devgraph.observability.session_contract import SessionAttach
+            from devgraph.observability.session_ref import SessionRef
+            from devgraph.observability.session_registry import SessionRegistry
+
+            contract = SessionAttach.model_validate(payload, strict=True)
+            registry = SessionRegistry(self.storage)
+
+            def reference(identity):
+                return SessionRef(identity, actor_id, session_id, correlation_id)
+
+            ref = reference(contract.session.identity())
+            try:
+                if contract.link:
+                    link = contract.link.link()
+                    registry.link(reference(link.origin), reference(link.target), link)
+                registry.attach(
+                    ref,
+                    work=subject.kind + "/" + subject.id,
+                    expected_version=subject.version,
+                    basis=contract.basis,
+                    observed_at=contract.observed_at,
+                )
+            except ValueError:
+                raise WorkRelationshipConflict(
+                    "Session attribution conflicts with stored provenance."
+                ) from None
+            return self._bump(subject)
         if operation == "progress.set":
             from devgraph.progress_mutations import set_progress
 

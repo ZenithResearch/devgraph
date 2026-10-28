@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "ontology_version": "0.10.0",
+  "ontology_version": "0.11.0",
   "namespace": {
     "class": "ZenithLocalSpace",
     "folder_name": ".zenith",

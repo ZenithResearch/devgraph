@@ -1,0 +1,5 @@
+name: devgraph-observer
+version: 0.1.0
+description: Metadata-only local session observation for DevGraph Pulse.
+author: ZenithResearch
+kind: standalone

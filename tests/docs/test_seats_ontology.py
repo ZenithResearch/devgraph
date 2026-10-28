@@ -34,6 +34,7 @@ def test_shared_seats_support_people_and_agents_without_runtime_authority():
 
 def test_seat_publication_preserves_all_runtime_contracts_and_prior_release():
     old = ONTOLOGY / "releases/v0.9.0"
+    seat_release = ONTOLOGY / "releases/v0.10.0"
     for name in [
         "operations.json",
         "arena-contract.json",
@@ -41,14 +42,14 @@ def test_seat_publication_preserves_all_runtime_contracts_and_prior_release():
         "zenith-local-space.json",
     ]:
         prior = json.loads((old / name).read_text())
-        current = json.loads((ONTOLOGY / name).read_text())
+        current = json.loads((seat_release / name).read_text())
         assert prior.pop("ontology_version") == "0.9.0"
         assert current.pop("ontology_version") == "0.10.0"
         assert current == prior
     assert (old / "constraints.cypher").read_bytes() == (
-        ONTOLOGY / "neo4j/constraints.cypher"
+        seat_release / "constraints.cypher"
     ).read_bytes()
-    current = json.loads((ONTOLOGY / "ontology.jsonld").read_text())["@graph"]
+    current = json.loads((seat_release / "ontology.jsonld").read_text())["@graph"]
     previous = json.loads((old / "ontology.jsonld").read_text())["@graph"]
     assert {x["@id"] for x in current if x.get("runtimeLabel")} == {
         x["@id"] for x in previous if x.get("runtimeLabel")
@@ -58,7 +59,7 @@ def test_seat_publication_preserves_all_runtime_contracts_and_prior_release():
         manifest = json.loads((release / "manifest.json").read_text())
         assert manifest["version"] == "0.10.0"
         for name in ["seats.md", "seats.json"]:
-            assert (release / name).read_bytes() == (ONTOLOGY / name).read_bytes()
+            assert (release / name).read_bytes() == (seat_release / name).read_bytes()
         for item in json.loads((root / "v0.9.0/manifest.json").read_text())["files"]:
             assert (
                 hashlib.sha256((root / "v0.9.0" / item["path"]).read_bytes()).hexdigest()

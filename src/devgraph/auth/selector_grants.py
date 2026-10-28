@@ -88,7 +88,13 @@ def snapshot(storage, service, refs):
         node = storage.get_node(kind, identifier)
         if node is None:
             continue
-        if node.label != kind or node.id != identifier or node.properties.get("kind") != kind:
+        canonical_kind = node.properties.get("kind")
+        compatible_session = kind in {"SessionRef", "SessionLink"} and canonical_kind is None
+        if (
+            node.label != kind
+            or node.id != identifier
+            or (canonical_kind != kind and not compatible_session)
+        ):
             raise UnauthenticatedError("ambiguous_resource_identity")
         if kind == "Arena":
             ancestors = []

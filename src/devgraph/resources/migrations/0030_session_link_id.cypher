@@ -1,0 +1,1 @@
+CREATE CONSTRAINT session_link_id IF NOT EXISTS FOR (n:SessionLink) REQUIRE n.id IS UNIQUE;

@@ -28,7 +28,8 @@ def test_local_space_is_independent_namespace_and_only_typed_registry_is_public(
 
 
 def test_descriptive_terms_do_not_expand_runtime_kinds_operations_or_constraints():
-    current = json.loads((ONTOLOGY / "ontology.jsonld").read_text())["@graph"]
+    local_release = ONTOLOGY / "releases/v0.9.0"
+    current = json.loads((local_release / "ontology.jsonld").read_text())["@graph"]
     previous = json.loads((ONTOLOGY / "releases/v0.8.0/ontology.jsonld").read_text())["@graph"]
     by_id = {item["@id"]: item for item in current}
     for term in TERMS:
@@ -42,11 +43,11 @@ def test_descriptive_terms_do_not_expand_runtime_kinds_operations_or_constraints
     assert by_id["zn:DESCRIBES_SERVICE"]["range"] == "zn:ServiceInstance"
     for filename in ["operations.json", "arena-contract.json", "repository-contract.json"]:
         old = json.loads((ONTOLOGY / "releases/v0.8.0" / filename).read_text())
-        new = json.loads((ONTOLOGY / filename).read_text())
+        new = json.loads((local_release / filename).read_text())
         assert old.pop("ontology_version") == "0.8.0"
-        assert new.pop("ontology_version") == "0.10.0"
+        assert new.pop("ontology_version") == "0.9.0"
         assert old == new
-    assert (ONTOLOGY / "neo4j/constraints.cypher").read_bytes() == (
+    assert (local_release / "constraints.cypher").read_bytes() == (
         ONTOLOGY / "releases/v0.8.0/constraints.cypher"
     ).read_bytes()
 

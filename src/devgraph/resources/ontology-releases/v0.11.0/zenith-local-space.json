@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "ontology_version": "0.11.0",
+  "namespace": {
+    "class": "ZenithLocalSpace",
+    "folder_name": ".zenith",
+    "scope": "one operating-system user on one machine",
+    "default_path": "~/.zenith",
+    "nested_under_castalia": false
+  },
+  "registry": {
+    "class": "LocalResourceRegistry",
+    "relative_path": "resources/v1",
+    "descriptor_class": "LocalResourceRegistration",
+    "descriptor_schema": "zenith.local-resource.v1",
+    "service_class": "ServiceInstance",
+    "id_format": "lowercase UUID",
+    "id_meaning": "stable service-instance reference; independent of endpoint, Wallet and process",
+    "publication": "advisory configured-service metadata",
+    "live_heartbeat": false
+  },
+  "runtime": {
+    "graph_labels": false,
+    "work_kinds": false,
+    "storage_migration": false,
+    "filesystem_contract": "zenith.local-resource.v1"
+  },
+  "authority": {
+    "registration_proves_ownership": false,
+    "registration_grants_access": false,
+    "registration_installs_issuer_trust": false,
+    "registration_changes_wallet_custody": false,
+    "registration_enables_silent_pin_replacement": false
+  },
+  "privacy": {
+    "registry_record_contains_secrets": false,
+    "whole_namespace_is_public": false,
+    "scan_other_namespace_files": false,
+    "move_existing_app_data": false
+  }
+}
