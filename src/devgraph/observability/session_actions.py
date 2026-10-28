@@ -7,6 +7,7 @@ from the browser. Pending/uncertain attempts retain their original retry identit
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
@@ -15,6 +16,7 @@ import stat
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from devgraph.observability.session_prepare import prepare_state, write_bundle
@@ -24,6 +26,41 @@ from devgraph.work_requests import WorkRequest
 
 TICKET = re.compile(r"[0-9a-f]{64}")
 REVIEW_LEASE_SECONDS = 300
+REVIEW_ERRORS = frozenset(
+    {
+        "approval_required",
+        "credential_adapter_unavailable",
+        "wallet_review_timed_out",
+        "credential_adapter_timed_out",
+        "signer_unavailable",
+        "terminal_trust_unavailable",
+        "credential_installation_unavailable",
+        "credential_issuance_denied",
+        "credential_binding_mismatch",
+        "wallet_approval_denied",
+        "current_authority_denied",
+        "outcome_unknown",
+        "status_unavailable",
+        "review_cancelled",
+        "review_failed",
+    }
+)
+
+
+@contextmanager
+def review_lock(directory):
+    fd = os.open(directory / "review.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            raise ValueError("unsafe_session_review_lock")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError("session_review_active_close_terminal") from None
+        yield
+    finally:
+        os.close(fd)
 
 
 def _directory(path, *, create=False):
@@ -136,72 +173,71 @@ class SessionStateActions:
             directory, request = self._bundle(ticket)
             return self._review(directory, request, reconcile=True)
 
+    def cancel(self, ticket):
+        """Cancel only an inactive window; an active human review must close in Terminal."""
+        with self.lock:
+            directory, request = self._bundle(ticket)
+            with review_lock(directory):
+                attempts = self._attempts(directory)
+                if not attempts:
+                    raise ValueError("session_review_unavailable")
+                attempt = attempts[-1]
+                _directory(attempt)
+                if not (attempt / "ready-gated").exists():
+                    raise ValueError("session_review_unavailable")
+                if not (attempt / "exit-code").exists():
+                    if not (attempt / "cancelled").exists():
+                        _write(attempt / "cancelled", "cancelled\n")
+                    elif _read(attempt / "cancelled", 16) != b"cancelled\n":
+                        raise ValueError("session_review_unavailable")
+                    if not (attempt / "result.json").exists():
+                        error = (
+                            "outcome_unknown"
+                            if (attempt / "ready-at").exists()
+                            else "review_cancelled"
+                        )
+                        _write(attempt / "result.json", json.dumps({"error": error}))
+                    _write(attempt / "exit-code", "130\n")
+            return self.status(request.digest)
+
     def _review(self, directory, request, *, reconcile=False):
         attempts = self._attempts(directory)
         if attempts and not (attempts[-1] / "exit-code").exists():
             pending = self.status(request.digest)
             if pending["phase"] == "awaiting_approval":
                 return pending
-        if len(attempts) >= 20:
-            raise ValueError("session_action_attempt_limit")
-        attempt = directory / f"attempt-{len(attempts) + 1:02d}"
-        _directory(attempt, create=True)
-        command = attempt / "Review session state.command"
-        result = attempt / "result.json"
-        pending = attempt / "result.pending"
-        exit_code = attempt / "exit-code"
-        _write(attempt / "started-at", str(self.clock()))
-        arguments = [
-            str(self.python),
-            "-I",
-            "-m",
-            "devgraph.cli",
-            "work",
-            "session.state",
-            "--credential-v2",
-            "--request-file",
-            str(directory / "request.json"),
-            "--idempotency-key-file",
-            str(directory / "idempotency.txt"),
-        ]
-        if reconcile:
-            arguments.append("--reconcile")
-        # stdin AND stderr stay on the real tty: the CLI and Wallet require it.
-        script = "#!/bin/sh\numask 077\n"
-        for signal_name, code in (("HUP", 129), ("INT", 130), ("TERM", 143)):
-            interrupted = (
-                f"printf '%s\\n' {code} > " + shlex.quote(str(exit_code)) + f"; exit {code}"
+        with review_lock(directory):
+            attempts = self._attempts(directory)
+            if attempts and not (attempts[-1] / "exit-code").exists():
+                pending = self.status(request.digest)
+                if pending["phase"] == "awaiting_approval":
+                    return pending
+            if len(attempts) >= 20:
+                raise ValueError("session_action_attempt_limit")
+            attempt = directory / f"attempt-{len(attempts) + 1:02d}"
+            _directory(attempt, create=True)
+            command = attempt / "Review session state.command"
+            _write(attempt / "started-at", str(self.clock()))
+            _write(attempt / "ready-gated", "1\n")
+            _write(attempt / "review-mode", "reconcile" if reconcile else "mutation")
+            arguments = [
+                str(self.python),
+                "-I",
+                "-m",
+                "devgraph.observability.session_review",
+                "--attempt-directory",
+                str(attempt),
+            ]
+            # No redirects: Wallet stdin/stderr remain the real tty. The wrapper
+            # waits for readiness before issuing credentials and saves only closed errors.
+            script = (
+                "#!/bin/sh\numask 077\nexec " + " ".join(shlex.quote(a) for a in arguments) + "\n"
             )
-            script += "trap " + shlex.quote(interrupted) + " " + signal_name + "\n"
-        script += (
-            "printf '%s\\n' "
-            + shlex.quote(
-                "Check saved DevGraph session result"
-                if reconcile
-                else "DevGraph session work → " + request.payload["state"].upper()
-            )
-            + "\n"
-        )
-        script += (
-            " ".join(shlex.quote(a) for a in arguments) + " > " + shlex.quote(str(pending)) + "\n"
-        )
-        script += (
-            "result_code=$?\n/bin/mv "
-            + shlex.quote(str(pending))
-            + " "
-            + shlex.quote(str(result))
-            + "\n"
-        )
-        script += "printf '%s\\n' \"$result_code\" > " + shlex.quote(str(exit_code)) + "\n"
-        script += (
-            "printf '\\nReturn to Pulse to check the saved state. Press Return to close.\\n'\n"
-            "read -r close_review\n"
-        )
-        _write(command, script, 0o700)
+            _write(command, script, 0o700)
         try:
             self.launch(command)
         except (OSError, subprocess.SubprocessError):
-            _write(exit_code, "127\n")
+            _write(attempt / "exit-code", "127\n")
             raise ValueError("session_approval_window_unavailable") from None
         return self.status(request.digest)
 
@@ -222,6 +258,11 @@ class SessionStateActions:
         _directory(attempt)
         exit_file = attempt / "exit-code"
         if not exit_file.exists():
+            if (attempt / "ready-gated").exists():
+                value["review_stage"] = (
+                    "wallet_review" if (attempt / "ready-at").exists() else "waiting_to_start"
+                )
+                return value  # No lease expiry can revive an old waiting window.
             try:
                 age = self.clock() - float(_read(attempt / "started-at", 64))
                 if not 0 <= age < REVIEW_LEASE_SECONDS:
@@ -234,6 +275,9 @@ class SessionStateActions:
             result = json.loads(_read(attempt / "result.json"))
             if not isinstance(result, dict):
                 raise ValueError("invalid_session_action_result")
+            if isinstance(result.get("error"), str) and result["error"] in REVIEW_ERRORS:
+                value["error"] = result["error"]
+                return value
             receipt = result.get("receipt") or {}
             if not isinstance(receipt, dict):
                 raise ValueError("invalid_session_action_result")

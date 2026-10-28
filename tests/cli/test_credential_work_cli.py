@@ -66,6 +66,19 @@ def test_terminal_unavailable_fails_before_reading_keys_or_issuing_credentials(m
         )
 
 
+@pytest.mark.parametrize(
+    "interactive,expected",
+    [(True, "wallet_review_timed_out"), (False, "credential_adapter_timed_out")],
+)
+def test_adapter_timeout_has_closed_stage_specific_error(monkeypatch, interactive, expected):
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired("synthetic", kwargs["timeout"])
+
+    monkeypatch.setattr(agent.subprocess, "run", timeout)
+    with pytest.raises(agent.LocalCredentialWorkAgentError, match=expected):
+        agent._run_adapter(["synthetic"], env={}, interactive=interactive)
+
+
 @pytest.mark.parametrize("aliased_temporary", [False, True])
 def test_exact_snapshots_run_issuer_wallet_authority_in_order(
     monkeypatch, tmp_path, aliased_temporary

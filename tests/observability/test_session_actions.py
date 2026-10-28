@@ -52,7 +52,7 @@ def test_native_review_is_pending_until_receipt_and_fresh_canonical_read(tmp_pat
     )
     assert len(launched) == 1
     script = launched[0].read_text()
-    assert "--credential-v2" in script and " -I -m devgraph.cli work session.state " in script
+    assert " -I -m devgraph.observability.session_review --attempt-directory " in script
     assert "APPROVE" not in script and "2>" not in script and "< /dev/null" not in script
     assert launched[0].stat().st_mode & 0o077 == 0
     assert bridge.begin(REF, "done", 1)["ticket"] == result["ticket"] and len(launched) == 1
@@ -119,6 +119,8 @@ def test_lost_response_and_abandoned_window_have_explicit_same_identity_recovery
     now = [100.0]
     bridge.clock = lambda: now[0]
     first = bridge.begin(REF, "done", 1)
+    # Retain the historical non-gated attempt's bounded lease behavior.
+    (launched[0].parent / "ready-gated").unlink()
     request_dir = bridge.root / first["ticket"]
     original = (request_dir / "idempotency.txt").read_bytes()
     # A lost HTTP response reuses the active review rather than opening another.
@@ -132,7 +134,7 @@ def test_lost_response_and_abandoned_window_have_explicit_same_identity_recovery
     assert (request_dir / "idempotency.txt").read_bytes() == original
     assert canonical["work_state"]["state"] == "unreviewed"
     script = launched[0].read_text()
-    assert " HUP\n" in script and " INT\n" in script and " TERM\n" in script
+    assert "exec " in script
 
 
 def test_committed_write_with_lost_response_can_reconcile_original_request(tmp_path):
@@ -146,7 +148,8 @@ def test_committed_write_with_lost_response_can_reconcile_original_request(tmp_p
     retry = bridge.begin(REF, "done", 1)  # the original browser intent remains reachable
     assert retry["phase"] == "needs_reconciliation" and retry["ticket"] == result["ticket"]
     bridge.reconcile(result["ticket"])
-    assert len(launched) == 2 and "--reconcile" in launched[-1].read_text()
+    assert len(launched) == 2
+    assert (launched[-1].parent / "review-mode").read_text() == "reconcile"
     assert original == (request_dir / "request.json").read_bytes()
     assert key == (request_dir / "idempotency.txt").read_bytes()
     finish(launched[-1])
