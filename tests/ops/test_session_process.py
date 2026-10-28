@@ -3,6 +3,7 @@
 import json
 import os
 import secrets
+import sqlite3
 import subprocess
 import sys
 import time
@@ -93,7 +94,7 @@ def process(tmp_path):
 
 
 def test_complete_process_flow_recovers_exact_root_and_returns_only_business_data(process):
-    call, owner, _ = process
+    call, owner, profile = process
     client = secrets.token_hex(16)
     service = call(client, "services")["value"]["services"][0]
     assert service["mode"] == "disposable"
@@ -189,6 +190,65 @@ def test_complete_process_flow_recovers_exact_root_and_returns_only_business_dat
         )["ok"]
         is False
     )
+
+    with sqlite3.connect(profile.parent / "enrollment.sqlite") as db:
+        roots_before = db.execute("SELECT id,status,grant FROM holder_roots").fetchall()
+    assert len(roots_before) == 1
+    closed = call(client, "close_client")
+    assert closed["ok"]
+    assert closed["value"] == {
+        "schema": "zenith.session-client-closed.v1",
+        "closed": True,
+        "server_revocation_confirmed": False,
+    }
+    assert call(client, "close_client")["value"] == closed["value"]
+    assert call(client, "reconcile", request_handle=handle)["ok"] is False
+    with sqlite3.connect(profile.parent / "enrollment.sqlite") as db:
+        assert db.execute("SELECT id,status,grant FROM holder_roots").fetchall() == roots_before
+    assert (
+        call(
+            client,
+            "execute",
+            credential_handle=result["credential_handle"],
+            request_id=secrets.token_hex(16),
+            call=get,
+        )["ok"]
+        is False
+    )
+
+
+def test_client_cleanup_releases_only_its_slot_without_recreating_old_keys(process):
+    call, owner, _ = process
+    service = call(secrets.token_hex(16), "services")["value"]["services"][0]["service"]
+    clients = [secrets.token_hex(16) for _ in range(9)]
+    requests = [
+        dict(
+            service=service,
+            request_id=secrets.token_hex(16),
+            permissions=permissions_for(service),
+            lifetime_seconds=300,
+            display=dict(session_label="Capacity fixture", purpose="Read one task"),
+        )
+        for _ in clients
+    ]
+    reviews = []
+    for client, request in zip(clients[:8], requests[:8], strict=True):
+        value = call(client, "prepare", **request)
+        assert value["ok"]
+        reviews.append(value["value"]["review"])
+    assert call(clients[8], "prepare", **requests[8])["ok"] is False
+    assert call(clients[0], "close_client")["ok"]
+    assert call(clients[0], "close_client")["ok"]
+    assert call(clients[0], "prepare", **requests[0])["ok"] is False
+    assert call(clients[8], "prepare", **requests[8])["ok"]
+    unaffected = call(
+        clients[1],
+        "owner_challenge",
+        request_handle=reviews[1]["request_handle"],
+        owner_public_key=owner.public_key().public_bytes_raw().hex(),
+        installation_id="aa" * 16,
+    )
+    assert unaffected["ok"]
 
 
 def test_invalid_client_cannot_create_files_or_choose_a_profile(process):

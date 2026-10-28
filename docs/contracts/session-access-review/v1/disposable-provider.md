@@ -38,6 +38,14 @@ proofs stay inside the broker/provider. Only bounded business results return.
 Current revocation, replay, selector and transaction checks use the existing
 signed-read handler. No public credential, issuer-key or proof is returned by MCP.
 
+The private `close_client` operation takes empty arguments and only the broker's
+bound client ID. On adapter EOF/finally it terminates that client's helper,
+destroys its ephemeral keys and releases its slot. Repeating it succeeds with
+`{schema:"zenith.session-client-closed.v1",closed:true,server_revocation_confirmed:false}`.
+Old handles become unusable; recovering them never generates replacement keys.
+Other clients, root/assignment records and retained review history stay intact.
+It is not a public MCP tool, a signing action or an issuer-side revocation.
+
 This first adapter supports finite fixed-ID Work `get`/`list` only. It refuses
 modern Arena/path/standing profiles rather than flattening their selectors or
 guards. Writes are unavailable. Production profile integration requires its own

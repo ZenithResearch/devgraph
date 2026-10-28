@@ -28,6 +28,7 @@ def dispatch(app, value):
     client, action, args = value["client_id"], value["operation"], value["arguments"]
     fields = {
         "services": set(),
+        "close_client": set(),
         "prepare": {"service", "request_id", "permissions", "expires_at", "display"},
         "update_expiry": {"request_handle", "expires_at"},
         "owner_challenge": {"request_handle", "owner_public_key", "installation_id"},
@@ -43,6 +44,8 @@ def dispatch(app, value):
         )
     if not valid:
         raise ValueError("unsupported_provider_command")
+    if action == "close_client":
+        return app.close_client(client)
     if action == "services":
         caps = app.provider.capabilities()
         return {

@@ -468,6 +468,18 @@ class DisposableSessionApplication:
             client, handle, request_id, envelope, storage=self.storage, audit_log=self.audit
         )
 
-    def close(self):
-        for context in self.clients.values():
+    def close_client(self, client):
+        if not isinstance(client, str) or not re.fullmatch(r"[0-9a-f]{32}", client):
+            raise ValueError("invalid_session_client")
+        context = self.clients.pop(client, None)
+        if context is not None:
             context["native"].close()
+        # Retain original roots, assignments and review history. Custody closure
+        # destroys ephemeral keys; it is not an issuer-side revocation.
+        return dict(
+            schema="zenith.session-client-closed.v1", closed=True, server_revocation_confirmed=False
+        )
+
+    def close(self):
+        for client in list(self.clients):
+            self.close_client(client)
