@@ -266,6 +266,51 @@ def test_event_receipt_claim_rejects_mismatched_digest_before_storage() -> None:
     assert calls == []
 
 
+@pytest.mark.parametrize("field", ["idempotency_claim_digest", "idempotency_key_digest"])
+@pytest.mark.parametrize("encoded", [False, True])
+def test_receipt_lookup_filters_before_hydration_and_includes_archived(field, encoded):
+    digest = "a" * 64
+    properties = {field: digest}
+    if encoded:
+        properties = Neo4jGraphStorage._generic_properties(properties)
+    storage, calls = _storage_with_rows([_generic_row(properties=properties, archived=True)])
+    found = storage.find_event_receipt_by_digest(field, digest)
+    assert found.archived and found.properties[field] == digest
+    query, parameters = calls[0]
+    assert f"WHERE n.`{field}` IN $digests" in query
+    assert "LIMIT 2" in query and "archived = false" not in query
+    assert parameters["digests"] == [
+        digest,
+        Neo4jGraphStorage._generic_properties({field: digest})[field],
+    ]
+
+
+@pytest.mark.parametrize(
+    "field,digest",
+    [("id", "a" * 64), ("idempotency_claim_digest", "bad"), ("x` OR true", "a" * 64)],
+)
+def test_receipt_lookup_rejects_invalid_selectors_before_storage(field, digest):
+    storage, calls = _storage_with_rows([])
+    with pytest.raises(StorageUnavailable, match="invalid receipt lookup"):
+        storage.find_event_receipt_by_digest(field, digest)
+    assert not calls
+
+
+def test_receipt_lookup_rejects_ambiguous_or_mismatched_rows():
+    field, digest = "idempotency_claim_digest", "a" * 64
+    row = _generic_row(properties={field: digest})
+    for rows in (
+        [row, row],
+        [_generic_row(properties={field: "b" * 64})],
+        [_generic_row(label="Task", properties={field: digest})],
+    ):
+        storage, _ = _storage_with_rows(rows)
+        with pytest.raises(StorageUnavailable):
+            storage.find_event_receipt_by_digest(field, digest)
+    storage, _ = _storage_with_rows([])
+    assert storage.find_event_receipt_by_digest(field, digest) is None
+
+
 def test_legacy_generic_sentinel_string_is_not_decoded_without_node_marker() -> None:
     properties: dict[str, object] = {"message": '__devgraph_generic_json_v1__:{"legacy":true}'}
     storage, _ = _storage_with_rows([_generic_row(properties=properties)])

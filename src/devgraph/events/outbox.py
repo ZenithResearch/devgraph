@@ -288,10 +288,8 @@ class EventOutbox:
         property_name: str,
         idempotency_digest: str,
     ) -> EventReceipt | None:
-        for node in self._storage.query(EVENT_RECEIPT_LABEL):
-            if node.properties.get(property_name) == idempotency_digest:
-                return EventReceipt.from_node_properties(node.id, node.properties)
-        return None
+        node = self._storage.find_event_receipt_by_digest(property_name, idempotency_digest)
+        return None if node is None else EventReceipt.from_node_properties(node.id, node.properties)
 
 
 def canonical_idempotency_claim_bytes(

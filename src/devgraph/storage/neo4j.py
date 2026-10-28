@@ -34,6 +34,7 @@ from devgraph.storage.base import (
 )
 from devgraph.storage.containment import validate_arena_page, validate_containment_subject
 from devgraph.storage.delegated import DelegatedWorkSelector
+from devgraph.storage.receipt_lookup import validate_receipt_lookup
 from devgraph.storage.supporting_material import (
     MAX_PROVENANCE,
     SUPPORTING_KINDS,
@@ -1368,6 +1369,28 @@ class Neo4jGraphStorage:
             limit=limit,
         )
         return [self._node_from_row(row, node_label) for row in rows]
+
+    def find_event_receipt_by_digest(self, property_name: str, digest: str) -> NodeRecord | None:
+        validate_receipt_lookup(property_name, digest)
+        # The claim field uses migration 24's unique index. Legacy keys retain
+        # their server-side predicate; neither lookup transfers unrelated receipts.
+        # Admit both pre-encoding rows and current marked generic properties.
+        encoded = self._generic_properties({property_name: digest})[property_name]
+        rows = self._run_graph(
+            "MATCH (n:`EventReceipt`) "
+            f"WHERE n.`{property_name}` IN $digests "
+            "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+            "properties(n) AS properties LIMIT 2",
+            digests=[digest, encoded],
+        )
+        if len(rows) > 1:
+            raise StorageUnavailable("ambiguous receipt lookup")
+        if not rows:
+            return None
+        node = self._node_from_row(rows[0], "EventReceipt")
+        if node.properties.get(property_name) != digest:
+            raise StorageUnavailable("invalid receipt lookup result")
+        return node
 
     def claim_event_receipt(
         self,
