@@ -67,6 +67,8 @@ class EventOutbox:
         *,
         receipt_id_factory: Callable[[], str] | None = None,
     ) -> None:
+        if not callable(getattr(storage, "link_new_event_receipt", None)):
+            raise TypeError("fresh receipt link capability required")
         self._storage = storage
         self._receipt_id_factory = receipt_id_factory or (lambda: f"event-receipt-{uuid.uuid4()}")
 
@@ -272,13 +274,7 @@ class EventOutbox:
                 return None, existing_receipt
 
             result = mutation(self._storage)
-            self._storage.create_edge(
-                subject_label,
-                subject_id,
-                EMITTED_EVENT,
-                EVENT_RECEIPT_LABEL,
-                receipt.id,
-            )
+            self._storage.link_new_event_receipt(subject_label, subject_id, receipt.id)
             if on_result is not None:
                 on_result(receipt, False)
             return result, receipt

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from copy import deepcopy
-from threading import RLock
+from threading import RLock, local
 from typing import Any
 
 from devgraph.model.validation import (
@@ -44,6 +44,7 @@ class MemoryGraphStorage:
         self._edges: list[EdgeRecord] = []
         self._applied_constraints: set[str] = set()
         self._transaction_lock = RLock()
+        self._transaction_state = local()
 
     @staticmethod
     def _is_canonical_payload(label: str, properties: object) -> bool:
@@ -764,10 +765,61 @@ class MemoryGraphStorage:
                 raise StorageUnavailable("ambiguous idempotency claim")
             if matches:
                 return EventReceiptClaim(False, matches[0])
-            return EventReceiptClaim(
-                True,
-                self.create_node("EventReceipt", node_id, properties),
-            )
+            node = self.create_node("EventReceipt", node_id, properties)
+            active = getattr(self._transaction_state, "transaction", None)
+            if active is not None:
+                self._transaction_state.fresh_receipt_claims[node.id] = (
+                    active,
+                    properties.get("subject_label"),
+                    properties.get("subject_id"),
+                    node,
+                )
+            return EventReceiptClaim(True, node)
+
+    def link_new_event_receipt(
+        self, subject_label: str, subject_id: str, receipt_id: str
+    ) -> EdgeRecord:
+        validate_work_object_id(subject_id)
+        validate_work_object_id(receipt_id)
+        with self._transaction_lock:
+            state = self._transaction_state
+            active = getattr(state, "transaction", None)
+            proof = getattr(state, "fresh_receipt_claims", {}).get(receipt_id)
+            if (
+                active is None
+                or proof is None
+                or proof[0] is not active
+                or proof[1:3]
+                != (
+                    subject_label,
+                    subject_id,
+                )
+            ):
+                raise StorageUnavailable("fresh receipt claim required")
+            try:
+                target = self._nodes.get(("EventReceipt", receipt_id))
+                if (
+                    target is not proof[3]
+                    or target.archived
+                    or target.properties.get("subject_label") != subject_label
+                    or target.properties.get("subject_id") != subject_id
+                    or (subject_label, subject_id) not in self._nodes
+                    or any(
+                        e.relationship == "EMITTED_EVENT"
+                        and e.to_label == "EventReceipt"
+                        and e.to_id == receipt_id
+                        for e in self._edges
+                    )
+                ):
+                    raise StorageUnavailable("fresh receipt endpoints unavailable")
+                edge = self.create_edge(
+                    subject_label, subject_id, "EMITTED_EVENT", "EventReceipt", receipt_id
+                )
+            except BaseException:
+                state.rollback_only = True
+                raise
+            del state.fresh_receipt_claims[receipt_id]
+            return edge
 
     def inspect_canonical_persistence(self) -> None:
         try:
@@ -789,16 +841,38 @@ class MemoryGraphStorage:
     @contextmanager
     def transaction(self) -> Iterator[None]:
         with self._transaction_lock:
+            state = self._transaction_state
+            outer = not hasattr(state, "transaction")
+            if outer:
+                state.transaction = object()
+                state.fresh_receipt_claims = {}
+                state.rollback_only = False
+            rollback_only_snapshot = state.rollback_only
             nodes_snapshot = deepcopy(self._nodes)
             edges_snapshot = deepcopy(self._edges)
             constraints_snapshot = deepcopy(self._applied_constraints)
+            claims_snapshot = {
+                key: (*proof[:3], nodes_snapshot.get(("EventReceipt", key)))
+                if self._nodes.get(("EventReceipt", key)) is proof[3]
+                else proof
+                for key, proof in state.fresh_receipt_claims.items()
+            }
             try:
                 yield
+                if state.rollback_only:
+                    raise StorageUnavailable("nested transaction failed")
             except BaseException:
                 self._nodes = nodes_snapshot
                 self._edges = edges_snapshot
                 self._applied_constraints = constraints_snapshot
+                state.fresh_receipt_claims = claims_snapshot
+                state.rollback_only = rollback_only_snapshot
                 raise
+            finally:
+                if outer:
+                    del state.transaction
+                    del state.fresh_receipt_claims
+                    del state.rollback_only
 
     def apply_constraints(self, statements: list[str]) -> ConstraintResult:
         return count_idempotent_application(statements, self._applied_constraints)
