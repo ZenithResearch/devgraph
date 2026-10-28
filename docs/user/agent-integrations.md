@@ -166,3 +166,14 @@ For Hermes, use its plugin disable command before removing or replacing the
 installed plugin directory. Preserve the old package for rollback and install
 the new package into a fresh destination. Integration removal does not revoke
 Devgraph grants or remove graph data; those are separate operator actions.
+
+## Finish work in a tracked session
+
+DevGraph's session work disposition is independent of an application's retained
+conversation and current turn. Use the [session state workflow](../dev/session-provenance.md#finish-or-reopen-work-in-a-session)
+to prepare an exact `session.state` update, then submit through the normal native
+Wallet/secS approval path. Mark Done only when the intended work in that session
+has finished; closing a turn or receiving a successful tool result is insufficient.
+Reopen explicitly before treating that conversation as Open work again. A Done
+session can still have unfinished linked tasks; each task keeps its own progress
+and acceptance rules. State changes do not cascade to child or runtime sessions.

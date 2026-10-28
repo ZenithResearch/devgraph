@@ -111,6 +111,7 @@ class SessionReader:
                     if not after:
                         break
                 for item in items:
+                    item["work_state"] = canonical.get(item["id"], {}).get("work_state")
                     item["canonical"] = (
                         True
                         if item["id"] in canonical
@@ -328,6 +329,7 @@ class SessionReader:
             return None
         item["source_resolution"] = self.sources.resolve(item)
         item["canonical_status"] = "not_connected"
+        item["work_state"] = None
         if self.config.get("canonical_reads"):
             with self.lock:
                 status = self.value["canonical_graph"]
@@ -344,6 +346,7 @@ class SessionReader:
                 if canonical:
                     item["canonical"] = True
                     item["canonical_import"] = canonical
+                    item["work_state"] = canonical.get("work_state")
                     for binding in canonical["work_refs"]:
                         existing = next(
                             (b for b in item["work_refs"] if b["key"] == binding["key"]), None

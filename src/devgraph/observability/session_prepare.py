@@ -17,6 +17,35 @@ BASIS = {
 }
 
 
+def prepare_state(reader, ref_id, state):
+    from devgraph.observability.session_reads import REF_ID
+
+    if not REF_ID.fullmatch(ref_id):
+        raise ValueError("invalid_session_reference")
+    # A native record is not required: DevGraph owns this disposition even if
+    # the source app deleted its retained conversation or is currently offline.
+    canonical = reader.graph_reader("/session-refs/v1/" + ref_id)
+    if not canonical or canonical.get("canonical") is not True:
+        raise ValueError("canonical_session_required")
+    current = canonical.get("work_state")
+    if not current:
+        raise ValueError("session_state_host_upgrade_required")
+    if current["state"] == state:
+        raise ValueError("session_work_state_unchanged")
+    return WorkRequest.from_json(
+        json.dumps(
+            {
+                "schema": "devgraph.work-request.v2",
+                "operation": "session.state",
+                "kind": "SessionRef",
+                "id": ref_id,
+                "expected_version": current["version"],
+                "payload": {"state": state},
+            }
+        ).encode()
+    )
+
+
 def prepare(reader, ref_id, work, *, link_ref=None):
     kind, node_id = work_ref(work)
     detail = reader.detail(ref_id)
@@ -90,6 +119,11 @@ def write_bundle(request, directory: Path):
                     "schema": "devgraph.session-import-review.v1",
                     "authority": False,
                     "operation": request.authority_operation,
+                    **(
+                        {"session_work_state": request.payload["state"]}
+                        if request.operation == "session.state"
+                        else {}
+                    ),
                     "resources": list(request.resources),
                     "expected_version": request.expected_version,
                     "request_digest_sha256": request.digest,

@@ -89,6 +89,16 @@ def register_credential_work(app, services):
 
         parsed = parse_named_request(value["request"].encode("utf-8"))
         if isinstance(parsed, WorkRequest) and parsed.version == 2:
+            if parsed.operation == "session.state":
+                return {
+                    "state": "committed",
+                    "schema": "devgraph.work-result.v2",
+                    "receipt": _receipt_envelope(receipt, duplicate=duplicate),
+                    "work": None,
+                    "session": (
+                        None if work is None else {"id": work.id, "work_state": work.public()}
+                    ),
+                }
             return {
                 "state": "committed",
                 "schema": "devgraph.work-result.v2",

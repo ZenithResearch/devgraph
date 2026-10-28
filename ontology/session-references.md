@@ -105,3 +105,29 @@ Missing/deleted/ephemeral/denied/unresolved source records stay distinct. A stor
 file or ended_at=null is not proof of current activity. Grok/other harnesses have
 the general representation and importer seam; no Grok collector or source API
 is asserted. Only Codex CLI and Claude Code print mode have capture adapters here.
+
+## DevGraph-owned session work state
+
+`SessionWorkState` stores the operator's Open/Done disposition separately from
+immutable SessionRef identity. Its ID is the associated SessionRef ID. Reads expose
+`work_state` with `state`, `version`, `updated_at` and `updated_by`. A reference
+without a state record is `unreviewed`, revision 1, with no fabricated actor/time.
+Unimported or unavailable canonical reads have no authoritative state.
+
+`devgraph.work.session.state.v2` uses the existing signed v2 transport with an
+exact `SessionRef` subject, expected state revision and `{"state":"done"}` or
+`{"state":"open"}` payload. This transport specialization does not make sessions
+Todo-derived Work. Only this operation accepts a SessionRef subject. It authorizes
+exactly `SessionRef/{id}`; an attachment or Work grant never implicitly grants it.
+The serialized receiver transaction writes state and EventReceipt together. A stale
+revision conflicts, retries reuse the original request/idempotency files, and a
+successful update increments only the state revision. Identity bytes, attribution
+edges, linked Work versions/progress, parent and child sessions remain unchanged.
+
+Done means the operator has finished the current work in that conversation. It
+is not a claim that a task passed acceptance. Native turn completion, process exit,
+file activity, later imports or observations cannot set or reopen this state.
+Reopening requires a new explicit signed update. Pulse's Current view excludes
+only canonically Done sessions; Done and All remain available for context/history.
+Source records without canonical state remain visibly unreviewed, never inferred
+as Open. A missing source does not prevent an authorized canonical state update.

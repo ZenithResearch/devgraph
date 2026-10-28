@@ -33,6 +33,7 @@ def test_session_specializations_agree_with_common_source_owned_contract():
         "GET /session-refs/v1",
         "GET /session-refs/v1/{id}",
         "devgraph.work.session.attach.v2",
+        "devgraph.work.session.state.v2",
     ]
     assert profile["relations"]["uses_runtime"] == "harness-to-native-runtime"
     assert terms["zn:SESSION_LINK_ORIGIN"]["domain"] == "zn:SessionLink"
@@ -40,6 +41,15 @@ def test_session_specializations_agree_with_common_source_owned_contract():
 
 
 def test_generalization_preserves_legacy_bundle_and_operational_contracts():
+    latest_previous = ONTOLOGY / "releases/v0.11.0"
+    assert hashlib.sha256((latest_previous / "manifest.json").read_bytes()).hexdigest() == (
+        "d47d471c423ed58f9a17d8223bda7f9c871912af9e4f69fec75c26e1afeb3a8d"
+    )
+    for item in json.loads((latest_previous / "manifest.json").read_text())["files"]:
+        assert (
+            hashlib.sha256((latest_previous / item["path"]).read_bytes()).hexdigest()
+            == item["sha256"]
+        )
     previous = ONTOLOGY / "releases/v0.10.0"
     assert hashlib.sha256((previous / "manifest.json").read_bytes()).hexdigest() == (
         "4d6b556256ef6e815d474a7a80edcece49c2317f51c92bb2b97918c097074953"
@@ -48,7 +58,7 @@ def test_generalization_preserves_legacy_bundle_and_operational_contracts():
         assert hashlib.sha256((previous / item["path"]).read_bytes()).hexdigest() == item["sha256"]
     for name in ("operations.json", "arena-contract.json", "repository-contract.json"):
         old = json.loads((previous / name).read_text())
-        new = json.loads((ONTOLOGY / name).read_text())
+        new = json.loads((ONTOLOGY / "releases/v0.11.0" / name).read_text())
         assert old.pop("ontology_version") == "0.10.0"
         assert new.pop("ontology_version") == "0.11.0"
         if name == "operations.json":
@@ -60,7 +70,8 @@ def test_generalization_preserves_legacy_bundle_and_operational_contracts():
         x["@id"]: x for x in json.loads((previous / "ontology.jsonld").read_text())["@graph"]
     }
     new_terms = {
-        x["@id"]: x for x in json.loads((ONTOLOGY / "ontology.jsonld").read_text())["@graph"]
+        x["@id"]: x
+        for x in json.loads((ONTOLOGY / "releases/v0.11.0/ontology.jsonld").read_text())["@graph"]
     }
     for key, old in prior_terms.items():
         if key == "https://zenith-research.ca/ontology":

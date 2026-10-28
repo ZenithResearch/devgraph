@@ -142,3 +142,30 @@ record again through the canonical HTTP API. It never represents this as graph
 attribution, delegation evidence or completed work. No Work body or transcript is
 copied into the journal. Retained inspection timestamps can order source activity
 without claiming a running process.
+
+## Finish or reopen work in a session
+
+Session disposition is DevGraph-owned; native app conversations remain available.
+Prepare a narrow state update against the current canonical revision:
+
+```sh
+devgraph sessions prepare-state --config /absolute/private/session-reader.json \
+  --ref sr-<64-hex-digest> --state done --output-dir /absolute/private/finish-session
+devgraph work session.state --credential-v2 \
+  --request-file /absolute/private/finish-session/request.json \
+  --idempotency-key-file /absolute/private/finish-session/idempotency.txt
+```
+
+Use `--state open` and a new prepared bundle to reopen. Preparation does not grant,
+sign or submit. Submission uses the existing native Wallet approval and separately
+provisioned exact session-state authority. Retry uncertain outcomes with the same
+files; `--reconcile` performs the existing status-only receipt lookup. The response
+has `work: null` and a `session` result; generic Todo decoders should not claim this
+is a task. The read-only Pulse reader displays state but does not submit mutations.
+
+Source-only records must first be explicitly imported. A missing `work_state` in a
+canonical read means that host needs the coordinated upgrade; the preparation
+command refuses to guess a revision. Migration 31 adds state uniqueness only.
+Take the normal native backup before rollout. This source candidate has not been
+deployed merely by changing the prototype reader. Existing v0.11.0 bundles and
+stored SessionRef records remain unchanged and readable.

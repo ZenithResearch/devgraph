@@ -28,6 +28,7 @@ WRITE_OPERATIONS = frozenset(
         "restore",
         "proposal.reject",
         "session.attach",
+        "session.state",
     )
 ) | frozenset(f"devgraph.arena.{op}.v1" for op in ("create", "patch", "archive", "member.set"))
 ResourceKind = Literal[

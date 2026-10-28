@@ -209,3 +209,17 @@ explicit public scalar projections, and mandatory LIMIT 1–100. It does not
 support Arena, Entity, whole-node projections, write clauses, procedures,
 subqueries, arbitrary functions, or private properties. Prefer named reads
 unless a bounded query materially helps.
+
+## Session work disposition
+
+An imported SessionRef has a separate DevGraph-owned `work_state`: unreviewed
+until explicitly set, then open or done. Native turn status is observation only.
+`devgraph sessions prepare-state --config /private/session-reader.json --ref sr-…
+--state done --output-dir /private/new-bundle` prepares exact current revision,
+request and idempotency files. Submit with `devgraph work session.state
+--credential-v2 --request-file ... --idempotency-key-file ...` through the native
+Wallet/secS contract. Reopening uses `--state open` and a new prepared request.
+The only resource is that exact SessionRef; attachment/Work grants do not confer
+state authority. Do not infer completion, auto-reopen from new source activity,
+or complete linked Work. Failed canonical reads or a missing `work_state` require
+recovery/upgrade, never an invented revision. Receipt retry rules remain unchanged.

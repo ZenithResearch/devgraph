@@ -27,3 +27,4 @@ CREATE CONSTRAINT event_receipt_idempotency_claim_digest IF NOT EXISTS FOR (n:Ev
 CREATE CONSTRAINT arena_id IF NOT EXISTS FOR (n:Arena) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT session_ref_id IF NOT EXISTS FOR (n:SessionRef) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT session_link_id IF NOT EXISTS FOR (n:SessionLink) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT session_work_state_id IF NOT EXISTS FOR (n:SessionWorkState) REQUIRE n.id IS UNIQUE;

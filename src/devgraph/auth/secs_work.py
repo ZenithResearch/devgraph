@@ -303,6 +303,8 @@ class SecSWorkAdapter:
                 summary = (
                     {**verified.safe_summary, **scope.summary} if scope else verified.safe_summary
                 )
+                if request.operation == "session.state":
+                    summary = {**summary, "session_work_state": request.payload["state"]}
                 subject_kind, subject_id = (
                     ("Issue", request.payload["issue_id"])
                     if request.operation == "convert"

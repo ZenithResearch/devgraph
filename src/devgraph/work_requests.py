@@ -29,7 +29,7 @@ from devgraph.auth.secs_issue_create import (
     _strict_json_object,
 )
 from devgraph.model.validation import validate_version, validate_work_object_id
-from devgraph.observability.session_contract import SessionAttach
+from devgraph.observability.session_contract import SessionAttach, SessionStateSet
 from devgraph.progress_contract import ProgressSet, ProposalReject
 from devgraph.workflow_contract import (
     PARENTS,
@@ -76,6 +76,7 @@ WorkOperation = Literal[
     "restore",
     "proposal.reject",
     "session.attach",
+    "session.state",
 ]
 
 
@@ -127,7 +128,7 @@ class _Envelope(_Strict):
         alias="schema"
     )
     operation: WorkOperation
-    kind: Literal["Todo", "Proposal", "Initiative", "Project", "Issue", "Task"]
+    kind: Literal["Todo", "Proposal", "Initiative", "Project", "Issue", "Task", "SessionRef"]
     id: str
     expected_version: int | None
     payload: dict
@@ -138,9 +139,11 @@ WORK_OPERATIONS_V2 = tuple(op for op in WORK_OPERATIONS if op != "status") + (
     "restore",
     "proposal.reject",
     "session.attach",
+    "session.state",
 )
 
 _PAYLOAD_TYPES = {
+    "session.state": SessionStateSet,
     "session.attach": SessionAttach,
     "progress.set": ProgressSet,
     "restore": _Strict,
@@ -180,6 +183,13 @@ class WorkRequest:
             value = _strict_json_object(raw, maximum_bytes=131_072, reason="invalid_work_request")
             envelope = _Envelope.model_validate(value, strict=True)
             legacy = envelope.schema_name == WORK_REQUEST_SCHEMA
+            if (envelope.kind == "SessionRef") != (envelope.operation == "session.state"):
+                raise ValueError("session state requires exact SessionRef subject")
+            if envelope.kind == "SessionRef":
+                from devgraph.observability.session_reads import REF_ID
+
+                if not REF_ID.fullmatch(envelope.id):
+                    raise ValueError("invalid session reference")
             if legacy and (envelope.kind == "Todo" or envelope.operation not in WORK_OPERATIONS):
                 raise ValueError("v2 operation requires v2 request")
             if not legacy and envelope.operation == "status":

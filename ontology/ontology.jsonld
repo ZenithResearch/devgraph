@@ -6,8 +6,8 @@
       "@type": "owl:Ontology",
       "label": "Zenith Ontology",
       "comment": "Canonical vocabulary for Zenith work, arenas, directory entities, evidence, provenance, readiness, repository structure, and transport-neutral Devgraph operations.",
-      "versionIRI": "https://zenith-research.ca/ontology/v0.11.0/ontology.jsonld",
-      "versionInfo": "0.11.0",
+      "versionIRI": "https://zenith-research.ca/ontology/v0.12.0/ontology.jsonld",
+      "versionInfo": "0.12.0",
       "canonicalAuthority": "https://github.com/ZenithResearch/devgraph"
     },
     {
@@ -596,6 +596,13 @@
       "domain": "zn:SessionLink",
       "range": "zn:SessionRef",
       "comment": "Target endpoint: delegated child or original fork parent, according to relation."
+    },
+    {
+      "@id": "zn:SessionWorkState",
+      "@type": "owl:Class",
+      "label": "Session work state",
+      "comment": "DevGraph-owned open/done disposition for an immutable SessionRef; independent of native turn state and linked Work progress.",
+      "runtimeLabel": true
     }
   ]
 }

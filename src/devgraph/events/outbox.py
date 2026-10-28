@@ -155,7 +155,11 @@ class EventOutbox:
         )
         valid_work = valid_work or (
             operation in {f"devgraph.work.{op}.v2" for op in WORK_OPERATIONS_V2}
+            and operation != "devgraph.work.session.state.v2"
             and subject_label in {"Todo", "Proposal", "Initiative", "Project", "Issue", "Task"}
+        )
+        valid_work = valid_work or (
+            operation == "devgraph.work.session.state.v2" and subject_label == "SessionRef"
         )
         valid_arena = operation in {f"devgraph.arena.{op}.v1" for op in ARENA_OPERATIONS} and (
             subject_label

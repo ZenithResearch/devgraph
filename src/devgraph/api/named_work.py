@@ -122,8 +122,19 @@ def register_named_work(app: FastAPI, services: ApiServices) -> None:
             else 200
         )
         if version == 2:
+            from devgraph.observability.session_work_state import SessionWorkState
             from devgraph.todo_views import todo_summary
 
+            if parsed.operation == "session.state":
+                assert work is None or isinstance(work, SessionWorkState)
+                return {
+                    "schema": "devgraph.work-result.v2",
+                    "work": None,
+                    "session": (
+                        None if work is None else {"id": work.id, "work_state": work.public()}
+                    ),
+                    "receipt": _receipt_envelope(receipt, duplicate=duplicate),
+                }
             return {
                 "schema": "devgraph.work-result.v2",
                 "work": None if work is None else todo_summary(work, description=True),

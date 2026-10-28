@@ -216,3 +216,11 @@ receiver/projection adapter and a narrowly scoped owner-approved attachment gran
 is separate from the metadata reader deployment. Existing read capability and
 signed grants retain their original permissions. Historical bindings are not
 inferred and a missing canonical API is reported as unavailable.
+
+## Session disposition candidate
+
+The source includes separately authorized, revision-checked session Open/Done
+state, private CLI preparation and canonical/companion read projection. Native
+activity cannot finish or reopen the session's work. See
+[session provenance](dev/session-provenance.md). Local host/native authority
+rollout remains a separate coordinated step.
