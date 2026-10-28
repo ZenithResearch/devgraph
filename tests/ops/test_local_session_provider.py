@@ -68,6 +68,7 @@ def test_preparation_is_exact_private_new_files_without_starting_runtime(setup):
     profile = json.loads((descriptor.parent / "profile.json").read_bytes())
     assert registration["schema"] == "zenith.session-provider-registration.v1"
     assert registration["mode"] == profile["mode"] == "production"
+    assert profile["session_grant_schema"] == "secs.holder-grant.v2"
     assert registration["provider"] == setup.provider
     assert registration["receiver_pin"] == setup.receiver
     assert descriptor.stat().st_mode & 0o777 == 0o600
@@ -135,3 +136,53 @@ def test_factory_closes_composition_if_actual_provider_disagrees(setup, monkeypa
     with pytest.raises(ValueError, match="binding_changed"):
         module.LocalSessionApplication(descriptor.parent / "profile.json")
     assert calls == ["closed"]
+
+
+def test_scoped_feature_probe_is_synthetic_and_cannot_issue_or_read_graph():
+    calls = []
+
+    def invoke(operation, **fields):
+        calls.append((operation, fields))
+        return {"allowed": [True]}
+
+    module.require_scoped_authority(SimpleNamespace(service="service:fixture", invoke=invoke))
+    assert len(calls) == 1 and calls[0][0] == "check_selector"
+    assert set(calls[0][1]) == {"selector", "targets", "snapshot"}
+    assert calls[0][1]["targets"] == [{"kind": "Arena", "id": "session-capability-probe"}]
+    with pytest.raises(ValueError, match="scoped_native_authority_required"):
+        module.require_scoped_authority(
+            SimpleNamespace(
+                service="service:fixture", invoke=lambda *args, **kw: {"allowed": [False]}
+            )
+        )
+
+
+def test_explicit_canonical_provider_precedes_publication_parent_and_keeps_v1_default(
+    tmp_path, monkeypatch
+):
+    runtime_file, authority_file = tmp_path / "runtime", tmp_path / "authority"
+    authority = dict(
+        issuer="fixture",
+        key_id="fixture-key",
+        public_key="ab" * 32,
+        receiver="https://fixture.invalid",
+        audience="devgraph",
+    )
+    runtime_file.write_text("{}")
+    authority_file.write_bytes(canonical_json(authority))
+    runtime_file.chmod(0o600)
+    authority_file.chmod(0o600)
+    config = SimpleNamespace(
+        schema_="devgraph.signed-read-runtime.v11",
+        holder_grant_schema="secs.holder-grant.v1",
+        holder_grant_binary=Path("/fixture/helper"),
+        canonical_service_id="service:fixture",
+        membership_requirement="optional",
+        holder_grant_provider_runtime_file=runtime_file,
+        owner_parent_runtime_file=tmp_path / "publication-parent",
+        authority_policy_file=authority_file,
+    )
+    monkeypatch.setattr(module.ReadRuntimeConfiguration, "model_validate", lambda value: config)
+    selected, provider, receiver = module.configured_provider(runtime_file)
+    assert selected.holder_grant_schema == "secs.holder-grant.v1"
+    assert receiver == authority and provider["service"] == "service:fixture"

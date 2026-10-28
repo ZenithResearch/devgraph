@@ -13,7 +13,7 @@ import stat
 from pathlib import Path
 
 from devgraph.auth.delegated_contract import canonical_json
-from devgraph.auth.holder_grants import checksum_bytes
+from devgraph.auth.holder_grants import HolderGrantHost, checksum_bytes
 from devgraph.auth.session_access import SessionAccessProvider
 from devgraph.disposable_sessions import SessionApplication, _write
 from devgraph.local_host import load_local_config
@@ -39,16 +39,16 @@ def configured_provider(runtime_file):
     config = ReadRuntimeConfiguration.model_validate(private_json(Path(runtime_file)))
     if (
         config.schema_ != "devgraph.signed-read-runtime.v11"
-        or config.holder_grant_schema != "secs.holder-grant.v2"
+        or config.holder_grant_schema not in ("secs.holder-grant.v1", "secs.holder-grant.v2")
         or config.holder_grant_binary is None
         or not config.canonical_service_id
         or config.membership_requirement != "optional"
     ):
         raise ValueError("unsupported_local_session_runtime")
     # Session assignments belong to the canonical registry, never a route alias.
-    for path in (config.holder_grant_provider_runtime_file, config.owner_parent_runtime_file):
-        if path is not None and path.resolve() != Path(runtime_file).resolve():
-            raise ValueError("canonical_provider_runtime_required")
+    selected = config.holder_grant_provider_runtime_file or config.owner_parent_runtime_file
+    if selected is not None and selected.resolve() != Path(runtime_file).resolve():
+        raise ValueError("canonical_provider_runtime_required")
     authority = private_json(config.authority_policy_file)
     receiver = {k: authority[k] for k in ("issuer", "key_id", "public_key", "receiver", "audience")}
     provider = {k: authority[k] for k in ("issuer", "key_id", "public_key")}
@@ -69,9 +69,11 @@ def validate_profile(profile):
             "host_config",
             "runtime_config",
             "session_binary",
+            "session_grant_schema",
         }
         or profile["schema"] != "devgraph.local-session-provider.v1"
         or profile["mode"] != "production"
+        or profile["session_grant_schema"] != "secs.holder-grant.v2"
         or not isinstance(profile["name"], str)
         or not 1 <= len(profile["name"]) <= 80
         or type(profile["maximum_seconds"]) is not int
@@ -85,6 +87,34 @@ def validate_profile(profile):
     if provider != profile["provider"] or receiver != profile["receiver_pin"]:
         raise ValueError("session_provider_binding_changed")
     return host, config
+
+
+def require_scoped_authority(holder):
+    """Read-only native feature probe on synthetic resources, not graph data."""
+    ref = dict(kind="Arena", id="session-capability-probe")
+    result = holder.invoke(
+        "check_selector",
+        selector=dict(
+            schema="secs.resource-selector.v1",
+            service=holder.service,
+            kinds=["Arena"],
+            selection=dict(mode="objects", refs=[ref]),
+        ),
+        targets=[ref],
+        snapshot=dict(
+            service=holder.service,
+            relation="devgraph.containment.v1",
+            resources=[dict(resource=ref, ancestors=[])],
+        ),
+    )
+    if (
+        not isinstance(result, dict)
+        or set(result) != {"allowed"}
+        or not isinstance(result["allowed"], list)
+        or len(result["allowed"]) != 1
+        or result["allowed"][0] is not True
+    ):
+        raise ValueError("scoped_native_authority_required")
 
 
 def prepare_registration(
@@ -110,6 +140,7 @@ def prepare_registration(
         host_config=file_pin(host_config),
         runtime_config=file_pin(runtime_config),
         session_binary=file_pin(session_binary),
+        session_grant_schema="secs.holder-grant.v2",
     )
     validate_profile(profile)  # metadata only; not create_app/enrollment/Neo4j
     root = Path(source_root).resolve(strict=True)
@@ -174,6 +205,19 @@ class LocalSessionApplication(SessionApplication):
             holder = components.enrollment.holder_grants
             if holder.pin != profile["provider"]:
                 raise ValueError("session_provider_binding_changed")
+            if holder.grant_schema != profile["session_grant_schema"]:
+                # Private process only: retain the exact existing issuer, binary,
+                # provider/route registries and identities. Public host defaults
+                # and every stored v1/v2 grant remain untouched.
+                holder = HolderGrantHost(
+                    enrollment=holder.enrollment,
+                    provider_enrollment=holder.provider,
+                    binary=holder.binary,
+                    binary_sha256=holder.binary_sha256,
+                    service=holder.service,
+                    grant_schema=profile["session_grant_schema"],
+                )
+            require_scoped_authority(holder)
             self.clients, self.directory = {}, profile_file.parent
             self.holder, self.operator = holder, components.operator
             self.inbox, self.audit = components.operator.inbox, components.audit_log

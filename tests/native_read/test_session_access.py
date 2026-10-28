@@ -401,8 +401,10 @@ def test_owner_approval_cannot_survive_expiry_edit_or_policy_change(session_setu
 
 
 @pytest.mark.parametrize("session_setup", ["modern"], indirect=True)
+@pytest.mark.parametrize("receiver_schema", ["secs.holder-grant.v1", "secs.holder-grant.v2"])
 def test_modern_session_native_root_reads_new_arenas_and_preserves_canonical_registry(
     session_setup,
+    receiver_schema,
 ):
     from tests.model.test_arena_runtime import add_arena
 
@@ -411,6 +413,16 @@ def test_modern_session_native_root_reads_new_arenas_and_preserves_canonical_reg
     s = session_setup
     provider = s["provider"]
     issued = issue(s)
+    current = provider.holder
+    receiver = HolderGrantHost(
+        enrollment=current.enrollment,
+        provider_enrollment=current.provider,
+        binary=current.binary,
+        binary_sha256=current.binary_sha256,
+        service=current.service,
+        grant_schema=receiver_schema,
+    )
+    assert receiver.grant_schema == receiver_schema
     mutations = ArenaMutations(s["storage"])
     add_arena(mutations, "first")
     call = dict(

@@ -8,12 +8,13 @@ reads issuer-key bytes, signs, issues a grant or changes authority. Required fla
 arguments or Wallet backup records. Preserve the invoking venv interpreter path.
 
 The selected runtime must be an explicitly configured v11 canonical provider with
-secS v2 holder grants and optional community membership. A route alias pointing
-to a different provider registry is refused. This slice does not invent a
+optional community membership. Effective provider selection follows the existing
+explicit holder-provider reference before publication-parent provenance. A route
+alias pointing to a different provider registry is refused. This slice does not invent a
 membership proof or override required eligibility for an ephemeral identity.
 
 The output `profile.json` uses `devgraph.local-session-provider.v1`: production
-mode, public canonical provider/receiver pins, bounded session lifetime, hashed
+mode, explicit session grant schema v2, public canonical provider/receiver pins, bounded session lifetime, hashed
 host/runtime config references and hashed native session helper. `provider.json`
 matches `zenith.session-provider-registration.v1`: public pins, canonical profile
 digest and exact interpreter/script/profile/application-source file hashes.
@@ -34,6 +35,15 @@ authorization database, verifier fallback, trusted-localhost exception, native
 policy edit or new provider identity is introduced. Small session review/challenge
 tables live alongside the canonical inbox. Existing signed formats and records
 are retained. Normal typed graph projections remain behind signed scoped calls.
+
+The ordinary host's v1/v2 default issuance setting is retained. The private
+process explicitly uses v2 for its new session assignments, with the exact same
+issuer, binary, provider/route registry and service; existing roots are never
+converted or rewritten. A synthetic native selector probe fails startup if the
+configured native tool predates scoped verification. Every access point must use
+a qualified dual-version verifier before live activation. Updating old native
+binary references and restarting existing Wallet services is a distinct reviewed
+prerequisite; installing only a descriptor is insufficient.
 
 Local host storage settings are derived inside that server composition. Neither
 MCP nor the app receives database credentials. Public HTTPS, Tailnet and local
