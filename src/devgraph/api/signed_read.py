@@ -31,6 +31,66 @@ class GetParameters(BaseModel):
     work_id: str = Field(min_length=1, max_length=256)
 
 
+def execute_signed_read(*, storage, enrollment, audit_log, body):
+    call = body["call"]
+    if (
+        not isinstance(call, dict)
+        or set(call) != {"operation", "resource", "parameters"}
+        or call["resource"] != RESOURCE
+    ):
+        raise UnauthenticatedError("unsupported_read")
+    try:
+        if call["operation"] == "devgraph.work.list":
+            parameters = ListParameters.model_validate(call["parameters"])
+        elif call["operation"] == "devgraph.work.get":
+            parameters = GetParameters.model_validate(call["parameters"])
+        else:
+            raise UnauthenticatedError("unsupported_read")
+    except ValidationError:
+        raise UnauthenticatedError("invalid_request") from None
+    context = enrollment.verify_request(**body)
+
+    def project(context):
+        class VerifiedRequest:
+            def verify(self, credential, *, audience):
+                if credential is not None or audience != "devgraph":
+                    raise UnauthenticatedError("invalid_request")
+                return context
+
+        service = DelegatedReadService(
+            storage=storage,
+            verifier=VerifiedRequest(),
+            audience="devgraph",
+            audit_log=audit_log,
+        )
+        if isinstance(parameters, ListParameters):
+            return WorkObjectListEnvelope(
+                items=[
+                    _envelope(item) for item in service.list_work(None, **parameters.model_dump())
+                ]
+            )
+        return _envelope(service.get_work(None, **parameters.model_dump()))
+
+    from devgraph.auth.selector_grants import SelectorGrant, materialize
+
+    if any(isinstance(g, SelectorGrant) for g in context.read_grants):
+        from dataclasses import replace
+
+        with (
+            audit_log.transaction(),
+            storage.work_mutation_transaction(),
+            enrollment.holder_grants.current_read(body["credential"], body["proof"]),
+        ):
+            context = replace(
+                context,
+                envelope=replace(
+                    context.envelope, read_grants=materialize(storage, context.read_grants)
+                ),
+            )
+            return project(context)
+    return project(context)
+
+
 def create_signed_read_app(
     *,
     storage: GraphStorage,
@@ -85,64 +145,9 @@ def create_signed_read_app(
             return await run_in_threadpool(enrollment.holder_grants.issue, **body)
 
     def read(body):
-        call = body["call"]
-        if (
-            not isinstance(call, dict)
-            or set(call) != {"operation", "resource", "parameters"}
-            or call["resource"] != RESOURCE
-        ):
-            raise UnauthenticatedError("unsupported_read")
-        try:
-            if call["operation"] == "devgraph.work.list":
-                parameters = ListParameters.model_validate(call["parameters"])
-            elif call["operation"] == "devgraph.work.get":
-                parameters = GetParameters.model_validate(call["parameters"])
-            else:
-                raise UnauthenticatedError("unsupported_read")
-        except ValidationError:
-            raise UnauthenticatedError("invalid_request") from None
-        context = enrollment.verify_request(**body)
-
-        def project(context):
-            class VerifiedRequest:
-                def verify(self, credential, *, audience):
-                    if credential is not None or audience != "devgraph":
-                        raise UnauthenticatedError("invalid_request")
-                    return context
-
-            service = DelegatedReadService(
-                storage=storage,
-                verifier=VerifiedRequest(),
-                audience="devgraph",
-                audit_log=audit_log,
-            )
-            if isinstance(parameters, ListParameters):
-                return WorkObjectListEnvelope(
-                    items=[
-                        _envelope(item)
-                        for item in service.list_work(None, **parameters.model_dump())
-                    ]
-                )
-            return _envelope(service.get_work(None, **parameters.model_dump()))
-
-        from devgraph.auth.selector_grants import SelectorGrant, materialize
-
-        if any(isinstance(g, SelectorGrant) for g in context.read_grants):
-            from dataclasses import replace
-
-            with (
-                audit_log.transaction(),
-                storage.work_mutation_transaction(),
-                enrollment.holder_grants.current_read(body["credential"], body["proof"]),
-            ):
-                context = replace(
-                    context,
-                    envelope=replace(
-                        context.envelope, read_grants=materialize(storage, context.read_grants)
-                    ),
-                )
-                return project(context)
-        return project(context)
+        return execute_signed_read(
+            storage=storage, enrollment=enrollment, audit_log=audit_log, body=body
+        )
 
     @app.post("/devgraph/native-read/v2/requests")
     async def request_read(request: Request):
