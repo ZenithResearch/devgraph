@@ -335,6 +335,10 @@ class GraphStorage(Protocol):
 class EventReceiptClaimStorage(Protocol):
     """Atomic receipt-claim capability required only by the event outbox."""
 
+    def find_event_receipt_by_digest(
+        self, property_name: str, digest: str
+    ) -> NodeRecord | None: ...
+
     def claim_event_receipt(
         self,
         node_id: str,

@@ -18,9 +18,48 @@ from devgraph.events.outbox import (
     canonical_idempotency_claim_bytes,
     digest_idempotency_claim,
 )
+from devgraph.storage.base import StorageUnavailable
 from devgraph.storage.memory import MemoryGraphStorage
 
 RAW_IDEMPOTENCY_KEY = "synthetic-raw-idempotency-key-secret"
+
+
+def test_mutation_and_retry_never_materialize_the_full_receipt_history(monkeypatch):
+    storage = MemoryGraphStorage()
+    original = storage.query
+
+    def bounded_only(label=None, *args, **kwargs):
+        if label == EVENT_RECEIPT_LABEL:
+            pytest.fail("mutation must not load unrelated receipt history")
+        return original(label, *args, **kwargs)
+
+    monkeypatch.setattr(storage, "query", bounded_only)
+    outbox = EventOutbox(storage)
+    options = dict(
+        authority=_authority(),
+        operation="create_issue",
+        subject_label="Issue",
+        subject_id="issue-1",
+        idempotency_key=RAW_IDEMPOTENCY_KEY,
+        summary={},
+    )
+    _, first = outbox.record_mutation_with_receipt(
+        **options, mutation=lambda tx: _record_subject(tx)
+    )
+    _, retry = outbox.record_mutation_with_receipt(
+        **options, mutation=lambda tx: pytest.fail("duplicate mutation")
+    )
+    assert retry == first
+
+
+def test_memory_receipt_lookup_rejects_duplicate_digest_including_archived():
+    storage = MemoryGraphStorage()
+    field, digest = "idempotency_key_digest", "a" * 64
+    storage.create_node(EVENT_RECEIPT_LABEL, "receipt-a", {field: digest})
+    storage.create_node(EVENT_RECEIPT_LABEL, "receipt-b", {field: digest})
+    storage.archive_node(EVENT_RECEIPT_LABEL, "receipt-b")
+    with pytest.raises(StorageUnavailable, match="ambiguous receipt lookup"):
+        storage.find_event_receipt_by_digest(field, digest)
 
 
 def _authority(

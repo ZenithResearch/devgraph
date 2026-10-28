@@ -25,6 +25,7 @@ from devgraph.storage.base import (
 from devgraph.storage.containment import validate_arena_page, validate_containment_subject
 from devgraph.storage.delegated import DelegatedWorkSelector, validate_work_filter
 from devgraph.storage.migrations import count_idempotent_application
+from devgraph.storage.receipt_lookup import validate_receipt_lookup
 from devgraph.storage.supporting_material import (
     MAX_PROVENANCE,
     SUPPORTING_PROPERTIES,
@@ -731,6 +732,18 @@ class MemoryGraphStorage:
             ]
             records.sort(key=lambda node: node.id, reverse=descending)
             return records[:limit]
+
+    def find_event_receipt_by_digest(self, property_name: str, digest: str) -> NodeRecord | None:
+        validate_receipt_lookup(property_name, digest)
+        with self._transaction_lock:
+            matches = [
+                node
+                for node in self._nodes.values()
+                if node.label == "EventReceipt" and node.properties.get(property_name) == digest
+            ]
+            if len(matches) > 1:
+                raise StorageUnavailable("ambiguous receipt lookup")
+            return matches[0] if matches else None
 
     def claim_event_receipt(
         self,
