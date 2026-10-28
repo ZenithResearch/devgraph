@@ -840,6 +840,13 @@ def create_app(*, config_path=None, canonical_routes=True):
     if operator is not None:
         register_access_request_routes(app, inbox)
         register_access_operator(app, operator)
+    # Internal composition reuse by the explicitly configured private session
+    # process. This is not a route, bypass, new listener or automatic activation.
+    from types import SimpleNamespace
+
+    app.state.session_access_components = SimpleNamespace(
+        operator=operator, enrollment=enrollment, audit_log=audit
+    )
     app.state.service_storage = storage
     app.state.service_authority_receiver = enrollment.policy().receiver
     if canonical_routes and config.canonical_access_points:

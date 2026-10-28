@@ -1,4 +1,4 @@
-"""Long-lived private process wire for disposable session qualification only."""
+"""Private process wire for an explicitly configured session provider."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pathlib import Path
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.disposable_sessions import DisposableSessionApplication
 from devgraph.ops.secs_issue_create_receiver import _strict_json_object
+from devgraph.signed_read_runtime import private_json
 
 MAX = 262144
 
@@ -52,11 +53,11 @@ def dispatch(app, value):
             "services": [
                 dict(
                     service=app.profile["service"],
-                    name="Disposable session qualification",
+                    name=app.profile.get("name", "Disposable session qualification"),
                     capabilities=caps,
                     trusted_provider=caps["provider"],
                     receiver_pin=app.receiver_pin,
-                    mode="disposable",
+                    mode=app.profile["mode"],
                 )
             ]
         }
@@ -79,14 +80,20 @@ def dispatch(app, value):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Private disposable session provider; no installed host access"
+        description="Private session provider; profile is trusted application configuration"
     )
     parser.add_argument("--profile-file", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        app = DisposableSessionApplication(args.profile_file)
+        profile = private_json(args.profile_file)
+        if profile.get("mode") == "production":
+            from devgraph.local_session_provider import LocalSessionApplication
+
+            app = LocalSessionApplication(args.profile_file)
+        else:
+            app = DisposableSessionApplication(args.profile_file)
     except Exception:
-        print("disposable_session_profile_unavailable", file=sys.stderr)
+        print("session_provider_profile_unavailable", file=sys.stderr)
         return 2
     try:
         while True:

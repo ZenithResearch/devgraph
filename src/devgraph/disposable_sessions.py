@@ -183,8 +183,186 @@ class NativeSessionProcess:
         self.child.stdout.close()
 
 
-class DisposableSessionApplication:
-    """Fixed configured service plus real native custody/crypto, fixture data only."""
+class SessionApplication:
+    """Private session operations over explicitly constructed provider components."""
+
+    def _client(self, client):
+        if client not in self.clients:
+            raise RuntimeError("session_custody_unavailable")
+        return self.clients[client]
+
+    def _preparation(self, review):
+        return dict(
+            review=review,
+            capabilities=self.provider.capabilities(),
+            trusted_provider=self.provider.capabilities()["provider"],
+            holder=review["manifest"]["holder"],
+            receiver_pin=self.receiver_pin,
+        )
+
+    def prepare(self, client, request):
+        if not isinstance(client, str) or not re.fullmatch(r"[0-9a-f]{32}", client):
+            raise ValueError("invalid_session_client")
+        base_fields = {"service", "request_id", "permissions", "display"}
+        if set(request) not in (base_fields | {"expires_at"}, base_fields | {"lifetime_seconds"}):
+            raise ValueError("invalid_session_request")
+        if request["service"] != self.profile["service"]:
+            raise ValueError("unknown_session_service")
+        if (
+            not isinstance(request["request_id"], str)
+            or not re.fullmatch(r"[0-9a-f]{32}", request["request_id"])
+            or type(request.get("expires_at", request.get("lifetime_seconds"))) is not int
+            or not isinstance(request["permissions"], list)
+            or not 1 <= len(request["permissions"]) <= 32
+        ):
+            raise ValueError("invalid_session_request")
+        with self.inbox._database() as db:
+            prior = db.execute(
+                "SELECT 1 FROM access_requests WHERE id=?", (request["request_id"],)
+            ).fetchone()
+        if prior and (
+            client not in self.clients
+            or request["request_id"] not in self.clients[client]["identities"]
+        ):
+            raise RuntimeError("session_custody_unavailable")
+        if client not in self.clients:
+            if len(self.clients) >= 8:
+                raise ValueError("session_client_capacity")
+            pinfile = self.directory / ("helper-" + client + ".json")
+            value = dict(
+                schema="castalia.session-agent-profile.v1",
+                provider=self.holder.pin,
+                receiver=self.receiver_pin,
+                maximum_session_seconds=self.provider.maximum_seconds + 120,
+            )
+            if not pinfile.exists():
+                _write(pinfile, value)
+            elif private_json(pinfile) != value:
+                raise ValueError("session_profile_changed")
+            native = NativeSessionProcess(self.profile["binaries"]["session"]["path"], pinfile)
+            self.clients[client] = dict(native=native, identities={})
+        context = self._client(client)
+        if request["request_id"] not in context["identities"]:
+            # Custody has a bounded preparation window, not extra grant time.
+            # The issuer still anchors its configured limit to final review start.
+            public = context["native"].call(
+                "create_session", expires_at=int(time.time()) + self.provider.maximum_seconds + 120
+            )
+            context["identities"][request["request_id"]] = dict(
+                session_handle=public["session_handle"],
+                public_key=public["holder_public_key"],
+                installation_id=public["installation_id"],
+            )
+        identity = context["identities"][request["request_id"]]
+        action = RequestAction.model_validate(
+            dict(
+                schema="devgraph.access-request-action.v1",
+                action="submit",
+                request_id=request["request_id"],
+                subject_public_key=identity["public_key"],
+                installation_id=identity["installation_id"],
+                intent=None,
+            )
+        )
+        challenge = self.inbox.wallet_challenge(action)
+        proof = context["native"].call(
+            "approve_member_request", session_handle=identity["session_handle"], challenge=challenge
+        )
+        self.inbox.execute_wallet(proof["challenge"], {}, proof["signature"])
+        review = self.provider.prepare(
+            client,
+            request["request_id"],
+            identity,
+            request["permissions"],
+            request.get("expires_at"),
+            request["display"],
+            lifetime_seconds=request.get("lifetime_seconds"),
+        )
+        return self._preparation(review)
+
+    def submit(self, client, handle, proof):
+        if set(proof) != {"challenge", "signature"}:
+            raise ValueError("invalid_owner_proof")
+        context = self._client(client)
+        result = self.provider.submit(client, handle, **proof)
+        if result["state"] == "submitting":
+            challenge = self.provider.begin_enrollment(client, handle)
+            with self.inbox._database() as db:
+                identity = json.loads(self.provider._row(db, client, handle)[3])["manifest"][
+                    "holder"
+                ]
+            approval = context["native"].call(
+                "approve_enrollment", session_handle=identity["session_handle"], challenge=challenge
+            )
+            self.provider.complete_enrollment(
+                client, handle, approval["challenge"], approval["signature"]
+            )
+        return self.reconcile(client, handle)
+
+    def reconcile(self, client, handle):
+        context = self._client(client)  # never generate a key on recovery
+        if context["native"].child.poll() is not None:
+            raise RuntimeError("session_custody_unavailable")
+        result = self.provider.reconcile(client, handle)
+        if result["state"] == "issued":
+            root = self.provider.reconcile(client, handle, internal_root=True)
+            with self.inbox._database() as db:
+                review = json.loads(self.provider._row(db, client, handle)[3])
+            context["native"].call(
+                "install_grant",
+                session_handle=review["manifest"]["holder"]["session_handle"],
+                grant=root["grant"],
+                reviewed_expiry=review["manifest"]["expires_at"],
+                reviewed_permissions=review["manifest"]["permissions"],
+            )
+        return result
+
+    def execute(self, client, credential_handle, request_id, call):
+        context = self._client(client)
+        with self.inbox._database() as db:
+            candidates = db.execute(
+                "SELECT handle,original_root FROM session_access_reviews "
+                "WHERE client=? AND state='issued'",
+                (client,),
+            ).fetchall()
+        handle = next(
+            (
+                handle
+                for handle, original in candidates
+                if original and "root_" + json.loads(original)["id"] == credential_handle
+            ),
+            None,
+        )
+        if not handle:
+            raise ValueError("session_credential_unavailable")
+        with self.inbox._database() as db:
+            identity = json.loads(self.provider._row(db, client, handle)[3])["manifest"]["holder"]
+        envelope = context["native"].call(
+            "present_call", session_handle=identity["session_handle"], call=call
+        )
+        return self.provider.execute(
+            client, handle, request_id, envelope, storage=self.storage, audit_log=self.audit
+        )
+
+    def close_client(self, client):
+        if not isinstance(client, str) or not re.fullmatch(r"[0-9a-f]{32}", client):
+            raise ValueError("invalid_session_client")
+        context = self.clients.pop(client, None)
+        if context is not None:
+            context["native"].close()
+        # Retain original roots, assignments and review history. Custody closure
+        # destroys ephemeral keys; it is not an issuer-side revocation.
+        return dict(
+            schema="zenith.session-client-closed.v1", closed=True, server_revocation_confirmed=False
+        )
+
+    def close(self):
+        for client in list(self.clients):
+            self.close_client(client)
+
+
+class DisposableSessionApplication(SessionApplication):
+    """Fixed native custody/crypto and a new fixture issuer/in-memory graph only."""
 
     def __init__(self, profile_file):
         profile_file = Path(profile_file).resolve(strict=True)
@@ -311,175 +489,3 @@ class DisposableSessionApplication:
         repository = WorkObjectRepository(self.storage)
         repository.create(Task(id="example-task", title="Disposable example task"))
         repository.create(Task(id="hidden-task", title="Outside the fixture grant"))
-
-    def _client(self, client):
-        if client not in self.clients:
-            raise RuntimeError("session_custody_unavailable")
-        return self.clients[client]
-
-    def _preparation(self, review):
-        return dict(
-            review=review,
-            capabilities=self.provider.capabilities(),
-            trusted_provider=self.provider.capabilities()["provider"],
-            holder=review["manifest"]["holder"],
-            receiver_pin=self.receiver_pin,
-        )
-
-    def prepare(self, client, request):
-        if not isinstance(client, str) or not re.fullmatch(r"[0-9a-f]{32}", client):
-            raise ValueError("invalid_session_client")
-        base_fields = {"service", "request_id", "permissions", "display"}
-        if set(request) not in (base_fields | {"expires_at"}, base_fields | {"lifetime_seconds"}):
-            raise ValueError("invalid_session_request")
-        if request["service"] != self.profile["service"]:
-            raise ValueError("unknown_session_service")
-        if (
-            not isinstance(request["request_id"], str)
-            or not re.fullmatch(r"[0-9a-f]{32}", request["request_id"])
-            or type(request.get("expires_at", request.get("lifetime_seconds"))) is not int
-            or not isinstance(request["permissions"], list)
-            or not 1 <= len(request["permissions"]) <= 16
-        ):
-            raise ValueError("invalid_session_request")
-        with self.inbox._database() as db:
-            prior = db.execute(
-                "SELECT 1 FROM access_requests WHERE id=?", (request["request_id"],)
-            ).fetchone()
-        if prior and (
-            client not in self.clients
-            or request["request_id"] not in self.clients[client]["identities"]
-        ):
-            raise RuntimeError("session_custody_unavailable")
-        if client not in self.clients:
-            if len(self.clients) >= 8:
-                raise ValueError("session_client_capacity")
-            pinfile = self.directory / ("helper-" + client + ".json")
-            value = dict(
-                schema="castalia.session-agent-profile.v1",
-                provider=self.holder.pin,
-                receiver=self.receiver_pin,
-                maximum_session_seconds=3720,
-            )
-            if not pinfile.exists():
-                _write(pinfile, value)
-            elif private_json(pinfile) != value:
-                raise ValueError("session_profile_changed")
-            native = NativeSessionProcess(self.profile["binaries"]["session"]["path"], pinfile)
-            self.clients[client] = dict(native=native, identities={})
-        context = self._client(client)
-        if request["request_id"] not in context["identities"]:
-            # Custody has a bounded preparation window, not extra grant time.
-            # The issuer still anchors at most3600sec to the final review start.
-            public = context["native"].call("create_session", expires_at=int(time.time()) + 3720)
-            context["identities"][request["request_id"]] = dict(
-                session_handle=public["session_handle"],
-                public_key=public["holder_public_key"],
-                installation_id=public["installation_id"],
-            )
-        identity = context["identities"][request["request_id"]]
-        action = RequestAction.model_validate(
-            dict(
-                schema="devgraph.access-request-action.v1",
-                action="submit",
-                request_id=request["request_id"],
-                subject_public_key=identity["public_key"],
-                installation_id=identity["installation_id"],
-                intent=None,
-            )
-        )
-        challenge = self.inbox.wallet_challenge(action)
-        proof = context["native"].call(
-            "approve_member_request", session_handle=identity["session_handle"], challenge=challenge
-        )
-        self.inbox.execute_wallet(proof["challenge"], {}, proof["signature"])
-        review = self.provider.prepare(
-            client,
-            request["request_id"],
-            identity,
-            request["permissions"],
-            request.get("expires_at"),
-            request["display"],
-            lifetime_seconds=request.get("lifetime_seconds"),
-        )
-        return self._preparation(review)
-
-    def submit(self, client, handle, proof):
-        if set(proof) != {"challenge", "signature"}:
-            raise ValueError("invalid_owner_proof")
-        context = self._client(client)
-        result = self.provider.submit(client, handle, **proof)
-        if result["state"] == "submitting":
-            challenge = self.provider.begin_enrollment(client, handle)
-            with self.inbox._database() as db:
-                identity = json.loads(self.provider._row(db, client, handle)[3])["manifest"][
-                    "holder"
-                ]
-            approval = context["native"].call(
-                "approve_enrollment", session_handle=identity["session_handle"], challenge=challenge
-            )
-            self.provider.complete_enrollment(
-                client, handle, approval["challenge"], approval["signature"]
-            )
-        return self.reconcile(client, handle)
-
-    def reconcile(self, client, handle):
-        context = self._client(client)  # never generate a key on recovery
-        if context["native"].child.poll() is not None:
-            raise RuntimeError("session_custody_unavailable")
-        result = self.provider.reconcile(client, handle)
-        if result["state"] == "issued":
-            root = self.provider.reconcile(client, handle, internal_root=True)
-            with self.inbox._database() as db:
-                review = json.loads(self.provider._row(db, client, handle)[3])
-            context["native"].call(
-                "install_grant",
-                session_handle=review["manifest"]["holder"]["session_handle"],
-                grant=root["grant"],
-                reviewed_expiry=review["manifest"]["expires_at"],
-                reviewed_permissions=review["manifest"]["permissions"],
-            )
-        return result
-
-    def execute(self, client, credential_handle, request_id, call):
-        context = self._client(client)
-        with self.inbox._database() as db:
-            candidates = db.execute(
-                "SELECT handle,original_root FROM session_access_reviews "
-                "WHERE client=? AND state='issued'",
-                (client,),
-            ).fetchall()
-        handle = next(
-            (
-                handle
-                for handle, original in candidates
-                if original and "root_" + json.loads(original)["id"] == credential_handle
-            ),
-            None,
-        )
-        if not handle:
-            raise ValueError("session_credential_unavailable")
-        with self.inbox._database() as db:
-            identity = json.loads(self.provider._row(db, client, handle)[3])["manifest"]["holder"]
-        envelope = context["native"].call(
-            "present_call", session_handle=identity["session_handle"], call=call
-        )
-        return self.provider.execute(
-            client, handle, request_id, envelope, storage=self.storage, audit_log=self.audit
-        )
-
-    def close_client(self, client):
-        if not isinstance(client, str) or not re.fullmatch(r"[0-9a-f]{32}", client):
-            raise ValueError("invalid_session_client")
-        context = self.clients.pop(client, None)
-        if context is not None:
-            context["native"].close()
-        # Retain original roots, assignments and review history. Custody closure
-        # destroys ephemeral keys; it is not an issuer-side revocation.
-        return dict(
-            schema="zenith.session-client-closed.v1", closed=True, server_revocation_confirmed=False
-        )
-
-    def close(self):
-        for client in list(self.clients):
-            self.close_client(client)

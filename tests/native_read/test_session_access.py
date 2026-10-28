@@ -68,7 +68,7 @@ def write(path, value):
 
 
 @pytest.fixture
-def session_setup(tmp_path):
+def session_setup(tmp_path, request):
     names = (
         "CASTALIA_SESSION_TEST_BINARY",
         "SECS_HOLDER_GRANT_TEST_BINARY",
@@ -77,6 +77,7 @@ def session_setup(tmp_path):
     if not all(os.environ.get(name) for name in names):
         pytest.skip("matched real native session/holder/read executables required")
     tmp_path.chmod(0o700)
+    modern = getattr(request, "param", None) == "modern"
     now = int(time.time())
     issuer, owner = Ed25519PrivateKey.generate(), Ed25519PrivateKey.generate()
     owner_public = owner.public_key().public_bytes_raw().hex()
@@ -123,6 +124,65 @@ def session_setup(tmp_path):
     provisioning = ReadGrantProvisioning(inbox=inbox, members=lambda: base)
     operator = AccessOperator(inbox=inbox, policy=lambda: policies[0], provisioning=provisioning)
     policy = compile_monitor_read(ceiling)
+    enrollment_type = MemberMonitorReadEnrollment
+    if modern:
+        from tests.native_read.test_path_access_flow import setup as native_setup
+
+        from devgraph.auth.arena_access import (
+            OwnerArenaAccessDraft,
+            OwnerArenaMemberPolicy,
+            OwnerArenaOperatorPolicy,
+            compile_arena_read,
+        )
+        from devgraph.auth.arena_activation import (
+            ArenaAccessOperator,
+            ArenaMonitorReadEnrollment,
+            OwnerArenaGrantProvisioning,
+        )
+
+        raw = json.loads(canonical_json(ceiling))
+        raw.update(
+            schema="devgraph.access-draft.v7",
+            validity={
+                "schema": "castalia.grant-validity.v1",
+                "mode": "until_revoked",
+                "not_before": raw.pop("not_before"),
+            },
+        )
+        raw.pop("not_after")
+        raw["read_grants"].append(dict(scope="devgraph.arena.read", all_arenas=True))
+        ceiling = OwnerArenaAccessDraft.model_validate(raw)
+        policies[0] = OwnerArenaOperatorPolicy.model_validate(
+            dict(
+                schema="devgraph.access-operator-policy.v6",
+                revision=2,
+                operator_public_keys=[owner_public],
+                ceiling=ceiling,
+            )
+        )
+        base = OwnerArenaMemberPolicy.model_validate(
+            dict(
+                schema="devgraph.member-access-policy.v6",
+                revision=2,
+                ceiling=ceiling,
+                assignments=[],
+            )
+        )
+        scratch = tmp_path / "native-fixture"
+        scratch.mkdir(mode=0o700)
+        native_policy = native_setup(scratch).native[0]
+        provisioning = OwnerArenaGrantProvisioning(
+            inbox=inbox,
+            members=lambda: base,
+            operators=lambda: policies[0],
+            native=lambda: native_policy,
+            native_admission=None,
+        )
+        operator = ArenaAccessOperator(
+            inbox=inbox, policy=lambda: policies[0], provisioning=provisioning
+        )
+        policy = compile_arena_read(ceiling)
+        enrollment_type = ArenaMonitorReadEnrollment
     keyfile = tmp_path / "issuer.key"
     keyfile.write_text(issuer.private_bytes_raw().hex())
     keyfile.chmod(0o600)
@@ -134,12 +194,12 @@ def session_setup(tmp_path):
         issuer_key_file=keyfile,
         policy_file=write(tmp_path / "authority.json", read_policy),
     )
-    enrollment = MemberMonitorReadEnrollment(
+    enrollment = enrollment_type(
         path=tmp_path / "enrollment.sqlite",
         policy=lambda: policy,
         membership_check=lambda proof, public: proof == {},
         authority=authority,
-        members=provisioning.registry,
+        **({"provisioning": provisioning} if modern else {"members": provisioning.registry}),
     )
     binary = Path(os.environ[names[1]])
     holder = HolderGrantHost(
@@ -202,6 +262,13 @@ def session_setup(tmp_path):
             ),
         )
     )
+    if modern:
+        from devgraph.auth.arena_access import CollectionArenaAccessDraft
+
+        raw = json.loads(canonical_json(draft))
+        raw.update(schema="devgraph.access-draft.v8")
+        raw["read_grants"].append(dict(scope="devgraph.arena.read", all_arenas=True))
+        draft = CollectionArenaAccessDraft.model_validate(raw)
     permissions = provider._permissions(draft)
     review = provider.prepare(
         client,
@@ -261,6 +328,7 @@ def issue(s):
     return result
 
 
+@pytest.mark.parametrize("session_setup", ["legacy", "modern"], indirect=True)
 def test_real_session_issue_call_replay_scope_and_no_owner_key_borrowing(session_setup):
     s = session_setup
     assert s["identity"]["public_key"] != s["owner_public"]
@@ -309,6 +377,7 @@ def test_real_session_issue_call_replay_scope_and_no_owner_key_borrowing(session
         )
 
 
+@pytest.mark.parametrize("session_setup", ["legacy", "modern"], indirect=True)
 def test_owner_approval_cannot_survive_expiry_edit_or_policy_change(session_setup):
     s = session_setup
     provider, review, client = s["provider"], s["review"], s["client"]
@@ -322,13 +391,54 @@ def test_owner_approval_cannot_survive_expiry_edit_or_policy_change(session_setu
     stranger = Ed25519PrivateKey.generate()
     with pytest.raises(UnauthenticatedError):
         provider.submit(client, handle, current, signed(stranger, current))
-    s["policies"][0] = s["policies"][0].model_copy(update={"revision": 2})
+    s["policies"][0] = s["policies"][0].model_copy(
+        update={"revision": s["policies"][0].revision + 1}
+    )
     with pytest.raises(UnauthenticatedError):
         provider.submit(client, handle, current, signed(s["owner"], current))
     with provider.inbox._database() as db:
         assert db.execute("SELECT count(*) FROM access_decisions").fetchone()[0] == 0
 
 
+@pytest.mark.parametrize("session_setup", ["modern"], indirect=True)
+def test_modern_session_native_root_reads_new_arenas_and_preserves_canonical_registry(
+    session_setup,
+):
+    from tests.model.test_arena_runtime import add_arena
+
+    from devgraph.arenas import ArenaMutations
+
+    s = session_setup
+    provider = s["provider"]
+    issued = issue(s)
+    mutations = ArenaMutations(s["storage"])
+    add_arena(mutations, "first")
+    call = dict(
+        operation="devgraph.arena.list",
+        resource="https://work.zenith-research.ca/devgraph",
+        parameters=dict(path="/arenas"),
+    )
+
+    def read():
+        envelope = s["native"].call(
+            "present_call", session_handle=s["identity"]["session_handle"], call=call
+        )
+        return provider.execute(
+            s["client"],
+            s["review"]["request_handle"],
+            secrets.token_hex(16),
+            envelope,
+            storage=s["storage"],
+            audit_log=s["audit"],
+        )["result"]
+
+    assert [item["id"] for item in read()["items"]] == ["first"]
+    add_arena(mutations, "later")
+    assert [item["id"] for item in read()["items"]] == ["first", "later"]
+    assert provider.reconcile(s["client"], s["review"]["request_handle"]) == issued
+
+
+@pytest.mark.parametrize("session_setup", ["legacy", "modern"], indirect=True)
 def test_activation_failure_rolls_back_assignment_and_can_reuse_exact_original(
     session_setup, monkeypatch
 ):

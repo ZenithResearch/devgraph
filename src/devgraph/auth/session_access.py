@@ -17,15 +17,19 @@ from devgraph.auth.access_operator import GrantSelection
 from devgraph.auth.access_policy import require_subset
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.errors import UnauthenticatedError
+from devgraph.auth.grant_validity import GrantValidity
 from devgraph.auth.holder_grants import checksum
-from devgraph.auth.monitor_read import AccessDraftV2, MonitorWorkGrant
 from devgraph.auth.native_read import _seconds
-from devgraph.auth.selector_grants import permission_v2
+from devgraph.auth.session_read_profile import (
+    SUPPORTED,
+    build_read_session_selection,
+    read_session_permissions,
+)
 from devgraph.session_review_contract import check_review
 
 
 class SessionAccessProvider:
-    """Private application API. This slice supports finite Work reads only."""
+    """Private application API. Finite reads use lossless typed provider mappings."""
 
     def __init__(self, *, operator, holder, profile_digest, maximum_seconds=3600):
         if (
@@ -39,10 +43,11 @@ class SessionAccessProvider:
         self.operator, self.holder = operator, holder
         self.inbox = operator.inbox
         self.profile_digest, self.maximum_seconds = profile_digest, maximum_seconds
-        # Modern Arena/path profiles require their own lossless adapter; do not
-        # flatten them into this fixed-ID Work read projection.
-        if type(operator.policy().ceiling) is not AccessDraftV2:
+        self.selection_type = getattr(operator.provisioning, "selection_type", GrantSelection)
+        if operator.policy().ceiling.schema_ not in SUPPORTED:
             raise ValueError("unsupported_session_policy_profile")
+        if operator.policy().ceiling.issuer != holder.pin["issuer"]:
+            raise ValueError("session_issuer_mismatch")
         with self.inbox._database() as db:
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS session_access_reviews (
@@ -92,49 +97,19 @@ class SessionAccessProvider:
         )
 
     def _permissions(self, draft):
-        compiled = self.operator.compile_read(draft)
-        authority = self.holder.enrollment.authority.policy_for(
-            compiled, key_id=self.holder.pin["key_id"], public_key=self.holder.pin["public_key"]
-        )
-        return [permission_v2(p, self.holder.service) for p in authority["permissions"]]
+        return read_session_permissions(draft, self.operator.compile_read, self.holder.pin)
 
     def _draft(self, policy, identity, permissions, expiry, current):
-        grants = []
-        for permission in permissions:
-            if not isinstance(permission, dict) or set(permission) != {
-                "operation",
-                "resource",
-                "roles",
-                "constraints",
-            }:
-                raise UnauthenticatedError("unsupported_session_permission")
-            grant = MonitorWorkGrant.model_validate(permission["constraints"])
-            operation = permission["operation"].removeprefix("devgraph.work.")
-            if operation not in ("get", "list") or grant.operations != (operation,):
-                raise UnauthenticatedError("unsupported_session_permission")
-            grants.append(grant)
-        ceiling = policy.ceiling
-        draft = AccessDraftV2.model_validate(
-            dict(
-                schema="devgraph.access-draft.v2",
-                issuer=ceiling.issuer,
-                receiver=ceiling.receiver,
-                write_audience=ceiling.write_audience,
-                subject_public_key=identity["public_key"],
-                installation_id=identity["installation_id"],
-                not_before=current,
-                not_after=expiry,
-                lifetime_seconds=60,
-                read_grants=grants,
-                write_grants=[],
-                previous_digest=ceiling.digest,
-            )
-        )
-        require_subset(draft, ceiling)
-        if canonical_json(self._permissions(draft)) != canonical_json(permissions):
-            # Never discard a selector/guard and grant only its broader constraints.
-            raise UnauthenticatedError("unsupported_session_selector_mapping")
-        return draft
+        return build_read_session_selection(
+            ceiling=policy.ceiling,
+            provisioning=self.operator.provisioning,
+            compile_read=self.operator.compile_read,
+            issuer_pin=self.holder.pin,
+            identity=identity,
+            permissions=permissions,
+            not_before=current,
+            expires_at=expiry,
+        ).read
 
     def prepare(
         self,
@@ -201,7 +176,7 @@ class SessionAccessProvider:
             previous_digest = old.digest if old else None
             if old is not None:
                 raise UnauthenticatedError("new_session_holder_required")
-            selection = GrantSelection(read=draft)
+            selection = self.selection_type(read=draft)
             self.operator.provisioning.preview(db, selection, record, previous_digest, current)
             handle = secrets.token_hex(16)
             manifest = dict(
@@ -265,13 +240,19 @@ class SessionAccessProvider:
         with self.inbox._database() as db:
             db.execute("BEGIN IMMEDIATE")
             row = self._row(db, client, handle)
-            review, selection = json.loads(row[3]), GrantSelection.model_validate_json(row[4])
+            review, selection = json.loads(row[3]), self.selection_type.model_validate_json(row[4])
             manifest = review["manifest"]
             if row[6] != "awaiting_human" or manifest["provider"] != self._provider(policy):
                 raise UnauthenticatedError("session_review_changed")
-            draft = selection.read.model_copy(update={"not_after": expiry})
-            # Reparse, not model_copy alone: retain validation and policy ceiling.
-            draft = AccessDraftV2.model_validate_json(canonical_json(draft))
+            raw = json.loads(canonical_json(selection.read))
+            if "validity" in raw:
+                raw["validity"] = json.loads(
+                    GrantValidity.dated(selection.read.not_before, expiry).to_json()
+                )
+            else:
+                raw["not_after"] = expiry
+            # Decode with the configured profile; preserve all scope guards.
+            draft = self.operator.provisioning.decode_draft(canonical_json(raw))
             require_subset(draft, policy.ceiling)
             manifest.update(
                 expires_at=expiry,
@@ -291,7 +272,7 @@ class SessionAccessProvider:
                 "UPDATE session_access_reviews SET review=?,selection=? WHERE handle=?",
                 (
                     canonical_json(review).decode(),
-                    canonical_json(GrantSelection(read=draft)).decode(),
+                    canonical_json(self.selection_type(read=draft)).decode(),
                     handle,
                 ),
             )
@@ -397,7 +378,7 @@ class SessionAccessProvider:
                     "SELECT 1 FROM access_decisions WHERE request_id=?", (row[2],)
                 ).fetchone():
                     raise UnauthenticatedError("session_request_changed")
-                selection = GrantSelection.model_validate_json(row[4])
+                selection = self.selection_type.model_validate_json(row[4])
                 require_subset(selection.read, policy.ceiling)
                 self.operator.provisioning.activate(
                     db,
@@ -532,6 +513,7 @@ class SessionAccessProvider:
         No model-selected credential/provider/receiver is trusted here.
         """
         from devgraph.api.signed_read import execute_signed_read
+        from devgraph.api.wallet_monitor import wallet_monitor_read
 
         if not isinstance(request_id, str) or not re.fullmatch(r"[0-9a-f]{32}", request_id):
             raise UnauthenticatedError("invalid_session_call")
@@ -545,15 +527,24 @@ class SessionAccessProvider:
                 raise ValueError()
         except (KeyError, TypeError, ValueError):
             raise UnauthenticatedError("session_credential_mismatch") from None
-        result = execute_signed_read(
-            storage=storage, enrollment=self.holder.enrollment, audit_log=audit_log, body=envelope
-        )
+        parameters = envelope.get("call", {}).get("parameters")
+        if isinstance(parameters, dict) and set(parameters) == {"path"}:
+            result = wallet_monitor_read(storage, self.holder.enrollment, audit_log, envelope)
+            if not isinstance(result, dict):
+                raise UnauthenticatedError("session_read_failed")
+        else:
+            result = execute_signed_read(
+                storage=storage,
+                enrollment=self.holder.enrollment,
+                audit_log=audit_log,
+                body=envelope,
+            ).model_dump(mode="json")
         value = dict(
             schema="zenith.session-call-result.v1",
             request_id=request_id,
             provider_service=self.holder.service,
             operation=envelope["call"]["operation"],
-            result=result.model_dump(mode="json"),
+            result=result,
         )
         if len(canonical_json(value)) > 262144:
             raise UnauthenticatedError("session_result_capacity")

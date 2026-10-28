@@ -46,15 +46,14 @@ Old handles become unusable; recovering them never generates replacement keys.
 Other clients, root/assignment records and retained review history stay intact.
 It is not a public MCP tool, a signing action or an issuer-side revocation.
 
-This first adapter supports finite fixed-ID Work `get`/`list` only. It refuses
-modern Arena/path/standing profiles rather than flattening their selectors or
-guards. Writes are unavailable. Production profile integration requires its own
-lossless mapping, tests and review; successful fixture tests do not qualify it.
+The disposable host creates a finite fixed-ID Work `get`/`list` fixture. The
+separately configured local host uses the modern mapping below. Writes are
+unavailable. Production registration/activation requires separate review;
+successful fixture tests do not authorize it.
 
 ## Modern profile mapping qualification
 
-`auth/session_read_profile.py` is the source-only mapping primitive for the next
-adapter slice. It uses the trusted configured provisioning decoder, selection
+`auth/session_read_profile.py` uses the trusted configured provisioning decoder, selection
 type and read compiler. The complete shared secS permission list must round-trip
 exactly, including roles, selectors and legacy constraints; no ancestry is inferred
 from a client, no different grants are combined and no extra operations are added.
@@ -68,9 +67,12 @@ Pure mapping tests cover fixed/dynamic Arena reads, original ceiling byte
 preservation, retained hierarchy ancestry and rejection of changed service,
 broader selectors, extra roles, writes and fixed-to-dynamic amplification. A
 single Arena get permission is currently unrepresentable by the existing draft's
-get/list pair and is rejected rather than receiving extra list authority. These
-tests do not enable the modern adapter in the private process or qualify actual
-production issuance/execution. That integration remains a distinct next step.
+get/list pair and is rejected rather than receiving extra list authority. Real
+native tests also exercise the existing OwnerArena provisioning/enrollment,
+issuer-signed root installation, scoped reads, expiry edits, replay denial,
+stale-policy rejection and transactional rollback. A newly created Arena is
+readable under the same dynamic session grant. All this uses disposable state;
+the actual graph still needs a reviewed local registration before activation.
 
 Custody is an ephemeral Rust child using inherited private pipes, not XPC or a
 same-user security boundary. Native exchanges time out after ten seconds and
