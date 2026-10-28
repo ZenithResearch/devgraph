@@ -61,7 +61,11 @@ def _run_adapter(command, *, env, interactive=False):
             stdout=subprocess.DEVNULL,
             stderr=None if interactive else subprocess.DEVNULL,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except subprocess.TimeoutExpired:
+        raise LocalCredentialWorkAgentError(
+            "wallet_review_timed_out" if interactive else "credential_adapter_timed_out"
+        ) from None
+    except OSError:
         raise LocalCredentialWorkAgentError("credential_adapter_unavailable") from None
 
 

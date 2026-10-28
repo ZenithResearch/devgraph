@@ -192,9 +192,26 @@ closed JSON. Cross-site, extra-field, duplicate-key and arbitrary proxy requests
 are rejected. The browser receives an opaque ticket and safe receipt/state metadata.
 Source-only sessions must first be imported; missing canonical state is not guessed.
 
-A review window has a bounded five-minute lease and records interruption exits.
-Abandoned windows become unconfirmed rather than staying pending forever; polling
-never launches a new approval. An explicit retry retains the original bytes/key.
+New review windows wait for the human to press Return before issuing the
+short-lived credential or starting Wallet's approval timer. Return only signals
+readiness; Wallet still requires its separate human approval on the real tty.
+A private ticket lock spans waiting and native review. Gated windows never
+expire into another attempt while an old window could still continue. Close the
+active Terminal window or use Ctrl-C to cancel. An inactive/crashed window can
+be explicitly released with `SessionStateActions.cancel(ticket)`; cancellation
+holds the same lock and prevents a late window from submitting. It cannot cancel
+an active review. Historical non-gated windows retain their five-minute lease.
+Polling never launches approval or releases a window. An explicit retry retains
+the original bytes/key.
+
+The one-shot runner saves bounded results and allowlisted error codes in private
+attempt files. It never captures Wallet tty output or presentation bytes. Unknown
+pre-execution exceptions become `review_failed`; interruption or an unexpected
+failure after execution starts remains `outcome_unknown` (`status_unavailable`
+for reconciliation). Native review timeout is distinguished from
+adapter unavailability; neither implies anything about an earlier unknown write.
+The local status response adds optional `review_stage` and `error` fields;
+older readers can ignore them. Existing result/receipt/state fields are unchanged.
 For a lost response after commit, `SessionStateActions.reconcile(ticket)` opens
 only the original CLI's `--reconcile` status lookup, with its own native approval.
 The retained intent remains reachable even when its original state revision has
