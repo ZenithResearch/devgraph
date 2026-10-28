@@ -169,3 +169,25 @@ command refuses to guess a revision. Migration 31 adds state uniqueness only.
 Take the normal native backup before rollout. This source candidate has not been
 deployed merely by changing the prototype reader. Existing v0.11.0 bundles and
 stored SessionRef records remain unchanged and readable.
+
+### Optional Pulse native approval bridge
+
+`devgraph.observability.session_actions.SessionStateActions` prepares and retains
+one exact state request per desired state/revision. A local UI can opt into it
+using a fixed installed Python and owner-private action directory. It opens only
+the generated review command in macOS Terminal; CLI stdin and stderr remain on
+the real terminal so native Wallet still requires the human. No credential/key,
+command, output path, Work write or approval response is accepted from the UI.
+
+A pending attempt is reused. An explicitly requested retry retains the original
+request and idempotency key. Completed/uncertain attempts remain in private history.
+A zero exit code alone is insufficient: the helper checks the exact session-state
+receipt and rereads the current canonical state before reporting committed.
+Canonical read failure stays unconfirmed. The UI never optimistically marks Done.
+
+The local Pulse prototype enables this only with `--session-state-actions` after
+the matched runtime/authority rollout. Its action endpoint requires the existing
+private browser session, exact Host/Origin, same-origin Fetch metadata and bounded
+closed JSON. Cross-site, extra-field, duplicate-key and arbitrary proxy requests
+are rejected. The browser receives an opaque ticket and safe receipt/state metadata.
+Source-only sessions must first be imported; missing canonical state is not guessed.
