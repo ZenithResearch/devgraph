@@ -14,6 +14,7 @@ import shlex
 import stat
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 from devgraph.observability.session_prepare import prepare_state, write_bundle
@@ -22,6 +23,7 @@ from devgraph.observability.session_sources import owned
 from devgraph.work_requests import WorkRequest
 
 TICKET = re.compile(r"[0-9a-f]{64}")
+REVIEW_LEASE_SECONDS = 300
 
 
 def _directory(path, *, create=False):
@@ -60,12 +62,13 @@ def open_terminal(command):
 
 
 class SessionStateActions:
-    def __init__(self, *, root: Path, python: Path, reader, launch=None):
+    def __init__(self, *, root: Path, python: Path, reader, launch=None, clock=None):
         if not root.is_absolute() or not python.is_absolute() or not python.is_file():
             raise ValueError("session_action_runtime_unavailable")
         self.root, self.python, self.reader = root, python, reader
         _directory(root, create=True)
         self.launch = launch or open_terminal
+        self.clock = clock or time.time
         self.lock = threading.Lock()
 
     def _bundle(self, ticket):
@@ -92,70 +95,115 @@ class SessionStateActions:
             raise ValueError("invalid_session_reference")
         if state not in {"open", "done"} or type(expected_version) is not int:
             raise ValueError("invalid_session_state_intent")
+        candidate = WorkRequest.from_json(
+            json.dumps(
+                {
+                    "schema": "devgraph.work-request.v2",
+                    "operation": "session.state",
+                    "kind": "SessionRef",
+                    "id": ref_id,
+                    "expected_version": expected_version,
+                    "payload": {"state": state},
+                }
+            ).encode()
+        )
         with self.lock:
-            request = prepare_state(self.reader, ref_id, state)
-            if request.expected_version != expected_version:
-                raise ValueError("session_state_changed_refresh_required")
-            directory = self.root / request.digest
-            if not directory.exists():
+            directory = self.root / candidate.digest
+            if directory.exists():
+                directory, request = self._bundle(candidate.digest)
+                prior = self.status(candidate.digest)
+                if prior["phase"] in {"committed", "awaiting_approval"}:
+                    return prior
+                # A committed write may have lost its response. Keep the original
+                # intent reachable even after the current state/revision changed.
+                try:
+                    fresh = prepare_state(self.reader, ref_id, state)
+                    if fresh.expected_version != expected_version:
+                        raise ValueError("session_state_changed_refresh_required")
+                except ValueError:
+                    return {**prior, "phase": "needs_reconciliation"}
+            else:
+                request = prepare_state(self.reader, ref_id, state)
+                if request.expected_version != expected_version:
+                    raise ValueError("session_state_changed_refresh_required")
                 if sum(1 for _ in self.root.iterdir()) >= 1000:
                     raise ValueError("session_action_capacity")
                 write_bundle(request, directory)
-            directory, request = self._bundle(request.digest)
-            attempts = self._attempts(directory)
-            if attempts and not (attempts[-1] / "exit-code").exists():
-                return self.status(request.digest)
-            if len(attempts) >= 20:
-                raise ValueError("session_action_attempt_limit")
-            attempt = directory / f"attempt-{len(attempts) + 1:02d}"
-            _directory(attempt, create=True)
-            command = attempt / "Review session state.command"
-            result = attempt / "result.json"
-            pending = attempt / "result.pending"
-            exit_code = attempt / "exit-code"
-            arguments = [
-                str(self.python),
-                "-I",
-                "-m",
-                "devgraph.cli",
-                "work",
-                "session.state",
-                "--credential-v2",
-                "--request-file",
-                str(directory / "request.json"),
-                "--idempotency-key-file",
-                str(directory / "idempotency.txt"),
-            ]
-            # stdin AND stderr stay on the real tty: the CLI and Wallet require it.
-            script = "#!/bin/sh\numask 077\n"
-            script += (
-                "printf '%s\\n' " + shlex.quote(f"DevGraph session work → {state.upper()}") + "\n"
+            return self._review(directory, request)
+
+    def reconcile(self, ticket):
+        with self.lock:
+            directory, request = self._bundle(ticket)
+            return self._review(directory, request, reconcile=True)
+
+    def _review(self, directory, request, *, reconcile=False):
+        attempts = self._attempts(directory)
+        if attempts and not (attempts[-1] / "exit-code").exists():
+            pending = self.status(request.digest)
+            if pending["phase"] == "awaiting_approval":
+                return pending
+        if len(attempts) >= 20:
+            raise ValueError("session_action_attempt_limit")
+        attempt = directory / f"attempt-{len(attempts) + 1:02d}"
+        _directory(attempt, create=True)
+        command = attempt / "Review session state.command"
+        result = attempt / "result.json"
+        pending = attempt / "result.pending"
+        exit_code = attempt / "exit-code"
+        _write(attempt / "started-at", str(self.clock()))
+        arguments = [
+            str(self.python),
+            "-I",
+            "-m",
+            "devgraph.cli",
+            "work",
+            "session.state",
+            "--credential-v2",
+            "--request-file",
+            str(directory / "request.json"),
+            "--idempotency-key-file",
+            str(directory / "idempotency.txt"),
+        ]
+        if reconcile:
+            arguments.append("--reconcile")
+        # stdin AND stderr stay on the real tty: the CLI and Wallet require it.
+        script = "#!/bin/sh\numask 077\n"
+        for signal_name, code in (("HUP", 129), ("INT", 130), ("TERM", 143)):
+            interrupted = (
+                f"printf '%s\\n' {code} > " + shlex.quote(str(exit_code)) + f"; exit {code}"
             )
-            script += (
-                " ".join(shlex.quote(a) for a in arguments)
-                + " > "
-                + shlex.quote(str(pending))
-                + "\n"
+            script += "trap " + shlex.quote(interrupted) + " " + signal_name + "\n"
+        script += (
+            "printf '%s\\n' "
+            + shlex.quote(
+                "Check saved DevGraph session result"
+                if reconcile
+                else "DevGraph session work → " + request.payload["state"].upper()
             )
-            script += (
-                "result_code=$?\n/bin/mv "
-                + shlex.quote(str(pending))
-                + " "
-                + shlex.quote(str(result))
-                + "\n"
-            )
-            script += "printf '%s\\n' \"$result_code\" > " + shlex.quote(str(exit_code)) + "\n"
-            script += (
-                "printf '\\nReturn to Pulse to check the saved state. Press Return to close.\\n'\n"
-                "read -r close_review\n"
-            )
-            _write(command, script, 0o700)
-            try:
-                self.launch(command)
-            except (OSError, subprocess.SubprocessError):
-                _write(exit_code, "127\n")
-                raise ValueError("session_approval_window_unavailable") from None
-            return self.status(request.digest)
+            + "\n"
+        )
+        script += (
+            " ".join(shlex.quote(a) for a in arguments) + " > " + shlex.quote(str(pending)) + "\n"
+        )
+        script += (
+            "result_code=$?\n/bin/mv "
+            + shlex.quote(str(pending))
+            + " "
+            + shlex.quote(str(result))
+            + "\n"
+        )
+        script += "printf '%s\\n' \"$result_code\" > " + shlex.quote(str(exit_code)) + "\n"
+        script += (
+            "printf '\\nReturn to Pulse to check the saved state. Press Return to close.\\n'\n"
+            "read -r close_review\n"
+        )
+        _write(command, script, 0o700)
+        try:
+            self.launch(command)
+        except (OSError, subprocess.SubprocessError):
+            _write(exit_code, "127\n")
+            raise ValueError("session_approval_window_unavailable") from None
+        return self.status(request.digest)
 
     def status(self, ticket):
         directory, request = self._bundle(ticket)
@@ -174,11 +222,21 @@ class SessionStateActions:
         _directory(attempt)
         exit_file = attempt / "exit-code"
         if not exit_file.exists():
+            try:
+                age = self.clock() - float(_read(attempt / "started-at", 64))
+                if not 0 <= age < REVIEW_LEASE_SECONDS:
+                    value["phase"] = "unconfirmed"
+            except (OSError, ValueError):
+                value["phase"] = "unconfirmed"
             return value
         value["phase"] = "needs_review"
         try:
             result = json.loads(_read(attempt / "result.json"))
-            receipt = result.get("receipt", {})
+            if not isinstance(result, dict):
+                raise ValueError("invalid_session_action_result")
+            receipt = result.get("receipt") or {}
+            if not isinstance(receipt, dict):
+                raise ValueError("invalid_session_action_result")
             if (
                 _read(exit_file, 16).strip() != b"0"
                 or receipt.get("operation") != request.authority_operation

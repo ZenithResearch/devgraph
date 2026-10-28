@@ -112,3 +112,43 @@ def test_private_root_and_bundle_cannot_redirect(tmp_path):
     with pytest.raises(ValueError):
         bridge.status(result["ticket"])
     assert len(launched) == 1
+
+
+def test_lost_response_and_abandoned_window_have_explicit_same_identity_recovery(tmp_path):
+    bridge, canonical, launched = fixture(tmp_path)
+    now = [100.0]
+    bridge.clock = lambda: now[0]
+    first = bridge.begin(REF, "done", 1)
+    request_dir = bridge.root / first["ticket"]
+    original = (request_dir / "idempotency.txt").read_bytes()
+    # A lost HTTP response reuses the active review rather than opening another.
+    assert bridge.begin(REF, "done", 1)["phase"] == "awaiting_approval"
+    assert len(launched) == 1
+    now[0] = 401.0
+    assert bridge.status(first["ticket"])["phase"] == "unconfirmed"
+    assert len(launched) == 1  # polling never launches a retry or claims Done
+    second = bridge.begin(REF, "done", 1)  # explicit user retry after abandonment
+    assert second["ticket"] == first["ticket"] and len(launched) == 2
+    assert (request_dir / "idempotency.txt").read_bytes() == original
+    assert canonical["work_state"]["state"] == "unreviewed"
+    script = launched[0].read_text()
+    assert " HUP\n" in script and " INT\n" in script and " TERM\n" in script
+
+
+def test_committed_write_with_lost_response_can_reconcile_original_request(tmp_path):
+    bridge, canonical, launched = fixture(tmp_path)
+    result = bridge.begin(REF, "done", 1)
+    request_dir = bridge.root / result["ticket"]
+    original = (request_dir / "request.json").read_bytes()
+    key = (request_dir / "idempotency.txt").read_bytes()
+    finish(launched[0], code=1)  # CLI lost the HTTP response after commit
+    canonical["work_state"] = {"state": "done", "version": 2}
+    retry = bridge.begin(REF, "done", 1)  # the original browser intent remains reachable
+    assert retry["phase"] == "needs_reconciliation" and retry["ticket"] == result["ticket"]
+    bridge.reconcile(result["ticket"])
+    assert len(launched) == 2 and "--reconcile" in launched[-1].read_text()
+    assert original == (request_dir / "request.json").read_bytes()
+    assert key == (request_dir / "idempotency.txt").read_bytes()
+    finish(launched[-1])
+    assert bridge.status(result["ticket"])["phase"] == "committed"
+    assert canonical["work_state"]["version"] == 2  # status lookup never advances state

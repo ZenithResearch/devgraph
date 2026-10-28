@@ -191,3 +191,13 @@ private browser session, exact Host/Origin, same-origin Fetch metadata and bound
 closed JSON. Cross-site, extra-field, duplicate-key and arbitrary proxy requests
 are rejected. The browser receives an opaque ticket and safe receipt/state metadata.
 Source-only sessions must first be imported; missing canonical state is not guessed.
+
+A review window has a bounded five-minute lease and records interruption exits.
+Abandoned windows become unconfirmed rather than staying pending forever; polling
+never launches a new approval. An explicit retry retains the original bytes/key.
+For a lost response after commit, `SessionStateActions.reconcile(ticket)` opens
+only the original CLI's `--reconcile` status lookup, with its own native approval.
+The retained intent remains reachable even when its original state revision has
+already advanced. Pulse exposes Check result and keeps pending ticket/intent
+metadata in same-origin session storage across reloads; no state or authority is
+restored from that storage. Only current canonical reads establish Open/Done.
