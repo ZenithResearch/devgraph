@@ -161,6 +161,59 @@ class AccessOperator:
     def decorate_inbox(self, result, policy):
         return result
 
+    def active_selection(self, db, record, policy, current):
+        """An exact live baseline, never the possibly superseded decision alone."""
+        if record is None:
+            raise UnauthenticatedError("assignment_changed")
+        decision = db.execute(
+            "SELECT version,status,selection FROM access_decisions WHERE request_id=?",
+            (record[0],),
+        ).fetchone()
+        if not decision or decision[:2] != (2, "active") or not decision[2]:
+            raise UnauthenticatedError("assignment_changed")
+        previous = json.loads(decision[2])
+        selected = {}
+        for side, table in (("read", "access_assignments"), ("write", "write_assignments")):
+            if not previous.get(side):
+                continue
+            predicate = "owner=? AND device=?" if side == "read" else "owner=?"
+            parameters = record[1:3] if side == "read" else (record[1],)
+            row = db.execute(
+                "SELECT request_id,assignment,digest,active FROM " + table + " WHERE " + predicate,
+                parameters,
+            ).fetchone()
+            if not row or row[0] != record[0] or row[3] != 1:
+                raise UnauthenticatedError("assignment_changed")
+            decode = (
+                self.provisioning.decode_draft
+                if side == "read"
+                else self.provisioning.decode_write_draft
+            )
+            grant = decode(row[1])
+            if grant.digest != row[2] or not _draft_validity(grant).contains(current):
+                raise UnauthenticatedError("assignment_changed")
+            require_subset(grant, policy.ceiling)
+            selected[side] = json.loads(canonical_json(grant))
+        if not selected:
+            raise UnauthenticatedError("assignment_changed")
+        return selected
+
+    def configure_summaries(self, db, result, policy, current):
+        result["activation"]["configure_existing_grants"] = "devgraph.grant-configuration.v1"
+        for item in result["active_grants"]:
+            record = db.execute(
+                "SELECT * FROM access_requests WHERE id=?", (item["request_id"],)
+            ).fetchone()
+            try:
+                selection = self.active_selection(db, record, policy, current)
+            except (UnauthenticatedError, ValueError):
+                continue  # A partially superseded grant remains visible/revocable.
+            snapshot = dict(schema="devgraph.grant-configuration.v1", selection=selection)
+            # Keep the bounded inbox usable even with many large assignments.
+            item["configuration"] = snapshot
+            if len(canonical_json(result)) > 180000:
+                item.pop("configuration")
+
     @staticmethod
     def previous_assignments(action):
         return action.previous_assignment_digest
@@ -531,6 +584,8 @@ class AccessOperator:
                     if self.inventory is not None:
                         result["inventory"] = self.inventory(policy.ceiling.read_grants)
                     result = self.decorate_inbox(result, policy)
+                    if self.provisioning is not None:
+                        self.configure_summaries(db, result, policy, current)
                 elif action.action == "revoke":
                     record = db.execute(
                         "SELECT * FROM access_requests WHERE id=?", (action.request_id,)
@@ -573,14 +628,33 @@ class AccessOperator:
                         "SELECT version FROM access_decisions WHERE request_id=?",
                         (action.request_id,),
                     ).fetchone()
+                    configuring = bool(
+                        decision
+                        and action.expected_version == 2
+                        and action.action in ("review", "approve")
+                    )
                     if (
                         not record
-                        or record[6] <= current
-                        or action.expected_version != 1
-                        or decision
+                        or (
+                            not configuring
+                            and (record[6] <= current or action.expected_version != 1 or decision)
+                        )
                         or record[3] != action.request_digest_sha256
                     ):
                         raise UnauthenticatedError("request_changed")
+                    baseline = None
+                    if configuring:
+                        baseline = self.active_selection(db, record, policy, current)
+                        # Omission retains its established meaning for pending requests.
+                        # Configuring a grant edits its existing components; it cannot
+                        # silently remove one or overwrite another request's assignment.
+                        components = {
+                            side
+                            for side in ("read", "write")
+                            if getattr(action.selection, side, None) is not None
+                        }
+                        if set(baseline) != components:
+                            raise UnauthenticatedError("configuration_components_changed")
                     if action.action in ("review", "approve"):
                         plans = self._selection(action.selection, record, policy, current)
                         if self.provisioning is not None:
@@ -605,13 +679,15 @@ class AccessOperator:
                             action_id=action.action_id,
                             request_id=record[0],
                             request_digest_sha256=record[3],
-                            expected_version=1,
+                            expected_version=action.expected_version,
                             review_id=action.action_id,
                             selection=selection,
                             selection_digest_sha256=selection_digest,
                             plans=plans,
                             authority_issued=False,
                         )
+                        if baseline is not None:
+                            result["current_selection"] = baseline
                     else:
                         if action.action == "approve":
                             review = db.execute(
@@ -673,18 +749,25 @@ class AccessOperator:
                                 current,
                             )
                             state = "active"
-                        db.execute(
-                            "INSERT INTO access_decisions VALUES(?,2,?,?,?,?,?,?)",
-                            (
-                                record[0],
-                                state,
-                                action.action_id,
-                                parsed.subject_public_key,
-                                canonical_json(selection).decode() if selection else None,
-                                action.reason,
-                                current,
-                            ),
+                        values = (
+                            state,
+                            action.action_id,
+                            parsed.subject_public_key,
+                            canonical_json(selection).decode() if selection else None,
+                            action.reason,
+                            current,
                         )
+                        if configuring:
+                            db.execute(
+                                "UPDATE access_decisions SET status=?,action_id=?,owner=?,"
+                                "selection=?,reason=?,created=? WHERE request_id=?",
+                                (*values, record[0]),
+                            )
+                        else:
+                            db.execute(
+                                "INSERT INTO access_decisions VALUES(?,2,?,?,?,?,?,?)",
+                                (record[0], *values),
+                            )
                         result = dict(
                             schema="devgraph.access-operator-result.v1",
                             action_id=action.action_id,
@@ -699,6 +782,8 @@ class AccessOperator:
                                 activation=activation,
                                 request_digest_sha256=record[3],
                             )
+                        if configuring:
+                            result["configured_existing_grant"] = True
                 if action.action == "inbox":
                     while (
                         len(canonical_json(result)) > 262144 and len(result["inbox"]["items"]) > 1
