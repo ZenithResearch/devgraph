@@ -225,6 +225,16 @@
         "exact_ids"
       ],
       "resource_requirements": "Exact Work subject and every derived SessionRef and SessionLink ID must be admitted together; native source IDs supply no authority."
+    },
+    {
+      "operation": "devgraph.work.session.state.v2",
+      "classification": "recipient_rule",
+      "selectors": [
+        "exact_ids"
+      ],
+      "resource_requirements": [
+        "One existing exact SessionRef; independent state revision. No linked Work or child session mutation."
+      ]
     }
   ],
   "other_ontology_operations": [

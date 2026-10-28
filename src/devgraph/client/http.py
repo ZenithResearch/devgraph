@@ -159,17 +159,44 @@ class TodoObject(_StrictFrozenModel):
 
 class TodoMutationReceipt(MutationReceipt):
     operation: str
-    subject_label: Literal["Todo", "Proposal", "Initiative", "Project", "Issue", "Task"]
+    subject_label: Literal[
+        "Todo", "Proposal", "Initiative", "Project", "Issue", "Task", "SessionRef"
+    ]
+
+
+class SessionDisposition(_StrictFrozenModel):
+    state: Literal["open", "done"]
+    version: int = Field(strict=True, ge=2, le=9007199254740991)
+    updated_at: str
+    updated_by: str
+
+
+class SessionStateResult(_StrictFrozenModel):
+    id: str = Field(pattern=r"^sr-[0-9a-f]{64}$")
+    work_state: SessionDisposition
 
 
 class TodoMutationResult(_StrictFrozenModel):
     schema_name: Literal["devgraph.work-result.v2"] = Field(alias="schema")
     work: TodoObject | None
+    session: SessionStateResult | None = None
     receipt: TodoMutationReceipt
 
     @model_validator(mode="after")
     def duplicate_shape(self):
-        if self.receipt.duplicate == (self.work is not None):
+        session_operation = self.receipt.operation == "devgraph.work.session.state.v2"
+        if session_operation != (self.receipt.subject_label == "SessionRef"):
+            raise ValueError("inconsistent session result")
+        if (
+            self.session is not None
+            and not session_operation
+            or self.work is not None
+            and session_operation
+        ):
+            raise ValueError("inconsistent session result")
+        if self.session is not None and self.session.id != self.receipt.subject_id:
+            raise ValueError("inconsistent session result")
+        if self.receipt.duplicate == (self.work is not None or self.session is not None):
             raise ValueError("inconsistent result")
         return self
 

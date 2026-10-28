@@ -1,6 +1,6 @@
 {
   "schema": "devgraph.session-reference-contract.v1",
-  "ontology_version": "0.11.0",
+  "ontology_version": "0.12.0",
   "identity_fields": [
     "application",
     "source_instance_id",
@@ -16,7 +16,8 @@
   "default_type": "SessionRef",
   "storage_labels": [
     "SessionRef",
-    "SessionLink"
+    "SessionLink",
+    "SessionWorkState"
   ],
   "legacy_storage_label": "HermesSessionRef",
   "legacy_edge": "ATTRIBUTED_TO_HERMES_SESSION",
@@ -39,7 +40,8 @@
   "http_operations": [
     "GET /session-refs/v1",
     "GET /session-refs/v1/{id}",
-    "devgraph.work.session.attach.v2"
+    "devgraph.work.session.attach.v2",
+    "devgraph.work.session.state.v2"
   ],
   "capture_adapters": [
     "codex-exec-json",
@@ -49,5 +51,17 @@
   "automatic_legacy_migration": false,
   "source_bindings": {
     "hermes_codex": "sessions.model_config.codex_thread_id; exact retained native record required; no historical inference"
+  },
+  "work_state": {
+    "states": [
+      "open",
+      "done"
+    ],
+    "missing": "unreviewed",
+    "initial_revision": 1,
+    "authority_resource": "SessionRef/{id}",
+    "native_observation_can_change": false,
+    "completes_linked_work": false,
+    "cascades_to_related_sessions": false
   }
 }

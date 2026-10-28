@@ -30,11 +30,20 @@ def read_references(storage, *, ref_id=None, after=None, limit=50):
         if node is None:
             return None
         value = public_reference(node)
+        from devgraph.observability.session_work_state import read_state
+
+        value["work_state"] = read_state(storage, ref_id).public()
         value.update(storage.session_ref_context(ref_id, limit=limit))
         return value
     nodes = storage.query("SessionRef", after_id=after, limit=limit)
     return {
         "schema": "devgraph.session-refs.v1",
-        "items": [public_reference(n) for n in nodes],
+        "items": [_with_state(storage, n) for n in nodes],
         "next_after": nodes[-1].id if len(nodes) == limit else None,
     }
+
+
+def _with_state(storage, node):
+    from devgraph.observability.session_work_state import read_state
+
+    return {**public_reference(node), "work_state": read_state(storage, node.id).public()}

@@ -31,6 +31,10 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, hide_input_in_errors=True)
 
 
+class SessionStateSet(Strict):
+    state: Literal["open", "done"]
+
+
 class NativeIdentity(Strict):
     application: str
     source_instance_id: str

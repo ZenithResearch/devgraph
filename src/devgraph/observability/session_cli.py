@@ -42,6 +42,13 @@ def configure(subcommands: argparse._SubParsersAction) -> None:
     prepare.add_argument("--work", required=True)
     prepare.add_argument("--link-ref")
     prepare.add_argument("--output-dir", type=Path, required=True)
+    state = commands.add_parser(
+        "prepare-state", help="prepare DevGraph session completion or reopening"
+    )
+    state.add_argument("--config", type=Path, required=True)
+    state.add_argument("--ref", required=True)
+    state.add_argument("--state", choices=("open", "done"), required=True)
+    state.add_argument("--output-dir", type=Path, required=True)
 
 
 def _arguments(application: str, arguments: list[str]) -> list[str]:
@@ -103,14 +110,18 @@ def capture_process(dispatch: Dispatch, arguments: list[str], journal: SessionJo
 def execute(args: argparse.Namespace) -> int:
     journal = None
     try:
-        if args.sessions_command == "prepare-import":
-            from devgraph.observability.session_prepare import prepare, write_bundle
+        if args.sessions_command in {"prepare-import", "prepare-state"}:
+            from devgraph.observability.session_prepare import prepare, prepare_state, write_bundle
             from devgraph.observability.session_read_runtime import SessionReader
             from devgraph.observability.session_sources import owned
 
             owned(args.config, private=True)
             reader = SessionReader(json.loads(args.config.read_text()))
-            request = prepare(reader, args.ref, args.work, link_ref=args.link_ref)
+            request = (
+                prepare_state(reader, args.ref, args.state)
+                if args.sessions_command == "prepare-state"
+                else prepare(reader, args.ref, args.work, link_ref=args.link_ref)
+            )
             print(json.dumps(write_bundle(request, args.output_dir)))
             return 0
         if args.sessions_command == "events":

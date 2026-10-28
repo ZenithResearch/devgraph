@@ -74,6 +74,13 @@ class NamedWorkMutations:
 
     def _execute(self, request, *, actor_id="", session_id="", correlation_id=""):
         operation, payload = request.operation, request.payload
+        if operation == "session.state":
+            from devgraph.observability.session_work_state import set_state
+
+            return set_state(
+                self.storage, request.id, request.expected_version, payload["state"],
+                actor_id=actor_id, session_id=session_id, correlation_id=correlation_id,
+            )
         if operation == "create":
             values = dict(payload)
             for field in ("artifact_ids", "external_link_ids"):

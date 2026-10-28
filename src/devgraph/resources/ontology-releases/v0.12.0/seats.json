@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "ontology_version": "0.12.0",
+  "terms_base": "https://zenith-research.ca/ontology/terms/",
+  "seat": {
+    "class": "Seat",
+    "independent_of_occupant": true,
+    "organization_class": "Organization",
+    "classification_class": "SeatType"
+  },
+  "assignment": {
+    "class": "SeatAssignment",
+    "seat_count": 1,
+    "occupant_count": 1,
+    "occupant_classes": [
+      "Person",
+      "Agent"
+    ],
+    "dated": true,
+    "vacant_seat_requires_fake_actor": false,
+    "reports_to_is_permission_inheritance": false
+  },
+  "presets": {
+    "class": "CredentialPreset",
+    "revision_class": "CredentialPresetRevision",
+    "seat_type_predicate": "SUGGESTS_CREDENTIAL_PRESET",
+    "association_cardinality": "many_to_many",
+    "immutable_revision": true,
+    "selection_retains_exact_revision": true,
+    "scope_and_validity_separate": true
+  },
+  "authority": {
+    "seat_is_credential": false,
+    "assignment_issues_grant": false,
+    "preset_edit_changes_grants": false,
+    "reporting_line_grants_access": false,
+    "organization_membership_grants_access": false
+  },
+  "runtime": {
+    "graph_labels": false,
+    "work_kinds": false,
+    "storage_migration": false,
+    "seat_appointment_api": false
+  },
+  "reference_contract": {
+    "local_recipe_schema": "zenith.credential-preset.v1",
+    "owner_setup_schema": "zenith.devgraph-owner-setup.v2",
+    "seat_class_field": "seat_class_iri",
+    "seat_type_field": "seat_type_iri",
+    "references_are_descriptive": true
+  },
+  "examples": [
+    {
+      "name": "human-project-manager",
+      "occupant_class": "Person",
+      "accepted": true
+    },
+    {
+      "name": "agent-contributor",
+      "occupant_class": "Agent",
+      "accepted": true
+    },
+    {
+      "name": "organization-as-occupant",
+      "occupant_class": "Organization",
+      "accepted": false
+    }
+  ],
+  "review_mapping": {
+    "draft_scoped_post_iri": "urn:zenith:ontology-review:shared:0.1.0:directory#ScopedPost",
+    "candidate_term": "Seat",
+    "relation": "proposed_alignment_not_owl_equivalence",
+    "automatic_migration": false
+  }
+}

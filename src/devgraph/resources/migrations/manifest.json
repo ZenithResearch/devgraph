@@ -240,6 +240,14 @@
       "checksum": "73692b0ff0260b725806e5982cfd82ea4c7530833c89f17e1ccf98325b73132d",
       "posture": "forward_only",
       "kind": "schema_ddl"
+    },
+    {
+      "version": 31,
+      "name": "session_work_state_id",
+      "payload_path": "migrations/0031_session_work_state_id.cypher",
+      "checksum": "7ed3d68df9a1e4214d77903e3e636fcbda84f609b7d91d1fb29779fd97813734",
+      "posture": "forward_only",
+      "kind": "schema_ddl"
     }
   ]
 }

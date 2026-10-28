@@ -142,3 +142,62 @@ record again through the canonical HTTP API. It never represents this as graph
 attribution, delegation evidence or completed work. No Work body or transcript is
 copied into the journal. Retained inspection timestamps can order source activity
 without claiming a running process.
+
+## Finish or reopen work in a session
+
+Session disposition is DevGraph-owned; native app conversations remain available.
+Prepare a narrow state update against the current canonical revision:
+
+```sh
+devgraph sessions prepare-state --config /absolute/private/session-reader.json \
+  --ref sr-<64-hex-digest> --state done --output-dir /absolute/private/finish-session
+devgraph work session.state --credential-v2 \
+  --request-file /absolute/private/finish-session/request.json \
+  --idempotency-key-file /absolute/private/finish-session/idempotency.txt
+```
+
+Use `--state open` and a new prepared bundle to reopen. Preparation does not grant,
+sign or submit. Submission uses the existing native Wallet approval and separately
+provisioned exact session-state authority. Retry uncertain outcomes with the same
+files; `--reconcile` performs the existing status-only receipt lookup. The response
+has `work: null` and a `session` result; generic Todo decoders should not claim this
+is a task. The read-only Pulse reader displays state but does not submit mutations.
+
+Source-only records must first be explicitly imported. A missing `work_state` in a
+canonical read means that host needs the coordinated upgrade; the preparation
+command refuses to guess a revision. Migration 31 adds state uniqueness only.
+Take the normal native backup before rollout. This source candidate has not been
+deployed merely by changing the prototype reader. Existing v0.11.0 bundles and
+stored SessionRef records remain unchanged and readable.
+
+### Optional Pulse native approval bridge
+
+`devgraph.observability.session_actions.SessionStateActions` prepares and retains
+one exact state request per desired state/revision. A local UI can opt into it
+using a fixed installed Python and owner-private action directory. It opens only
+the generated review command in macOS Terminal; CLI stdin and stderr remain on
+the real terminal so native Wallet still requires the human. No credential/key,
+command, output path, Work write or approval response is accepted from the UI.
+
+A pending attempt is reused. An explicitly requested retry retains the original
+request and idempotency key. Completed/uncertain attempts remain in private history.
+A zero exit code alone is insufficient: the helper checks the exact session-state
+receipt and rereads the current canonical state before reporting committed.
+Canonical read failure stays unconfirmed. The UI never optimistically marks Done.
+
+The local Pulse prototype enables this only with `--session-state-actions` after
+the matched runtime/authority rollout. Its action endpoint requires the existing
+private browser session, exact Host/Origin, same-origin Fetch metadata and bounded
+closed JSON. Cross-site, extra-field, duplicate-key and arbitrary proxy requests
+are rejected. The browser receives an opaque ticket and safe receipt/state metadata.
+Source-only sessions must first be imported; missing canonical state is not guessed.
+
+A review window has a bounded five-minute lease and records interruption exits.
+Abandoned windows become unconfirmed rather than staying pending forever; polling
+never launches a new approval. An explicit retry retains the original bytes/key.
+For a lost response after commit, `SessionStateActions.reconcile(ticket)` opens
+only the original CLI's `--reconcile` status lookup, with its own native approval.
+The retained intent remains reachable even when its original state revision has
+already advanced. Pulse exposes Check result and keeps pending ticket/intent
+metadata in same-origin session storage across reloads; no state or authority is
+restored from that storage. Only current canonical reads establish Open/Done.
