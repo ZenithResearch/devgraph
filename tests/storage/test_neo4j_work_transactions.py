@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from devgraph.storage.base import StorageUnavailable
-from devgraph.storage.neo4j import Neo4jGraphStorage
+from devgraph.storage.neo4j import Neo4jGraphStorage, _work_query_phase
 
 
 class Transaction:
@@ -174,3 +174,92 @@ def test_success_does_not_log_diagnostics_and_each_scope_starts_fresh(caplog):
             assert set(storage._transaction_state.work_timings) == {"guard_schema", "guard_lock"}
         assert not hasattr(storage._transaction_state, "work_timings")
     assert not caplog.records
+
+
+@pytest.mark.parametrize(
+    "phase,query",
+    [
+        (
+            "receipt_claim",
+            "MERGE (n:`EventReceipt` {idempotency_claim_digest: $claim_digest}) "
+            "ON CREATE SET n = $properties",
+        ),
+        (
+            "receipt_claim_lookup",
+            "MATCH (n:`EventReceipt`) WHERE n.`idempotency_claim_digest` IN $digests "
+            "RETURN properties(n)",
+        ),
+        (
+            "receipt_legacy_lookup",
+            "MATCH (n:`EventReceipt`) WHERE n.`idempotency_key_digest` IN $digests "
+            "RETURN properties(n)",
+        ),
+        (
+            "node_read",
+            "MATCH (n:`Task` {id: $node_id}) RETURN labels(n) AS labels, n.id AS id, "
+            "n.archived AS archived, properties(n) AS properties",
+        ),
+        (
+            "node_create",
+            "MERGE (n:`SessionWorkState` {id: $node_id}) "
+            "ON CREATE SET n.archived = false, n += $properties",
+        ),
+        (
+            "node_write",
+            "MATCH (n:`Project` {id: $node_id}) WHERE n.version = $expected_version "
+            "SET n += $properties RETURN properties(n)",
+        ),
+        (
+            "node_write",
+            "MATCH (n:`SessionWorkState` {id: $node_id}) "
+            "WHERE properties(n) = $expected_properties SET n = $replacement_properties "
+            "RETURN properties(n)",
+        ),
+        (
+            "edge_merge",
+            "MATCH (source:`Task` {id: $from_id}), (target:`EventReceipt` {id: $to_id}) "
+            "MERGE (source)-[edge:`EMITTED_EVENT`]->(target) RETURN properties(edge)",
+        ),
+        ("graph", "MATCH (n:`Task` {id: $node_id}) RETURN n"),
+        ("graph", "MERGE (n:Unknown {id: $node_id}) RETURN n"),
+        ("graph", "RETURN 'private-query-marker'"),
+    ],
+)
+def test_query_phase_uses_closed_categories_with_unknown_fallback(phase, query):
+    assert _work_query_phase(query) == phase
+
+
+@pytest.mark.parametrize("failure_at", ["run", "consume"])
+def test_failed_query_and_result_consumption_are_included_in_timing(
+    failure_at, caplog, monkeypatch
+):
+    from devgraph.storage import neo4j as module
+
+    clock = [0.0]
+    monkeypatch.setattr(module.time, "monotonic", lambda: clock[0])
+    original = Transaction.run
+
+    def fail():
+        clock[0] += 0.25
+        raise RuntimeError("private-failure-marker")
+
+    def run(self, query, **parameters):
+        if query == "RETURN $private_parameter":
+            if failure_at == "run":
+                fail()
+            return [SimpleNamespace(data=fail)]
+        return original(self, query, **parameters)
+
+    monkeypatch.setattr(Transaction, "run", run)
+    storage, transactions = storage_fixture()
+    with pytest.raises(RuntimeError):
+        with storage.work_mutation_transaction():
+            storage._run_graph(
+                "RETURN $private_parameter", private_parameter="private-value-marker"
+            )
+    records = [r for r in caplog.records if r.message.startswith("named_work_transaction_failed ")]
+    assert len(records) == 1 and "private" not in records[0].message
+    diagnostic = json.loads(records[0].message.split(" ", 1)[1])
+    assert diagnostic["queries"]["graph"] == {"count": 1, "elapsed_ms": 250.0}
+    assert diagnostic["work_scope_ms"] == 250.0
+    assert (transactions[0].commits, transactions[0].rollbacks) == (0, 1)

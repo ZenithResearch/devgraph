@@ -77,6 +77,28 @@ def _work_query_phase(query: str) -> str:
         return "receipt_claim_lookup"
     if query.startswith("MATCH (n:`EventReceipt`) WHERE n.`idempotency_key_digest`"):
         return "receipt_legacy_lookup"
+    if (
+        query.startswith("MATCH (source:`")
+        and "{id: $from_id}" in query
+        and "{id: $to_id}" in query
+        and "MERGE (source)-[edge:`" in query
+    ):
+        return "edge_merge"
+    if query.startswith("MATCH (n:`") and "{id: $node_id}" in query:
+        if "SET n += $properties" in query or "SET n = $replacement_properties" in query:
+            return "node_write"
+        if (
+            query.endswith(
+                "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
+                "properties(n) AS properties"
+            )
+            and " WHERE " not in query
+        ):
+            return "node_read"
+    if query.startswith("MERGE (n:`") and (
+        "ON CREATE SET n.archived = false, n += $properties" in query
+    ):
+        return "node_create"
     return "graph"
 
 
