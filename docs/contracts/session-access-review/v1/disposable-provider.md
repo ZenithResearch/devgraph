@@ -51,6 +51,27 @@ modern Arena/path/standing profiles rather than flattening their selectors or
 guards. Writes are unavailable. Production profile integration requires its own
 lossless mapping, tests and review; successful fixture tests do not qualify it.
 
+## Modern profile mapping qualification
+
+`auth/session_read_profile.py` is the source-only mapping primitive for the next
+adapter slice. It uses the trusted configured provisioning decoder, selection
+type and read compiler. The complete shared secS permission list must round-trip
+exactly, including roles, selectors and legacy constraints; no ancestry is inferred
+from a client, no different grants are combined and no extra operations are added.
+Identical constraint rows for get/list may be deduplicated into one typed grant.
+The owner-only v7 All ceiling projects only to ordinary explicit v8 member All;
+earlier fixed-ID parsers retain their closed formats. Every session assignment is
+dated, independently holder/installation-bound and read-only. A ceiling's preset
+reference is not copied as requester provenance.
+
+Pure mapping tests cover fixed/dynamic Arena reads, original ceiling byte
+preservation, retained hierarchy ancestry and rejection of changed service,
+broader selectors, extra roles, writes and fixed-to-dynamic amplification. A
+single Arena get permission is currently unrepresentable by the existing draft's
+get/list pair and is rejected rather than receiving extra list authority. These
+tests do not enable the modern adapter in the private process or qualify actual
+production issuance/execution. That integration remains a distinct next step.
+
 Custody is an ephemeral Rust child using inherited private pipes, not XPC or a
 same-user security boundary. Native exchanges time out after ten seconds and
 close the child on corrupt, oversized or stalled responses. There are at most
