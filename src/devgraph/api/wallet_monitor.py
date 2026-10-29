@@ -185,6 +185,8 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
                         "schema": enrollment.holder_grants.grant_schema,
                         "service": enrollment.holder_grants.service,
                         "endpoint": BASE + "/grants",
+                        "v2_endpoint": BASE + "/grants/v2",
+                        "supported_schemas": ["secs.holder-grant.v1", "secs.holder-grant.v2"],
                     }
                 }
                 if getattr(enrollment, "holder_grants", None) is not None
@@ -226,6 +228,11 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         async def holder_grant(request: Request):
             body = await _body(request, {"challenge", "proof", "signature"})
             return await run_in_threadpool(enrollment.holder_grants.issue, **body)
+
+        @app.post(BASE + "/grants/v2")
+        async def holder_grant_v2(request: Request):
+            body = await _body(request, {"challenge", "proof", "signature"})
+            return await run_in_threadpool(enrollment.holder_grants.issue_v2, **body)
 
     def read(body):
         return wallet_monitor_read(storage, enrollment, audit_log, body)

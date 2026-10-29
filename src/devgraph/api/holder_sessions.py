@@ -15,6 +15,15 @@ def request_origin(enrollment, origin):
     return nullcontext() if sessions is None else sessions.from_origin(origin)
 
 
+def configured_native_origins(enrollment):
+    sessions = getattr(getattr(enrollment, "holder_grants", None), "holder_sessions", None)
+    if sessions is None or not sessions.policy.enabled:
+        return ()
+    return tuple(
+        origin for origin in sessions.policy.allowed_origins if origin.startswith("app://")
+    )
+
+
 def _headers(method):
     return {
         "Cache-Control": "no-store",

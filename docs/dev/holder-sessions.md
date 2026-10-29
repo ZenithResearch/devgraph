@@ -110,3 +110,28 @@ file tests canonical revocation; no production route contains that control.
 Native iOS temporary-key custody and full installed-app/Tailscale qualification
 are separate work; macOS helper availability does not imply an iOS implementation.
 Passing these tests is not production activation or evidence of live access.
+
+
+## Fresh v2 enrollment and native read transport
+
+The ordinary monitor configuration retains `holder_grants.schema` and `endpoint`
+unchanged. It additionally advertises `v2_endpoint` as
+`/monitor/wallet-access/v1/grants/v2` and `supported_schemas` as the existing v1/v2
+formats. A compatible Wallet can explicitly request a **fresh** ordinary read
+challenge and approve/save a v2 parent under its current operator-approved
+assignment. This issues a separate signed root, not a conversion: old grants,
+assignment permissions, revision and original-result recovery stay intact. A
+reused v1 enrollment challenge cannot be reinterpreted as a v2 request. A user
+without an approved assignment still needs the ordinary operator request flow.
+After saving the parent, starting an application session is a separate exact
+finite review. Clients retain the originally selected enrollment endpoint/schema
+after dispatch so uncertain results cannot silently change grant format.
+
+Native HTTPS session calls use the reviewed fixed `app://zenith-ios` or
+`app://zenith-transfer` origin context. The receiver's explicit session policy
+admits those origins only for the signed monitor/native-v2 read POST endpoints;
+operator routes, mutations, metadata and browser CORS retain their old boundary.
+Every read still requires the finite token, current parent and a fresh key proof.
+No native origin is admitted by default, and no origin string grants authority.
+Ordinary enrollment/discovery requests retain their existing transport behavior;
+the fixed app-origin header is needed for the new bound session read.

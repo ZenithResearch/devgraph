@@ -28,8 +28,13 @@ class _PageAssets(EndpointReadBoundary):
 class OwnerHTTPSBoundary(EndpointReadBoundary):
     get_paths = EndpointReadBoundary.get_paths | {"/.well-known/devgraph-wallet-service.json"}
 
-    def __init__(self, app, *, origin, canonical_paths=False):
-        super().__init__(app, origin=origin, canonical_paths=canonical_paths)
+    def __init__(self, app, *, origin, canonical_paths=False, native_session_origins=()):
+        super().__init__(
+            app,
+            origin=origin,
+            canonical_paths=canonical_paths,
+            native_session_origins=native_session_origins,
+        )
         self.assets = _PageAssets(app, origin=origin)
 
     async def __call__(self, scope, receive, send):
@@ -128,8 +133,15 @@ def create_app():
             access_requires_current_grant=True,
         )
 
+    from devgraph.api.holder_sessions import configured_native_origins
+
     boundary = OwnerHTTPSBoundary(
-        app, origin=origin, canonical_paths=config.canonical_access_points
+        app,
+        origin=origin,
+        canonical_paths=config.canonical_access_points,
+        native_session_origins=configured_native_origins(
+            getattr(getattr(app.state, "session_access_components", None), "enrollment", None)
+        ),
     )
     return (
         DedicatedTLSProxy(boundary, port=config.endpoint_tls_proxy_port)
