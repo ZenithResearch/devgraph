@@ -63,6 +63,7 @@ class CanonicalServiceRoute:
         selected["path"] = path[len(PREFIX) :]
         selected["raw_path"] = selected["path"].encode("utf8")
         selected["root_path"] = ""
+        selected["devgraph.canonical_access_prefix"] = PREFIX
         selected["scheme"] = "https"
         selected["server"] = (self.authority.hostname, self.authority.port or 443)
         selected["headers"] = [

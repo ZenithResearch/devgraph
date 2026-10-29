@@ -54,6 +54,16 @@ test('unsupported installed Wallet cannot fall back to pasted credentials',async
  const {client,provider}=fixture();provider.getCapabilities=async()=>['credential_presentation_v2'];await client.initialize();await assert.rejects(client.useProvider(provider),/wallet_upgrade_required/);
 });
 
+test('an idle read connection expires at its original deadline without renewal or another Wallet approval',async()=>{
+ const {client,provider,events}=fixture();let now=1000;client.now=()=>now;
+ await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();await client.advance();
+ const expires=client.expiresAt;assert.equal(client.stage,'ready');
+ now=expires-1;await client.read('/monitor/topology/v1');assert.equal(client.expireIfNeeded(),false);assert.equal(client.expiresAt,expires);
+ now=expires;assert.equal(client.expireIfNeeded(),true);assert.equal(client.sessionKey,'');assert.equal(client.accessId,null);assert.equal(client.expiresAt,null);assert.equal(client.notice,'read_access_expired');
+ assert.equal(events.filter(x=>x==='approve').length,1);assert.equal(events.filter(x=>x==='present').length,1);
+ await assert.rejects(client.read('/monitor/topology/v1'),/wallet_read_access_required/);
+});
+
 
 test('an unassigned Wallet exposes only public setup details and retries without new site consent',async()=>{
  const {client,provider,events}=fixture();let connections=0,denied=true;

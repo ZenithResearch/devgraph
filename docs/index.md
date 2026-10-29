@@ -28,6 +28,8 @@ package behavior from the memory-backed demo and machine-specific deployment sta
 - [Service boundaries](boundaries.md)
 - [Authorization](auth.md)
 - [Exact monitor proof of possession](monitor-proof-of-possession.md)
+- [Optional finite holder sessions](dev/holder-sessions.md) — shared contract,
+  explicit local/HTTPS composition and isolated client qualification.
 - [Exports and redaction](export-redaction.md)
 - [Events and outbox](events.md)
 - [Observability](observability.md)

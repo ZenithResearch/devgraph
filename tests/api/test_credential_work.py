@@ -271,6 +271,7 @@ def test_signed_read_composition_does_not_shadow_credential_sdk_assets():
     register_wallet_monitor(app, storage=None, enrollment=None, audit_log=None)
     with TestClient(app) as client:
         assert client.get("/assets/credential-v2/read-access.mjs").status_code == 200
+        assert client.get("/assets/credential-v2/holder-session.mjs").status_code == 200
         assert client.get("/assets/credential-v2/coordinator.mjs").status_code == 404
     register_credential_work(app, None)
     with TestClient(

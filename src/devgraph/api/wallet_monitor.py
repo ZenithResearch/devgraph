@@ -146,6 +146,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             "subject.mjs",
             "wallet-errors.mjs",
             "read-access.mjs",
+            "holder-session.mjs",
             "access-request.mjs",
             "scope-picker.mjs",
             "web-wallet.mjs",
@@ -239,7 +240,10 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             ),
         )
         try:
-            return await run_in_threadpool(read, body)
+            from devgraph.api.holder_sessions import request_origin
+
+            with request_origin(enrollment, request.headers.get("origin")):
+                return await run_in_threadpool(read, body)
         except (UnauthenticatedError, ForbiddenError):
             audit_log.record(
                 actor_id="unverified",

@@ -73,6 +73,7 @@ class ReadRuntimeConfiguration(BaseModel):
         "secs.holder-grant.v1"
     )
     holder_grant_provider_runtime_file: Path | None = None
+    holder_session_policy_file: Path | None = None
     owner_parent_runtime_file: Path | None = None
     owner_endpoint_profile_file: Path | None = None
     endpoint_tls_proxy_port: int | None = Field(default=None, strict=True, ge=1024, le=65535)
@@ -96,6 +97,11 @@ class ReadRuntimeConfiguration(BaseModel):
 
     @model_validator(mode="after")
     def paths(self):
+        if self.holder_session_policy_file is not None and (
+            self.schema_ != "devgraph.signed-read-runtime.v11"
+            or self.holder_grant_binary is None
+        ):
+            raise ValueError("holder sessions require explicit v11 canonical holder authority")
         if self.owner_arena_upgrade_file is not None and (
             self.schema_ != "devgraph.signed-read-runtime.v11"
             or self.owner_bootstrap_database_file is None
@@ -647,6 +653,7 @@ def create_app(*, config_path=None, canonical_routes=True):
                 parent.canonical_service_id != config.canonical_service_id
                 or parent.holder_grant_binary != config.holder_grant_binary
                 or parent.holder_grant_binary_sha256 != config.holder_grant_binary_sha256
+                or parent.holder_session_policy_file != config.holder_session_policy_file
             ):
                 raise ValueError("published holder grants require the unchanged canonical provider")
             next_provider = (
@@ -669,7 +676,7 @@ def create_app(*, config_path=None, canonical_routes=True):
             ):
                 raise ValueError("canonical holder provider ownership or eligibility changed")
             provider = load_enrollment(parent, data_root=Path(data_root))
-        HolderGrantHost(
+        holder = HolderGrantHost(
             enrollment=enrollment,
             provider_enrollment=provider,
             binary=config.holder_grant_binary,
@@ -677,6 +684,25 @@ def create_app(*, config_path=None, canonical_routes=True):
             service=config.canonical_service_id,
             grant_schema=config.holder_grant_schema,
         )
+        if config.holder_session_policy_file is not None:
+            from devgraph.auth.holder_grants import checksum
+            from devgraph.auth.holder_sessions import HolderSessionHost, HolderSessionPolicy
+
+            selected_policy = HolderSessionPolicy.model_validate(
+                private_json(config.holder_session_policy_file)
+            )
+            digest = checksum(selected_policy.model_dump(mode="json", by_alias=True))
+
+            def unchanged_session_policy():
+                try:
+                    current = HolderSessionPolicy.model_validate(
+                        private_json(config.holder_session_policy_file)
+                    )
+                    return checksum(current.model_dump(mode="json", by_alias=True)) == digest
+                except (OSError, ValueError):
+                    return False
+
+            HolderSessionHost(holder, selected_policy, policy_check=unchanged_session_policy)
     # Same storage implementation/configuration as the production composition
     # root; no database migrations or direct ad-hoc queries are performed here.
     operator = None

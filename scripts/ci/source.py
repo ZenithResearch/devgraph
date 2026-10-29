@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def main():
     lane = sys.argv[1]
-    if lane not in {"repository", "protocol", "sdk", "codeql"}:
+    if lane not in {"repository", "protocol", "sdk", "codeql", "holder-sessions"}:
         raise ValueError("Unknown public CI lane")
     files = [*sorted((ROOT / "scripts/ci").glob("*.sh")),
              ROOT / "scripts/ci/source.py", ROOT / ".github/workflows/source.yml"]

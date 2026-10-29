@@ -11,6 +11,7 @@ WALLET_CONNECTION_HTML = r'''      <div class="wallet-connection" id="wallet-rea
 <li data-wallet-step="3">Receive credential</li>
 </ol>
         <p data-wallet-status role="status" aria-live="polite">Preparing Wallet connection…</p>
+<p data-wallet-session-expiry hidden></p>
 <p data-wallet-provider-status role="status" aria-live="polite" hidden></p>
         <div class="wallet-connection-actions">
 <button type="button" class="button" data-wallet-chrome>Use Wallet</button>

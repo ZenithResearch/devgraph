@@ -13,7 +13,7 @@ USAGE = ROOT / "docs" / "usage.md"
 def test_actions_preserves_all_public_lanes_without_private_credentials():
     pipeline = PIPELINE.read_text()
     runner = RUNNER.read_text() + (ROOT / "scripts/ci/repository.sh").read_text()
-    for lane in ("repository", "protocol", "sdk", "codeql"):
+    for lane in ("repository", "protocol", "sdk", "codeql", "holder-sessions"):
         assert lane in pipeline
     assert 'bash scripts/ci/run.sh "$DG_CI_LANE"' in pipeline
     for command in (
@@ -29,6 +29,20 @@ def test_actions_preserves_all_public_lanes_without_private_credentials():
     assert 'requires-python = ">=3.10"' in PYPROJECT.read_text()
     assert (ROOT / ".python-version").read_text().strip() == "3.10"
     assert "uv python install 3.10" in (ROOT / "scripts/ci/bootstrap.sh").read_text()
+
+
+def test_holder_session_lane_pins_real_native_crypto_instead_of_skipping_it():
+    import json
+
+    pin = json.loads((ROOT / "docs/dev/holder-session-source-set.json").read_bytes())
+    assert pin["secs_repository"] == "https://github.com/ZenithResearch/secS-magik"
+    assert len(pin["secs_revision"]) == 40
+    runner = RUNNER.read_text()
+    assert "SECS_HOLDER_GRANT_TEST_BINARY=" in runner
+    assert "SECS_READ_AUTHORITY_TEST_BINARY=" in runner
+    assert 'test "$(git -C "$DG_CI_TMP/holder-secs" rev-parse HEAD)" = "$secs_revision"' in runner
+    assert "tools/holder-grant-authority/Cargo.toml tools/read-authority/Cargo.toml" in runner
+    assert "uv run pytest -q tests/native_read" in runner
 
 
 def test_repository_verification_accepts_linked_git_worktrees() -> None:
