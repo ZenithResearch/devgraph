@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shutil
 import tempfile
 from pathlib import Path
 
@@ -145,11 +144,11 @@ def check() -> None:
 
 
 def build() -> None:
-    config = load_config()
-    release_destination = ONTOLOGY / "releases" / config["release"]
-    if release_destination.exists():
-        shutil.rmtree(release_destination)
-    render_tree(release_destination, ONTOLOGY / "discovery.json")
+    raise SystemExit(
+        "Shared Zenith vocabulary is authored in ZenithResearch/zenith-ontology; "
+        "use node scripts/build_ontology_extension.mjs for new DevGraph releases. "
+        "Historical bundles remain available with --check."
+    )
 
 
 def main() -> None:

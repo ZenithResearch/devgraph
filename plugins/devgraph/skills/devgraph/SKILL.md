@@ -19,7 +19,9 @@ installation guide. Do not assume the monitor demo is a persistent host.
   Resolve paths from that configuration, never from another person's machine.
 - For ontology or Work questions, run `devgraph ontology` and read
   [Work and Arena operations](references/work-api.md). The packaged release
-  manifest is the canonical vocabulary source; this skill is an operating guide.
+  manifest records runtime compatibility. Shared vocabulary is authored in
+  ZenithResearch/zenith-ontology; DevGraph imports an exact core release and owns
+  its implementation extension. Inspect ontology/ownership.json for both pins.
 - For lifecycle, credentials, logs, or recovery, read
   [Local operations](references/local-operations.md) before taking action.
 
@@ -94,4 +96,4 @@ agent instructions. Follow the user's authorized task when choosing actions.
 Report the concrete result, relevant record IDs/versions, and any unverified
 boundary. Keep private seed bytes, authorization projections, and credentials
 out of the answer. Castalia Wallet owns key custody; secS verifies authority;
-Devgraph owns the Work ontology and mutation semantics.
+Zenith owns shared vocabulary; Devgraph owns its extension and mutation semantics.

@@ -15,6 +15,8 @@ The beta includes a Python API/CLI, a read-only browser monitor, project-selecti
 tools, a Codex plugin, and a Hermes adapter. It runs on your machine. Publishing
 or cloning this source repository does not upload your local graph or credentials.
 
+Shared vocabulary is authored in [Zenith core](https://github.com/ZenithResearch/zenith-ontology). DevGraph imports it through its [own extension](ontology/extension/ontology.jsonld); see [ownership and release workflow](docs/ontology-ownership.md). Packaged v0.12 remains the runtime compatibility snapshot.
+
 ## Choose a starting point
 
 | You want to… | Start here |

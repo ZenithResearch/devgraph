@@ -203,7 +203,11 @@ def ontology_snapshot(release: str | None = None) -> dict[str, Any]:
         raise CliError("ontology release manifest malformed")
     authority = manifest.get("authority")
     compatibility = manifest.get("compatibility")
+    ownership_path = Path(__file__).parent / "resources" / "ontology-ownership.json"
+    ownership = json.loads(ownership_path.read_text(encoding="utf-8"))
     return {
+        "canonical_vocabulary": ownership["canonicalCore"],
+        "extension": ownership["extension"],
         "authority": authority if isinstance(authority, dict) else None,
         "bundle_digest": manifest.get("bundle_digest"),
         "canonical_base_url": manifest.get("canonical_base_url"),

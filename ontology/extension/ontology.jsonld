@@ -1,0 +1,24 @@
+{
+  "@context": "https://zenith-research.ca/ontology/devgraph/v0.1.0/context.jsonld",
+  "@graph": [
+    {
+      "@id": "https://zenith-research.ca/ontology/devgraph",
+      "@type": "owl:Ontology",
+      "label": "DevGraph ontology",
+      "comment": "DevGraph implementation extension of the shared Zenith core. Work and directory term definitions are imported; DevGraph owns operation, validation and runtime profiles.",
+      "versionIRI": "https://zenith-research.ca/ontology/devgraph/v0.1.0/ontology.jsonld",
+      "versionInfo": "0.1.0",
+      "canonicalAuthority": "https://github.com/ZenithResearch/devgraph",
+      "owl:imports": [
+        {
+          "@id": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld"
+        }
+      ],
+      "rdfs:seeAlso": [
+        {
+          "@id": "https://zenith-research.ca/ontology/devgraph/v0.1.0/operations.json"
+        }
+      ]
+    }
+  ]
+}

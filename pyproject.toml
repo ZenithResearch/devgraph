@@ -37,6 +37,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 devgraph = [
   "resources/*.in",
+  "resources/ontology-ownership.json",
   "frontend/static/selection/core/*",
   "frontend/static/topology/*",
   "frontend/static/kanban/*",
