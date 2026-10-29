@@ -108,9 +108,10 @@ def test_prepare_and_exchange_recover_exact_original_without_extending_end(tmp_p
 
 def test_late_new_exchange_and_clock_rollback_do_not_issue_or_recover_authority(tmp_path):
     s, auth, _, _, _, _ = setup(tmp_path)
-    with pytest.raises(UnauthenticatedError, match="review_expired"):
-        s.exchange(auth, now=NOW + timedelta(seconds=120))
-    s.exchange(auth, now=NOW)
+    assert s.exchange(auth, now=NOW + timedelta(seconds=120))["state"] == "expired"
+    # A confirmed terminal review cannot reopen after a restart or clock rollback.
+    restarted = HolderSessionHost(s.host, s.policy)
+    assert restarted.exchange(auth, now=NOW)["state"] == "expired"
     with pytest.raises(UnauthenticatedError):
         s.exchange(auth, now=NOW - timedelta(seconds=1))
 

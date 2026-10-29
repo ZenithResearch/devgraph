@@ -40,6 +40,7 @@ GET_PATHS = frozenset(
     (
         "/",
         "/monitor",
+        "/login",
         "/monitor/kanban",
         "/monitor/kanban/",
         "/monitor/wallet-access/v1",

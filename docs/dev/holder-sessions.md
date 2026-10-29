@@ -36,7 +36,20 @@ Changing an undispatched draft requires a fresh temporary key and inner request
 ID/review. Reusing an inner request ID with changed bytes fails. After possible
 dispatch, preserve the original key and status proof: identical issued retries
 return the original token without extending it, including after review deadline.
-A late new exchange is rejected. Status never issues a token. Losing the key or
+A late unissued exchange or authenticated status returns `expired`, with no
+credential. This terminal outcome is retained in the canonical database, so a
+restart, another alias, or clock rollback cannot reopen the review. Already-issued
+credentials remain recoverable until their original absolute expiry; the shorter
+review deadline does not revoke them. Admission time is sampled after acquiring
+the canonical write lock and rechecked after signing; status-proof expiry is
+rechecked after verification and before disclosure. A database trigger also
+rejects stale credential updates from an older writer that ignores the terminal
+record. This protects recorded terminal outcomes, not arbitrary mixed-version
+deadline admission: an old writer may still issue late before any tombstone is
+recorded. Drain old exchange writers before activation; rollback to old writers
+requires keeping new exchange admission disabled. Old clients retain the same
+signed formats. Status never issues a
+token. Losing the key or
 reaching expiry requires a new human-reviewed session, not silent fallback.
 
 Each read checks native cryptography, current parent/revision/membership, shared

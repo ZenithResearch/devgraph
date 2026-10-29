@@ -22,7 +22,10 @@ def test_setup_shell_serves_wallet_under_connect_graph_and_keeps_access_closed(
         assert 'type="password"' not in response.text
         assert 'id="token"' not in response.text
         assert response.headers["cache-control"] == "no-store"
-    assert "Connect to your graph with Wallet" in http.get("/").text
+    assert "data-session-logout" in http.get("/").text
+    assert 'id="wallet-login"' in http.get("/login").text
+    assert "wallet-connection-steps" not in http.get("/").text
+    assert "script-src" in http.get("/login").headers["content-security-policy"]
     for path in (
         "/monitor/topology-assets/wallet-access.js",
         "/assets/credential-v2/read-access.mjs",

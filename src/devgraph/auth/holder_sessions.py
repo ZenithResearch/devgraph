@@ -204,6 +204,18 @@ class HolderSessionHost:
                 CREATE TABLE IF NOT EXISTS holder_session_status_replay (
                     challenge_id TEXT NOT NULL, nonce TEXT NOT NULL,
                     expires INTEGER NOT NULL, PRIMARY KEY(challenge_id, nonce));
+                CREATE TABLE IF NOT EXISTS holder_session_expired_reviews (
+                    service TEXT NOT NULL, request_id TEXT NOT NULL,
+                    challenge_id TEXT NOT NULL,
+                    PRIMARY KEY(service, request_id));
+                CREATE TRIGGER IF NOT EXISTS holder_session_expired_review_no_issue
+                    BEFORE UPDATE OF credential ON holder_sessions
+                    WHEN NEW.credential IS NOT NULL AND EXISTS (
+                        SELECT 1 FROM holder_session_expired_reviews
+                        WHERE service=NEW.service AND request_id=NEW.request_id)
+                    BEGIN
+                        SELECT RAISE(ABORT, 'holder_session_review_expired');
+                    END;
             """)
         host.holder_sessions = self
 
@@ -322,6 +334,42 @@ class HolderSessionHost:
             "expires_at": challenge["expires_at"],
         }
 
+    def _review_expired(self, db, challenge, row, current):
+        """Retain terminality for unissued reviews, even after clock rollback.
+
+        This is called only after holder/session authentication while holding
+        the canonical write transaction. An issued result is never invalidated
+        by the shorter review deadline. Tombstones share retained-row capacity.
+        """
+        expired = db.execute(
+            "SELECT challenge_id FROM holder_session_expired_reviews "
+            "WHERE service=? AND request_id=?",
+            (self.host.service, challenge["request_id"]),
+        ).fetchone()
+        if expired is not None:
+            if expired[0] != challenge["challenge_id"] or row[4] is not None:
+                raise UnauthenticatedError("holder_session_review_changed")
+            return True
+        if row[4] is not None or current < challenge["review_deadline"]:
+            return False
+        db.execute(
+            "INSERT INTO holder_session_expired_reviews VALUES(?,?,?)",
+            (self.host.service, challenge["request_id"], challenge["challenge_id"]),
+        )
+        return True
+
+    @staticmethod
+    def _status_time(challenge, proof, now):
+        # Native verification authenticates these exact fields. Recheck their
+        # clock limits after crypto/lock waits and immediately before disclosure.
+        current = _seconds(now)
+        if not (
+            challenge["issued_at"] <= current < challenge["expires_at"]
+            and proof["issued_at"] <= current < proof["expires_at"]
+        ):
+            raise UnauthenticatedError("holder_session_status_expired")
+        return current
+
     def prepare(self, body, *, now=None):
         self._enabled()
         # Native signature/subset validation uses only the supplied object. No
@@ -359,7 +407,6 @@ class HolderSessionHost:
 
     def exchange(self, authorization, *, now=None):
         self._enabled()
-        current = _seconds(now)
         try:
             challenge = authorization["challenge"]
             context = self._context(challenge)
@@ -375,10 +422,13 @@ class HolderSessionHost:
                 context=context,
                 now=challenge["issued_at"],
             )
-            if current < challenge["issued_at"]:
-                raise UnauthenticatedError("holder_session_not_yet_valid")
             with self.host._provider_context(), self.host.provider._database() as db:
                 db.execute("BEGIN IMMEDIATE")
+                # Admission time is sampled after acquiring the canonical lock.
+                # A request queued before deadline cannot issue using stale time.
+                current = _seconds(now)
+                if current < challenge["issued_at"]:
+                    raise UnauthenticatedError("holder_session_not_yet_valid")
                 self.host.provider._check_policy_snapshot(db)
                 row = self._record(db, challenge["request_id"])
                 if canonical_json(json.loads(row[2])) != canonical_json(challenge):
@@ -387,16 +437,25 @@ class HolderSessionHost:
                 if row[3] is not None and row[3] != digest:
                     raise UnauthenticatedError("holder_session_exchange_conflict")
                 if current >= challenge["expires_at"]:
+                    self._review_expired(db, challenge, row, current)
                     db.execute("COMMIT")
                     return self._result(challenge, "expired")
                 parent = self._parent(db, challenge, current)
                 if checksum(parent) != checksum(authorization["parent_grant"]):
                     raise UnauthenticatedError("holder_session_parent_changed")
                 if row[4] is not None:
+                    current = _seconds(now)
+                    if current < challenge["issued_at"]:
+                        raise UnauthenticatedError("holder_session_not_yet_valid")
+                    if current >= challenge["expires_at"]:
+                        db.execute("COMMIT")
+                        return self._result(challenge, "expired")
+                    self._parent(db, challenge, current)
                     db.execute("COMMIT")
                     return self._result(challenge, "issued", json.loads(row[4]))
-                if not challenge["issued_at"] <= current < challenge["review_deadline"]:
-                    raise UnauthenticatedError("holder_session_review_expired")
+                if self._review_expired(db, challenge, row, current):
+                    db.execute("COMMIT")
+                    return self._result(challenge, "expired")
                 credential = self.host.invoke(
                     "issue_holder_session",
                     authorization=authorization,
@@ -405,6 +464,22 @@ class HolderSessionHost:
                     now=current,
                 )
                 self._enabled()
+                current = _seconds(now)
+                if current < challenge["issued_at"]:
+                    raise UnauthenticatedError("holder_session_not_yet_valid")
+                if self._review_expired(db, challenge, row, current):
+                    # The token generated during crypto is not a retained issued
+                    # result and must never be disclosed after admission expires.
+                    db.execute("COMMIT")
+                    return self._result(challenge, "expired")
+                self._parent(db, challenge, current)
+                self._enabled()
+                current = _seconds(now)
+                if current < challenge["issued_at"]:
+                    raise UnauthenticatedError("holder_session_not_yet_valid")
+                if self._review_expired(db, challenge, row, current):
+                    db.execute("COMMIT")
+                    return self._result(challenge, "expired")
                 db.execute(
                     "UPDATE holder_sessions SET authorization_digest=?,credential=? "
                     "WHERE service=? AND request_id=? AND credential IS NULL",
@@ -422,10 +497,10 @@ class HolderSessionHost:
 
     def status(self, proof, *, now=None, expected_context=None):
         self._enabled()
-        current = _seconds(now)
         try:
             with self.host._provider_context(), self.host.provider._database() as db:
                 db.execute("BEGIN IMMEDIATE")
+                current = _seconds(now)
                 row = self._record(db, proof["request_id"])
                 challenge = json.loads(row[2])
                 context = self._context(challenge)
@@ -441,6 +516,7 @@ class HolderSessionHost:
                     context=context,
                     now=current,
                 )
+                current = self._status_time(challenge, proof, now)
                 # Only a valid temporary-key proof may learn original outcome or
                 # current-parent state. Status proofs have a separate replay set.
                 db.execute("DELETE FROM holder_session_status_replay WHERE expires<=?", (current,))
@@ -457,9 +533,14 @@ class HolderSessionHost:
                 self.host.provider._check_policy_snapshot(db)
                 try:
                     self._parent(db, challenge, current)
-                    state = "issued" if row[4] is not None else "pending"
                 except UnauthenticatedError:
                     state = "revoked"
+                else:
+                    current = self._status_time(challenge, proof, now)
+                    if self._review_expired(db, challenge, row, current):
+                        state = "expired"
+                    else:
+                        state = "issued" if row[4] is not None else "pending"
                 db.execute(
                     "INSERT INTO holder_session_status_replay VALUES(?,?,?)",
                     (challenge["challenge_id"], proof["nonce"], proof["expires_at"]),
@@ -468,6 +549,7 @@ class HolderSessionHost:
                     challenge, state, json.loads(row[4]) if row[4] is not None else None
                 )
                 self._enabled()
+                self._status_time(challenge, proof, now)
                 db.execute("COMMIT")
                 return result
         except (KeyError, TypeError, ValueError, OverflowError):

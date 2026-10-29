@@ -36,6 +36,8 @@ _ASSETS = {
     "chooser.css": "text/css",
     "wallet-access.js": "text/javascript",
     "wallet-access.css": "text/css",
+    "session-access.js": "text/javascript",
+    "session-access.css": "text/css",
 }
 
 
