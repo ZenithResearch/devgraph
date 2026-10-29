@@ -16,6 +16,7 @@ WALLET_CONNECTION_HTML = r'''      <div class="wallet-connection" id="wallet-rea
         <div class="wallet-connection-actions">
 <button type="button" class="button" data-wallet-chrome>Use Wallet</button>
 <button type="button" data-wallet-advance hidden>Continue in Wallet</button>
+<button type="button" data-wallet-session-setup hidden>Set up browser session</button>
 <button type="button" data-wallet-request hidden>Request access</button>
 <button type="button" data-wallet-retry hidden>Retry connection setup</button>
 <button type="button" data-wallet-disconnect hidden>Disconnect</button>

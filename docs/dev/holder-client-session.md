@@ -5,6 +5,18 @@ not advertised or activated by this frontend change. The issuer, shared secS
 verifier, Wallet approval bridge and receiver must be qualified together before
 the new capability is enabled. Existing holder v1/v2 bytes remain unchanged.
 
+The public holder-grant discovery may add `v2_endpoint` and
+`supported_schemas` while retaining its existing `schema` and `endpoint`.
+The browser accepts only the fixed `/monitor/wallet-access/v1/grants/v2` path
+and the explicit v1/v2 schema pair. A capable Wallet can then prepare a finite
+session from an already saved v2 parent without changing the server's default.
+An existing v1 saved grant keeps its original flow. **Set up browser session**
+starts a fresh, Wallet-reviewed enrollment under the current assignment; it
+does not convert stored grants or request different permissions. Saving that
+new reusable grant is a separate one-time choice from approving its finite
+session. Recovery retains the original signed enrollment and selected endpoint,
+and rejects a result for the other grant protocol.
+
 Wallet keeps the reusable grant and long-term signing key. For the new session
 profile, the browser creates a fresh nonextractable Ed25519 key and a distinct
 random client installation ID. Wallet approves one typed challenge binding that

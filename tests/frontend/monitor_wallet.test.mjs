@@ -168,7 +168,7 @@ test('saved reusable grant connects without enrollment or provider reissuance',a
 });
 test('first grant is separately reviewed and saved, without legacy credential issuance',async()=>{
  const {client,provider,events}=fixture();const old=client.fetchImpl,read=provider.readAccess;let issued=0;
- client.fetchImpl=async(path,options)=>{assert.ok(!path.endsWith('/enrollments'));if(path.endsWith('/grants')){issued++;return{ok:true,status:200,json:async()=>({schema:'devgraph.holder-grant-result.v1',grant:{claims:{service:'service:graph'}}})}}const r=await old(path,options),v=await r.json();if(path==='/monitor/wallet-access/v1')v.holder_grants={schema:'secs.holder-grant.v1',service:'service:graph',endpoint:'/monitor/wallet-access/v1/grants'};return{...r,json:async()=>v}};
+ client.fetchImpl=async(path,options)=>{assert.ok(!path.endsWith('/enrollments'));if(path.endsWith('/grants')){issued++;return{ok:true,status:200,json:async()=>({schema:'devgraph.holder-grant-result.v1',grant:{claims:{schema:'secs.holder-grant.v1',service:'service:graph'}}})}}const r=await old(path,options),v=await r.json();if(path==='/monitor/wallet-access/v1')v.holder_grants={schema:'secs.holder-grant.v1',service:'service:graph',endpoint:'/monitor/wallet-access/v1/grants'};return{...r,json:async()=>v}};
  provider.getCapabilities=async()=>['read_access_v1','provider_profiles_v1','connection_v1','holder_grant_v1'];
  provider.readAccess=async input=>{if(input.operation==='use_grant')throw Error('grant_not_saved');if(input.operation==='save_grant'){events.push('save_grant');return{accessId:'new-grant',service:'service:graph',expires_at:4000}}return read(input)};
  await client.initialize();await client.useProvider(provider);await client.advance();await client.advance();await client.advance();assert.equal(client.stage,'approval');await client.advance();assert.equal(client.stage,'grant');assert.equal(client.sessionKey,'');await client.advance();assert.equal(client.stage,'ready');assert.equal(issued,1);assert.equal(events.at(-1),'save_grant');
@@ -178,7 +178,7 @@ test('lost grant response retains the original signed request and never reopens 
  const {client,provider,events}=fixture();const old=client.fetchImpl,read=provider.readAccess;const originals=[];
  client.fetchImpl=async(path,options)=>{
   assert.ok(!path.endsWith('/enrollments'));
-  if(path.endsWith('/grants')){originals.push(options.body);if(originals.length===1)throw Error('lost response');return{ok:true,status:200,json:async()=>({schema:'devgraph.holder-grant-result.v1',grant:{claims:{service:'service:graph'}}})};}
+  if(path.endsWith('/grants')){originals.push(options.body);if(originals.length===1)throw Error('lost response');return{ok:true,status:200,json:async()=>({schema:'devgraph.holder-grant-result.v1',grant:{claims:{schema:'secs.holder-grant.v1',service:'service:graph'}}})};}
   const r=await old(path,options),v=await r.json();if(path==='/monitor/wallet-access/v1')v.holder_grants={schema:'secs.holder-grant.v1',service:'service:graph',endpoint:'/monitor/wallet-access/v1/grants'};return{...r,json:async()=>v};
  };
  provider.getCapabilities=async()=>['read_access_v1','provider_profiles_v1','connection_v1','holder_grant_v1'];
