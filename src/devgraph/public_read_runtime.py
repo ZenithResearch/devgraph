@@ -28,7 +28,10 @@ POST_PATHS = frozenset(
     base + suffix
     for base, suffixes in (
         ("/devgraph/native-read/v2", ("/challenges", "/enrollments", "/grants", "/requests")),
-        ("/monitor/wallet-access/v1", ("/challenges", "/enrollments", "/grants", "/requests")),
+        (
+            "/monitor/wallet-access/v1",
+            ("/challenges", "/enrollments", "/grants", "/grants/v2", "/requests"),
+        ),
         ("/devgraph/access-requests/v2", ("/challenges", "/actions")),
     )
     for suffix in suffixes
@@ -112,7 +115,21 @@ class PublicReadBoundary:
         clock=time.time,
         approved_operator_policy=None,
         canonical_paths=False,
+        native_session_origins=(),
     ):
+        if (
+            not isinstance(native_session_origins, (list, tuple))
+            or len(set(native_session_origins)) != len(native_session_origins)
+            or any(
+                not isinstance(v, str)
+                or not v.startswith("app://")
+                or len(v) > 256
+                or any(not 33 <= ord(c) <= 126 or c == "*" for c in v)
+                for v in native_session_origins
+            )
+        ):
+            raise ValueError("explicit native session origins required")
+        self.native_session_origins = {v.encode("ascii") for v in native_session_origins}
         self.canonical_paths = canonical_paths
         self.app, self.origin = app, public_origin(origin)
         self.host = urlsplit(origin).netloc.encode("ascii")
@@ -143,17 +160,33 @@ class PublicReadBoundary:
         if self.canonical_paths and path.startswith("/service/v1/"):
             path = path[len("/service/v1") :]
         session_route = (
-            method == "GET" and path in SESSION_GET_PATHS
-            or method == "POST" and path in SESSION_POST_PATHS
-            or method == "OPTIONS" and path in SESSION_PATHS
+            method == "GET"
+            and path in SESSION_GET_PATHS
+            or method == "POST"
+            and path in SESSION_POST_PATHS
+            or method == "OPTIONS"
+            and path in SESSION_PATHS
         )
         hosts = [v for k, v in headers if k.lower() == b"host"]
         origins = [v for k, v in headers if k.lower() == b"origin"]
+        native_read = (
+            method == "POST"
+            and path
+            in {
+                "/monitor/wallet-access/v1/requests",
+                "/devgraph/native-read/v2/requests",
+            }
+            and len(origins) == 1
+            and origins[0] in self.native_session_origins
+        )
         if (
             scope.get("scheme") != "https"
             or hosts != [self.host]
             or len(origins) > 1
-            or origins and not session_route and origins != [self.origin.encode()]
+            or origins
+            and not session_route
+            and not native_read
+            and origins != [self.origin.encode()]
             or any(k.lower() == b"authorization" for k, _ in headers)
         ):
             return await reject(421, "invalid_public_receiver")

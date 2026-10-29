@@ -239,8 +239,9 @@ class HolderGrantHost:
         canonical_assignment.pop("receiver", None)
         if original_assignment != canonical_assignment:
             raise UnauthenticatedError("canonical_assignment_required")
+        selected_schema = original["grant_schema"]
         claims = dict(
-            schema=self.grant_schema,
+            schema=selected_schema,
             grant_id=original["id"],
             revision=self.revision(owner, device, current),
             issuer=self.pin["issuer"],
@@ -253,14 +254,14 @@ class HolderGrantHost:
             onward_delegation=False,
             permissions=[permission(p) for p in authority["permissions"]],
         )
-        if self.grant_schema == "secs.holder-grant.v2":
+        if selected_schema == "secs.holder-grant.v2":
             from devgraph.auth.selector_grants import permission_v2
 
             claims["permissions"] = [
                 permission_v2(p, self.service) for p in authority["permissions"]
             ]
         grant = self.invoke(
-            "issue_v2" if self.grant_schema.endswith(".v2") else "issue", claims=claims, now=current
+            "issue_v2" if selected_schema.endswith(".v2") else "issue", claims=claims, now=current
         )
         manifest.update(
             credential_id="dgrg_" + original["id"],
@@ -348,13 +349,26 @@ class HolderGrantHost:
             self._current(row, current)
             if row[5] != original["digest"]:
                 raise UnauthenticatedError("grant_request_changed")
-            return dict(schema="devgraph.holder-grant-result.v1", grant=json.loads(row[6]))
+            grant = json.loads(row[6])
+            if grant["claims"]["schema"] != original["grant_schema"]:
+                raise UnauthenticatedError("grant_schema_changed")
+            return dict(schema="devgraph.holder-grant-result.v1", grant=grant)
 
     def issue(self, challenge, proof, signature, *, now=None):
+        return self._issue(challenge, proof, signature, grant_schema=self.grant_schema, now=now)
+
+    def issue_v2(self, challenge, proof, signature, *, now=None):
+        """Explicit new enrollment, retaining current approved assignment unchanged."""
+        return self._issue(
+            challenge, proof, signature, grant_schema="secs.holder-grant.v2", now=now
+        )
+
+    def _issue(self, challenge, proof, signature, *, grant_schema, now=None):
         current = _seconds(now)
         original = dict(
             id=checksum(challenge)[:32],
             digest=checksum(dict(challenge=challenge, proof=proof, signature=signature)),
+            grant_schema=grant_schema,
         )
         with self._provider_context():
             recovered = self._recover(original, current)
@@ -466,9 +480,7 @@ class HolderGrantHost:
         )
         return self._verified_context(verified, credential, proof, current, v2=v2)
 
-    def _verified_context(
-        self, verified, credential, proof, current, *, v2, unbound_parent=False
-    ):
+    def _verified_context(self, verified, credential, proof, current, *, v2, unbound_parent=False):
         """Normalize only native-verified authority against the current canonical root."""
         e = self.provider
         owner, device = verified["holder_public_key"], verified["installation_id"]

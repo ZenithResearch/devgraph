@@ -17,9 +17,13 @@ from devgraph.signed_read_runtime import ReadRuntimeConfiguration, private_json
 class EndpointReadBoundary(PublicReadBoundary):
     get_paths = GET_PATHS | {"/devgraph/access-requests/v2/catalog"}
 
-    def __init__(self, app, *, origin, canonical_paths=False):
+    def __init__(self, app, *, origin, canonical_paths=False, native_session_origins=()):
         super().__init__(
-            app, origin=public_origin(origin), expires_at=0, canonical_paths=canonical_paths
+            app,
+            origin=public_origin(origin),
+            expires_at=0,
+            canonical_paths=canonical_paths,
+            native_session_origins=native_session_origins,
         )
 
     def expired(self):
@@ -117,7 +121,16 @@ def create_app():
             credential_requests_enabled=True,
         )
 
-    return EndpointReadBoundary(app, origin=origin, canonical_paths=config.canonical_access_points)
+    from devgraph.api.holder_sessions import configured_native_origins
+
+    return EndpointReadBoundary(
+        app,
+        origin=origin,
+        canonical_paths=config.canonical_access_points,
+        native_session_origins=configured_native_origins(
+            getattr(getattr(app.state, "session_access_components", None), "enrollment", None)
+        ),
+    )
 
 
 def main():

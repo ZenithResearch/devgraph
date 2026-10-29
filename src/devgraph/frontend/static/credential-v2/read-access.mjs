@@ -48,7 +48,13 @@ export class WalletReadClient{
   const config=await this.fetch(BASE,{signal});
   if(!plain(config)||config.schema!=='devgraph.wallet-read-configuration.v1'||config.endpoint!==BASE)throw failure('wallet_read_setup_required');
   if(config.web_wallet_url!==null&&config.web_wallet_url!==undefined){const u=new URL(config.web_wallet_url);if(u.protocol!=='https:'||u.username||u.password||u.hash||u.search)throw failure('wallet_read_setup_required');}
-  if(config.holder_grants!==undefined){const h=config.holder_grants;if(!plain(h)||Object.keys(h).sort().join(',')!=='endpoint,schema,service'||!['secs.holder-grant.v1','secs.holder-grant.v2'].includes(h.schema)||typeof h.service!=='string'||!h.service||h.service.length>256||h.endpoint!==BASE+'/grants')throw failure('wallet_read_setup_required');}
+  if(config.holder_grants!==undefined){
+   const h=config.holder_grants,fields=['schema','service','endpoint','v2_endpoint','supported_schemas'];
+   if(!plain(h)||Object.keys(h).some(k=>!fields.includes(k))||!['secs.holder-grant.v1','secs.holder-grant.v2'].includes(h.schema)||typeof h.service!=='string'||!h.service||h.service.length>256||h.endpoint!==BASE+'/grants')throw failure('wallet_read_setup_required');
+   if(h.v2_endpoint!==undefined||h.supported_schemas!==undefined){
+    if(h.v2_endpoint!==BASE+'/grants/v2'||!Array.isArray(h.supported_schemas)||JSON.stringify(h.supported_schemas)!=='["secs.holder-grant.v1","secs.holder-grant.v2"]')throw failure('wallet_read_setup_required');
+   }
+  }
   if(config.service_access_point_endpoint!==undefined){
    if(config.service_access_point_endpoint!=='/.well-known/devgraph-service.json'||!config.holder_grants)throw failure('invalid_service_binding');
    const response=await this.fetchImpl(config.service_access_point_endpoint,{credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
@@ -90,7 +96,7 @@ export class WalletReadClient{
   this.memberships=this.graphAccessV2?[]:identity.memberships;this.profileId=this.memberships.length===1?this.memberships[0].profileId:undefined;
   if(this.holderGrants){
    this.stage='saved_grant';this.notify();
-   if(this.setup.holderSessions&&this.configuration.holder_grants.schema==='secs.holder-grant.v2'){
+   if(this.setup.holderSessions&&this.setup.holderGrantV2&&(this.configuration.holder_grants.schema==='secs.holder-grant.v2'||this.configuration.holder_grants.v2_endpoint)){
     try{await this.prepareClientSession(current);}catch(error){if(!['grant_not_saved','holder_session_parent_unsupported'].includes(error.message))throw error;}
    }
    return;
@@ -111,6 +117,7 @@ export class WalletReadClient{
   const pin=this.setup.profile.presentations.find(p=>p.issuer===caps.issuer_pin.issuer&&p.key_id===caps.issuer_pin.key_id&&p.public_key===caps.issuer_pin.public_key&&p.audience===caps.audience);
   if(!pin)throw failure('holder_session_setup_invalid');
   if(!caps.supported)return;
+  this.sessionAvailable=true;
   const session=await createBrowserHolderSession({origin:this.origin,service:caps.issuer_pin.service,holderPublicKey:this.identity.subject_public_key,
     installationId:this.identity.installation_id,profile:this.setup.profile,ttlSeconds:Math.min(900,caps.max_ttl_seconds),audience:caps.audience,now:this.now});
   try{
@@ -122,6 +129,14 @@ export class WalletReadClient{
    const signature=await session.prepare(prepared.challenge);current();
    this.clientSession=session;this.sessionPreparation={...structuredClone(prepared),session_signature:signature};this.stage='session_review';this.notify();
   }catch(error){session.dispose();throw error;}
+ }
+ get canSetUpSession(){return this.stage==='saved_grant'&&this.sessionAvailable===true&&!!this.configuration?.holder_grants?.v2_endpoint;}
+ async setUpSession(){
+  if(!this.canSetUpSession)throw failure('holder_session_unavailable');
+  const generation=this.generation;
+  // This is an explicit new enrollment under the current assignment, never
+  // recovery or conversion of the user's saved v1 grant.
+  await this.checkAccess(()=>{if(this.generation!==generation)throw failure('wallet_connection_changed');});
  }
  async acceptClientSession(credential,current){
   await this.clientSession.accept(credential);current();
@@ -165,7 +180,16 @@ export class WalletReadClient{
   }
   if(this.stage==='grant_recovery'){await this.obtainHolderGrant(current);return;}
   if(this.stage==='grant'){
-   const accepted=await this.provider.readAccess({operation:'save_grant',service:this.configuration.holder_grants.service,grant:structuredClone(this.pendingGrant)});current();this.acceptHolder(accepted);this.pendingGrant=null;return;
+   const savedSchema=this.pendingGrant?.claims?.schema;
+   const accepted=await this.provider.readAccess({operation:'save_grant',service:this.configuration.holder_grants.service,grant:structuredClone(this.pendingGrant)});current();this.pendingGrant=null;
+   if(savedSchema==='secs.holder-grant.v2'&&this.sessionAvailable){
+    // Saving a reusable grant is a separate one-time decision. The page only
+    // connects after the user approves its own finite session challenge.
+    if(accepted?.accessId)void this.provider.readAccess({operation:'disconnect',accessId:accepted.accessId}).catch(()=>{});
+    this.stage='saved_grant';this.readPhase='';
+    await this.prepareClientSession(current);return;
+   }
+   this.acceptHolder(accepted);return;
   }
   if(this.stage==='profile'){const pending=this.setup.approve();await pending;current();if(this.connectionApproved){await this.identifyAndCheckAccess(current);return;}this.stage='connection';this.notify();return;}
   if(this.stage==='connection'){
@@ -188,6 +212,8 @@ export class WalletReadClient{
    this.readPhase='issuing_credential';this.notify();
    if(this.holderGrants){
     this.originalGrantRequest=structuredClone(approved.enrollment);
+    this.originalGrantEndpoint=this.sessionAvailable&&this.configuration.holder_grants.v2_endpoint?this.configuration.holder_grants.v2_endpoint:BASE+'/grants';
+    this.originalGrantSchema=this.originalGrantEndpoint===BASE+'/grants/v2'?'secs.holder-grant.v2':this.configuration.holder_grants.schema;
     await this.obtainHolderGrant(current);return;
    }
    const result=await this.fetch(BASE+'/enrollments',{body:approved.enrollment});current();
@@ -202,8 +228,8 @@ export class WalletReadClient{
  async obtainHolderGrant(current){
   if(!this.originalGrantRequest)throw failure('original_grant_request_missing');
   this.stage='grant_recovery';this.readPhase='';this.notify();
-  try{const result=await this.fetch(BASE+'/grants',{body:structuredClone(this.originalGrantRequest)});current();
-   if(result?.schema!=='devgraph.holder-grant-result.v1'||!plain(result.grant)||result.grant.claims?.service!==this.configuration.holder_grants.service)throw failure('invalid_holder_grant');
+  try{const result=await this.fetch(this.originalGrantEndpoint??BASE+'/grants',{body:structuredClone(this.originalGrantRequest)});current();
+   if(result?.schema!=='devgraph.holder-grant-result.v1'||!plain(result.grant)||result.grant.claims?.service!==this.configuration.holder_grants.service||(this.originalGrantSchema&&result.grant.claims?.schema!==this.originalGrantSchema))throw failure('invalid_holder_grant');
    this.pendingGrant=structuredClone(result.grant);this.stage='grant';this.notify();
   }catch(error){current();throw failure('holder_grant_outcome_unknown');}
  }
@@ -244,7 +270,7 @@ export class WalletReadClient{
  }
  disconnect(notice=''){
   const provider=this.provider,accessId=this.usingClientSession?null:this.accessId;this.provider=null;
-  this.clientSession?.dispose();this.clientSession=null;this.sessionPreparation=null;this.usingClientSession=false;
+  this.clientSession?.dispose();this.clientSession=null;this.sessionPreparation=null;this.usingClientSession=false;this.sessionAvailable=false;this.originalGrantEndpoint=null;this.originalGrantSchema=null;
   this.generation++;this.pendingGrant=null;this.originalGrantRequest=null;this.usingHolderGrant=false;this.accessId=null;this.expiresAt=null;this.sessionKey='';this.preferenceSeed='';this.identity=null;this.challenge=null;this.memberships=[];this.graphAccessV2=false;this.notice=notice;this.connectionApproved=false;
   this.readPhase='';this.stage=this.configuration?'choose':'unavailable';this.notify();
   if(accessId&&provider?.readAccess)void provider.readAccess({operation:'disconnect',accessId}).catch(()=>{});
