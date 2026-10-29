@@ -159,7 +159,7 @@ class NativeSessionProcess:
         try:
             raw = self._exchange(raw)
             result = _strict_json_object(raw, label="session helper result")
-        except (OSError, ValueError, TimeoutError):
+        except (OSError, ValueError, TimeoutError, RuntimeError):
             self.close()
             raise RuntimeError("session_custody_unavailable") from None
         if (
