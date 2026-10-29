@@ -150,6 +150,9 @@ def prepare_registration(
         file_pin(p)
         for p in (root / "uv.lock", Path(host_config), Path(runtime_config), Path(session_binary))
     ]
+    venv_configuration = Path(interpreter).absolute().parent.parent / "pyvenv.cfg"
+    if venv_configuration.exists():
+        sources.append(file_pin(venv_configuration))
     if not 1 <= len(sources) < 1024 or len({p["path"] for p in sources}) != len(sources):
         raise ValueError("invalid_session_source_inventory")
     interpreter_pin, script_pin = file_pin(interpreter), file_pin(script)

@@ -102,6 +102,19 @@ def test_interpreter_symlink_keeps_venv_invocation_but_hashes_resolved_bytes(set
     assert pin["sha256"] == hashlib.sha256(real.read_bytes()).hexdigest()
 
 
+def test_venv_prefix_configuration_is_pinned_when_present(setup):
+    target = setup.directory.parent / "venv/bin/python"
+    target.parent.mkdir(parents=True)
+    setup.files["python"].rename(target)
+    setup.files["python"] = target
+    config = target.parent.parent / "pyvenv.cfg"
+    config.write_text("include-system-site-packages = false\n")
+    config.chmod(0o600)
+    descriptor = prepare(setup)
+    sources = json.loads(descriptor.read_bytes())["launch"]["sources"]
+    assert module.file_pin(config) in sources
+
+
 @pytest.mark.parametrize("variant", ["required-membership", "route-alias"])
 def test_profile_cannot_infer_session_eligibility_or_use_route_registry(
     tmp_path, monkeypatch, variant
