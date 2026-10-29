@@ -16,7 +16,30 @@ local host and its separate Neo4j/Java prerequisites. Open
 [your local monitor](http://127.0.0.1:8080/) once that host is running. The
 credential belongs to that installation; the demo credential will not work there.
 
-To connect a configured local reader, run these commands in your own terminal:
+### Connect through Wallet
+
+On a Wallet-enabled Devgraph address, expand **Connect to your graph with Wallet**.
+Use your browser extension or the Wallet supplied by the host app. The monitor
+loads the server's public settings and verifies its signed service address before
+offering connection; you do not enter a Wallet website or recovery password.
+
+Review the site connection and server settings in Wallet when prompted. An
+existing grant can be reused. If no access is assigned, choose **Request access**
+and wait for the service owner to approve it. An older saved grant may offer
+**Set up browser session**: this saves a session-capable grant under the current
+permissions, with a separate Wallet review from starting a session.
+
+Choose **Start read session** and approve its scope and fixed expiry in Wallet.
+The temporary session can read permitted Work and Arenas and change monitor views
+without repeated approval, including after the root Wallet locks. Usage does not
+extend its expiry. Reloading or closing the page discards this browser session;
+the saved grant stays in Wallet. A fresh session requires Wallet approval.
+**Check original session** recovers an uncertain result without requesting another
+credential. A public address still requires the configured Wallet authorization.
+
+### Connect a local credential reader
+
+For a host using the local credential field, run these commands in your terminal:
 
 ```sh
 devgraph local status

@@ -57,7 +57,10 @@ export class WalletReadClient{
   }
   if(config.service_access_point_endpoint!==undefined){
    if(config.service_access_point_endpoint!=='/.well-known/devgraph-service.json'||!config.holder_grants)throw failure('invalid_service_binding');
-   const response=await this.fetchImpl(config.service_access_point_endpoint,{credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
+   // Browser fetch rejects a foreign receiver; keep discovery consistent with
+   // the ordinary read transport rather than calling it as a client method.
+   const fetchImpl=this.fetchImpl;
+   const response=await fetchImpl(config.service_access_point_endpoint,{credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
    if(!response.ok)throw failure('service_binding_unavailable');
    const text=await response.text();if(new TextEncoder().encode(text).length>16384)throw failure('invalid_service_binding');
    this.serviceBinding=await verifyServiceRoute(JSON.parse(text),{origin:this.origin,profile:config.provider_profile,service:config.holder_grants.service,now:this.now()});

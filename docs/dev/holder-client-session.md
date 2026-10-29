@@ -17,6 +17,20 @@ new reusable grant is a separate one-time choice from approving its finite
 session. Recovery retains the original signed enrollment and selected endpoint,
 and rejects a result for the other grant protocol.
 
+Signed service discovery uses the browser fetch API as a standalone function,
+just like ordinary read requests. Calling a stored fetch function as a method of
+the client fails in Chromium before Wallet can connect. Discovery still verifies
+the exact issuer signature, site origin, service, route prefix and validity;
+loading public settings never installs trust or grants access.
+
+`tests/frontend/service_route.test.mjs` checks the fetch receiver as well as the
+signed route. `tests/frontend/browser/holder_session_smoke.mjs` exercises native
+browser fetch, crypto and the monitor UI across legacy and signed canonical
+routes, public and Tailnet-style origins, and narrow/wide viewports. The canonical
+case uses the deployed additive v1/v2 grant discovery shape and checks one
+synthetic Wallet approval, prefixed reads, Wallet lock, fragment navigation and
+fixed expiry without renewal. These fixtures use no personal Wallet or grants.
+
 Wallet keeps the reusable grant and long-term signing key. For the new session
 profile, the browser creates a fresh nonextractable Ed25519 key and a distinct
 random client installation ID. Wallet approves one typed challenge binding that
