@@ -27,7 +27,7 @@ if __name__ == "__main__":
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.enforcement import AuditLog
@@ -271,6 +271,22 @@ def tls_files(directory):
                 [x509.DNSName("localhost"), x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]
             ),
             critical=False,
+        )
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=None,
+                decipher_only=None,
+            ),
+            critical=True,
         )
         .sign(key, hashes.SHA256())
     )
