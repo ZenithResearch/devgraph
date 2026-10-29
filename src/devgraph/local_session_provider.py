@@ -23,7 +23,7 @@ from devgraph.signed_read_runtime import ReadRuntimeConfiguration, private_json
 def file_pin(path):
     # Retain the invoking venv path; hashing resolves its interpreter symlink.
     path = Path(path).absolute()
-    return dict(path=str(path), sha256=checksum_bytes(path))
+    return dict(path=str(path), sha256=checksum_bytes(path.resolve(strict=True)))
 
 
 def checked_file(pin):
@@ -152,6 +152,7 @@ def prepare_registration(
     ]
     if not 1 <= len(sources) < 1024 or len({p["path"] for p in sources}) != len(sources):
         raise ValueError("invalid_session_source_inventory")
+    interpreter_pin, script_pin = file_pin(interpreter), file_pin(script)
     directory = Path(directory).absolute()
     directory.mkdir(mode=0o700)  # exclusive; never overwrite installed configuration
     directory = directory.resolve(strict=True)
@@ -164,8 +165,8 @@ def prepare_registration(
         receiver_pin=receiver,
         profile_digest_sha256=hashlib.sha256(canonical_json(profile)).hexdigest(),
         launch=dict(
-            interpreter=file_pin(interpreter),
-            script=file_pin(script),
+            interpreter=interpreter_pin,
+            script=script_pin,
             profile=file_pin(profile_file),
             sources=sources,
         ),

@@ -90,6 +90,18 @@ def test_profile_pins_reject_configuration_drift_before_composition(setup):
         module.validate_profile(profile)
 
 
+def test_interpreter_symlink_keeps_venv_invocation_but_hashes_resolved_bytes(setup):
+    import hashlib
+
+    real = setup.files["python"].with_name("real-python")
+    setup.files["python"].rename(real)
+    setup.files["python"].symlink_to(real)
+    descriptor = prepare(setup)
+    pin = json.loads(descriptor.read_bytes())["launch"]["interpreter"]
+    assert pin["path"] == str(setup.files["python"])
+    assert pin["sha256"] == hashlib.sha256(real.read_bytes()).hexdigest()
+
+
 @pytest.mark.parametrize("variant", ["required-membership", "route-alias"])
 def test_profile_cannot_infer_session_eligibility_or_use_route_registry(
     tmp_path, monkeypatch, variant
