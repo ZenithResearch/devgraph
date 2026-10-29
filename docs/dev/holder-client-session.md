@@ -29,7 +29,23 @@ browser fetch, crypto and the monitor UI across legacy and signed canonical
 routes, public and Tailnet-style origins, and narrow/wide viewports. The canonical
 case uses the deployed additive v1/v2 grant discovery shape and checks one
 synthetic Wallet approval, prefixed reads, Wallet lock, fragment navigation and
-fixed expiry without renewal. These fixtures use no personal Wallet or grants.
+fixed expiry without renewal. It also checks expired review refresh, an unavailable
+approval window, and lost-result recovery across those same routes and viewports.
+These fixtures use no personal Wallet or grants.
+
+A prepared review is separate from an issued session. Before its review deadline
+(with a five-second UI margin), the button changes to **Refresh session review**.
+Refreshing drops the unused temporary key and prepares a new review only; a
+second **Start read session** click is required to open Wallet approval.
+The controller's exact no-exchange errors (`holder_session_preparation_required`,
+`approval_required`, `approval_unavailable`, `wallet_locked` /
+`wallet_unlock_required`, and `read_approval_expired`) also expose this explicit
+refresh path. Failed preparation stays retryable without enrollment or fallback.
+Cancellation still disconnects. `approval_pending`, context changes, unknown
+errors and lost exchange replies remain conservative: retain the original key
+and use **Check original session**, never silently prepare another exchange.
+No signed format, persisted grant, permission or issuer policy changes.
+
 
 Wallet keeps the reusable grant and long-term signing key. For the new session
 profile, the browser creates a fresh nonextractable Ed25519 key and a distinct

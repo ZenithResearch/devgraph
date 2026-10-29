@@ -107,3 +107,48 @@ test('an invalid returned token closes custody without switching to the old sign
 test('status cannot change the original session expiry or silently start again',async()=>{
  const f=await fixture({lost:true,badStatus:true});await f.connect();await assert.rejects(f.client.advance(),/holder_session_outcome_unknown/);await assert.rejects(f.client.advance(),/holder_session_outcome_unknown/);assert.equal(f.client.stage,'session_recovery');assert.equal(f.counts().preparations,1);assert.equal(f.counts().approvals,1);
 });
+
+for(const code of ['holder_session_preparation_required','approval_required','approval_unavailable','wallet_locked','wallet_unlock_required','read_approval_expired'])test('known pre-dispatch '+code+' offers explicit fresh review without status recovery',async()=>{
+ const f=await fixture();await f.connect();const previous=f.client.clientSession;
+ const read=f.provider.readAccess;let attempts=0;
+ f.provider.readAccess=input=>input.operation==='open_holder_session'&&attempts++===0?Promise.reject(Error(code)):read(input);
+ await assert.rejects(f.client.advance(),new RegExp(code));
+ assert.equal(f.client.stage,'session_refresh');assert.equal(previous.closed,true);assert.equal(f.client.clientSession,null);
+ assert.deepEqual(f.counts(),{approvals:0,preparations:1,reads:0,statuses:0});
+ await f.client.advance();assert.equal(f.client.stage,'session_review');assert.equal(f.counts().approvals,0);assert.equal(f.counts().preparations,2);
+ await f.client.advance();assert.equal(f.client.stage,'ready');assert.equal(f.counts().approvals,1);assert.equal(f.counts().statuses,0);assert.equal(f.enrollments.length,0);
+});
+for(const code of ['approval_pending','read_context_changed','unexpected_failure','holder_session_outcome_unknown'])test('possibly dispatched '+code+' retains original custody for status',async()=>{
+ const f=await fixture();await f.connect();const previous=f.client.clientSession;
+ f.provider.readAccess=async()=>{throw Error(code)};
+ await assert.rejects(f.client.advance(),/holder_session_outcome_unknown/);assert.equal(f.client.stage,'session_recovery');
+ assert.equal(f.client.clientSession,previous);assert.equal(previous.closed,false);assert.equal(f.counts().preparations,1);
+});
+test('expired prepared review refreshes on its own click and requires a second approval click',async()=>{
+ const f=await fixture();await f.connect();const previous=f.client.clientSession,publicKey=previous.publicKey;
+ f.now(1060);assert.equal(f.client.sessionReviewExpired,true);assert.equal(f.client.expireIfNeeded(),false);
+ assert.equal(f.client.stage,'session_review');await f.client.advance();
+ assert.equal(previous.closed,true);assert.notEqual(f.client.clientSession.publicKey,publicKey);
+ assert.equal(f.client.stage,'session_review');assert.equal(f.client.sessionReviewExpired,false);assert.equal(f.client.notice,'session_review_refreshed');
+ assert.deepEqual(f.counts(),{approvals:0,preparations:2,reads:0,statuses:0});
+ await f.client.advance();assert.equal(f.client.stage,'ready');assert.equal(f.counts().approvals,1);
+});
+test('failed fresh preparation stays retryable and never falls back to a saved-grant signer',async()=>{
+ const f=await fixture();await f.connect();f.now(1060);const read=f.provider.readAccess;
+ f.provider.readAccess=async input=>{assert.notEqual(input.operation,'use_grant');if(input.operation==='prepare_holder_session')throw Error('wallet_locked');return read(input)};
+ await assert.rejects(f.client.advance(),/wallet_locked/);assert.equal(f.client.stage,'session_refresh');assert.equal(f.client.clientSession,null);assert.equal(f.client.readPhase,'');
+ f.provider.readAccess=read;await f.client.advance();assert.equal(f.client.stage,'session_review');assert.equal(f.counts().approvals,0);
+});
+
+test('disconnect during a fresh preparation cannot revive a session',async()=>{
+ const f=await fixture();await f.connect();f.now(1060);const read=f.provider.readAccess;let release;
+ f.provider.readAccess=input=>input.operation==='prepare_holder_session'?new Promise(resolve=>{release=()=>read(input).then(resolve)}):read(input);
+ const refreshing=f.client.advance();while(!release)await new Promise(resolve=>setImmediate(resolve));
+ f.client.disconnect();release();await assert.rejects(refreshing,/wallet_connection_changed/);
+ assert.equal(f.client.stage,'choose');assert.equal(f.client.clientSession,null);assert.equal(f.client.sessionPreparation,null);assert.equal(f.counts().approvals,0);
+});
+test('session review refresh remains separate from approval near its deadline',async()=>{
+ const f=await fixture();await f.connect();f.now(1054);assert.equal(f.client.sessionReviewExpired,false);
+ f.now(1055);assert.equal(f.client.sessionReviewExpired,true);await f.client.advance();
+ assert.equal(f.client.stage,'session_review');assert.equal(f.counts().approvals,0);assert.equal(f.counts().preparations,2);
+});
