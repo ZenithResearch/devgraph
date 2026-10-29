@@ -100,7 +100,7 @@ def invoke_native(binary, binary_sha256, pin_value, operation, *, issuer_key_fil
         with os.fdopen(fd, "wb") as f:
             f.write(canonical_json(pin_value))
         args = [str(binary), "--issuer-pin-file", str(pin)]
-        if operation in ("issue", "issue_v2", "issue_access_point"):
+        if operation in ("issue", "issue_v2", "issue_access_point", "issue_holder_session"):
             args += ["--issuer-key-file", str(issuer_key_file)]
         elif operation not in (
             "verify",
@@ -108,6 +108,10 @@ def invoke_native(binary, binary_sha256, pin_value, operation, *, issuer_key_fil
             "verify_access_point",
             "check_selector",
             "check_effect",
+            "review_holder_session",
+            "verify_holder_session_authorization",
+            "verify_holder_session",
+            "verify_holder_session_status",
         ):
             raise UnauthenticatedError("unsupported_operation")
         try:
@@ -391,6 +395,22 @@ class HolderGrantHost:
         Proof consumption happens first. This second check holds a shared
         DELETE-journal lock so revocation cannot commit during disclosure.
         """
+        if credential.get("claims", {}).get("schema") == "secs.holder-session-credential.v1":
+            sessions = getattr(self, "holder_sessions", None)
+            if sessions is None:
+                raise UnauthenticatedError("holder_sessions_not_enabled")
+            with sessions.current_read(credential, proof, now=now):
+                yield
+            return
+        grant = credential["grant"]
+        with self._current_read_refs(
+            grant["claims"]["grant_id"], checksum(grant), credential["claims"], proof, now=now
+        ):
+            yield
+
+    @contextmanager
+    def _current_read_refs(self, grant_id, grant_digest, claims, proof, *, now=None, extra=None):
+        """Shared canonical disclosure fence for old credentials and finite sessions."""
         current = _seconds(now)
         with self._provider_context(), self.provider._database() as db:
             db.execute("BEGIN")
@@ -410,7 +430,6 @@ class HolderGrantHost:
 
             def check_clock():
                 selected = _seconds(now)
-                claims = credential["claims"]
                 if not (
                     claims["issued_at"] <= selected < claims["expires_at"]
                     and proof["issued_at"] <= selected < proof["expires_at"]
@@ -418,22 +437,25 @@ class HolderGrantHost:
                     raise UnauthenticatedError("holder_credential_expired")
 
             check_clock()
-            grant = credential["grant"]
+            if extra is not None:
+                extra(db)
             row = db.execute(
                 "SELECT service,owner,device,revision,digest,request_digest,"
                 "grant,membership,status "
                 "FROM holder_roots WHERE id=?",
-                (grant["claims"]["grant_id"],),
+                (grant_id,),
             ).fetchone()
-            if row is None or row[4] != checksum(grant):
+            if row is None or row[4] != grant_digest:
                 raise UnauthenticatedError("unknown_holder_grant")
             self._current(row, current)
             yield
             check_clock()
+            if extra is not None:
+                extra(db)
             self._current(row, _seconds(now))
 
     def verify_request(self, *, credential, call, proof, now=None):
-        current, e = _seconds(now), self.provider
+        current = _seconds(now)
         v2 = credential.get("claims", {}).get("schema") == "secs.holder-credential.v2"
         verified = self.invoke(
             "verify_v2" if v2 else "verify",
@@ -442,6 +464,13 @@ class HolderGrantHost:
             proof=proof,
             now=current,
         )
+        return self._verified_context(verified, credential, proof, current, v2=v2)
+
+    def _verified_context(
+        self, verified, credential, proof, current, *, v2, unbound_parent=False
+    ):
+        """Normalize only native-verified authority against the current canonical root."""
+        e = self.provider
         owner, device = verified["holder_public_key"], verified["installation_id"]
         with self._provider_context(), e._database() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -455,7 +484,13 @@ class HolderGrantHost:
                 ).fetchone()
                 if not row or row[4] != verified["grant_digest"]:
                     raise UnauthenticatedError("unknown_holder_grant")
-                if row[1:3] != (owner, device):
+                if row[1] != owner or (
+                    row[2] != device
+                    and (
+                        not unbound_parent
+                        or json.loads(row[6])["claims"].get("installation_id") is not None
+                    )
+                ):
                     raise UnauthenticatedError("holder_binding_changed")
                 self._current(row, current)
                 permissions = (

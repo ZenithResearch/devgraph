@@ -106,6 +106,10 @@ def create_signed_read_app(
         openapi_url=None,
         lifespan=lifespan,
     )
+    from devgraph.api.holder_sessions import register_holder_sessions, request_origin
+
+    if getattr(enrollment, "holder_grants", None) is not None:
+        register_holder_sessions(app, host=enrollment.holder_grants)
 
     @app.exception_handler(UnauthenticatedError)
     async def denied(_request, _error):
@@ -160,7 +164,8 @@ def create_signed_read_app(
         )
         if any(not isinstance(v, dict) for v in body.values()):
             raise UnauthenticatedError("invalid_request")
-        return await run_in_threadpool(read, body)
+        with request_origin(enrollment, request.headers.get("origin")):
+            return await run_in_threadpool(read, body)
 
     from devgraph.auth.arena_activation import ArenaMonitorReadEnrollment
 
@@ -174,9 +179,10 @@ def create_signed_read_app(
             from devgraph.api.wallet_monitor import wallet_monitor_read
 
             body = await _body(request, {"credential", "call", "proof"}, maximum_bytes=131072)
-            return await run_in_threadpool(
-                wallet_monitor_read, storage, enrollment, audit_log, body
-            )
+            with request_origin(enrollment, request.headers.get("origin")):
+                return await run_in_threadpool(
+                    wallet_monitor_read, storage, enrollment, audit_log, body
+                )
 
     from devgraph.auth.monitor_read import MemberMonitorReadEnrollment
 

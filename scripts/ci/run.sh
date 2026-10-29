@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-case "${1:-}" in repository|protocol|sdk|companion|codeql) lane=$1 ;; *) exit 2 ;; esac
+case "${1:-}" in repository|protocol|sdk|companion|codeql|holder-sessions) lane=$1 ;; *) exit 2 ;; esac
 if [[ ${GITHUB_ACTIONS:-} == true ]]; then
   [[ "$lane" != companion ]] || { echo 'Companion qualification is manual-only.' >&2; exit 1; }
   export DG_CI_OUTPUT_ROOT="$PWD/build/ci"
@@ -72,6 +72,23 @@ case "$lane" in
     rustup toolchain install 1.85.1 --profile minimal
     cargo +1.85.1 test --locked -p devgraph-work-protocol --features hostile-map-order,hostile-number-repr
     cargo fmt --all --check
+    ;;
+  holder-sessions)
+    secs_revision=$(python3 -c 'import json; print(json.load(open("docs/dev/holder-session-source-set.json"))["secs_revision"])')
+    git init "$DG_CI_TMP/holder-secs"
+    git -C "$DG_CI_TMP/holder-secs" remote add origin https://github.com/ZenithResearch/secS-magik.git
+    git -C "$DG_CI_TMP/holder-secs" fetch --depth=1 origin "$secs_revision"
+    git -C "$DG_CI_TMP/holder-secs" checkout --detach FETCH_HEAD
+    test "$(git -C "$DG_CI_TMP/holder-secs" rev-parse HEAD)" = "$secs_revision"
+    export CARGO_TARGET_DIR="$DG_CI_TMP/holder-native-target"
+    for manifest in tools/holder-grant-authority/Cargo.toml tools/read-authority/Cargo.toml; do
+      cargo build --locked --manifest-path "$DG_CI_TMP/holder-secs/$manifest"
+    done
+    export SECS_HOLDER_GRANT_TEST_BINARY="$CARGO_TARGET_DIR/debug/secs-holder-grant-authority"
+    export SECS_READ_AUTHORITY_TEST_BINARY="$CARGO_TARGET_DIR/debug/secs-read-authority-v1"
+    uv sync --locked
+    uv run pytest -q tests/native_read tests/ops/test_local_holder_session_provider.py \
+      | tee "$DG_CI_OUTPUT_ROOT/$lane/native-receiver-tests.log"
     ;;
   sdk)
     cargo install cargo-audit --version 0.22.1 --locked

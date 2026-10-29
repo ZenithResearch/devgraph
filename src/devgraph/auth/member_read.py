@@ -177,11 +177,19 @@ class MemberReadEnrollment(SignedReadEnrollment):
             isinstance(credential, dict)
             and isinstance(credential.get("claims"), dict)
             and credential["claims"].get("schema")
-            in ("secs.holder-credential.v1", "secs.holder-credential.v2")
+            in ("secs.holder-credential.v1", "secs.holder-credential.v2",
+                "secs.holder-session-credential.v1")
         ):
             host = getattr(self, "holder_grants", None)
             if host is None:
                 raise UnauthenticatedError("holder_grants_not_enabled")
+            if credential["claims"]["schema"] == "secs.holder-session-credential.v1":
+                sessions = getattr(host, "holder_sessions", None)
+                if sessions is None:
+                    raise UnauthenticatedError("holder_sessions_not_enabled")
+                return sessions.verify_request(
+                    credential=credential, call=call, proof=proof, now=now
+                )
             return host.verify_request(credential=credential, call=call, proof=proof, now=now)
         with self._using_registry():
             return super().verify_request(credential=credential, call=call, proof=proof, now=now)

@@ -1,0 +1,9 @@
+{
+  "schema": "devgraph.holder-session-source-set.v1",
+  "secs_repository": "https://github.com/ZenithResearch/secS-magik",
+  "secs_revision": "8a62adb137bd9f6efbbe937ff80352c86ad6b1cf",
+  "signed_vector": "crates/secs-grant-contract/tests/fixtures/holder-session-v1.json",
+  "signed_vector_sha256": "15537a80cc14ace50d1d47400c53851bf7ba272e1861fd7b7ad051cb8c400046",
+  "wallet_core_runtime_revision": "6d8bf278bb17586ba535d19fb8fc2cd1fb5f399a",
+  "scope": "Optional finite read sessions; no runtime activation or existing grant conversion"
+}

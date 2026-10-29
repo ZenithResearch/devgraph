@@ -17,6 +17,11 @@ from anyio import fail_after
 from starlette.responses import JSONResponse
 
 from devgraph.auth.delegated_contract import canonical_json
+from devgraph.auth.holder_session_transport import (
+    SESSION_GET_PATHS,
+    SESSION_PATHS,
+    SESSION_POST_PATHS,
+)
 from devgraph.signed_read_runtime import ReadRuntimeConfiguration, private_json
 
 POST_PATHS = frozenset(
@@ -87,6 +92,8 @@ class PublicReadBoundary:
     refill_per_second = 2
 
     def body_limit(self, path, method):
+        if method == "POST" and path in SESSION_POST_PATHS:
+            return 131072
         if method == "POST" and path in OPERATOR_POST_PATHS:
             return 524288
         if method == "POST" and path in (
@@ -132,23 +139,28 @@ class PublicReadBoundary:
             await send({"type": "websocket.close", "code": 1008})
             return
         headers = scope.get("headers", [])
+        path, method = scope["path"], scope["method"]
+        if self.canonical_paths and path.startswith("/service/v1/"):
+            path = path[len("/service/v1") :]
+        session_route = (
+            method == "GET" and path in SESSION_GET_PATHS
+            or method == "POST" and path in SESSION_POST_PATHS
+            or method == "OPTIONS" and path in SESSION_PATHS
+        )
         hosts = [v for k, v in headers if k.lower() == b"host"]
         origins = [v for k, v in headers if k.lower() == b"origin"]
         if (
             scope.get("scheme") != "https"
             or hosts != [self.host]
-            or origins
-            and origins != [self.origin.encode()]
+            or len(origins) > 1
+            or origins and not session_route and origins != [self.origin.encode()]
             or any(k.lower() == b"authorization" for k, _ in headers)
         ):
             return await reject(421, "invalid_public_receiver")
         if self.expired():
             return await reject(503, "pilot_window_closed")
-        path, method = scope["path"], scope["method"]
         # Apply the SAME route, method, body and abuse limits inside the opt-in
         # canonical namespace. Never forward an unrestricted prefixed path.
-        if self.canonical_paths and path.startswith("/service/v1/"):
-            path = path[len("/service/v1") :]
 
         operator_route = (method == "POST" and path in OPERATOR_POST_PATHS) or (
             method == "GET" and (path in OPERATOR_GET_PATHS or OPERATOR_ASSET.fullmatch(path))
@@ -172,6 +184,7 @@ class PublicReadBoundary:
             )
             or (method == "POST" and path in self.post_paths)
             or operator_allowed
+            or session_route
         ):
             return await reject(404, "not_found")
         if (
