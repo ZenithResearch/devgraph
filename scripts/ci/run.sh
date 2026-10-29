@@ -44,6 +44,8 @@ sdk_checks() {
     npm run build
     npm pack --ignore-scripts
   )
+  DEVGRAPH_UI_EVIDENCE="$DG_CI_OUTPUT_ROOT/$lane/holder-session-browser" \
+    node tests/frontend/browser/holder_session_smoke.mjs
   mkdir "$DG_CI_TMP/consumer"
   cp packages/web/devgraph-web-0.2.0-preview.3.tgz "$DG_CI_TMP/consumer/"
   npm install --prefix "$DG_CI_TMP/consumer" --ignore-scripts \

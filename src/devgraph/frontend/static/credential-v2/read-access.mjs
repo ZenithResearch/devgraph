@@ -26,8 +26,12 @@ export class WalletReadClient{
  constructor({origin=globalThis.location?.origin,fetchImpl=globalThis.fetch,now=()=>Math.floor(Date.now()/1000),onChange=()=>{}}={}){
   Object.assign(this,{origin,fetchImpl,now,onChange,stage:'unavailable',provider:null,configuration:null,sessionKey:'',preferenceSeed:'',generation:0,accessId:null,memberships:[],profileId:undefined,readPhase:'',usingClientSession:false,clientSession:null,sessionPreparation:null});
  }
+ get sessionReviewExpired(){return this.stage==='session_review'&&Number.isSafeInteger(this.sessionPreparation?.challenge?.review_deadline)&&this.now()>=this.sessionPreparation.challenge.review_deadline-5;}
  get approvalExpired(){return this.stage==='approval'&&Number.isSafeInteger(this.challenge?.expires_at)&&this.now()>=this.challenge.expires_at-5;}
  expireIfNeeded(){
+  // A review that has not opened approval can be explicitly prepared again.
+  // Issued/uncertain sessions still retain their original hard expiry.
+  if(this.stage==='session_review'&&!this.readPhase)return false;
   const expiry=this.clientSession?.expiresAt??(this.stage==='ready'?this.expiresAt:null);
   if(expiry===null||expiry===undefined||this.now()<expiry&&(!this.usingClientSession||this.clientSession?.active))return false;
   this.disconnect('read_access_expired');return true;
@@ -141,6 +145,18 @@ export class WalletReadClient{
   // recovery or conversion of the user's saved v1 grant.
   await this.checkAccess(()=>{if(this.generation!==generation)throw failure('wallet_connection_changed');});
  }
+ requireSessionRefresh(){
+  this.clientSession?.dispose();this.clientSession=null;this.sessionPreparation=null;
+  this.readPhase='';this.stage='session_refresh';this.notify();
+ }
+ async refreshClientSession(current){
+  this.requireSessionRefresh();this.readPhase='preparing_session';this.notify();
+  try{
+   await this.prepareClientSession(current);current();
+   if(this.stage!=='session_review')throw failure('holder_session_unavailable');
+   this.notice='session_review_refreshed';
+  }finally{current();this.readPhase='';this.notify();}
+ }
  async acceptClientSession(credential,current){
   await this.clientSession.accept(credential);current();
   this.accessId=credential.claims.credential_id;this.expiresAt=this.clientSession.expiresAt;this.usingClientSession=true;
@@ -160,6 +176,7 @@ export class WalletReadClient{
  async advance(){
   this.notice='';
   const generation=this.generation,current=()=>{if(generation!==this.generation)throw failure('wallet_connection_changed');};
+  if(this.stage==='session_refresh'||this.sessionReviewExpired){await this.refreshClientSession(current);return;}
   if(this.stage==='session_recovery'){await this.recoverClientSession(current);return;}
   if(this.stage==='session_review'){
    const p=this.sessionPreparation;if(!p||!this.clientSession)throw failure('holder_session_preparation_required');
@@ -172,8 +189,13 @@ export class WalletReadClient{
     this.readPhase='accepting_credential';this.notify();await this.acceptClientSession(result.credential,current);return;
    }catch(error){
     current();this.readPhase='';
+    // These exact bridge/controller errors precede issuer exchange. Never
+    // treat arbitrary, concurrent or context/transport failures as safe retries.
+    if(['holder_session_preparation_required','approval_required','approval_unavailable','wallet_locked','wallet_unlock_required','read_approval_expired'].includes(error.code??error.message)){
+     this.requireSessionRefresh();throw error;
+    }
     if(this.clientSession?.closed){this.disconnect();throw error;}
-    if(['approval_denied','user_denied','read_approval_expired'].includes(error.code??error.message)){this.disconnect();throw error;}
+    if(['approval_denied','user_denied'].includes(error.code??error.message)){this.disconnect();throw error;}
     this.stage='session_recovery';this.notify();throw failure('holder_session_outcome_unknown');
    }
   }

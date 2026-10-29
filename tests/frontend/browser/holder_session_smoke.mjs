@@ -18,17 +18,17 @@ const hash=v=>createHash('sha256').update(canonical(v)).digest('hex');
 const browser=await chromium.launch({headless:true,executablePath:process.env.DEVGRAPH_CHROMIUM_EXECUTABLE});
 const results=[];
 try{
- for(const origin of ['https://graph.example','https://graph-example.tail123abc.ts.net:9443'])for(const width of [1280,375])for(const canonicalRoute of [false,true]){
+ for(const origin of ['https://graph.example','https://graph-example.tail123abc.ts.net:9443'])for(const width of [1280,375])for(const canonicalRoute of [false,true])for(const scenario of ['normal','expired-review','popup-unavailable','lost-reply']){
   const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage(),errors=[];
   page.setDefaultTimeout(10000);page.on('pageerror',error=>errors.push(error.message));
-  let challenge,credential,preparations=0,issued=0,reads=0;const nonces=new Set();
+  let challenge,credential,preparations=0,issued=0,reads=0,statuses=0;let fixtureNow=Math.floor(Date.now()/1000);const nonces=new Set();
   const pin={issuer:'synthetic',key_id:'key',public_key:publicKey,service:'service:synthetic'};
   const profile={schema:'castalia.provider-profile.v1',display_name:'Synthetic issuer',origins:[origin],membership:null,presentations:[{issuer:pin.issuer,key_id:pin.key_id,public_key:pin.public_key,audience:'devgraph',callers:[{kind:'browser',id:origin}]}]};
   const prefix=canonicalRoute?'/service/v1':'',now=Math.floor(Date.now()/1000);
   const routeClaims={schema:'secs.service-access-point.v1',issuer:pin.issuer,key_id:pin.key_id,service:pin.service,origin,authority_receiver:origin,prefix:'/service/v1',not_before:now-30,not_after:now+3600};
   const binding={claims:routeClaims,signature:sign(null,transcript('secs.service-access-point.v1',routeClaims),key).toString('hex')};
   await page.addInitScript(canonicalRoute=>{
-   window.fixtureWalletCalls=[];window.fixtureLocked=false;
+   window.fixtureWalletCalls=[];window.fixtureLocked=false;window.fixtureOpenError=null;window.fixtureLoseReply=false;
    const post=async(path,body)=>(await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
    window.devgraphWalletProvider={
     getCapabilities:async()=>['provider_profiles_v1','connection_v1','read_access_v1','read_setup_status_v1','holder_grant_v1','holder_grant_v2','holder_session_exchange_v1',...(canonicalRoute?['service_access_point_v1']:[])],
@@ -38,7 +38,10 @@ try{
      if(input.operation==='setup_status')return{schema:'castalia.read-setup-status.v1',connection_approved:true,profile_approved:true};
      if(input.operation==='identity')return{subject_public_key:'a'.repeat(64),installation_id:'b'.repeat(32),memberships:[]};
      if(input.operation==='prepare_holder_session')return post('/fixture/challenge',input);
-     if(input.operation==='open_holder_session')return new Promise((resolve,reject)=>{window.fixtureApprove=()=>post('/fixture/approve',input).then(resolve,reject)});
+     if(input.operation==='open_holder_session'){
+      if(window.fixtureOpenError){const code=window.fixtureOpenError;window.fixtureOpenError=null;throw Error(code);}
+      return new Promise((resolve,reject)=>{window.fixtureApprove=()=>post('/fixture/approve',input).then(value=>{if(window.fixtureLoseReply){window.fixtureLoseReply=false;reject(Error('holder_session_outcome_unknown'));}else resolve(value);},reject)});
+     }
      throw Error('unexpected Wallet operation '+input.operation);
     }
    };
@@ -53,7 +56,7 @@ try{
    if(canonicalRoute&&url.pathname==='/.well-known/devgraph-service.json')return send({schema:'devgraph.service-access-point.v1',binding});
    if(url.pathname===prefix+'/holder-sessions/v1/capabilities')return send({schema:'secs.holder-session-capabilities.v1',supported:true,profile:'secs.holder-session.v1',issuer_pin:pin,audience:'devgraph',grant_schemas:['secs.holder-grant.v2'],credential_schema:'secs.holder-session-credential.v1',presentation_schema:'secs.holder-session-presentation.v1',read_only:true,max_ttl_seconds:600,review_ttl_seconds:120,proof_max_ttl_seconds:60,challenge_path:prefix+'/holder-sessions/v1/challenges',exchange_path:prefix+'/holder-sessions/v1/exchange',status_path:prefix+'/holder-sessions/v1/status'});
    if(url.pathname==='/fixture/challenge'){
-    preparations++;const input=request.postDataJSON(),now=Math.floor(Date.now()/1000);
+    preparations++;const input=request.postDataJSON(),now=fixtureNow;
     if(canonicalRoute)assert.deepEqual(input.service_access_point,binding);
     challenge={schema:'secs.holder-session-challenge.v1',challenge_id:randomBytes(16).toString('hex'),request_id:randomBytes(16).toString('hex'),nonce:randomBytes(32).toString('hex'),issuer:pin.issuer,key_id:pin.key_id,service:pin.service,audience:'devgraph',origin,parent_grant_id:'f'.repeat(32),parent_grant_digest:'1'.repeat(64),parent_revision:'2'.repeat(64),holder_public_key:'a'.repeat(64),installation_id:'b'.repeat(32),session_public_key:input.session_public_key,session_installation_id:input.session_installation_id,permissions:[{operation:'devgraph.work.list',resource:'https://work.zenith-research.ca/devgraph',constraints:{},roles:[]}],issued_at:now,review_deadline:now+60,expires_at:now+60};
     return send({schema:'castalia.holder-session-prepared.v1',preparationId:'synthetic-preparation',challenge});
@@ -66,6 +69,13 @@ try{
     credential={claims,signature:sign(null,transcript('secs.holder-session-credential.v1/signature',claims),key).toString('hex')};issued++;
     return send({schema:'castalia.holder-session-opened.v1',credential});
    }
+   if(url.pathname===prefix+'/holder-sessions/v1/status'){
+    statuses++;const input=request.postDataJSON(),proof={...input};delete proof.signature;
+    assert.equal(input.request_id,challenge.request_id);assert.equal(input.challenge_id,challenge.challenge_id);
+    const clientKey=createPublicKey({key:Buffer.from('302a300506032b6570032100'+challenge.session_public_key,'hex'),format:'der',type:'spki'});
+    assert.ok(verify(null,transcript('secs.holder-session-status.v1/signature',proof),clientKey,Buffer.from(input.signature,'hex')));
+    return send({schema:'secs.holder-session-result.v1',request_id:challenge.request_id,challenge_id:challenge.challenge_id,state:'issued',credential,expires_at:challenge.expires_at});
+   }
    if(url.pathname===prefix+'/monitor/wallet-access/v1/requests'){
     const envelope=request.postDataJSON(),proof={...envelope.proof};delete proof.signature;
     assert.deepEqual(envelope.credential,credential);assert.equal(proof.call_digest,hash(envelope.call));assert.equal(proof.credential_digest,hash(credential));assert.ok(proof.expires_at<=challenge.expires_at);assert.ok(!nonces.has(proof.nonce));nonces.add(proof.nonce);
@@ -74,24 +84,50 @@ try{
    }
    throw Error('unexpected synthetic route '+url.pathname);
   });
+  await page.clock.install({time:new Date(fixtureNow*1000)});
   await page.goto(origin);await page.getByRole('button',{name:'Start read session',exact:true}).waitFor();
   assert.equal(issued,0);assert.equal(preparations,1);
+  if(scenario==='expired-review'){
+   fixtureNow+=61;await page.clock.fastForward(61000);
+   await page.getByRole('button',{name:'Refresh session review',exact:true}).waitFor();
+   await page.screenshot({path:join(output,`review-${width}-${canonicalRoute?'canonical':'legacy'}-${origin.includes('tail123abc')?'tailnet':'public'}-${scenario}.png`),fullPage:true});
+   await page.getByRole('button',{name:'Refresh session review',exact:true}).click();
+   await page.getByRole('button',{name:'Start read session',exact:true}).waitFor();
+   assert.equal(preparations,2);assert.equal(issued,0);assert.equal(statuses,0);
+   assert.equal((await page.evaluate(()=>window.fixtureWalletCalls)).filter(x=>x==='open_holder_session').length,0);
+  }
+  if(scenario==='popup-unavailable'){
+   await page.evaluate(()=>{window.fixtureOpenError='approval_unavailable'});
+   await page.getByRole('button',{name:'Start read session',exact:true}).click();
+   await page.getByText('Wallet could not open its approval window. No read connection was established.',{exact:true}).waitFor();
+   await page.getByRole('button',{name:'Refresh session review',exact:true}).waitFor();
+   await page.screenshot({path:join(output,`review-${width}-${canonicalRoute?'canonical':'legacy'}-${origin.includes('tail123abc')?'tailnet':'public'}-${scenario}.png`),fullPage:true});
+   await page.getByRole('button',{name:'Refresh session review',exact:true}).click();
+   await page.getByRole('button',{name:'Start read session',exact:true}).waitFor();
+   assert.equal(preparations,2);assert.equal(issued,0);assert.equal(statuses,0);
+  }
+  if(scenario==='lost-reply')await page.evaluate(()=>{window.fixtureLoseReply=true});
   await page.getByRole('button',{name:'Start read session',exact:true}).click();
   await page.getByText('Opening Wallet approval. A read connection is not active yet.',{exact:true}).waitFor();assert.equal(issued,0);
-  await page.locator('#fixture-approve').click();await page.getByText('Browser read session · Read only',{exact:true}).waitFor();
+  await page.locator('#fixture-approve').click();
+  if(scenario==='lost-reply'){
+   await page.getByRole('button',{name:'Check original session',exact:true}).click();
+   assert.equal(issued,1);assert.equal(statuses,1);assert.equal(preparations,1);
+  }
+  await page.getByText('Browser read session · Read only',{exact:true}).waitFor();
   assert.match(await page.locator('[data-wallet-session-expiry]').textContent(),/Using it does not extend this time\./);
   await page.locator('#fixture-read').click();await page.getByText('Verified shared work 1',{exact:true}).waitFor();
   await page.evaluate(()=>{window.fixtureLocked=true;window.dispatchEvent(new Event('castalia:wallet:read-access-invalidated'));});
   await page.locator('#topology').click();await page.locator('#fixture-read').click();await page.getByText('Verified shared work 2',{exact:true}).waitFor();
-  assert.equal(await page.evaluate(()=>window.fixtureController.connected),true);assert.equal(issued,1);assert.equal(preparations,1);
-  assert.equal((await page.evaluate(()=>window.fixtureWalletCalls)).filter(x=>x==='open_holder_session').length,1);
+  assert.equal(await page.evaluate(()=>window.fixtureController.connected),true);assert.equal(issued,1);assert.equal(preparations,['expired-review','popup-unavailable'].includes(scenario)?2:1);
+  assert.equal((await page.evaluate(()=>window.fixtureWalletCalls)).filter(x=>x==='open_holder_session').length,scenario==='popup-unavailable'?2:1);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-  await page.screenshot({path:join(output,`session-${origin.includes('tail123abc')?'tailnet':'public'}-${width}-${canonicalRoute?'canonical':'legacy'}.png`),fullPage:true});
-  await page.clock.install({time:new Date()});await page.clock.fastForward(61000);
+  await page.screenshot({path:join(output,`session-${origin.includes('tail123abc')?'tailnet':'public'}-${width}-${canonicalRoute?'canonical':'legacy'}-${scenario}.png`),fullPage:true});
+  await page.clock.fastForward(61000);
   await page.getByText('Your read access expired. Connect Wallet to review fresh access.',{exact:true}).waitFor();
-  assert.equal(await page.evaluate(()=>window.fixtureController.connected),false);assert.equal(issued,1);assert.equal(preparations,1);assert.deepEqual(errors,[]);
-  results.push({origin,width,canonical_route:canonicalRoute,approvals:1,preparations,issued,reads,lock_independent:true,hash_preserves_session:true,fixed_idle_expiry:true});await context.close();
+  assert.equal(await page.evaluate(()=>window.fixtureController.connected),false);assert.equal(issued,1);assert.equal(preparations,['expired-review','popup-unavailable'].includes(scenario)?2:1);assert.deepEqual(errors,[]);
+  results.push({origin,width,canonical_route:canonicalRoute,scenario,approvals:1,preparations,issued,reads,statuses,lock_independent:true,hash_preserves_session:true,fixed_idle_expiry:true});await context.close();
  }
  await writeFile(join(output,'verification.json'),JSON.stringify({qualification:'real browser temporary keys and application UI with synthetic Wallet approval/issuer only; not installed Wallet or native authorization evidence',results},null,2)+'\n');
- console.log('Finite browser session walkthrough passed (8 scenarios).');
+ console.log('Finite browser session walkthrough passed (32 scenarios).');
 }finally{await browser.close();}
