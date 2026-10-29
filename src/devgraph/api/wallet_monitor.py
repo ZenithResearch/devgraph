@@ -146,6 +146,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             "subject.mjs",
             "wallet-errors.mjs",
             "read-access.mjs",
+            "holder-session.mjs",
             "access-request.mjs",
             "scope-picker.mjs",
             "web-wallet.mjs",

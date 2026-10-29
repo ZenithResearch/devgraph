@@ -1,6 +1,8 @@
 import {verifyServiceRoute} from './service-route.mjs';
 import {prepareProviderSetup} from './provider-setup.mjs';
+import {createBrowserHolderSession} from './holder-session.mjs';
 const BASE='/monitor/wallet-access/v1';
+const SESSION_BASE='/holder-sessions/v1';
 const failure=(code,status=0)=>Object.assign(new Error(code),{code,status});
 const plain=v=>!!v&&Object.getPrototypeOf(v)===Object.prototype;
 const aborted=signal=>{if(signal?.aborted)throw signal.reason??new DOMException('Aborted','AbortError');};
@@ -22,11 +24,12 @@ export function monitorReadOperation(target){
 /** Application-owned transport. Wallet holds custody and approved read connections. */
 export class WalletReadClient{
  constructor({origin=globalThis.location?.origin,fetchImpl=globalThis.fetch,now=()=>Math.floor(Date.now()/1000),onChange=()=>{}}={}){
-  Object.assign(this,{origin,fetchImpl,now,onChange,stage:'unavailable',provider:null,configuration:null,sessionKey:'',preferenceSeed:'',generation:0,accessId:null,memberships:[],profileId:undefined,readPhase:''});
+  Object.assign(this,{origin,fetchImpl,now,onChange,stage:'unavailable',provider:null,configuration:null,sessionKey:'',preferenceSeed:'',generation:0,accessId:null,memberships:[],profileId:undefined,readPhase:'',usingClientSession:false,clientSession:null,sessionPreparation:null});
  }
  get approvalExpired(){return this.stage==='approval'&&Number.isSafeInteger(this.challenge?.expires_at)&&this.now()>=this.challenge.expires_at-5;}
  expireIfNeeded(){
-  if(this.stage!=='ready'||this.now()<this.expiresAt)return false;
+  const expiry=this.clientSession?.expiresAt??(this.stage==='ready'?this.expiresAt:null);
+  if(expiry===null||expiry===undefined||this.now()<expiry&&(!this.usingClientSession||this.clientSession?.active))return false;
   this.disconnect('read_access_expired');return true;
  }
  notify(){this.onChange(this);}
@@ -85,12 +88,77 @@ export class WalletReadClient{
   if(!plain(identity)||!/^[a-f0-9]{64}$/.test(identity.subject_public_key)||!/^[a-f0-9]{32}$/.test(identity.installation_id)||(!this.graphAccessV2&&!Array.isArray(identity.memberships)))throw failure('read_identity_invalid');
   this.identity=this.graphAccessV2?{subject_public_key:identity.subject_public_key,installation_id:identity.installation_id}:identity;
   this.memberships=this.graphAccessV2?[]:identity.memberships;this.profileId=this.memberships.length===1?this.memberships[0].profileId:undefined;
-  if(this.holderGrants){this.stage='saved_grant';this.notify();return;}
+  if(this.holderGrants){
+   this.stage='saved_grant';this.notify();
+   if(this.setup.holderSessions&&this.configuration.holder_grants.schema==='secs.holder-grant.v2'){
+    try{await this.prepareClientSession(current);}catch(error){if(!['grant_not_saved','holder_session_parent_unsupported'].includes(error.message))throw error;}
+   }
+   return;
+  }
   await this.checkAccess(current);
+ }
+ async prepareClientSession(current){
+  let caps;
+  try{caps=await this.fetch(SESSION_BASE+'/capabilities');current();}catch(error){if(error.status===404)return;throw error;}
+  const fields=['schema','supported','profile','issuer_pin','audience','grant_schemas','credential_schema','presentation_schema','read_only','max_ttl_seconds','review_ttl_seconds','proof_max_ttl_seconds','challenge_path','exchange_path','status_path'];
+  if(!plain(caps)||Object.keys(caps).sort().join(',')!==fields.sort().join(',')||caps.schema!=='secs.holder-session-capabilities.v1'||typeof caps.supported!=='boolean'||
+    caps.profile!=='secs.holder-session.v1'||caps.audience!=='devgraph'||caps.read_only!==true||
+    !Array.isArray(caps.grant_schemas)||caps.grant_schemas.length!==1||caps.grant_schemas[0]!=='secs.holder-grant.v2'||
+    caps.credential_schema!=='secs.holder-session-credential.v1'||caps.presentation_schema!=='secs.holder-session-presentation.v1'||
+    !Number.isSafeInteger(caps.max_ttl_seconds)||caps.max_ttl_seconds<1||caps.max_ttl_seconds>3600||caps.review_ttl_seconds!==120||caps.proof_max_ttl_seconds!==60||
+    caps.challenge_path!==(this.serviceBinding?.claims.prefix??'').replace(/\/$/,'')+SESSION_BASE+'/challenges'||caps.exchange_path!==(this.serviceBinding?.claims.prefix??'').replace(/\/$/,'')+SESSION_BASE+'/exchange'||caps.status_path!==(this.serviceBinding?.claims.prefix??'').replace(/\/$/,'')+SESSION_BASE+'/status'||
+    !plain(caps.issuer_pin)||Object.keys(caps.issuer_pin).sort().join(',')!=='issuer,key_id,public_key,service'||caps.issuer_pin.service!==this.configuration.holder_grants.service)throw failure('holder_session_setup_invalid');
+  const pin=this.setup.profile.presentations.find(p=>p.issuer===caps.issuer_pin.issuer&&p.key_id===caps.issuer_pin.key_id&&p.public_key===caps.issuer_pin.public_key&&p.audience===caps.audience);
+  if(!pin)throw failure('holder_session_setup_invalid');
+  if(!caps.supported)return;
+  const session=await createBrowserHolderSession({origin:this.origin,service:caps.issuer_pin.service,holderPublicKey:this.identity.subject_public_key,
+    installationId:this.identity.installation_id,profile:this.setup.profile,ttlSeconds:Math.min(900,caps.max_ttl_seconds),audience:caps.audience,now:this.now});
+  try{
+   current();
+   const prepared=await this.provider.readAccess({operation:'prepare_holder_session',service:caps.issuer_pin.service,session_public_key:session.publicKey,session_installation_id:session.installationId,requested_ttl_seconds:Math.min(900,caps.max_ttl_seconds),...(this.serviceBinding?{service_access_point:this.serviceBinding}:{})});current();
+   if(!plain(prepared)||Object.keys(prepared).sort().join(',')!=='challenge,preparationId,schema'||prepared.schema!=='castalia.holder-session-prepared.v1'||typeof prepared.preparationId!=='string'||!prepared.preparationId||prepared.preparationId.length>128)throw failure('invalid_holder_session');
+   const readOperations=['devgraph.work.list','devgraph.work.get','devgraph.work.relationships','devgraph.arena.list','devgraph.arena.get'];
+   if(!Array.isArray(prepared.challenge?.permissions)||prepared.challenge.permissions.some(p=>!plain(p)||!readOperations.includes(p.operation)||p.resource!=='https://work.zenith-research.ca/devgraph'))throw failure('invalid_holder_session');
+   const signature=await session.prepare(prepared.challenge);current();
+   this.clientSession=session;this.sessionPreparation={...structuredClone(prepared),session_signature:signature};this.stage='session_review';this.notify();
+  }catch(error){session.dispose();throw error;}
+ }
+ async acceptClientSession(credential,current){
+  await this.clientSession.accept(credential);current();
+  this.accessId=credential.claims.credential_id;this.expiresAt=this.clientSession.expiresAt;this.usingClientSession=true;
+  this.sessionKey=`holder-session:${this.generation}:${this.accessId}`;this.preferenceSeed=`${this.configuration.holder_grants.service}:${this.identity.subject_public_key}`;
+  this.stage='ready';this.readPhase='';this.notify();
+ }
+ async recoverClientSession(current){
+  const request=await this.clientSession.status();current();
+  const result=await this.fetch(SESSION_BASE+'/status',{body:request});current();
+  const c=this.sessionPreparation.challenge;
+  if(!plain(result)||Object.keys(result).sort().join(',')!=='challenge_id,credential,expires_at,request_id,schema,state'||result.schema!=='secs.holder-session-result.v1'||result.request_id!==c.request_id||result.challenge_id!==c.challenge_id||result.expires_at!==c.expires_at)throw failure('holder_session_outcome_unknown');
+  if(result.state==='issued'&&plain(result.credential)){await this.acceptClientSession(result.credential,current);return;}
+  if(result.credential!==null||!['pending','unknown','revoked','expired'].includes(result.state))throw failure('holder_session_outcome_unknown');
+  if(['revoked','expired'].includes(result.state)){this.disconnect('read_access_expired');throw failure('read_access_expired');}
+  this.notice='holder_session_outcome_unknown';this.notify();
  }
  async advance(){
   this.notice='';
   const generation=this.generation,current=()=>{if(generation!==this.generation)throw failure('wallet_connection_changed');};
+  if(this.stage==='session_recovery'){await this.recoverClientSession(current);return;}
+  if(this.stage==='session_review'){
+   const p=this.sessionPreparation;if(!p||!this.clientSession)throw failure('holder_session_preparation_required');
+   this.readPhase='opening_wallet';this.notify();
+   try{
+    // The possession signature is prepared earlier so this consent starts in the click.
+    const pending=this.provider.readAccess({operation:'open_holder_session',preparationId:p.preparationId,challenge:structuredClone(p.challenge),session_signature:p.session_signature});
+    const result=await pending;current();
+    if(!plain(result)||Object.keys(result).sort().join(',')!=='credential,schema'||result.schema!=='castalia.holder-session-opened.v1'||!plain(result.credential))throw failure('invalid_holder_session');
+    this.readPhase='accepting_credential';this.notify();await this.acceptClientSession(result.credential,current);return;
+   }catch(error){
+    current();this.readPhase='';
+    if(this.clientSession?.closed){this.disconnect();throw error;}
+    if(['approval_denied','user_denied','read_approval_expired'].includes(error.code??error.message)){this.disconnect();throw error;}
+    this.stage='session_recovery';this.notify();throw failure('holder_session_outcome_unknown');
+   }
+  }
   if(this.stage==='saved_grant'){
    try{const accepted=await this.provider.readAccess({operation:'use_grant',service:this.configuration.holder_grants.service});current();this.acceptHolder(accepted);return;}
    catch(error){if(error?.code!=='grant_not_saved'&&error?.message!=='grant_not_saved')throw error;await this.checkAccess(current);return;}
@@ -166,15 +234,17 @@ export class WalletReadClient{
   const operation=monitorReadOperation(path),generation=this.generation;
   const call={operation,resource:'https://work.zenith-research.ca/devgraph',parameters:{path}};
   try{
-   const envelope=await cancellable(this.provider.readAccess({operation:this.usingHolderGrant?'present_grant':this.graphAccessV2?'present_graph_v2':'present',accessId:this.accessId,call}),signal);aborted(signal);
+   const pending=this.usingClientSession?this.clientSession.present(call):this.provider.readAccess({operation:this.usingHolderGrant?'present_grant':this.graphAccessV2?'present_graph_v2':'present',accessId:this.accessId,call});
+   const envelope=await cancellable(pending,signal);aborted(signal);
    if(generation!==this.generation)throw failure('wallet_connection_changed');
    if(!plain(envelope)||!plain(envelope.credential)||!plain(envelope.proof)||!plain(envelope.call)||Object.keys(envelope.call).sort().join(',')!=='operation,parameters,resource'||envelope.call.operation!==call.operation||envelope.call.resource!==call.resource||!plain(envelope.call.parameters)||Object.keys(envelope.call.parameters).join(',')!=='path'||envelope.call.parameters.path!==path)throw failure('read_presentation_invalid');
    const result=await this.fetch(BASE+'/requests',{body:envelope,signal});
    if(generation!==this.generation)throw failure('wallet_connection_changed');return result;
-  }catch(error){if(error.status===401||['wallet_locked','read_access_required','read_context_changed','read_access_expired'].includes(error.message))this.disconnect();throw error;}
+  }catch(error){if(error.status===401||['wallet_locked','read_access_required','read_context_changed','read_access_expired','holder_session_expired','holder_session_closed','holder_session_clock_changed'].includes(error.message))this.disconnect();throw error;}
  }
  disconnect(notice=''){
-  const provider=this.provider,accessId=this.accessId;this.provider=null;
+  const provider=this.provider,accessId=this.usingClientSession?null:this.accessId;this.provider=null;
+  this.clientSession?.dispose();this.clientSession=null;this.sessionPreparation=null;this.usingClientSession=false;
   this.generation++;this.pendingGrant=null;this.originalGrantRequest=null;this.usingHolderGrant=false;this.accessId=null;this.expiresAt=null;this.sessionKey='';this.preferenceSeed='';this.identity=null;this.challenge=null;this.memberships=[];this.graphAccessV2=false;this.notice=notice;this.connectionApproved=false;
   this.readPhase='';this.stage=this.configuration?'choose':'unavailable';this.notify();
   if(accessId&&provider?.readAccess)void provider.readAccess({operation:'disconnect',accessId}).catch(()=>{});

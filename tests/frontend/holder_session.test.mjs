@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {webcrypto} from 'node:crypto';
+import {webcrypto,createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {createBrowserHolderSession,canonicalSessionJson} from '../../src/devgraph/frontend/static/credential-v2/holder-session.mjs';
 
 const hex=b=>Buffer.from(b).toString('hex');
@@ -12,7 +13,7 @@ async function fixture(){
  const origin='https://graph.example',service='service:graph',holder='a'.repeat(64),installation='b'.repeat(32);
  const profile={presentations:[{issuer:'synthetic',key_id:'key',public_key:publicKey,audience:'devgraph',callers:[{kind:'browser',id:origin}]}]};
  const session=await createBrowserHolderSession({origin,service,holderPublicKey:holder,installationId:installation,profile,ttlSeconds:60,cryptoImpl:webcrypto,now:()=>now});
- const challenge={schema:'secs.holder-session-challenge.v1',challenge_id:'c'.repeat(32),request_id:'d'.repeat(32),nonce:'e'.repeat(64),issuer:'synthetic',key_id:'key',service,audience:'devgraph',origin,parent_grant_id:'f'.repeat(32),parent_grant_digest:'1'.repeat(64),parent_revision:'revision-one',holder_public_key:holder,installation_id:installation,session_installation_id:session.installationId,session_public_key:session.publicKey,permissions:[{operation:'devgraph.work.list',fixture:'exact signed scope'}],issued_at:now,review_deadline:now+30,expires_at:now+60};
+ const challenge={schema:'secs.holder-session-challenge.v1',challenge_id:'c'.repeat(32),request_id:'d'.repeat(32),nonce:'e'.repeat(64),issuer:'synthetic',key_id:'key',service,audience:'devgraph',origin,parent_grant_id:'f'.repeat(32),parent_grant_digest:'1'.repeat(64),parent_revision:'2'.repeat(64),holder_public_key:holder,installation_id:installation,session_installation_id:session.installationId,session_public_key:session.publicKey,permissions:[{operation:'devgraph.work.list',fixture:'exact signed scope'}],issued_at:now,review_deadline:now+60,expires_at:now+60};
  const issue=async(value=challenge)=>{const claims={schema:'secs.holder-session-credential.v1',credential_id:'2'.repeat(32),challenge_digest:hex(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(canonical(value)))),challenge:structuredClone(value)};return{claims,signature:hex(await webcrypto.subtle.sign('Ed25519',issuer.privateKey,domain('secs.holder-session-credential.v1/signature',claims)))};};
  return{session,challenge,issue,profile,now:value=>{now=value;}};
 }
@@ -47,7 +48,7 @@ test('issuer signature, reviewed scope and exact challenge cannot be substituted
   if(attack==='scope')credential=await f.issue({...f.challenge,permissions:[{operation:'different'}]});
   if(attack==='challenge_digest')credential.claims.challenge_digest='0'.repeat(64);
   if(attack==='unknown')credential.extra=true;
-  await assert.rejects(f.session.accept(credential),/invalid_holder_session/);assert.equal(f.session.active,false);
+  await assert.rejects(f.session.accept(credential),/invalid_holder_session/);assert.equal(f.session.active,false);assert.equal(f.session.closed,true);
  }
 });
 test('prepared review is immutable, installation is one-shot and dispose closes all signing',async()=>{
@@ -57,9 +58,34 @@ test('prepared review is immutable, installation is one-shot and dispose closes 
 });
 test('clock rollback and an expired review cannot extend the session',async()=>{
  const f=await fixture();await f.session.prepare(f.challenge);await f.session.accept(await f.issue());f.now(999);await assert.rejects(f.session.present({}),/holder_session_clock_changed/);assert.equal(f.session.active,false);
- const old=await fixture();old.now(1030);await assert.rejects(old.session.prepare(old.challenge),/invalid_holder_session/);
+ const old=await fixture();old.now(1060);await assert.rejects(old.session.prepare(old.challenge),/invalid_holder_session/);
+});
+test('pagehide drops temporary custody so a cached document cannot silently revive it',async()=>{
+ const f=await fixture(),lifecycle=new EventTarget();
+ const session=await createBrowserHolderSession({origin:'https://graph.example',service:'service:graph',holderPublicKey:'a'.repeat(64),installationId:'b'.repeat(32),profile:f.profile,ttlSeconds:60,cryptoImpl:webcrypto,now:()=>1000,lifecycle});
+ lifecycle.dispatchEvent(new Event('pagehide'));assert.equal(session.closed,true);await assert.rejects(session.prepare(f.challenge),/holder_session_closed/);
 });
 test('canonical session bytes reject unsafe values and sort Unicode keys as RFC 8785',()=>{
  assert.equal(canonical({'\uE000':1,'😀':2}),'{"😀":2,"":1}');
  for(const value of [1.5,Number.MAX_SAFE_INTEGER+1,NaN,undefined,{'bad':undefined},{bad:'\ud800'},Object.create({a:1})])assert.throws(()=>canonical(value),/invalid_holder_session/);
+});
+
+test('browser verifies and reproduces the committed secS credential, possession and per-call vectors',async()=>{
+ const raw=await readFile(new URL('../fixtures/holder-session-v1.json',import.meta.url));
+ const provenance=JSON.parse(await readFile(new URL('../fixtures/holder-session-v1.source.json',import.meta.url),'utf8'));
+ assert.equal(createHash('sha256').update(raw).digest('hex'),provenance.sha256);
+ const v=JSON.parse(raw);
+ const c=v.challenge;
+ // These are the producer's explicitly synthetic test keys, never user custody.
+ const privateKey=await webcrypto.subtle.importKey('pkcs8',Buffer.from('302e020100300506032b657004220420'+'3f'.repeat(32),'hex'),'Ed25519',false,['sign']);
+ const publicKey=await webcrypto.subtle.importKey('raw',Buffer.from(c.session_public_key,'hex'),'Ed25519',true,['verify']);
+ const subtle=Object.fromEntries(['exportKey','importKey','sign','verify','digest'].map(name=>[name,webcrypto.subtle[name].bind(webcrypto.subtle)]));
+ subtle.generateKey=async()=>({privateKey,publicKey});let random=0,now=101;
+ const cryptoImpl={subtle,getRandomValues:bytes=>{bytes.fill(++random===1?0x77:random===2?0x99:0xab);return bytes;}};
+ const profile={presentations:[{...v.pin,audience:c.audience,callers:[{kind:'browser',id:c.origin}]}]};
+ const session=await createBrowserHolderSession({origin:c.origin,service:c.service,holderPublicKey:c.holder_public_key,installationId:c.installation_id,profile,ttlSeconds:300,audience:c.audience,cryptoImpl,now:()=>now});
+ assert.equal(await session.prepare(c),v.authorization.session_signature);
+ now=102;await session.accept(v.credential);now=103;
+ assert.deepEqual(await session.present(v.call),{credential:v.credential,call:v.call,proof:v.proof});
+ assert.deepEqual(await session.status(),v.status);
 });

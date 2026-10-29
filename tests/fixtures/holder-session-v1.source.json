@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/ZenithResearch/secS-magik",
+  "revision": "8a62adb137bd9f6efbbe937ff80352c86ad6b1cf",
+  "path": "crates/secs-grant-contract/tests/fixtures/holder-session-v1.json",
+  "sha256": "15537a80cc14ace50d1d47400c53851bf7ba272e1861fd7b7ad051cb8c400046",
+  "qualification": "synthetic cross-language fixture only; no installed trust or real keys"
+}

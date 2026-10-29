@@ -55,6 +55,27 @@ Root claims reserve room for an equal-scope child:61,440 canonical bytes maximum
 
 ## Release gates
 
+### Finite browser session candidate
+
+The optional `holder_session_exchange_v1` provider capability and matching server
+capability enable a separate browser session for a saved v2 grant. The Wallet
+reviews the exact read scope and absolute expiry once. It sends the reusable grant
+only to its approved issuer; the page receives the finite issuer credential and
+keeps its own nonextractable proof key in memory. Reads then work while the Wallet
+is locked, until the original deadline. Navigation within the document preserves
+that deadline; reload, page departure, expiry or a rejected credential closes
+local custody. There is no silent renewal or persistent browser credential store.
+
+An uncertain exchange retains the original session key and request identifiers for
+proof-authenticated status recovery. Status cannot create a second credential or
+extend the deadline. A known unsupported v1 parent can retain its earlier path
+before session consent; a failed new-session exchange never falls back to it.
+
+This source candidate is not enabled in the installed Wallet or server. Its tests
+include committed synthetic secS vectors, browser crypto and public/Tailnet UI
+fixtures. These do not qualify a real installed Wallet-to-issuer exchange. Matching
+receiver, extension and native client integration must pass before activation.
+
 - Preserve issuer keys, policies, grants, request bytes and existing replay records.
 - Review the canonical provider selection and any legacy assignment migration.
 - Deploy matching verifier and clients with explicit rollback evidence.
