@@ -1420,6 +1420,9 @@ FRONTEND_HTML = r"""<!doctype html>
       invalidateLayout(); graphView.history = []; graphView.arrangement = null; graphView.initialArranged = false; graphView.preferenceKey = null; graphView.hoverRoot=graphView.focusRoot=graphView.selectedRoot=null; graphView.revealSignature=''; graphView.revealCache=null; graphView.nodePositions.clear(); graphView.nodeVelocities.clear(); updateGraphVisibility();
       ['total-work', 'active-initiatives', 'observation-count', 'pending-receipts'].forEach(id => text(id, '—'));
       renderActivity([]); renderObservations([]); renderPipeline({}); renderBars({});
+      document.getElementById('connection-dot').className = 'dot';
+      text('connection-label', walletAccess.connected ? 'Loading graph…' : 'Disconnected');
+      text('status-line', walletAccess.connected ? 'Loading graph…' : 'Connect Wallet to view shared work.');
     }
 
     function applySnapshot(snapshot, observations) {

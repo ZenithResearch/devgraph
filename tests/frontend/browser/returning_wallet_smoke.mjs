@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
-import {chromium} from '../../../packages/web/node_modules/playwright/index.mjs';
+import {createRequire} from 'node:module';
+const require=createRequire(process.env.DEVGRAPH_PLAYWRIGHT_PACKAGE??new URL('../../../packages/web/package.json',import.meta.url));
+const {chromium}=require('playwright-core');
 const repo=fileURLToPath(new URL('../../../',import.meta.url));
 const output=process.env.DEVGRAPH_UI_EVIDENCE??'/private/tmp/devgraph-returning-wallet-ui';
 await mkdir(output,{recursive:true});
 const markup=(await readFile(join(repo,'src/devgraph/frontend/wallet.py'),'utf8')).match(/r'''([\s\S]*?)'''/)[1];
-const browser=await chromium.launch({headless:true});
+const browser=await chromium.launch({headless:true,executablePath:process.env.DEVGRAPH_CHROMIUM_EXECUTABLE});
 const results=[];
 try{
  for(const origin of ['https://graph.example','https://graph-example.tail123abc.ts.net:9443'])for(const width of [1280,375])for(const scenario of ['returning','reconnect','changed','first']){
@@ -56,8 +58,14 @@ try{
   try{await page.getByText('Wallet connected · read only',{exact:true}).waitFor();}
   catch(error){console.error({origin,width,scenario,status:await page.locator('[data-wallet-status]').textContent(),calls:await page.evaluate(()=>window.fixtureCalls),errors});throw error;}
   assert.equal(enrollments,1);assert.deepEqual(errors,[]);
+  assert.match(await page.locator('[data-wallet-session-expiry]').textContent(),/Read access expires at .+Using it does not extend this time\./);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(scenario==='returning')await page.screenshot({path:join(output,`returning-${origin === 'https://graph-example.tail123abc.ts.net:9443'?'tailnet':'public'}-${width}.png`),fullPage:true});
+  await page.clock.install({time:new Date()});await page.clock.fastForward(901000);
+  await page.getByText('Your read access expired. Connect Wallet to review fresh access.',{exact:true}).waitFor();
+  assert.equal(await page.locator('[data-wallet-session-expiry]').isVisible(),false);
+  assert.equal(enrollments,1,'idle expiry never renews access');
+  assert.equal((await page.evaluate(()=>window.fixtureCalls)).filter(x=>x==='approve_graph_v2').length,1,'a fresh session requires a separate human decision');
   results.push({origin,width,scenario,setup_clicks:expected,read_approval_clicks:1});
   await context.close();
  }

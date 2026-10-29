@@ -25,6 +25,10 @@ export class WalletReadClient{
   Object.assign(this,{origin,fetchImpl,now,onChange,stage:'unavailable',provider:null,configuration:null,sessionKey:'',preferenceSeed:'',generation:0,accessId:null,memberships:[],profileId:undefined,readPhase:''});
  }
  get approvalExpired(){return this.stage==='approval'&&Number.isSafeInteger(this.challenge?.expires_at)&&this.now()>=this.challenge.expires_at-5;}
+ expireIfNeeded(){
+  if(this.stage!=='ready'||this.now()<this.expiresAt)return false;
+  this.disconnect('read_access_expired');return true;
+ }
  notify(){this.onChange(this);}
  async fetch(path,{body,signal}={}){
   const headers=body===undefined?{}:{'Content-Type':'application/json'};
@@ -157,8 +161,8 @@ export class WalletReadClient{
   });
  }
  async read(path,{signal}={}){
+  if(this.expireIfNeeded())throw failure('read_access_expired',401);
   if(this.stage!=='ready'||!this.accessId)throw failure('wallet_read_access_required',401);
-  if(this.now()>=this.expiresAt){this.disconnect();throw failure('read_access_expired',401);}
   const operation=monitorReadOperation(path),generation=this.generation;
   const call={operation,resource:'https://work.zenith-research.ca/devgraph',parameters:{path}};
   try{
@@ -169,9 +173,9 @@ export class WalletReadClient{
    if(generation!==this.generation)throw failure('wallet_connection_changed');return result;
   }catch(error){if(error.status===401||['wallet_locked','read_access_required','read_context_changed','read_access_expired'].includes(error.message))this.disconnect();throw error;}
  }
- disconnect(){
+ disconnect(notice=''){
   const provider=this.provider,accessId=this.accessId;this.provider=null;
-  this.generation++;this.pendingGrant=null;this.originalGrantRequest=null;this.usingHolderGrant=false;this.accessId=null;this.sessionKey='';this.preferenceSeed='';this.identity=null;this.challenge=null;this.memberships=[];this.graphAccessV2=false;this.notice='';this.connectionApproved=false;
+  this.generation++;this.pendingGrant=null;this.originalGrantRequest=null;this.usingHolderGrant=false;this.accessId=null;this.expiresAt=null;this.sessionKey='';this.preferenceSeed='';this.identity=null;this.challenge=null;this.memberships=[];this.graphAccessV2=false;this.notice=notice;this.connectionApproved=false;
   this.readPhase='';this.stage=this.configuration?'choose':'unavailable';this.notify();
   if(accessId&&provider?.readAccess)void provider.readAccess({operation:'disconnect',accessId}).catch(()=>{});
   provider?.dispose?.();

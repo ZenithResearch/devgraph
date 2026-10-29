@@ -93,6 +93,8 @@ test('changing or clearing the credential removes prior graph, reader, and docum
   c.detailState.relations.set('children', { items: [{ id: 'private-child' }] });
   c.graphView.nodePositions.set('private-work', { x: 0 });
   c.graphView.arenaKey = 'Arena:private';
+  c.document.getElementById('status-line').textContent = 'Wallet connected · Read only';
+  c.document.getElementById('connection-label').textContent = 'Graph ready';
   c.walletSession.value = '';
   c.synchronizeCredential();
   assert.equal(c.state.snapshot, null);
@@ -103,6 +105,8 @@ test('changing or clearing the credential removes prior graph, reader, and docum
   assert.equal(c.detailState.relations.size, 0);
   assert.equal(c.graphView.nodePositions.size, 0);
   assert.equal(c.graphView.arenaKey, '');
+  assert.equal(c.document.getElementById('status-line').textContent, 'Connect Wallet to view shared work.');
+  assert.equal(c.document.getElementById('connection-label').textContent, 'Disconnected');
 });
 
 test('a failed refresh retains the latest successful snapshot and reports staleness rather than empty data', async () => {
