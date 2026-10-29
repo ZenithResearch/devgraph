@@ -27,6 +27,14 @@ The native consumer validates an exact HTTPS origin, advertised mode and trusted
 provider/profile pins. Application source pins and the qualified dependency lock
 are drift fences, not proof of immutable third-party site-packages or OS custody.
 
+The pinned entry script compiles its bootstrap directly from source before any
+DevGraph import. First-party imports then compile regular, non-writable-by-others
+Python source, refusing cached bytecode, native aliases and sourceless modules.
+A fresh private cache prefix prevents inherited caches from being selected by
+later imports; bytecode writes are disabled. The registration pins all first-party
+resource files as well as source and the invoking venv's `pyvenv.cfg` when present.
+This does not make third-party dependencies immutable or establish OS isolation.
+
 On explicit launch the private process validates pins again and reuses the
 existing signed-read composition without listening on HTTP. It uses the canonical
 operator, assignment inbox, root registry, issuer-native tools, receiver, current

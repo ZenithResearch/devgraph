@@ -5,7 +5,11 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+source_root = Path(__file__).resolve().parents[1] / "src"
+bootstrap = source_root / "devgraph/_source_bootstrap.py"
+namespace = {"__name__": "_devgraph_source_bootstrap"}
+exec(compile(bootstrap.read_bytes(), str(bootstrap), "exec"), namespace)
+namespace["activate"](source_root)
 from devgraph.disposable_sessions import create_disposable_profile  # noqa: E402
 
 parser = argparse.ArgumentParser()

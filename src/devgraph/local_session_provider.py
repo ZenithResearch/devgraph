@@ -145,7 +145,11 @@ def prepare_registration(
     validate_profile(profile)  # metadata only; not create_app/enrollment/Neo4j
     root = Path(source_root).resolve(strict=True)
     script = root / "scripts/session_agent_service.py"
-    sources = [file_pin(p) for p in sorted((root / "src/devgraph").rglob("*.py"))]
+    sources = [
+        file_pin(p)
+        for p in sorted((root / "src/devgraph").rglob("*"))
+        if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc"
+    ]
     sources += [
         file_pin(p)
         for p in (root / "uv.lock", Path(host_config), Path(runtime_config), Path(session_binary))

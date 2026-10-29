@@ -115,6 +115,20 @@ def test_venv_prefix_configuration_is_pinned_when_present(setup):
     assert module.file_pin(config) in sources
 
 
+def test_first_party_resources_are_pinned_without_generated_cache_files(setup):
+    resources = setup.root / "src/devgraph/resources"
+    resources.mkdir()
+    data = resources / "scope.json"
+    data.write_text('{"fixture":true}')
+    cache = setup.root / "src/devgraph/__pycache__"
+    cache.mkdir()
+    (cache / "one.pyc").write_bytes(b"not-executable")
+    descriptor = prepare(setup)
+    sources = json.loads(descriptor.read_bytes())["launch"]["sources"]
+    assert module.file_pin(data) in sources
+    assert all(not p["path"].endswith(".pyc") for p in sources)
+
+
 @pytest.mark.parametrize("variant", ["required-membership", "route-alias"])
 def test_profile_cannot_infer_session_eligibility_or_use_route_registry(
     tmp_path, monkeypatch, variant
