@@ -74,7 +74,8 @@ def build(output: Path, *, root: Path = ROOT, private_review: bool = False) -> d
     required = ("SECURITY.md", "plugins/devgraph/.codex-plugin/plugin.json",
                 "plugins/devgraph/skills/devgraph/SKILL.md",
                 "integrations/hermes/devgraph/plugin.yaml",
-                ".agents/plugins/marketplace.json")
+                ".agents/plugins/marketplace.json",
+                "src/devgraph/resources/ontology-source-index.v1.json")
     for name in required:
         if name not in files:
             raise ValueError(f"beta prerequisite is missing: {name}")
@@ -99,11 +100,16 @@ def build(output: Path, *, root: Path = ROOT, private_review: bool = False) -> d
              if name.startswith("plugins/devgraph/") or name == ".agents/plugins/marketplace.json"}
     codex.update(legal)
     if "docs/user/agent-integrations.md" in files:
-        codex["INSTALL.md"] = files["docs/user/agent-integrations.md"]
+        instructions = files["docs/user/agent-integrations.md"].replace(
+            b"](../dev/", b"](https://github.com/ZenithResearch/devgraph/blob/main/docs/dev/"
+        )
+        codex["INSTALL.md"] = instructions
     hermes = subset(files, "integrations/hermes/devgraph/")
     hermes.update({f"skills/devgraph/{name}": data for name, data in
                    subset(files, "plugins/devgraph/skills/devgraph/").items()})
     hermes.update(legal)
+    if "docs/user/agent-integrations.md" in files:
+        hermes["INSTALL.md"] = instructions
     artifacts = {
         f"devgraph-{version}-source.tar.gz": (f"devgraph-{version}", files),
         f"devgraph-{version}-codex.tar.gz": ("devgraph-codex", codex),
@@ -116,11 +122,16 @@ def build(output: Path, *, root: Path = ROOT, private_review: bool = False) -> d
         write_bundle(path, prefix, contents)
         entries.append({"file": name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                         "bytes": path.stat().st_size, "files": len(contents)})
-    manifest = {"schema": "devgraph.beta-release.v1", "version": version,
+    sources = json.loads(files["src/devgraph/resources/ontology-source-index.v1.json"])
+    if sources.get("schemaVersion") != "devgraph.ontology-sources.v1":
+        raise ValueError("unsupported packaged ontology source index")
+    manifest = {"schema": "devgraph.beta-release.v2", "version": version,
                 "source_commit": commit,
                 "distribution": "private-review" if private_review else "licensed-candidate",
                 "project_license_included": "LICENSE" in files,
-                "ontology": "0.6.0", "artifacts": entries,
+                "ontology": sources["runtimeCompatibility"]["version"],
+                "ontology_sources": sources, "agent_ontology": "installed-cli-capability",
+                "artifacts": entries,
                 "operator_credentials_included": False, "git_history_included": False,
                 "native_binaries_included": False}
     (output / "release-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")

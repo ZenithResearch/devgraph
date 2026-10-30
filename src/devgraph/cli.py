@@ -203,11 +203,7 @@ def ontology_snapshot(release: str | None = None) -> dict[str, Any]:
         raise CliError("ontology release manifest malformed")
     authority = manifest.get("authority")
     compatibility = manifest.get("compatibility")
-    ownership_path = Path(__file__).parent / "resources" / "ontology-ownership.json"
-    ownership = json.loads(ownership_path.read_text(encoding="utf-8"))
     return {
-        "canonical_vocabulary": ownership["canonicalCore"],
-        "extension": ownership["extension"],
         "authority": authority if isinstance(authority, dict) else None,
         "bundle_digest": manifest.get("bundle_digest"),
         "canonical_base_url": manifest.get("canonical_base_url"),
@@ -700,8 +696,11 @@ def _parser() -> argparse.ArgumentParser:
     status = subcommands.add_parser("status", help="prove API and authorization posture")
     status.add_argument("--base-url", default=DEFAULT_BASE_URL)
 
-    ontology = subcommands.add_parser("ontology", help="inspect a canonical ontology release")
+    ontology = subcommands.add_parser(
+        "ontology", help="inspect packaged ontology compatibility and sources"
+    )
     ontology.add_argument("--release")
+    ontology.add_argument("--format", choices=("runtime-v1", "sources-v1"), default="runtime-v1")
 
     service = subcommands.add_parser("service", help="inspect or manage local services")
     service.add_argument("action", choices=("status", "up", "down", "restart"))
@@ -1028,7 +1027,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(_json(result))
             return 0 if result["healthy"] else 1
         if args.command == "ontology":
-            print(_json(ontology_snapshot(args.release)))
+            if args.format == "sources-v1":
+                from devgraph.ontology_sources import ontology_sources
+
+                if args.release is not None:
+                    raise CliError("--release selects runtime-v1, not sources-v1")
+                try:
+                    snapshot = ontology_sources()
+                except (OSError, ValueError, KeyError, StopIteration, TypeError) as error:
+                    raise CliError("packaged ontology source verification failed") from error
+            else:
+                snapshot = ontology_snapshot(args.release)
+            print(_json(snapshot))
             return 0
         if args.command == "service":
             result = launchd_snapshot() if args.action == "status" else manage_services(args.action)

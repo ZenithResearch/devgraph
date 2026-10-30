@@ -2,7 +2,7 @@
   "schemaVersion": "devgraph.ontology-ownership.v1",
   "canonicalCore": {
     "repository": "https://github.com/ZenithResearch/zenith-ontology",
-    "commit": "3d4cc3e06e7bf0e52133b636430ac4a82649ccb0",
+    "commit": "142f515675d4127736676c9e7a8b1bb158621eae",
     "sourcePath": "ontology/core/ontology.jsonld",
     "ontologyId": "https://zenith-research.ca/ontology",
     "version": "0.13.0",

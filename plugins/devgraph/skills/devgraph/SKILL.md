@@ -17,11 +17,17 @@ installation guide. Do not assume the monitor demo is a persistent host.
 
 - For a local host, run `devgraph local config` and `devgraph local status`.
   Resolve paths from that configuration, never from another person's machine.
-- For ontology or Work questions, run `devgraph ontology` and read
-  [Work and Arena operations](references/work-api.md). The packaged release
-  manifest records runtime compatibility. Shared vocabulary is authored in
-  ZenithResearch/zenith-ontology; DevGraph imports an exact core release and owns
-  its implementation extension. Inspect ontology/ownership.json for both pins.
+- For ontology questions, run `devgraph ontology --format sources-v1`.
+  Require `schemaVersion: devgraph.ontology-sources.v1` and `closureVerified: true`.
+  Use the returned `manifestPath` and `ontologyPath` for installed resources;
+  never guess a checkout path. Unknown output schemas are unsupported.
+  If the CLI is absent or rejects this option, report that DevGraph 0.1.0b3 or
+  a later CLI with this capability is required; use the supported installer.
+  `devgraph ontology` retains the runtime-v1 output contract and historical issuer.
+  Shared vocabulary is authored in ZenithResearch/zenith-ontology; DevGraph owns
+  its extension and adopts an exact core release. Offline resources, upstream
+  public availability, website selection and runtime admission are separate.
+- For Work questions, read [Work and Arena operations](references/work-api.md).
 - For lifecycle, credentials, logs, or recovery, read
   [Local operations](references/local-operations.md) before taking action.
 

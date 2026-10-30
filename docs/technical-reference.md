@@ -1,3 +1,8 @@
+> Ontology stewardship: shared-core authoring is maintained in Zenith ontology.
+> Use `devgraph ontology --format sources-v1` for the exact packaged adoption;
+> plain `devgraph ontology` and older version descriptions below retain their
+> historical runtime-compatibility meaning. See [ownership](ontology-ownership.md).
+
 # Technical reference
 
 ## Package architecture

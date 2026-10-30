@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "devgraph.ontology-source-index.v1",
+  "repository": "https://github.com/ZenithResearch/devgraph",
+  "sharedCoreAuthoring": "https://github.com/ZenithResearch/zenith-ontology",
+  "adoptedCore": {
+    "repository": "https://github.com/ZenithResearch/zenith-ontology",
+    "commit": "142f515675d4127736676c9e7a8b1bb158621eae",
+    "sourcePath": "ontology/core/ontology.jsonld",
+    "ontologyId": "https://zenith-research.ca/ontology",
+    "version": "0.13.0",
+    "manifest": {
+      "url": "https://zenith-research.ca/ontology/v0.13.0/manifest.json",
+      "sha256": "71c80068182f46bc30c019669d201cb6a5366646274737618c949802d9434a64",
+      "bytes": 1812,
+      "mediaType": "application/json"
+    },
+    "ontologyUrl": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld"
+  },
+  "extension": {
+    "repository": "https://github.com/ZenithResearch/devgraph",
+    "ontologyId": "https://zenith-research.ca/ontology/devgraph",
+    "version": "0.1.0",
+    "manifest": {
+      "url": "https://zenith-research.ca/ontology/devgraph/v0.1.0/manifest.json",
+      "sha256": "ea5ad93dcccccb16c291949ccf8928e583fe42d14e37e5010b6cafed899aa141",
+      "bytes": 4027,
+      "mediaType": "application/json"
+    },
+    "ontologyUrl": "https://zenith-research.ca/ontology/devgraph/v0.1.0/ontology.jsonld"
+  },
+  "runtimeCompatibility": {
+    "ontologyId": "https://zenith-research.ca/ontology",
+    "version": "0.12.0",
+    "manifest": {
+      "url": "https://zenith-research.ca/ontology/v0.12.0/manifest.json",
+      "sha256": "a087c476edf3bb6d6b050c18e4cc23cb3ed5e5370cb7314e6031971106f1ec7e",
+      "bytes": 7399,
+      "mediaType": "application/json"
+    },
+    "authority": {
+      "name": "Devgraph",
+      "release_tag": "ontology-v0.12.0",
+      "repository": "https://github.com/ZenithResearch/devgraph",
+      "source_path": "ontology/"
+    }
+  },
+  "runtimeAdmission": false,
+  "legacyScope": "Historical issuer and packaged runtime compatibility; superseded only for shared-core authoring.",
+  "packagedIndex": "src/devgraph/resources/ontology-source-index.v1.json"
+}
