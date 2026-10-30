@@ -23,6 +23,7 @@ const messages={
  holder_session_outcome_unknown:'The original sign-in result is uncertain. Check its status before starting another session.',
  holder_session_setup_invalid:'This server and Wallet have incompatible session settings. The service owner needs to check the setup.',
  invalid_holder_session:'The session could not be verified. No access was opened.',
+ monitor_arena_context_required:'DevGraph Monitor requires Work listing and Arena listing for the work you can read. Ask the service owner to include Arena access in your grant, then sign in again.',
  session_login_access_pending:'Your access request is awaiting review. Sign in again to check its status in Wallet.',
  grant_not_saved:'No reusable grant is saved yet. Continue in Wallet to check your approved access.',
  endpoint_wallet_setup_required:'Wallet access is not configured for this server address. Contact the service owner.',

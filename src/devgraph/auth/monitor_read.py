@@ -169,11 +169,12 @@ class MemberMonitorReadEnrollment(MemberReadEnrollment):
 class ReadProjectionStorage:
     """Only the captured authorized inventory; contains no source storage handle."""
 
-    def __init__(self, nodes, edges, health):
+    def __init__(self, nodes, edges, health, arena_membership=None):
         self.nodes = tuple(nodes)
         self.edges = tuple(edges)
         self._health = health
         self.by_key = {(n.label, n.id): n for n in nodes}
+        self.arena_membership = arena_membership
 
     def query(self, label=None, archived=None, after_id=None, descending=False, limit=None):
         nodes = sorted(
@@ -346,6 +347,7 @@ def _project_monitor_read(storage, grants, target):
     ]
     arena_ids = ()
     dynamic_arenas = False
+    arena_membership = None
     if path in ("/monitor/topology/v1", "/monitor/snapshot", "/monitor/kanban/v2"):
         # Arena metadata never follows from a Work selector. Both endpoints of
         # each real membership edge must already be independently authorized.
@@ -364,6 +366,8 @@ def _project_monitor_read(storage, grants, target):
             and "list" in getattr(g, "operations", ("list", "get"))
             for g in arena_grants
         )
+        if not arena_ids and not dynamic_arenas:
+            raise ForbiddenError("monitor_arena_context_required", correlation_id="monitor-read")
         if arena_ids or dynamic_arenas:
             after = None
             arena_nodes = []
@@ -371,14 +375,39 @@ def _project_monitor_read(storage, grants, target):
                 page = storage.delegated_arena_page(
                     () if dynamic_arenas else arena_ids,
                     all_resources=dynamic_arenas,
+                    include_archived=True,
                     after_id=after,
                     limit=100,
                 )
                 arena_nodes.extend(page)
+                if len(arena_nodes) > 10000:
+                    raise StorageUnavailable("scoped Arena projection capacity exceeded")
                 if len(page) < 100:
                     break
                 after = page[-1].id
             disclosed_ids = tuple(n.id for n in arena_nodes)
+            disclosed = set(disclosed_ids)
+            from devgraph.arenas import ArenaConflict, ArenaRepository
+
+            try:
+                membership = ArenaRepository(storage).membership_ids(
+                    tuple((n.label, n.id) for n in nodes)
+                )
+            except ArenaConflict:
+                raise StorageUnavailable("invalid Arena placement") from None
+            # A monitor cannot present a misleading unassigned bucket. Scoped
+            # Arena listing is sufficient only when it covers every visible
+            # Work item's actual placement. Never disclose a hidden Arena ID.
+            if any(
+                value is not None and value not in disclosed for value in membership.values()
+            ):
+                raise ForbiddenError(
+                    "monitor_arena_context_required", correlation_id="monitor-read"
+                )
+            arena_membership = {
+                kind + ":" + identifier: "Arena:" + value if value is not None else None
+                for (kind, identifier), value in membership.items()
+            }
             if disclosed_ids:
                 edges.extend(
                     storage.delegated_arena_edges(
@@ -388,7 +417,7 @@ def _project_monitor_read(storage, grants, target):
             nodes.extend(arena_nodes)
             if len(nodes) > 10000 or len(edges) > 10000:
                 raise StorageUnavailable("scoped Arena projection capacity exceeded")
-    captured = ReadProjectionStorage(nodes, edges, storage.health())
+    captured = ReadProjectionStorage(nodes, edges, storage.health(), arena_membership)
     if path == "/workflows/v1":
         from devgraph.workflow_contract import catalog
 
@@ -454,10 +483,9 @@ def _project_monitor_read(storage, grants, target):
         "relationship_data": bool(relationships or arena_ids or dynamic_arenas),
         "work_relationships": bool(node_relationships),
         "arena_metadata": bool(arena_ids or dynamic_arenas),
-        # All-Arena authority does not prove that Work ancestors are visible.
-        # Kind/ID/archive selectors can still hide the path to an Arena. Keep
-        # unknown wording for unattached nodes rather than assert nonmembership.
-        "arena_membership_complete": False,
+        # Placement was resolved from canonical ancestry, independently of
+        # visible Work parents and separately authorized Arena metadata.
+        "arena_membership_complete": arena_membership is not None,
         "complete": True,
     }
     if path == "/monitor/topology/v1":

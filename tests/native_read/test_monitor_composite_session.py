@@ -37,7 +37,7 @@ class FixtureEnrollment(MemberMonitorReadEnrollment):
     _policy_for = ArenaMonitorReadEnrollment._policy_for
 
 
-def fixture(tmp_path):
+def fixture(tmp_path, *, project_only=False):
     binary = os.environ.get("SECS_HOLDER_GRANT_TEST_BINARY")
     if not binary:
         pytest.skip("actual native holder authority required")
@@ -58,7 +58,7 @@ def fixture(tmp_path):
                 scope="devgraph.work.read",
                 operations=["list", "get", "relationships"],
                 relationship_types=["children", "parent"],
-                work_kinds=["Initiative", "Project"],
+                work_kinds=["Project"] if project_only else ["Initiative", "Project"],
                 include_archived=False,
             ),
             dict(scope="devgraph.arena.read", arena_ids=["shared"]),
@@ -226,6 +226,30 @@ def test_native_composite_session_discloses_only_signed_arena_and_real_hierarchy
         e.revoke("dgrg_" + token["claims"]["challenge"]["parent_grant_id"])
         with pytest.raises(UnauthenticatedError):
             e.verify_request(**presentation(key, token, conditional_path, nonce="aa" * 16), now=NOW)
+
+
+def test_native_project_only_session_places_work_without_disclosing_parent(tmp_path):
+    s, e, key, token, storage = fixture(tmp_path, project_only=True)
+    request = presentation(key, token)
+    with s.from_origin("https://graph.example"):
+        context = e.verify_request(**request, now=NOW)
+        with (
+            storage.work_mutation_transaction(),
+            s.host.current_read(token, request["proof"], now=NOW),
+        ):
+            result = project_monitor_read(
+                storage,
+                materialize(storage, context.read_grants),
+                request["call"]["parameters"]["path"],
+            )
+    assert {n["key"] for n in result["graph_nodes"]} == {"Arena:shared", "Project:child"}
+    assert (
+        next(n for n in result["graph_nodes"] if n["kind"] == "Project")["arena_key"]
+        == "Arena:shared"
+    )
+    assert result["graph_edges"] == []
+    assert "Initiative:parent" not in json.dumps(result)
+    assert result["access_scope"]["arena_membership_complete"] is True
 
 
 def test_ordinary_read_retains_matching_operation_and_tampered_inventory_denies(tmp_path):

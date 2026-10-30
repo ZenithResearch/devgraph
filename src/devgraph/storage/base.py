@@ -195,6 +195,10 @@ class GraphStorage(Protocol):
 
     def work_containment(self, label: str, node_id: str) -> WorkContainment | None: ...
 
+    def work_containment_batch(
+        self, keys: tuple[tuple[str, str], ...]
+    ) -> list[WorkContainment]: ...
+
     def arena_member_page(
         self, arena_id: str, *, after_resource: str | None = None, limit: int = 50
     ) -> list[WorkContainment]: ...
@@ -204,6 +208,7 @@ class GraphStorage(Protocol):
         arena_ids: tuple[str, ...],
         *,
         all_resources: bool = False,
+        include_archived: bool = False,
         after_id: str | None = None,
         limit: int = 50,
     ) -> list[NodeRecord]: ...

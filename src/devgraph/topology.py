@@ -216,8 +216,16 @@ def filter_projection(snapshot, filters: TopologyFilter):
         if not roots and filters.arena != "*":
             scope_error = "arena_unavailable"
         keys, queue = set(roots), list(roots)
+        # Independently authorized placement survives hidden Work ancestors.
+        for node in all_nodes:
+            if node.get("arena_key") in roots:
+                keys.add(node["key"])
+                queue.append(node["key"])
         for key in queue:
             for other in outgoing.get(key, ()):
+                candidate = available.get(other, {})
+                if "arena_key" in candidate and candidate["arena_key"] not in roots:
+                    continue
                 if other not in keys:
                     keys.add(other)
                     queue.append(other)
@@ -272,6 +280,10 @@ def filter_projection(snapshot, filters: TopologyFilter):
         if edge["relationship"] in {"HAS_CHILD", "CONTAINS_WORK"}:
             ancestry.setdefault(edge["target"], []).append(edge["source"])
     layout_keys = {n["key"] for n in shown if n["kind"] in overview_kinds}
+    layout_keys.update(
+        n["arena_key"] for n in shown
+        if n.get("arena_key") in available and available[n["arena_key"]]["kind"] == "Arena"
+    )
     queue = list(layout_keys)
     for key in queue:
         for parent in ancestry.get(key, ()):
@@ -284,7 +296,10 @@ def filter_projection(snapshot, filters: TopologyFilter):
                 queue.append(parent)
     layout_context = {
         "nodes": [
-            {key: node[key] for key in ("key", "kind", "title", "category")}
+            {
+                key: node[key]
+                for key in ("key", "kind", "title", "category", "arena_key") if key in node
+            }
             for node in all_nodes
             if node["key"] in layout_keys
         ],
@@ -334,6 +349,7 @@ def build_topology(storage, filters: TopologyFilter):
     if len(nodes) > SOURCE_NODE_LIMIT or len(edges) > SOURCE_EDGE_LIMIT:
         raise StorageUnavailable("topology source capacity exceeded")
     captured = _CapturedStorage(nodes, edges, storage.health())
+    captured.arena_membership = getattr(storage, "arena_membership", None)
     snapshot = build_monitor_snapshot(captured)
     return filter_projection(snapshot, filters)
 

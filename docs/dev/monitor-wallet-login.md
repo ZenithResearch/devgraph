@@ -11,8 +11,9 @@ it does not implement OAuth 2.0. The sidebar is not a prerequisite.
 ## Composite topology reads and loading
 
 Monitor topology, snapshot and board reads are composite read projections. A
-`devgraph.work.list` presentation admits the route; it does not imply Arena or
-relationship access. After native verification of the entire signed credential,
+`devgraph.work.list` presentation admits the route; the monitor also requires
+independently granted `devgraph.arena.list` covering every returned Work item's
+Arena. Work-only grants remain valid for ordinary Work APIs. After native verification of the entire signed credential,
 current parent/subset and exact call proof, DevGraph composes only the **same
 credential's** signed Work-list, Work-relationships and Arena-list permissions.
 It checks the native matching-list permission result against that signed
@@ -27,8 +28,32 @@ selectors reuse captured pages within that request only. Fixed and dynamic Arena
 metadata remain independent of Work scope. Dynamic scope disclosure includes
 `arena_metadata`, `work_relationships` and `arena_membership_complete`; older
 responses remain conservatively readable when optional fields are absent.
-Arena metadata access alone never proves Work ancestor visibility; unattached
-scoped items retain unknown membership wording even with all-Arena access.
+The monitor resolves placement using canonical containment in bounded, indexed
+batches inside the same transaction, including archived and scope-hidden parents.
+Work nodes gain an optional `arena_key`: the separately authorized `Arena:<id>`,
+or `null` for proven absence. Hidden parent IDs, titles and connecting edges are
+never included. This is derived placement, not an invented `CONTAINS_WORK` edge
+or permission to read hidden Work. Conflicting or malformed ancestry fails closed.
+Archived Arena metadata is included for placement under the same Arena authority;
+ordinary `/arenas` listing continues to exclude archives by default.
+
+`layout_context.nodes` preserves `arena_key` and the authorized Arena record even
+when display filters hide the parent chain or Arena node. Arena filters use this
+placement and cannot follow a dependency into another Arena. Source and conditional
+representation revisions cover placement, so moving an ancestor invalidates the
+view even when the ancestor is not disclosed. `arena_membership_complete: true`
+means placement was resolved for every readable Work item, not that its Work
+ancestors are visible. Older responses without placement retain the conservative
+fallback wording; older consumers may ignore the additive field.
+
+Discovery advertises `monitor_required_operations` as
+`["devgraph.work.list", "devgraph.arena.list"]`. The login client checks the
+Wallet-prepared challenge before child signing/final consent; it never adds a
+permission to a signed grant. Missing or incomplete Arena authority returns
+`monitor_arena_context_required` with instructions to ask the owner for Arena
+access. Existing grants are not expanded or rewritten. The same requirement is
+enforced on each aggregate read, including retained older sessions. Browser
+session lifetime, grant consent, revocation and scope attenuation are unchanged.
 
 New finite sessions retain an explicitly approved `devgraph.work.relationships`
 permission. Existing sessions keep their exact signed permissions and expiry;

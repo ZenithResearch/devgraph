@@ -234,7 +234,9 @@ def test_neo4j_collection_selector_is_parameterized_and_bounded_before_return():
     assert "($all_resources OR n.id IN $arena_ids)" in query
     assert "n.archived = false" in query
     assert "ORDER BY n.id LIMIT $limit" in query
-    assert parameters == dict(arena_ids=[], all_resources=True, after_id="after", limit=20)
+    assert parameters == dict(
+        arena_ids=[], all_resources=True, include_archived=False, after_id="after", limit=20
+    )
     for ids, flag in [((), False), (("a",), True), ((), 1)]:
         with pytest.raises(ValueError):
             storage.delegated_arena_page(ids, all_resources=flag)
