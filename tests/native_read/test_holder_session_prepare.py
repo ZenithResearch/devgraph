@@ -60,6 +60,7 @@ def test_null_permissions_select_only_trusted_read_catalogue(tmp_path, monkeypat
     assert {p["operation"] for p in challenge["permissions"]} <= {
         "devgraph.work.get",
         "devgraph.work.list",
+        "devgraph.work.relationships",
         "devgraph.arena.get",
         "devgraph.arena.list",
     }

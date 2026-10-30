@@ -23,7 +23,7 @@
     }else redirect();
    }
   }
-  const controller={get authorityOrigin(){return client?.authorityOrigin??root.location.origin;},get routePrefix(){return client?.serviceBinding?.claims.prefix??'';},get requestIdentity(){return client?.identity??null;},get accessEndpoint(){return client?.configuration?.access_requests_endpoint??null;},get sessionKey(){return client?.sessionKey??'';},get preferenceSeed(){return client?.preferenceSeed??'';},get connected(){return client?.stage==='ready';},
+  const controller={get authorityOrigin(){return client?.authorityOrigin??root.location.origin;},get routePrefix(){return client?.serviceBinding?.claims.prefix??'';},get requestIdentity(){return client?.identity??null;},get accessEndpoint(){return client?.configuration?.access_requests_endpoint??null;},get sessionKey(){return client?.sessionKey??'';},get preferenceSeed(){return client?.preferenceSeed??'';},get connected(){return client?.stage==='ready';},get topologyRevalidation(){return client?.configuration?.topology_revalidation===true;},
    read:(path,options)=>client?client.read(path,options):Promise.reject(Object.assign(Error('wallet_read_access_required'),{status:401})),
    // Existing monitor/board pagehide calls detach custody, never sign out.
    disconnect:()=>{settled=false;client?.disconnect();},

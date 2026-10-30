@@ -21,7 +21,7 @@ function refreshMonitor() {
     },
     graphView: { preferenceKey: 'fixture', filters: {}, filterSerial: 0, pointers: new Map(), nodePositions: new Map(), nodeVelocities: new Map() },
     text(id, value) { document.getElementById(id).textContent = value; },
-    render(snapshot, observations) { rendered.push({ snapshot, observations }); },
+    render(snapshot, observations, graphChanged) { rendered.push({ snapshot, observations, graphChanged }); },
     invalidateLayout() {}, announceGraph() {}, refreshCheckIn() {}, checkIn: { reset() {} }, projectFilters: { reset() {} },
     prepareGraphPreferences() { c.graphView.preferenceKey = 'fixture'; },
     updateGraphVisibility() {}, loadSelectedDetail() {},
@@ -65,6 +65,61 @@ test('snapshot refresh allows one flight and coalesces multiple requests into on
   assert.equal(rendered.length, 2);
   assert.equal(requests.length, 4);
   assert.equal(c.state.refreshPromise, null);
+});
+
+test('unchanged authorized revisions update freshness without rebuilding the graph', () => {
+  const {c,rendered}=refreshMonitor();
+  const first={revision:'same',applied_filters:{work_kind:['Task']},
+    access_scope:{arena_metadata:true},generated_at:'2026-10-30T00:00:00Z'};
+  c.applySnapshot(first,[]);
+  const next={...first,generated_at:'2026-10-30T00:00:10Z'};
+  c.applySnapshot(next,[]);
+  assert.equal(rendered[0].graphChanged,true);
+  assert.equal(rendered[1].graphChanged,false);
+  assert.equal(c.state.lastSuccess,next.generated_at);
+  c.applySnapshot({...next,applied_filters:{work_kind:['Issue']}},[]);
+  assert.equal(rendered.at(-1).graphChanged,true,'same source revision with new filters rebuilds');
+  c.applySnapshot({...next,access_scope:{arena_metadata:false}},[]);
+  assert.equal(rendered.at(-1).graphChanged,true,'permission disclosure changes rebuild');
+});
+
+test('coalesced triggers do not repeatedly refresh the independent check-in queue', async () => {
+  const {c,requests}=refreshMonitor();let checkIns=0;c.refreshCheckIn=()=>checkIns++;
+  const first=c.refresh(),second=c.refresh(),third=c.refresh();
+  assert.equal(checkIns,1);
+  resolveRefresh(requests,0,{generated_at:'2026-10-30T00:00:00Z'});
+  await Promise.all([first,second,third]);await flushPromises();
+  assert.equal(checkIns,2,'one queued update refreshes check-in once');
+  resolveRefresh(requests,2,{generated_at:'2026-10-30T00:00:10Z'});
+  await c.state.refreshPromise;
+});
+
+test('automatic polling pauses in hidden tabs without suppressing explicit refresh', () => {
+  const document=textDocument();document.getElementById('refresh-rate').value='10';
+  let tick,reads=0;
+  const c=contextWithFunctions(['schedule'],{document,state:{timer:null},
+    walletAccess:{connected:true},refresh:()=>reads++,
+    window:{setInterval:callback=>{tick=callback;return 1;},clearInterval(){}}});
+  c.schedule();document.hidden=true;tick();assert.equal(reads,0);
+  c.refresh();assert.equal(reads,1);
+  document.hidden=false;tick();assert.equal(reads,2);
+});
+
+test('conditional refresh reuses only the current authenticated representation', async () => {
+  const {c,requests,rendered}=refreshMonitor();c.walletAccess.topologyRevalidation=true;
+  const full={schema:'devgraph.topology.v1',revision:'source',representation_revision:'a'.repeat(64),
+    generated_at:'2026-10-30T00:00:00Z',storage:{ready:true},applied_filters:{},access_scope:{}};
+  const first=c.refresh();resolveRefresh(requests,0,full);await first;
+  const next=c.refresh();assert.match(requests[2].path,/if_revision=a{64}$/);
+  resolveRefresh(requests,2,{schema:'devgraph.topology-not-modified.v1',revision:'source',
+    representation_revision:'a'.repeat(64),generated_at:'2026-10-30T00:00:10Z',storage:{ready:true}});
+  await next;assert.equal(rendered.at(-1).graphChanged,false);
+  assert.equal(c.state.snapshot.graph_nodes,full.graph_nodes);
+  const invalid=c.refresh();
+  resolveRefresh(requests,4,{schema:'devgraph.topology-not-modified.v1',revision:'other',
+    representation_revision:'a'.repeat(64),generated_at:'2026-10-30T00:00:20Z',storage:{ready:true}});
+  await invalid;assert.equal(c.state.lastSuccess,'2026-10-30T00:00:10Z');
+  assert.equal(c.document.getElementById('connection-label').textContent,'Connection interrupted');
 });
 
 test('old-auth responses cannot overwrite a newer credential’s snapshot or clear its in-flight request', async () => {

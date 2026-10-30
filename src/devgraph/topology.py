@@ -53,6 +53,7 @@ class TopologyFilter:
     q: str = ""
     node_limit: int = 5_000
     edge_limit: int = 20_000
+    if_revision: str = ""
 
     @classmethod
     def parse(cls, query: str) -> TopologyFilter:
@@ -104,6 +105,10 @@ class TopologyFilter:
                     normalized[key] = int(value)
                 elif key == "archived":
                     if value not in ("include", "exclude", "only"):
+                        raise InvalidTopologyFilter("Invalid topology filters")
+                    normalized[key] = value
+                elif key == "if_revision":
+                    if not re.fullmatch(r"[a-f0-9]{64}", value):
                         raise InvalidTopologyFilter("Invalid topology filters")
                     normalized[key] = value
                 elif key in ("arena", "anchor"):
@@ -304,7 +309,7 @@ def filter_projection(snapshot, filters: TopologyFilter):
         "schema": "devgraph.topology.v1",
         "revision": revision,
         "consistency": "materialized_projection",
-        "applied_filters": asdict(filters),
+        "applied_filters": {k: v for k, v in asdict(filters).items() if k != "if_revision"},
         "graph_nodes": shown,
         "graph_edges": shown_edges,
         "layout_context": layout_context,
@@ -331,3 +336,22 @@ def build_topology(storage, filters: TopologyFilter):
     captured = _CapturedStorage(nodes, edges, storage.health())
     snapshot = build_monitor_snapshot(captured)
     return filter_projection(snapshot, filters)
+
+
+def revalidate_topology(result, known_revision):
+    """Private per-session revalidation AFTER authorization and fresh capture.
+
+    The representation includes filters and access disclosure, not just source
+    data. No shared cache, grant lookup shortcut or extension of authority.
+    """
+    representation = hashlib.sha256(json.dumps(
+        {k: result[k] for k in ("revision", "applied_filters", "access_scope")},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode()).hexdigest()
+    if known_revision == representation:
+        return dict(
+            schema="devgraph.topology-not-modified.v1", representation_revision=representation,
+            revision=result["revision"], generated_at=result["generated_at"],
+            storage=result["storage"],
+        )
+    return {**result, "representation_revision": representation}

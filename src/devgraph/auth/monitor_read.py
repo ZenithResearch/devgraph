@@ -36,7 +36,7 @@ from devgraph.todo_views import (
     todo_page,
     todo_summary,
 )
-from devgraph.topology import TopologyFilter, build_topology
+from devgraph.topology import TopologyFilter, build_topology, revalidate_topology
 
 
 class MonitorWorkGrant(WorkReadGrant):
@@ -253,23 +253,26 @@ def project_monitor_read(storage, grants, target):
     if monitor_target(target)[0].startswith("arena."):
         return project_arena_read(storage, grants, target)
     grants = tuple(grants)
-    if any(getattr(g, "resource_paths", ()) or g.scope == "devgraph.arena.read" for g in grants):
-        # Capture every page and relationship in one serialized graph interval.
-        # A concurrent move cannot slip between permission check and disclosure.
-        with storage.work_mutation_transaction():
-            return _project_monitor_read(storage, grants, target)
-    return _project_monitor_read(storage, grants, target)
+    # Capture every selector, page and edge in one serialized graph interval.
+    with storage.work_mutation_transaction():
+        return _project_monitor_read(storage, grants, target)
 
 
 def _project_monitor_read(storage, grants, target):
     operation, path, query = monitor_target(target)
     arena_grants = [g for g in grants if g.scope == "devgraph.arena.read"]
-    grants = [g for g in grants if g.scope == "devgraph.work.read" and operation in g.operations]
+    work_grants = [g for g in grants if g.scope == "devgraph.work.read"]
+    grants = [g for g in work_grants if operation in g.operations]
+    relationship_grants = [g for g in work_grants if "relationships" in g.operations]
     if not grants:
         raise ForbiddenError("scope_not_granted", correlation_id="monitor-read")
     by_key = {}
-    node_grants = {}
-    for index, grant in enumerate(grants):
+    # List/get and relationship permissions are independently decoded and may
+    # have disjoint selectors. Reuse each selector capture without combining
+    # their authority or reading the same inventory once per signed operation.
+    pages = {}
+
+    def selected_nodes(grant):
         selector = DelegatedWorkSelector(
             work_ids=grant.work_ids,
             resource_paths=getattr(grant, "resource_paths", ()),
@@ -277,6 +280,13 @@ def _project_monitor_read(storage, grants, target):
             work_kinds=grant.work_kinds,
             include_archived=grant.include_archived,
         )
+        cache_key = (
+            grant.work_ids, grant.arena_ids, getattr(grant, "resource_paths", ()),
+            grant.work_kinds, grant.include_archived,
+        )
+        if cache_key in pages:
+            return pages[cache_key]
+        selected = []
         for kind in grant.work_kinds:
             after = None
             while True:
@@ -289,21 +299,31 @@ def _project_monitor_read(storage, grants, target):
                     after_id=after,
                     limit=100,
                 )
-                for node in page:
-                    key = (node.label, node.id)
-                    by_key[key] = node
-                    node_grants.setdefault(key, set()).add(index)
-                if len(by_key) > 10000:
+                selected.extend(page)
+                if len(selected) > 10000:
                     raise StorageUnavailable("scoped read capacity exceeded")
                 if len(page) < 100:
                     break
                 after = page[-1].id
+        pages[cache_key] = selected
+        return selected
+
+    for grant in grants:
+        for node in selected_nodes(grant):
+            by_key[node.label, node.id] = node
+        if len(by_key) > 10000:
+            raise StorageUnavailable("scoped read capacity exceeded")
     nodes = list(by_key.values())
+    node_relationships = {}
+    for grant in relationship_grants:
+        for node in selected_nodes(grant):
+            key = (node.label, node.id)
+            if key in by_key:
+                node_relationships.setdefault(key, set()).update(grant.relationship_types)
     relationships = set()
     relation_map = {name: definition[0] for name, definition in WORK_RELATIONSHIPS.items()}
-    for grant in grants:
-        if "relationships" in grant.operations:
-            relationships.update(relation_map[r] for r in grant.relationship_types)
+    for allowed in node_relationships.values():
+        relationships.update(relation_map[r] for r in allowed)
     edges = storage.delegated_work_edges(
         tuple((n.label, n.id) for n in nodes), tuple(sorted(relationships)), limit=10001
     )
@@ -316,10 +336,7 @@ def _project_monitor_read(storage, grants, target):
     }
 
     def permits(key, relationship):
-        return any(
-            "relationships" in grants[i].operations and relationship in grants[i].relationship_types
-            for i in node_grants.get(key, ())
-        )
+        return relationship in node_relationships.get(key, ())
 
     edges = [
         e
@@ -328,6 +345,7 @@ def _project_monitor_read(storage, grants, target):
         or permits((e.to_label, e.to_id), directions[e.relationship][1])
     ]
     arena_ids = ()
+    dynamic_arenas = False
     if path in ("/monitor/topology/v1", "/monitor/snapshot", "/monitor/kanban/v2"):
         # Arena metadata never follows from a Work selector. Both endpoints of
         # each real membership edge must already be independently authorized.
@@ -433,8 +451,15 @@ def _project_monitor_read(storage, grants, target):
         "observations": False,
         "receipts": False,
         "supporting_material": False,
-        "relationship_data": bool(relationships or arena_ids),
-        "arena_metadata": bool(arena_ids),
+        "relationship_data": bool(relationships or arena_ids or dynamic_arenas),
+        "work_relationships": bool(node_relationships),
+        "arena_metadata": bool(arena_ids or dynamic_arenas),
+        # All-Arena authority does not prove that Work ancestors are visible.
+        # Kind/ID/archive selectors can still hide the path to an Arena. Keep
+        # unknown wording for unattached nodes rather than assert nonmembership.
+        "arena_membership_complete": False,
         "complete": True,
     }
+    if path == "/monitor/topology/v1":
+        return revalidate_topology(result, TopologyFilter.parse(query).if_revision)
     return result

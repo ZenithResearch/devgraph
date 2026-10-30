@@ -1092,7 +1092,7 @@ FRONTEND_HTML = r"""<!doctype html>
       const context = state.snapshot?.layout_context || {nodes:overview,edges:hierarchyEdges};
       const projection = Topology.overviewProjection(overview, hierarchyEdges, context, [graphView.hoverRoot,graphView.focusRoot,graphView.selectedRoot]);
       graphView.revealModel = projection;
-      graphView.layoutPlan = Topology.hierarchy(projection.context.nodes, projection.context.edges, {arenaMembershipComplete: !state.snapshot?.access_scope});
+      graphView.layoutPlan = Topology.hierarchy(projection.context.nodes, projection.context.edges, {arenaMembershipComplete: !state.snapshot?.access_scope || state.snapshot.access_scope.arena_membership_complete === true});
       graphView.layoutPlan.groups = graphView.layoutPlan.groups.map(group => ({...group,keys:group.keys.filter(key=>overviewKeys.has(key))})).filter(group=>group.keys.length || overviewKeys.has(group.key));
       let { nodes, edges } = filterGraph(projection.nodes.filter(node => node.kind !== 'Arena'), projection.edges, graphView.visibleCategories);
       if (graphView.neighborhood && state.snapshot?.schema !== 'devgraph.topology.v1') {
@@ -1383,12 +1383,13 @@ FRONTEND_HTML = r"""<!doctype html>
       rows('manager-attention', summary.attention, snapshot ? 'No recorded reviews or unresolved dependencies in this view.' : 'Recorded reviews and dependencies appear here.');
     }
 
-    function render(snapshot, observations) {
+    function render(snapshot, observations, graphChanged = true) {
       state.snapshot = snapshot;
-      renderManagerOverview(snapshot);
+      if (graphChanged) renderManagerOverview(snapshot);
       text('total-work', snapshot.total_work); text('active-initiatives', snapshot.active_initiatives); text('observation-count', snapshot.observation_count); text('pending-receipts', snapshot.pending_receipts);
       text('receipt-note', `${snapshot.receipt_count} records in the local outbox`); const age = relativeTime(snapshot.generated_at); text('generated-at', age === 'now' ? 'updated just now' : `updated ${age} ago`);
-      updateGraphVisibility(); renderPipeline(snapshot.observation_by_status); renderBars(snapshot.work_by_kind); renderActivity(snapshot.recent_activity); renderObservations(observations);
+      if (graphChanged) updateGraphVisibility();
+      renderPipeline(snapshot.observation_by_status); renderBars(snapshot.work_by_kind); renderActivity(snapshot.recent_activity); renderObservations(observations);
       document.getElementById('connection-dot').className = `dot ${snapshot.storage.ready ? 'ready' : 'error'}`;
       text('connection-label', snapshot.storage.ready ? 'Graph ready' : 'Some data unavailable');
       const connection = document.getElementById('connection-settings');
@@ -1427,8 +1428,12 @@ FRONTEND_HTML = r"""<!doctype html>
 
     function applySnapshot(snapshot, observations) {
       if (graphView.pointers.size || state.controlDragging) { state.pendingSnapshot = { snapshot, observations }; return; }
+      const previous = state.snapshot;
+      const graphChanged = !previous || !snapshot.revision || previous.revision !== snapshot.revision ||
+        JSON.stringify(previous.applied_filters) !== JSON.stringify(snapshot.applied_filters) ||
+        JSON.stringify(previous.access_scope) !== JSON.stringify(snapshot.access_scope);
       state.pendingSnapshot = null; state.snapshot = snapshot; state.observations = observations; state.lastSuccess = snapshot.generated_at;
-      render(snapshot, observations); loadSelectedDetail();
+      render(snapshot, observations, graphChanged); if (graphChanged) loadSelectedDetail();
     }
 
     function flushPendingSnapshot() {
@@ -1440,14 +1445,22 @@ FRONTEND_HTML = r"""<!doctype html>
       synchronizeCredential();
       if (!graphView.preferenceKey) await prepareGraphPreferences();
       if (!walletAccess.connected) { document.getElementById('connection-settings').open = true; text('status-line', 'Connect Wallet to view shared work.'); return; }
-      refreshCheckIn();
       if (state.refreshPromise) { state.refreshQueued = true; return state.refreshPromise; }
+      refreshCheckIn();
       const epoch = state.authEpoch, filterSerial = graphView.filterSerial, controller = new AbortController(); state.refreshController = controller;
       if (!state.snapshot) text('status-line', 'Loading graph…');
       const request = (async () => {
         try {
-          const [snapshot, observations] = await Promise.all([getJson(topologyPath(), { signal: controller.signal }), getJson('/initiative-observations?descending=true&limit=100', { signal: controller.signal }).catch(error => { if (error.code === 'read_not_granted') return {items: []}; throw error; })]);
+          const previous = state.snapshot, basePath = topologyPath();
+          const known = walletAccess.topologyRevalidation && /^[a-f0-9]{64}$/.test(previous?.representation_revision || '') ? previous.representation_revision : '';
+          const path = basePath + (known ? `${basePath.includes('?') ? '&' : '?'}if_revision=${known}` : '');
+          const [response, observations] = await Promise.all([getJson(path, { signal: controller.signal }), getJson('/initiative-observations?descending=true&limit=100', { signal: controller.signal }).catch(error => { if (error.code === 'read_not_granted') return {items: []}; throw error; })]);
           if (epoch !== state.authEpoch || filterSerial !== graphView.filterSerial) return;
+          let snapshot = response;
+          if (response.schema === 'devgraph.topology-not-modified.v1') {
+            if (!known || response.representation_revision !== known || response.revision !== previous.revision || !response.storage || typeof response.generated_at !== 'string') throw new Error('Invalid topology revalidation');
+            snapshot = {...previous, generated_at:response.generated_at, storage:response.storage};
+          }
           applySnapshot(snapshot, observations.items);
           if (state.filterFeedback) { state.filterFeedback = false; announceGraph(snapshot.scope_error ? 'The saved scope is unavailable. Choose another Arena or clear filters.' : `${snapshot.counts.matching_nodes} matching items. ${state.preferenceSaveFailed ? 'Filters could not be saved on this device.' : 'Filters saved on this device.'}`); }
         } catch (error) {
@@ -1682,7 +1695,7 @@ FRONTEND_HTML = r"""<!doctype html>
 
     function schedule() {
       if (state.timer) window.clearInterval(state.timer); const seconds = Number(document.getElementById('refresh-rate').value);
-      if (seconds > 0 && walletAccess.connected) state.timer = window.setInterval(refresh, seconds * 1000);
+      if (seconds > 0 && walletAccess.connected) state.timer = window.setInterval(() => { if (!document.hidden) refresh(); }, seconds * 1000);
     }
     const graphSvg = document.getElementById('graph-svg');
     const graphClientPoint = (x, y) => {
