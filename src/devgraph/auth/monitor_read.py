@@ -454,9 +454,10 @@ def _project_monitor_read(storage, grants, target):
         "relationship_data": bool(relationships or arena_ids or dynamic_arenas),
         "work_relationships": bool(node_relationships),
         "arena_metadata": bool(arena_ids or dynamic_arenas),
-        "arena_membership_complete": dynamic_arenas and all(
-            "parent" in node_relationships.get(key, ()) for key in by_key
-        ),
+        # All-Arena authority does not prove that Work ancestors are visible.
+        # Kind/ID/archive selectors can still hide the path to an Arena. Keep
+        # unknown wording for unattached nodes rather than assert nonmembership.
+        "arena_membership_complete": False,
         "complete": True,
     }
     if path == "/monitor/topology/v1":

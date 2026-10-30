@@ -27,6 +27,8 @@ selectors reuse captured pages within that request only. Fixed and dynamic Arena
 metadata remain independent of Work scope. Dynamic scope disclosure includes
 `arena_metadata`, `work_relationships` and `arena_membership_complete`; older
 responses remain conservatively readable when optional fields are absent.
+Arena metadata access alone never proves Work ancestor visibility; unattached
+scoped items retain unknown membership wording even with all-Arena access.
 
 New finite sessions retain an explicitly approved `devgraph.work.relationships`
 permission. Existing sessions keep their exact signed permissions and expiry;

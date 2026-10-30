@@ -170,6 +170,32 @@ def test_conditional_topology_includes_filters_and_access_disclosure():
         project_monitor_read(storage, [grant], target + "?if_revision=invalid")
 
 
+def test_all_arena_metadata_does_not_claim_hidden_work_ancestry_is_complete():
+    from tests.model.test_arena_runtime import add_arena
+
+    from devgraph.arenas import ArenaMutations
+    from devgraph.auth.arena_access import CollectionArenaReadGrant
+    from devgraph.model.work import Initiative, Project
+
+    storage = MemoryGraphStorage()
+    add_arena(ArenaMutations(storage), "shared")
+    repo = WorkObjectRepository(storage)
+    repo.create(Initiative(id="hidden-parent", title="Hidden parent"))
+    repo.create(Project(id="visible-child", title="Visible child"))
+    storage.create_edge("Arena", "shared", "CONTAINS_WORK", "Initiative", "hidden-parent")
+    storage.create_edge("Initiative", "hidden-parent", "HAS_CHILD", "Project", "visible-child")
+    grant = MonitorWorkGrant(scope="devgraph.work.read", operations=["list", "relationships"],
+        relationship_types=["parent"], work_kinds=["Project"],
+        work_ids=["Project/visible-child"], include_archived=False)
+    result = project_monitor_read(storage, [grant,
+        CollectionArenaReadGrant(scope="devgraph.arena.read", all_arenas=True)],
+        "/monitor/topology/v1")
+    assert {n["id"] for n in result["graph_nodes"]} == {"shared", "visible-child"}
+    assert result["graph_edges"] == []
+    assert result["access_scope"]["arena_metadata"] is True
+    assert result["access_scope"]["arena_membership_complete"] is False
+
+
 @pytest.mark.parametrize("renewals", [0, 2])
 def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(
     tmp_path, monkeypatch, renewals
