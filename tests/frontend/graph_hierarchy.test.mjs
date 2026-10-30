@@ -188,3 +188,24 @@ test('scoped responses do not claim unshared Arena membership is absent',()=>{
   assert.equal(actual.arenaOf.get(task.key),arena.key);
   assert.equal(actual.groups.some(g=>g.key==='unassigned'),false);
 });
+
+
+test('authorized Arena placement groups work when its parent is not disclosed',()=>{
+ const arena=node('Arena','shared'),project={...node('Project','child'),arena_key:arena.key};
+ const context={nodes:[arena,project],edges:[]};
+ const overview=T.overviewProjection([project],[],context);
+ assert.deepEqual(overview.context.nodes.map(n=>n.key).sort(),[arena.key,project.key].sort());
+ const plan=T.hierarchy(overview.context.nodes,overview.context.edges,{arenaMembershipComplete:true});
+ assert.equal(plan.arenaOf.get(project.key),arena.key);assert.equal(plan.parents.has(project.key),false);
+ assert.equal(plan.groups.some(g=>g.key==='unassigned'),false);
+ assert.ok(plan.positions.has(project.key));
+});
+test('Arena placement keeps a visible family together with relationship lines filtered out',()=>{
+ const a=node('Arena','a'),b=node('Arena','b');
+ const project={...node('Project','child'),arena_key:a.key},task={...node('Task','task'),arena_key:a.key};
+ const other={...node('Project','other'),arena_key:b.key},outside={...node('Proposal','outside'),arena_key:null};
+ const plan=T.hierarchy([a,b,project,task,other,outside],[]);
+ assert.deepEqual(Array.from(plan.groups.find(g=>g.key===a.key).keys).sort(),[project.key,task.key].sort());
+ assert.equal(plan.arenaOf.get(other.key),b.key);assert.equal(plan.arenaOf.get(outside.key),'unassigned');
+ assert.equal(plan.positions.size,4);
+});

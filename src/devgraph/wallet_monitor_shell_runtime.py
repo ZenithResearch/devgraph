@@ -9,8 +9,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
+
+from devgraph.frontend.wallet_login import secure_shell
 
 
 def create_app():
@@ -43,11 +45,11 @@ def create_app():
                 "Cache-Control": "no-store",
                 "Referrer-Policy": "no-referrer",
                 "X-Frame-Options": "DENY",
-                "Content-Security-Policy": (
-                    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
-                ),
                 "X-Content-Type-Options": "nosniff",
             }
+        )
+        response.headers.setdefault(
+            "Content-Security-Policy", "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
         )
         return response
 
@@ -60,13 +62,24 @@ def create_app():
         return {"live": True, "mode": "wallet-setup-only", "credential_requests_enabled": False}
 
     # Explicit aliases avoid HTTP redirects from a TLS-terminating loopback proxy.
+    def html(path):
+        body, headers = secure_shell(path.read_text())
+        return HTMLResponse(body, headers=headers)
+
+    @app.get("/")
     @app.get("/monitor")
+    @app.get("/monitor/")
     def monitor():
-        return FileResponse(directory / "index.html", media_type="text/html")
+        return html(directory / "index.html")
 
     @app.get("/monitor/kanban")
+    @app.get("/monitor/kanban/")
     def board():
-        return FileResponse(directory / "monitor/kanban/index.html", media_type="text/html")
+        return html(directory / "monitor/kanban/index.html")
+
+    @app.get("/login")
+    def login():
+        return html(directory / "login/index.html")
 
     app.mount("/", StaticFiles(directory=directory, html=True))
     return app

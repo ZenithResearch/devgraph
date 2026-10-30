@@ -53,6 +53,7 @@ class TopologyFilter:
     q: str = ""
     node_limit: int = 5_000
     edge_limit: int = 20_000
+    if_revision: str = ""
 
     @classmethod
     def parse(cls, query: str) -> TopologyFilter:
@@ -104,6 +105,10 @@ class TopologyFilter:
                     normalized[key] = int(value)
                 elif key == "archived":
                     if value not in ("include", "exclude", "only"):
+                        raise InvalidTopologyFilter("Invalid topology filters")
+                    normalized[key] = value
+                elif key == "if_revision":
+                    if not re.fullmatch(r"[a-f0-9]{64}", value):
                         raise InvalidTopologyFilter("Invalid topology filters")
                     normalized[key] = value
                 elif key in ("arena", "anchor"):
@@ -211,8 +216,16 @@ def filter_projection(snapshot, filters: TopologyFilter):
         if not roots and filters.arena != "*":
             scope_error = "arena_unavailable"
         keys, queue = set(roots), list(roots)
+        # Independently authorized placement survives hidden Work ancestors.
+        for node in all_nodes:
+            if node.get("arena_key") in roots:
+                keys.add(node["key"])
+                queue.append(node["key"])
         for key in queue:
             for other in outgoing.get(key, ()):
+                candidate = available.get(other, {})
+                if "arena_key" in candidate and candidate["arena_key"] not in roots:
+                    continue
                 if other not in keys:
                     keys.add(other)
                     queue.append(other)
@@ -267,6 +280,10 @@ def filter_projection(snapshot, filters: TopologyFilter):
         if edge["relationship"] in {"HAS_CHILD", "CONTAINS_WORK"}:
             ancestry.setdefault(edge["target"], []).append(edge["source"])
     layout_keys = {n["key"] for n in shown if n["kind"] in overview_kinds}
+    layout_keys.update(
+        n["arena_key"] for n in shown
+        if n.get("arena_key") in available and available[n["arena_key"]]["kind"] == "Arena"
+    )
     queue = list(layout_keys)
     for key in queue:
         for parent in ancestry.get(key, ()):
@@ -279,7 +296,10 @@ def filter_projection(snapshot, filters: TopologyFilter):
                 queue.append(parent)
     layout_context = {
         "nodes": [
-            {key: node[key] for key in ("key", "kind", "title", "category")}
+            {
+                key: node[key]
+                for key in ("key", "kind", "title", "category", "arena_key") if key in node
+            }
             for node in all_nodes
             if node["key"] in layout_keys
         ],
@@ -304,7 +324,7 @@ def filter_projection(snapshot, filters: TopologyFilter):
         "schema": "devgraph.topology.v1",
         "revision": revision,
         "consistency": "materialized_projection",
-        "applied_filters": asdict(filters),
+        "applied_filters": {k: v for k, v in asdict(filters).items() if k != "if_revision"},
         "graph_nodes": shown,
         "graph_edges": shown_edges,
         "layout_context": layout_context,
@@ -329,5 +349,25 @@ def build_topology(storage, filters: TopologyFilter):
     if len(nodes) > SOURCE_NODE_LIMIT or len(edges) > SOURCE_EDGE_LIMIT:
         raise StorageUnavailable("topology source capacity exceeded")
     captured = _CapturedStorage(nodes, edges, storage.health())
+    captured.arena_membership = getattr(storage, "arena_membership", None)
     snapshot = build_monitor_snapshot(captured)
     return filter_projection(snapshot, filters)
+
+
+def revalidate_topology(result, known_revision):
+    """Private per-session revalidation AFTER authorization and fresh capture.
+
+    The representation includes filters and access disclosure, not just source
+    data. No shared cache, grant lookup shortcut or extension of authority.
+    """
+    representation = hashlib.sha256(json.dumps(
+        {k: result[k] for k in ("revision", "applied_filters", "access_scope")},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode()).hexdigest()
+    if known_revision == representation:
+        return dict(
+            schema="devgraph.topology-not-modified.v1", representation_revision=representation,
+            revision=result["revision"], generated_at=result["generated_at"],
+            storage=result["storage"],
+        )
+    return {**result, "representation_revision": representation}

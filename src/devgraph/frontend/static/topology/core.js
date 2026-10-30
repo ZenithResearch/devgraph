@@ -122,6 +122,7 @@
     }
     const layoutKeys=new Set(visible),queue=[...visible];
     for(const key of queue)for(const parent of ancestors.get(key)||[])if(!layoutKeys.has(parent)){layoutKeys.add(parent);queue.push(parent);}
+    for(const node of context.nodes)if(layoutKeys.has(node.key)&&node.arena_key)layoutKeys.add(node.arena_key);
     return {nodes:nodes.filter(n=>visible.has(n.key)),edges:edges.filter(e=>visible.has(e.source)&&visible.has(e.target)),
       context:{nodes:context.nodes.filter(n=>layoutKeys.has(n.key)),edges:context.edges.filter(e=>layoutKeys.has(e.source)&&layoutKeys.has(e.target))},
       byKey,parents,children,base,families};
@@ -187,7 +188,11 @@
       trees.set(key,{key,width:Math.max(gap,childKeys.length?packed.width:gap),height:childKeys.length?level+packed.height:64,children:childKeys.length?packed.items:[]});
     }
     const arenaOf=new Map();
-    for(const node of work){let key=node.key;const trail=[];while(!arenaOf.has(key)&&byKey.get(key)?.kind!=='Arena'&&parents.has(key)){trail.push(key);key=parents.get(key);}
+    for(const node of work){
+      if(Object.hasOwn(node,'arena_key')&&(node.arena_key===null||byKey.get(node.arena_key)?.kind==='Arena')){
+        arenaOf.set(node.key,node.arena_key??'unassigned');continue;
+      }
+      let key=node.key;const trail=[];while(!arenaOf.has(key)&&byKey.get(key)?.kind!=='Arena'&&parents.has(key)){trail.push(key);key=parents.get(key);}
       const arena=arenaOf.get(key) || (byKey.get(key)?.kind==='Arena'?key:'unassigned');arenaOf.set(node.key,arena);for(const k of trail)arenaOf.set(k,arena);}
     const arenas=ordered.filter(n=>n.kind==='Arena').map(n=>({key:n.key,title:n.title||n.key}));
     if(work.some(n=>arenaOf.get(n.key)==='unassigned'))arenas.push({key:'unassigned',title:options.arenaMembershipComplete === false ? 'Arena not shared or unassigned' : 'Outside an Arena'});

@@ -15,6 +15,7 @@ from devgraph.auth.native_read import RESOURCE
 from devgraph.auth.resource_membership import ResourceMembershipAdmission
 from devgraph.frontend.app import FRONTEND_HTML
 from devgraph.frontend.wallet import WALLET_CONNECTION_HTML
+from devgraph.frontend.wallet_login import secure_shell, session_shell
 from devgraph.kanban import BoardChanged, InvalidBoardFilter
 from devgraph.storage.base import StorageUnavailable
 from devgraph.topology import InvalidTopologyFilter
@@ -71,28 +72,28 @@ def wallet_monitor_read(storage, enrollment, audit_log, body):
 def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web_wallet_url=None):
     register_topology_assets(app)
 
+    @app.get("/login", response_class=HTMLResponse, include_in_schema=False)
+    def login_shell():
+        raw = files("devgraph.frontend").joinpath("static/credential-v2/login.html").read_text()
+        body, headers = secure_shell(raw)
+        return HTMLResponse(body, headers=headers)
+
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     @app.get("/monitor", response_class=HTMLResponse, include_in_schema=False)
     def shell():
-        return HTMLResponse(
-            FRONTEND_HTML.replace(
-                '<a href="/monitor/selection">', '<a hidden href="/monitor/selection">'
-            ).replace(
-                "</nav>",
-                '<a href="/monitor/access/">Access requests</a></nav>'
-                if getattr(app.state, "access_operator_enabled", False)
-                else "</nav>",
-            ),
-            headers={
-                "Cache-Control": "no-store",
-                "Referrer-Policy": "no-referrer",
-                "X-Frame-Options": "DENY",
-                "Content-Security-Policy": (
-                    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
-                ),
-                "X-Content-Type-Options": "nosniff",
-            },
+        body, headers = secure_shell(
+            session_shell(
+                FRONTEND_HTML.replace(
+                    '<a href="/monitor/selection">', '<a hidden href="/monitor/selection">'
+                ).replace(
+                    "</nav>",
+                    '<a href="/monitor/access/">Access requests</a></nav>'
+                    if getattr(app.state, "access_operator_enabled", False)
+                    else "</nav>",
+                )
+            )
         )
+        return HTMLResponse(body, headers=headers)
 
     @app.get("/monitor/kanban", include_in_schema=False)
     @app.get("/monitor/kanban/", include_in_schema=False)
@@ -113,18 +114,8 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             '<link rel="stylesheet" href="/monitor/topology-assets/wallet-access.css">'
             '<script src="/monitor/topology-assets/wallet-access.js"></script></head>',
         )
-        return HTMLResponse(
-            raw,
-            headers={
-                "Cache-Control": "no-store",
-                "Referrer-Policy": "no-referrer",
-                "X-Frame-Options": "DENY",
-                "Content-Security-Policy": (
-                    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
-                ),
-                "X-Content-Type-Options": "nosniff",
-            },
-        )
+        body, headers = secure_shell(session_shell(raw))
+        return HTMLResponse(body, headers=headers)
 
     @app.get("/assets/kanban/{name}", include_in_schema=False)
     @app.get("/monitor/kanban-assets/{name}", include_in_schema=False)
@@ -147,6 +138,10 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             "wallet-errors.mjs",
             "read-access.mjs",
             "holder-session.mjs",
+            "session-store.mjs",
+            "session-login.mjs",
+            "login.mjs",
+            "login.css",
             "access-request.mjs",
             "scope-picker.mjs",
             "web-wallet.mjs",
@@ -154,7 +149,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             return Response(status_code=404)
         return Response(
             files("devgraph.frontend").joinpath("static/credential-v2", name).read_bytes(),
-            media_type="text/javascript",
+            media_type="text/css" if name.endswith(".css") else "text/javascript",
             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
         )
 
@@ -168,6 +163,8 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return {
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
+            "topology_revalidation": True,
+            "monitor_required_operations": ["devgraph.work.list", "devgraph.arena.list"],
             **(
                 {"service_access_point_endpoint": "/.well-known/devgraph-service.json"}
                 if getattr(app.state, "canonical_service_app", None) is not None
@@ -251,7 +248,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
 
             with request_origin(enrollment, request.headers.get("origin")):
                 return await run_in_threadpool(read, body)
-        except (UnauthenticatedError, ForbiddenError):
+        except (UnauthenticatedError, ForbiddenError) as error:
             audit_log.record(
                 actor_id="unverified",
                 session_id="none",
@@ -260,6 +257,8 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
                 operation="wallet_monitor_read_denied",
                 safe_summary={},
             )
+            if isinstance(error, ForbiddenError) and str(error) == "monitor_arena_context_required":
+                return JSONResponse({"error": "monitor_arena_context_required"}, status_code=403)
             raise
         except StorageUnavailable:
             return JSONResponse({"error": "scoped_read_unavailable"}, status_code=503)

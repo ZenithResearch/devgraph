@@ -36,6 +36,8 @@ _ASSETS = {
     "chooser.css": "text/css",
     "wallet-access.js": "text/javascript",
     "wallet-access.css": "text/css",
+    "session-access.js": "text/javascript",
+    "session-access.css": "text/css",
 }
 
 
@@ -86,6 +88,10 @@ def register_topology(app: FastAPI, services) -> None:
             ),
             ("arena", "Arena:<id> for directed reachability; * for any Arena.", {"type": "string"}),
             ("anchor", "Stable node key for its one-hop connected view.", {"type": "string"}),
+            (
+                "if_revision", "Optional scoped Wallet topology representation to revalidate.",
+                {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+            ),
             (
                 "q",
                 "Literal case-insensitive title or ID filter.",

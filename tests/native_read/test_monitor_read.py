@@ -6,6 +6,7 @@ import pytest
 from tests.auth.test_access_policy import draft
 from tests.native_read.test_signed_authority import setup
 
+from devgraph.auth.arena_access import CollectionArenaReadGrant, VerifiedArenaReadGrant
 from devgraph.auth.monitor_read import (
     AccessDraftV2,
     EnrollmentPolicyV2,
@@ -14,8 +15,10 @@ from devgraph.auth.monitor_read import (
     project_monitor_read,
 )
 from devgraph.model.repository import WorkObjectRepository
-from devgraph.model.work import Task
+from devgraph.model.work import Initiative, Task
 from devgraph.storage.memory import MemoryGraphStorage
+
+ARENAS = CollectionArenaReadGrant(scope="devgraph.arena.read", all_arenas=True)
 
 
 def test_new_read_contract_explicitly_admits_all_todo_types_without_widening_v1():
@@ -68,7 +71,7 @@ def test_monitor_projection_filters_items_and_edges_before_counts_or_pagination(
     )
     assert result["total"] == 1
     assert [i["id"] for i in result["items"]] == ["b-visible"]
-    snapshot = project_monitor_read(storage, [grant], "/monitor/topology/v1")
+    snapshot = project_monitor_read(storage, [grant, ARENAS], "/monitor/topology/v1")
     assert {n["id"] for n in snapshot["graph_nodes"]} == {"b-visible", "c-visible"}
     with pytest.raises((KeyError, ValueError)):
         project_monitor_read(storage, [grant], "/todos/v2/Task/a-private")
@@ -81,8 +84,12 @@ def test_relationship_authority_does_not_cross_product_with_unrelated_visible_it
     storage = MemoryGraphStorage()
     repo = WorkObjectRepository(storage)
     for identifier in ("root", "second", "third"):
-        repo.create(Task(id=identifier, title=identifier, workflow_json=None))
-    storage.create_edge("Task", "second", "HAS_CHILD", "Task", "third")
+        repo.create(
+            (Initiative if identifier in ("root", "second") else Task)(
+                id=identifier, title=identifier
+            )
+        )
+    storage.create_edge("Initiative", "second", "HAS_CHILD", "Task", "third")
 
     def grant(ids, operations):
         return MonitorWorkGrant.model_validate(
@@ -90,21 +97,153 @@ def test_relationship_authority_does_not_cross_product_with_unrelated_visible_it
                 "scope": "devgraph.work.read",
                 "operations": operations,
                 "relationship_types": ["children"],
-                "work_kinds": ["Task"],
+                "work_kinds": ["Initiative", "Task"],
                 "work_ids": ids,
                 "include_archived": False,
             }
         )
 
     grants = [
-        grant(["Task/root"], ["list", "relationships"]),
-        grant(["Task/second", "Task/third"], ["list"]),
+        grant(["Initiative/root"], ["list", "relationships"]),
+        grant(["Initiative/second", "Task/third"], ["list"]),
     ]
-    assert project_monitor_read(storage, grants, "/monitor/topology/v1")["graph_edges"] == []
+    assert (
+        project_monitor_read(storage, [*grants, ARENAS], "/monitor/topology/v1")["graph_edges"]
+        == []
+    )
     from devgraph.auth.errors import ForbiddenError
 
     with pytest.raises((ForbiddenError, KeyError)):
         project_monitor_read(storage, grants, "/work/Task/second/relationships/children")
+
+
+def test_split_relationship_permissions_intersect_visible_nodes_and_reuse_selector_pages():
+    from unittest.mock import patch
+
+    from devgraph.auth.arena_activation import ArenaMonitorReadEnrollment
+    from devgraph.auth.native_read import RESOURCE
+
+    storage = MemoryGraphStorage()
+    repo = WorkObjectRepository(storage)
+    for identifier in ("root", "child", "hidden"):
+        repo.create(
+            (Initiative if identifier in ("root", "second") else Task)(
+                id=identifier, title=identifier
+            )
+        )
+    storage.create_edge("Initiative", "root", "HAS_CHILD", "Task", "child")
+    storage.create_edge("Initiative", "root", "HAS_CHILD", "Task", "hidden")
+    c = dict(
+        scope="devgraph.work.read",
+        operations=["list", "get", "relationships"],
+        relationship_types=["children"],
+        work_kinds=["Initiative", "Task"],
+        work_ids=["Task/child", "Initiative/root"],
+        include_archived=False,
+    )
+    decoder = object.__new__(ArenaMonitorReadEnrollment)
+    grants = decoder._decode_grants(
+        [
+            dict(operation="devgraph.work." + op, resource=RESOURCE, constraints=c)
+            for op in c["operations"]
+        ]
+    )
+    with patch.object(storage, "delegated_work_page", wraps=storage.delegated_work_page) as page:
+        result = project_monitor_read(storage, [*grants, ARENAS], "/monitor/topology/v1")
+        assert page.call_count == 2, "identical list/relationship selectors share one capture"
+    assert result["graph_edges"] == [
+        dict(source="Initiative:root", target="Task:child", relationship="HAS_CHILD")
+    ]
+    assert {n["id"] for n in result["graph_nodes"]} == {"root", "child"}
+    # Relationship authority on another selector cannot attach visible nodes.
+    restricted = grants[2].model_copy(update={"work_ids": ("Task/hidden",)})
+    assert (
+        project_monitor_read(storage, [grants[0], restricted, ARENAS], "/monitor/topology/v1")[
+            "graph_edges"
+        ]
+        == []
+    )
+    assert (
+        project_monitor_read(storage, [grants[0], ARENAS], "/monitor/topology/v1")["graph_edges"]
+        == []
+    )
+
+
+def test_conditional_topology_includes_filters_and_access_disclosure():
+
+    storage = MemoryGraphStorage()
+    WorkObjectRepository(storage).create(Task(id="one", title="One", workflow_json=None))
+    grant = MonitorWorkGrant(
+        scope="devgraph.work.read",
+        operations=["list"],
+        relationship_types=["parent"],
+        work_kinds=["Task"],
+        include_archived=False,
+    )
+    target = "/monitor/topology/v1"
+    full = project_monitor_read(storage, [grant, ARENAS], target)
+    conditional = target + "?if_revision=" + full["representation_revision"]
+    small = project_monitor_read(storage, [grant, ARENAS], conditional)
+    assert small["schema"] == "devgraph.topology-not-modified.v1"
+    assert "graph_nodes" not in small and len(json.dumps(small)) < len(json.dumps(full))
+    assert "if_revision" not in full["applied_filters"]
+    changed_filter = project_monitor_read(storage, [grant, ARENAS], conditional + "&q=missing")
+    assert changed_filter["schema"] == "devgraph.topology.v1"
+    assert changed_filter["graph_nodes"] == []
+    changed_scope = project_monitor_read(
+        storage,
+        [
+            grant,
+            VerifiedArenaReadGrant(
+                scope="devgraph.arena.read", arena_ids=["not-present"], operations=["list"]
+            ),
+        ],
+        conditional,
+    )
+    assert changed_scope["schema"] == "devgraph.topology-not-modified.v1"
+    # Even a valid cached revision never admits a caller without list authority.
+    from devgraph.auth.errors import ForbiddenError
+
+    with pytest.raises(ForbiddenError):
+        project_monitor_read(storage, [], conditional)
+    with pytest.raises(ValueError):
+        project_monitor_read(storage, [grant, ARENAS], target + "?if_revision=invalid")
+
+
+def test_arena_placement_resolves_hidden_work_ancestry_without_disclosing_it():
+    from tests.model.test_arena_runtime import add_arena
+
+    from devgraph.arenas import ArenaMutations
+    from devgraph.auth.arena_access import CollectionArenaReadGrant
+    from devgraph.model.work import Initiative, Project
+
+    storage = MemoryGraphStorage()
+    add_arena(ArenaMutations(storage), "shared")
+    repo = WorkObjectRepository(storage)
+    repo.create(Initiative(id="hidden-parent", title="Hidden parent"))
+    repo.create(Project(id="visible-child", title="Visible child"))
+    storage.create_edge("Arena", "shared", "CONTAINS_WORK", "Initiative", "hidden-parent")
+    storage.create_edge("Initiative", "hidden-parent", "HAS_CHILD", "Project", "visible-child")
+    grant = MonitorWorkGrant(
+        scope="devgraph.work.read",
+        operations=["list", "relationships"],
+        relationship_types=["parent"],
+        work_kinds=["Project"],
+        work_ids=["Project/visible-child"],
+        include_archived=False,
+    )
+    result = project_monitor_read(
+        storage,
+        [grant, CollectionArenaReadGrant(scope="devgraph.arena.read", all_arenas=True)],
+        "/monitor/topology/v1",
+    )
+    assert {n["id"] for n in result["graph_nodes"]} == {"shared", "visible-child"}
+    assert result["graph_edges"] == []
+    assert result["access_scope"]["arena_metadata"] is True
+    assert result["access_scope"]["arena_membership_complete"] is True
+    child = next(n for n in result["graph_nodes"] if n["id"] == "visible-child")
+    assert child["arena_key"] == "Arena:shared"
+    assert "hidden-parent" not in json.dumps(result)
 
 
 @pytest.mark.parametrize("renewals", [0, 2])
@@ -284,9 +423,9 @@ def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(
     assert page.json()["items"][0]["id"] == "root"
     assert read("/todos/v2/Todo/a-private", "devgraph.work.get").status_code == 404
     assert read("/work-operations/v1", "devgraph.work.create.v2").status_code == 401
-    topology = read("/monitor/topology/v1").json()
-    assert {n["id"] for n in topology["graph_nodes"]} == {"root", "b-visible", "c-child"}
-    assert topology["access_scope"]["observations"] is False
+    # Legacy Work-only credentials remain valid for ordinary reads; the
+    # monitor explicitly requires independently granted Arena listing now.
+    assert read("/monitor/topology/v1").status_code == 403
     # An operator may select a wider assignment under the root policy, but
     # renewal must still respect this installation's persisted enrollment ceiling.
     broader = AccessDraftV2.model_validate({**selection, "read_grants": [raw]})
@@ -301,10 +440,13 @@ def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(
     enlarged = http.post(
         base + "/challenges", json={"subject_public_key": public, "installation_id": "a" * 32}
     ).json()
-    assert http.post(
-        base + "/enrollments",
-        json={"challenge": enlarged, "proof": membership, "signature": sign(owner, enlarged)},
-    ).status_code == 401
+    assert (
+        http.post(
+            base + "/enrollments",
+            json={"challenge": enlarged, "proof": membership, "signature": sign(owner, enlarged)},
+        ).status_code
+        == 401
+    )
     registry[0] = MemberAccessPolicyV2.model_validate(
         {
             "schema": "devgraph.member-access-policy.v2",
@@ -439,6 +581,12 @@ def test_blocker_permission_on_an_anchor_does_not_reveal_its_outgoing_blocked_it
         grant(["Task/other"], ["list"], ["parent"]),
     ]
     storage.create_edge("Task", "anchor", "BLOCKS", "Task", "other")
-    assert project_monitor_read(storage, grants, "/monitor/topology/v1")["graph_edges"] == []
+    assert (
+        project_monitor_read(storage, [*grants, ARENAS], "/monitor/topology/v1")["graph_edges"]
+        == []
+    )
     storage.create_edge("Task", "other", "BLOCKS", "Task", "anchor")
-    assert len(project_monitor_read(storage, grants, "/monitor/topology/v1")["graph_edges"]) == 1
+    assert (
+        len(project_monitor_read(storage, [*grants, ARENAS], "/monitor/topology/v1")["graph_edges"])
+        == 1
+    )

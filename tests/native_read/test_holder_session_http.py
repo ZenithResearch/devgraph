@@ -1,13 +1,16 @@
 """Actual session exchange and scoped read through the bounded HTTPS surface."""
 
 from functools import partial
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from tests.auth.test_write_scope import create
+from tests.native_read.test_holder_grants import host
 from tests.native_read.test_holder_session_exchange import read_request, setup
+from tests.native_read.test_http import sign
 from tests.native_read.test_signed_authority import NOW
 
 from devgraph.api.holder_sessions import register_holder_sessions
@@ -16,6 +19,54 @@ from devgraph.auth.enforcement import AuditLog
 from devgraph.auth.errors import UnauthenticatedError
 from devgraph.endpoint_read_runtime import EndpointReadBoundary
 from devgraph.storage.memory import MemoryGraphStorage
+
+
+def test_popup_preflight_and_invalid_holder_signature_do_not_issue_grants(tmp_path, monkeypatch):
+    holder, provider, owner, args, _, _, _ = host(tmp_path)
+    retained = holder.issue(**args)
+    s = SimpleNamespace(host=holder)
+    calls = []
+    original = provider.holder_grants.issue_v2
+
+    def issue(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs, now=NOW)
+
+    monkeypatch.setattr(provider.holder_grants, "issue_v2", issue)
+    target = EndpointReadBoundary(app(s, provider), origin="https://graph.example")
+    origin = "chrome-extension://" + "a" * 32
+    with TestClient(target, base_url="https://graph.example") as client:
+        for path in ("/monitor/wallet-access/v1/challenges", "/monitor/wallet-access/v1/grants/v2"):
+            preflight = client.options(
+                path,
+                headers={
+                    "Origin": origin,
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "content-type",
+                },
+            )
+            assert preflight.status_code == 204
+        assert not calls
+        response = client.post(
+            "/monitor/wallet-access/v1/grants/v2", json={}, headers={"Origin": origin}
+        )
+        assert response.status_code == 401
+        assert response.headers["access-control-allow-origin"] == origin
+        assert not calls
+        fresh = provider.challenge(owner.public_key().public_bytes_raw().hex(), "a" * 32, now=NOW)
+        signature = sign(owner, fresh)
+        bad_signature = ("B" if signature[0] == "A" else "A") + signature[1:]
+        denied = client.post(
+            "/monitor/wallet-access/v1/grants/v2",
+            json={"challenge": fresh, "proof": args["proof"], "signature": bad_signature},
+            headers={"Origin": origin},
+        )
+        assert denied.status_code == 401
+        assert denied.headers["access-control-allow-origin"] == origin
+        assert len(calls) == 1  # Valid shape reached actual native admission.
+        with provider._database() as db:
+            assert db.execute("SELECT COUNT(*) FROM holder_roots").fetchone()[0] == 1
+        assert holder.issue(**args) == retained
 
 
 def app(s, provider):

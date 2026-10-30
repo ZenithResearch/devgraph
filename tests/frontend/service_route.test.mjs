@@ -16,7 +16,8 @@ test('browser keeps site consent but uses the canonical read/request route',asyn
  const {WalletReadClient}=await import('../../src/devgraph/frontend/static/credential-v2/read-access.mjs');
  const origin=binding.claims.origin, calls=[];
  const config={schema:'devgraph.wallet-read-configuration.v1',endpoint:'/monitor/wallet-access/v1',holder_grants:{schema:'secs.holder-grant.v1',service:pin.service,endpoint:'/monitor/wallet-access/v1/grants'},provider_profile:{schema:'castalia.provider-profile.v1',display_name:'Fixture',origins:[origin],membership:null,presentations:options.profile.presentations},service_access_point_endpoint:'/.well-known/devgraph-service.json'};
- const client=new WalletReadClient({origin,now:()=>102,fetchImpl:async(path,request)=>{
+ const client=new WalletReadClient({origin,now:()=>102,fetchImpl:async function(path,request){
+  assert.equal(this,undefined,'browser fetch must not receive the WalletReadClient as its receiver');
   calls.push(path);
   if(path==='/monitor/wallet-access/v1')return Response.json(config);
   if(path==='/.well-known/devgraph-service.json')return Response.json({schema:'devgraph.service-access-point.v1',binding});

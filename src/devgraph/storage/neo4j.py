@@ -34,7 +34,11 @@ from devgraph.storage.base import (
     StorageUnavailable,
     WorkContainment,
 )
-from devgraph.storage.containment import validate_arena_page, validate_containment_subject
+from devgraph.storage.containment import (
+    validate_arena_page,
+    validate_containment_keys,
+    validate_containment_subject,
+)
 from devgraph.storage.delegated import DelegatedWorkSelector
 from devgraph.storage.receipt_lookup import validate_receipt_lookup
 from devgraph.storage.supporting_material import (
@@ -889,6 +893,25 @@ class Neo4jGraphStorage:
             raise StorageUnavailable("mismatched containment target")
         return result
 
+    def work_containment_batch(self, keys):
+        validate_containment_keys(keys)
+        # Closed labels preserve the canonical per-kind ID indexes. A generic
+        # labels(n)[0] predicate would scan the graph for every batch.
+        branches = " UNION ALL ".join(
+            f"WITH key MATCH (n:`{kind}` {{id: key.id}}) WHERE key.kind = '{kind}' RETURN n"
+            for kind in sorted({kind for kind, _ in keys})
+        )
+        rows = self._run_graph(
+            "UNWIND $keys AS key CALL { " + branches + " } "
+            "WITH n LIMIT $limit " + _containment_projection(),
+            keys=[dict(kind=kind, id=node_id) for kind, node_id in keys],
+            limit=len(keys) + 1,
+        )
+        result = [self._containment_from_row(row) for row in rows]
+        if [(item.node.label, item.node.id) for item in result] != sorted(keys):
+            raise StorageUnavailable("invalid containment batch")
+        return result
+
     def arena_member_page(
         self, arena_id: str, *, after_resource: str | None = None, limit: int = 50
     ) -> list[WorkContainment]:
@@ -920,12 +943,14 @@ class Neo4jGraphStorage:
         arena_ids: tuple[str, ...],
         *,
         all_resources: bool = False,
+        include_archived: bool = False,
         after_id: str | None = None,
         limit: int = 50,
     ) -> list[NodeRecord]:
         validate_page_limit(limit)
         if (
             type(all_resources) is not bool
+            or type(include_archived) is not bool
             or (all_resources and arena_ids)
             or (not all_resources and not arena_ids)
             or len(set(arena_ids)) != len(arena_ids)
@@ -936,12 +961,14 @@ class Neo4jGraphStorage:
         if after_id is not None:
             validate_work_object_id(after_id)
         rows = self._run_graph(
-            "MATCH (n:Arena) WHERE ($all_resources OR n.id IN $arena_ids) AND n.archived = false "
+            "MATCH (n:Arena) WHERE ($all_resources OR n.id IN $arena_ids) "
+            "AND ($include_archived OR n.archived = false) "
             "AND ($after_id IS NULL OR n.id > $after_id) "
             "RETURN labels(n) AS labels, n.id AS id, n.archived AS archived, "
             "properties(n) AS properties ORDER BY n.id LIMIT $limit",
             arena_ids=list(arena_ids),
             all_resources=all_resources,
+            include_archived=include_archived,
             after_id=after_id,
             limit=limit,
         )

@@ -478,9 +478,44 @@ class HolderGrantHost:
             proof=proof,
             now=current,
         )
-        return self._verified_context(verified, credential, proof, current, v2=v2)
+        return self._verified_context(verified, credential, proof, current, v2=v2, call=call)
 
-    def _verified_context(self, verified, credential, proof, current, *, v2, unbound_parent=False):
+    @staticmethod
+    def _projection_permissions(verified, credential, call):
+        """Compose only authenticated read inventory for aggregate monitor routes.
+
+        Called AFTER native verification of the full signed credential, parent
+        subset and the exact call proof. Native's matching-operation result stays
+        mandatory; this does not authorize another call or consult a ceiling.
+        The aggregate projector separately intersects every signed selector.
+        """
+        from devgraph.auth.monitor_read import monitor_target
+
+        matching = verified["permissions"]
+        if (
+            call is None or call.get("operation") != "devgraph.work.list"
+            or call.get("resource") != RESOURCE
+            or set(call.get("parameters", {})) != {"path"}
+        ):
+            return matching
+        _, path, _ = monitor_target(call["parameters"]["path"])
+        if path not in {"/monitor/topology/v1", "/monitor/snapshot", "/monitor/kanban/v2"}:
+            return matching
+        claims = credential["claims"]
+        if claims["schema"] == "secs.holder-session-credential.v1":
+            claims = claims["challenge"]
+        inventory = claims["permissions"]
+        expected = [p for p in inventory
+                    if p["operation"] == call["operation"] and p["resource"] == RESOURCE]
+        if not expected or canonical_json(expected) != canonical_json(matching):
+            raise UnauthenticatedError("holder_projection_permission_mismatch")
+        return [p for p in inventory if p["resource"] == RESOURCE and p["operation"] in {
+            "devgraph.work.list", "devgraph.work.relationships", "devgraph.arena.list",
+        }]
+
+    def _verified_context(
+        self, verified, credential, proof, current, *, v2, unbound_parent=False, call=None
+    ):
         """Normalize only native-verified authority against the current canonical root."""
         e = self.provider
         owner, device = verified["holder_public_key"], verified["installation_id"]
@@ -506,7 +541,7 @@ class HolderGrantHost:
                     raise UnauthenticatedError("holder_binding_changed")
                 self._current(row, current)
                 permissions = (
-                    verified["permissions"]
+                    self._projection_permissions(verified, credential, call)
                     if v2
                     else [constraint(p) for p in credential["claims"]["permissions"]]
                 )

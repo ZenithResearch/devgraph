@@ -177,7 +177,13 @@ def test_filtering_precedes_count_cursor_and_hidden_relationships():
     selected = read("Project/project-a", work_ids=["Task/z-visible"])
     result = project_monitor_read(storage, [selected], "/todos/v2?limit=1&archived=exclude")
     assert result["total"] == 1 and result["items"][0]["id"] == "z-visible"
-    graph = project_monitor_read(storage, [read("Project/project-a")], "/monitor/topology/v1")
+    from devgraph.auth.delegated_contract import ArenaReadGrant
+
+    graph = project_monitor_read(
+        storage,
+        [read("Project/project-a"), ArenaReadGrant(scope="devgraph.arena.read", arena_ids=["a"])],
+        "/monitor/topology/v1",
+    )
     assert "a-hidden" not in {n["id"] for n in graph["graph_nodes"]}
     assert not any(e.get("type") == "DEPENDS_ON" for e in graph["graph_edges"])
 

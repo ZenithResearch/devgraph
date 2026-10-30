@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in · DevGraph</title>
+<script src="/monitor/topology-assets/theme.js"></script>
+<link rel="stylesheet" href="/monitor/topology-assets/zenith-tokens.css">
+<link rel="stylesheet" href="/assets/credential-v2/login.css">
+<script type="module" src="/assets/credential-v2/login.mjs"></script>
+</head><body>
+<main class="login-card" aria-labelledby="login-title">
+<a class="brand" href="/login" aria-label="DevGraph sign in"><span aria-hidden="true">DG</span> DevGraph</a>
+<p class="eyebrow">YOUR WORK, YOUR PERMISSIONS</p>
+<h1 id="login-title">Sign in with Wallet</h1>
+<p>Sign in to use your approved access. Your browser keeps the session across reloads.</p>
+<p id="login-server" class="server" aria-label="This server"></p>
+<button type="button" id="wallet-login" disabled>Preparing sign in…</button>
+<p id="login-status" role="status" aria-live="polite">Checking for an existing session…</p>
+<p id="login-error" role="alert" hidden></p>
+<details><summary>How sign in works</summary>
+<p>Your Wallet opens in its own window. Unlock it there and review the permissions and expiry. DevGraph Monitor needs Work listing and Arena listing to place your work in its Arenas. If you need access, Send access request sends a general request for this resource; the service owner chooses the permissions.</p>
+<p>Once approved, this browser can use the temporary credential until it expires, even after a reload or while Wallet is locked. Signing in does not change your grant.</p>
+<p>Your recovery keys stay in Wallet. Sign out on shared devices.</p>
+</details>
+<noscript>Enable JavaScript to sign in with your Wallet.</noscript>
+</main></body></html>

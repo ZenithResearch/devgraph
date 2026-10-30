@@ -1,0 +1,4 @@
+.browser-session{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.75rem 1rem;border:1px solid var(--line-soft,#dce6df);border-radius:.65rem;font-size:.82rem;background:var(--surface,#fff);margin-bottom:1rem}
+.browser-session [data-session-expiry]{color:var(--muted,#547366);font-size:.78rem}
+.browser-session button{margin-left:auto;font:inherit;cursor:pointer;padding:.45rem .8rem;background:transparent;border:1px solid var(--line-soft,#dce6df);border-radius:.4rem;color:inherit}
+.browser-session :focus-visible{outline:2px solid var(--aqua,#13745b);outline-offset:3px}
