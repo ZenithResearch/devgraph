@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {compileNetwork, describeNetwork, initializeDecision, runSelection, evaluateDecision} from '../../src/devgraph/frontend/static/selection/core/index.mjs';
+import {compileNetwork, describeNetwork, initializeDecision, uniformProfile, runSelection, evaluateDecision} from '../../src/devgraph/frontend/static/selection/core/index.mjs';
 import {exampleDecision} from '../../src/devgraph/frontend/static/selection/page/example.mjs';
 import {layoutFlow, edgeGeometry} from '../../src/devgraph/frontend/static/selection/page/flow-layout.mjs';
 
@@ -69,4 +69,30 @@ test('new goal predictors and confidence policy initialize all required slots', 
     assert.equal(n.variables[1].observed_unit, 'users'); assert.equal(n.observation_work_version, n.work.version);
     assert.equal(n.observation_context.horizon, p.horizon);
   }
+});
+
+test('equal-weight preset makes a new profile revision and preserves the supplied profile', async () => {
+  const decision = exampleDecision(), profile = decision.profile;
+  profile.version = '7';
+  profile.goals[0].weight = .8;
+  profile.goals.push({id: 'retention', label: 'Retention', weight: .2, scale: 50, predictors: [
+    {id: 'renewal', unit: 'ratio', weight: .8, reference: 1, direction: 1},
+    {id: 'expansion', unit: 'ratio', weight: .2, reference: 1, direction: 1},
+  ]});
+  profile.resources[0].predictors.push({id: 'review', unit: 'points', weight: .25, reference: 1});
+  profile.resources[0].predictors[0].weight = .75;
+
+  const uniform = uniformProfile(profile, 123456789);
+
+  assert.equal(uniform.version, '8');
+  assert.deepEqual(uniform.goals.map(goal => goal.weight), [.5, .5]);
+  assert.deepEqual(uniform.goals.map(goal => goal.predictors.map(predictor => predictor.weight)), [[1], [.5, .5]]);
+  assert.deepEqual(uniform.resources[0].predictors.map(predictor => predictor.weight), [.5, .5]);
+  assert.equal(profile.version, '7');
+  assert.deepEqual(profile.goals.map(goal => goal.weight), [.8, .2]);
+  assert.deepEqual(profile.resources[0].predictors.map(predictor => predictor.weight), [.75, .25]);
+
+  const simple = exampleDecision(); simple.profile.version = '7';
+  const run = await runSelection({...simple, profile: uniformProfile(simple.profile, 123456789)});
+  assert.equal(run.profile_version, '8', 'the exported solver certificate identifies the equal-weight revision');
 });

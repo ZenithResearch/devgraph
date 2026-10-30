@@ -49,6 +49,20 @@ def register_kanban(app: FastAPI, services):
     def static(name: str):
         return asset(name)
 
+    # Relative imports from either board asset prefix resolve here. Keep the
+    # read/setup dependency closure explicit; this does not expose write RPCs.
+    shared = {"provider-setup.mjs", "subject.mjs", "result.mjs", "wallet-errors.mjs"}
+
+    @app.get("/monitor/credential-v2/{name}", include_in_schema=False)
+    def shared_credential_module(name: str):
+        if name not in shared:
+            raise HTTPException(404)
+        return Response(
+            files("devgraph.frontend").joinpath("static/credential-v2", name).read_bytes(),
+            media_type="text/javascript",
+            headers=_HEADERS,
+        )
+
     @app.get("/monitor/kanban/v1")
     def board(
         request: Request, response: Response, authorization: str | None = Header(default=None)

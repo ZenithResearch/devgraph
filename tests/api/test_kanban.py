@@ -110,6 +110,35 @@ def test_page_security_and_asset_allowlist(fixture):
         assert response.status_code == 200
         assert "content-security-policy" in response.headers
     assert api.get("/monitor/kanban-assets/secrets.json").status_code == 404
+    for name in ("transport.d.mts", "coordinator.mjs", "secrets.json"):
+        assert api.get("/monitor/credential-v2/" + name).status_code == 404
+
+
+@pytest.mark.parametrize("prefix", ["/assets/kanban/", "/monitor/kanban-assets/"])
+def test_every_static_board_import_is_served(fixture, prefix):
+    """Load the actual browser import closure, rather than disk-only modules."""
+    import re
+    from urllib.parse import urljoin, urlsplit
+
+    api, _ = fixture
+    pending, seen = [prefix + "app.mjs"], set()
+    while pending:
+        url = pending.pop()
+        if url in seen:
+            continue
+        seen.add(url)
+        response = api.get(url)
+        assert response.status_code == 200, url
+        if not url.startswith("/assets/credential-v2/"):
+            assert "content-security-policy" in response.headers
+            assert response.headers["x-content-type-options"] == "nosniff"
+        for target in re.findall(r"^import\b[^'\"]*['\"]([^'\"]+)['\"]", response.text, re.M):
+            pending.append(urlsplit(urljoin("http://testserver" + url, target)).path)
+    shared_prefix = "/assets/credential-v2/" if prefix == "/assets/kanban/" else (
+        "/monitor/credential-v2/"
+    )
+    for name in ("subject.mjs", "result.mjs", "wallet-errors.mjs"):
+        assert shared_prefix + name in seen
 
 
 def test_scope_picker_is_bounded_and_searchable(fixture):

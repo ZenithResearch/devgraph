@@ -5,4 +5,4 @@ export {fromMonitorSnapshot, validateSnapshot, resolveScope} from './adapter.mjs
 export {solveClosure} from './closure.mjs';
 export {validateDecision, evaluateDecision, runSelection} from './run.mjs';
 export {compileNetwork} from './network.mjs';
-export {initializeDecision, describeNetwork} from './draft.mjs';
+export {initializeDecision, uniformProfile, describeNetwork} from './draft.mjs';
