@@ -18,7 +18,7 @@ const {privateKey:key,publicKey}=generateKeyPairSync('ed25519');
 const pin={issuer:'synthetic',key_id:'key',public_key:publicKey.export({format:'der',type:'spki'}).subarray(-32).toString('hex'),service:'service:fixture'};
 const browser=await chromium.launch({headless:true,executablePath:process.env.DEVGRAPH_CHROMIUM_EXECUTABLE}),results=[];
 try{
- for(const width of [1280,375])for(const tailnet of [false,true])for(const scenario of ['normal','lost-reply','revoked','expired','revoked-manual','expired-manual']){
+ for(const width of [1280,375])for(const tailnet of [false,true])for(const scenario of ['normal','lost-reply','transient-status','revoked','expired','revoked-manual','expired-manual']){
   const terminalState=scenario.startsWith('revoked')?'revoked':scenario.startsWith('expired')?'expired':null,manual=scenario.endsWith('-manual');
   const origin=tailnet?'https://graph-example.tail123abc.ts.net:9443':'https://graph.example';
   const context=await browser.newContext({viewport:{width,height:950}}),page=await context.newPage(),errors=[],calls=[];
@@ -61,7 +61,7 @@ try{
     return send({schema:'castalia.holder-session-opened.v1',credential});
    }
    if(url.pathname==='/holder-sessions/v1/status'){
-    statuses++;const input=request.postDataJSON(),proof={...input};delete proof.signature;assert.ok(verify(null,transcript('secs.holder-session-status.v1/signature',proof),child(),Buffer.from(input.signature,'hex')));
+    statuses++;if(scenario==='transient-status'&&statuses===1)return send({error:'temporarily_unavailable'},'application/json',503);const input=request.postDataJSON(),proof={...input};delete proof.signature;assert.ok(verify(null,transcript('secs.holder-session-status.v1/signature',proof),child(),Buffer.from(input.signature,'hex')));
     const state=terminalState?(manual&&statuses===1?'pending':terminalState):revoked?'revoked':'issued';
     return send({schema:'secs.holder-session-result.v1',request_id:challenge.request_id,challenge_id:challenge.challenge_id,state,credential:state==='issued'?credential:null,expires_at:challenge.expires_at});
    }
@@ -91,7 +91,9 @@ try{
    const saved=await page.evaluate(async()=>{const {BrowserSessionStore}=await import('/assets/credential-v2/session-store.mjs');return new BrowserSessionStore().load('devgraph.session.v1:'+location.origin+':service:fixture');});
    assert.equal(saved,null);results.push({origin,width,scenario,popups,reads,statuses,terminal_message:true,no_automatic_login:true});await context.close();continue;
   }
-  await page.waitForURL(origin+'/monitor#topology');await page.getByText('Signed in with Wallet',{exact:true}).waitFor();
+  await page.waitForURL(origin+'/monitor#topology');
+  if(scenario==='transient-status'){await page.getByText('Connection paused · your existing sign-in is preserved',{exact:true}).waitFor();assert.equal(popups,1);}
+  await page.getByText('Signed in with Wallet',{exact:true}).waitFor();
   // Authentication is rendered before graph loading completes. Wait for a real
   // authenticated read, rather than racing its asynchronous fetch in CI.
   await firstRead;
@@ -119,5 +121,5 @@ try{
   await other.waitForURL('**/login?**');await other.close();
   assert.deepEqual(errors,[]);results.push({origin,width,scenario,popups,reads,statuses,expiry_preserved:true,nonextractable:true});await context.close();
  }
- await writeFile(join(output,'verification.json'),JSON.stringify({qualification:'Real shells and browser custody; synthetic Wallet/issuer, no personal data or approvals',results},null,2));console.log('Popup login browser walkthrough passed (24 desktop/mobile public/Tailnet normal/lost-reply/automatic and manual terminal-recovery scenarios).');
+ await writeFile(join(output,'verification.json'),JSON.stringify({qualification:'Real shells and browser custody; synthetic Wallet/issuer, no personal data or approvals',results},null,2));console.log('Popup login browser walkthrough passed (28 desktop/mobile public/Tailnet normal/lost-reply/transient and terminal-recovery scenarios).');
 }finally{await browser.close();}

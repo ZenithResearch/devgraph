@@ -6,6 +6,7 @@ import secrets
 SESSION_CONNECTION_HTML = """<div class="browser-session" id="wallet-read-connection">
 <strong data-session-status role="status" aria-live="polite">Checking session…</strong>
 <span data-session-expiry></span>
+<button type="button" data-session-retry hidden>Reconnect</button>
 <button type="button" data-session-logout disabled>Sign out</button>
 </div>"""
 

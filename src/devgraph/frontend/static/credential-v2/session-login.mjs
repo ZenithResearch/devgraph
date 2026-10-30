@@ -39,9 +39,8 @@ export class WalletLoginClient extends WalletReadClient {
    !shape(c.issuer_pin,['issuer','key_id','public_key','service'])||c.issuer_pin.service!==service||
    !this.configuration.provider_profile.presentations.some(p=>p.issuer===c.issuer_pin.issuer&&p.key_id===c.issuer_pin.key_id&&p.public_key===c.issuer_pin.public_key&&p.audience===c.audience))throw error('holder_session_setup_invalid');
   this.clientSession?.dispose();
-  // This is the requested upper bound. Wallet offers a default/shorter duration
-  // after checking the signed parent and current service policy, then the human
-  // approves the exact returned challenge expiry in the popup.
+  // Wallet chooses within this bound and the signed parent/service ceilings.
+  // The exact permissions and fixed expiry remain in its final consent review.
   const ttl=c.max_ttl_seconds;
   this.clientSession=await createBrowserLoginSession({origin:this.origin,service,profile:this.configuration.provider_profile,ttlSeconds:ttl,cryptoImpl:this.cryptoImpl,now:this.now});
   this.current(generation);
@@ -50,7 +49,7 @@ export class WalletLoginClient extends WalletReadClient {
    session_installation_id:this.clientSession.installationId,requested_ttl_seconds:ttl,profile:structuredClone(this.configuration.provider_profile),
    ...(this.serviceBinding?{service_access_point:structuredClone(this.serviceBinding)}:{}),
    ...(this.configuration.holder_grants.v2_endpoint?{grant_acquisition:{schema:'castalia.session-login-grant.v1',challenge_path:'/monitor/wallet-access/v1/challenges',grant_path:this.configuration.holder_grants.v2_endpoint,grant_schema:'secs.holder-grant.v2',result_schema:'devgraph.holder-grant-result.v1',membership_requirement:this.configuration.membership_requirement??'required'}}:{}),
-   ...(this.configuration.access_requests_endpoint==='/devgraph/access-requests/v2'?{access_request:{schema:'castalia.session-login-access.v1',challenge_path:'/devgraph/access-requests/v2/challenges',action_path:'/devgraph/access-requests/v2/actions',request_schema:'devgraph.access-request-action.v1',result_schemas:['devgraph.access-request-result.v1','devgraph.access-request-result.v2','devgraph.access-request-result.v3','devgraph.access-request-result.v4'],...(this.configuration.access_catalog_endpoint?{catalog_path:'/devgraph/access-requests/v2/catalog'}:{})}}:{})};
+   ...(this.configuration.access_requests_endpoint==='/devgraph/access-requests/v2'?{access_request:{schema:'castalia.session-login-access.v1',challenge_path:'/devgraph/access-requests/v2/challenges',action_path:'/devgraph/access-requests/v2/actions',request_schema:'devgraph.access-request-action.v1',result_schemas:['devgraph.access-request-result.v1','devgraph.access-request-result.v2','devgraph.access-request-result.v3','devgraph.access-request-result.v4']}}:{})};
   this.stage='login_ready';this.notice='';this.notify();
  }
  async cancelPopup(provider,id){if(id&&provider?.readAccess)try{await provider.readAccess({operation:'cancel_session_login',loginId:id});}catch{}}
