@@ -20,8 +20,10 @@ The initial browser action calls `open_session_login` with the configured
 canonical service, public provider profile/access binding, temporary public key,
 temporary installation ID and a requested lifetime bounded by the selected service
 profile. The current
-read-only profile defaults to 900 seconds in Wallet, with a duration choice
-bounded by the caller, verified service and signed parent. The browser sends the
+read-only profile selects the longest duration already permitted by the caller,
+verified service and signed parent. Wallet prepares that duration directly and
+shows the exact permissions and absolute expiry in its final sign-in review.
+There is no mandatory duration setup screen. The browser sends the
 verified service ceiling (at most 3600 in the current signed contract), not an
 unlimited delegation. The user also requested support for eligible approved write authority and
 human-selected lifetime; the required parent compiler and transactional write
@@ -159,3 +161,23 @@ the exact deployed source/package and the human-approved live result separately.
 Before activation, qualify the real packaged Wallet against the actual consumer
 and drain every old exchange writer. This includes pinned native Transfer helper
 registrations that can launch a provider on demand, not just HTTP listeners.
+
+## General resource request and connection recovery
+
+Send access request in Wallet prepares and submits the existing null-intent
+request in one explicit button action. The verified service binding supplies the
+resource. No requester preset, resource picker, or requested permission inventory
+is required. The owner chooses permissions during review. Legacy signed request
+formats, retained request IDs and unknown-outcome recovery are unchanged; checking
+a retained request uses status, never silently replaces it. The older connection
+UI also prepares general requests instead of presenting a preset/scope form.
+
+A temporary issuer-status failure leaves the monitor in a paused state with the
+original browser key/checkpoint. It tries the original status at most three times
+(2, 5 and 10 seconds), with Reconnect and online recovery available afterward. It
+does not open Wallet, issue another credential, or extend expiry. Expiry and
+authenticated revocation still end access, and Sign out still clears local
+custody. Pagehide fences retries; BFCache restore resumes the original session.
+
+First-use provider trust and receiving/saving an approved reusable grant retain
+Wallet-owned consent. A simple request is not a grant or automatic owner approval.
