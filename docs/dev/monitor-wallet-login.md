@@ -34,7 +34,10 @@ different grant.
 
 Optional `access_request` and `grant_acquisition` descriptors supply closed,
 literal relative routes from the checked public configuration. They confer no
-authority. Request submission, obtaining already-approved access, saving a
+authority. DevGraph supplies its opaque access request schema and bounded exact
+result-schema tags as service data. Wallet owns generic signing/consent and does
+not contain DevGraph adapters or hierarchy rules. Request submission,
+obtaining already-approved access, saving a
 reusable parent and starting a temporary session each retain their explicit
 Wallet review; they occur within the same window. The grant descriptor names
 the exact supported result wrapper and v2 parent schema. The browser never

@@ -13,7 +13,7 @@ async function fixture({lost=false,cancel=false,maximum=900,acquisition=false,me
  const pin={service,issuer:'fixture',key_id:'key',public_key:hex(await webcrypto.subtle.exportKey('raw',issuer.publicKey))};
  const profile={schema:'castalia.provider-profile.v1',display_name:'Fixture',origins:[origin],membership:null,presentations:[{issuer:pin.issuer,key_id:pin.key_id,public_key:pin.public_key,audience:'devgraph',callers:[{kind:'browser',id:origin}]}]};
  const configuration={schema:'devgraph.wallet-read-configuration.v1',endpoint:'/monitor/wallet-access/v1',web_wallet_url:null,provider_profile:profile,holder_grants:{schema:'secs.holder-grant.v2',service,endpoint:'/monitor/wallet-access/v1/grants'}};
- if(acquisition){Object.assign(configuration.holder_grants,{v2_endpoint:'/monitor/wallet-access/v1/grants/v2',supported_schemas:['secs.holder-grant.v1','secs.holder-grant.v2']});if(membership!==undefined)configuration.membership_requirement=membership;}
+ if(acquisition){Object.assign(configuration.holder_grants,{v2_endpoint:'/monitor/wallet-access/v1/grants/v2',supported_schemas:['secs.holder-grant.v1','secs.holder-grant.v2']});configuration.access_requests_endpoint='/devgraph/access-requests/v2';if(membership!==undefined)configuration.membership_requirement=membership;}
  const capabilities={schema:'secs.holder-session-capabilities.v1',supported:true,profile:'secs.holder-session.v1',issuer_pin:pin,audience:'devgraph',grant_schemas:['secs.holder-grant.v2'],credential_schema:'secs.holder-session-credential.v1',presentation_schema:'secs.holder-session-presentation.v1',read_only:true,max_ttl_seconds:900,review_ttl_seconds:120,proof_max_ttl_seconds:60,challenge_path:'/holder-sessions/v1/challenges',exchange_path:'/holder-sessions/v1/exchange',status_path:'/holder-sessions/v1/status'};
  capabilities.max_ttl_seconds=maximum;
  const store={load:async slot=>structuredClone(rows.get(slot)??null),reserve:async(slot,epoch)=>{rows.set(slot,{epoch,value:null});},save:async(slot,epoch,value)=>{if(rows.get(slot)?.epoch!==epoch)throw Error('browser_session_changed');rows.set(slot,structuredClone({epoch,value}));},remove:async(slot,epoch)=>{if(!epoch||rows.get(slot)?.epoch===epoch)rows.delete(slot);}};
@@ -134,6 +134,8 @@ test('Wallet receives the verified service lifetime ceiling and returns the actu
 for(const requirement of ['optional','required',undefined])test('grant acquisition preserves membership admission '+String(requirement),async()=>{
  const f=await fixture({acquisition:true,membership:requirement});await f.client.prepareLogin(f.provider);
  assert.equal(f.client.loginRequest.grant_acquisition.membership_requirement,requirement??'required');
+ assert.equal(f.client.loginRequest.access_request.request_schema,'devgraph.access-request-action.v1');
+ assert.equal(f.client.loginRequest.access_request.result_schemas.length,4);
  assert.equal(f.calls.length,0,'preparation never enrolls, saves or opens a Wallet');
 });
 test('invalid membership admission cannot become optional proof-free enrollment',async()=>{
