@@ -10,8 +10,9 @@ uv run ruff check src tests scripts integrations
 git diff --check
 uv build --out-dir "$DG_CI_OUTPUT_ROOT/packages"
 uv venv "$DG_CI_TMP/ontology-installed"
-uv pip install --offline --python "$DG_CI_TMP/ontology-installed/bin/python" \
-  "$DG_CI_OUTPUT_ROOT"/packages/devgraph-*.whl
+uv export --locked --no-emit-project --no-dev --output-file "$DG_CI_TMP/ontology-constraints.txt"
+uv pip install --python "$DG_CI_TMP/ontology-installed/bin/python" \
+  -r "$DG_CI_TMP/ontology-constraints.txt" "$DG_CI_OUTPUT_ROOT"/packages/devgraph-*.whl
 uv run python scripts/qualify_ontology_install.py \
   --python "$DG_CI_TMP/ontology-installed/bin/python"
 mkdir "$DG_CI_TMP/ontology-sdist"
