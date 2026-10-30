@@ -12,17 +12,24 @@ from pathlib import Path
 
 from devgraph.frontend.app import FRONTEND_HTML
 from devgraph.frontend.wallet import WALLET_CONNECTION_HTML
+from devgraph.frontend.wallet_login import session_shell
 
 
 def build_shell(destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=False)
     frontend = Path(__file__).resolve().parents[1] / "src/devgraph/frontend/static"
-    monitor = FRONTEND_HTML.replace(
-        '<a href="/monitor/selection">', '<a hidden href="/monitor/selection">'
+    monitor = session_shell(
+        FRONTEND_HTML.replace(
+            '<a href="/monitor/selection">', '<a hidden href="/monitor/selection">'
+        )
     )
     (destination / "index.html").write_text(monitor)
     (destination / "monitor").mkdir()
     (destination / "monitor/index.html").write_text(monitor)
+    (destination / "login").mkdir()
+    (destination / "login/index.html").write_text(
+        (frontend / "credential-v2/login.html").read_text()
+    )
     for folder, target in (
         ("topology", "monitor/topology-assets"),
         ("credential-v2", "assets/credential-v2"),
@@ -37,9 +44,13 @@ def build_shell(destination: Path) -> None:
     board = (frontend / "kanban/index.html").read_text()
     start = board.index('<form id="connect"')
     end = board.index("</form>", start) + len("</form>")
-    board = board[:start] + '<section id="connect">' + WALLET_CONNECTION_HTML + (
-        '<button id="refresh" type="button">Refresh</button></section>'
-    ) + board[end:]
+    board = (
+        board[:start]
+        + '<section id="connect">'
+        + WALLET_CONNECTION_HTML
+        + ('<button id="refresh" type="button">Refresh</button></section>')
+        + board[end:]
+    )
     board = board.replace('<a href="/monitor/selection">', '<a hidden href="/monitor/selection">')
     board = board.replace('<div class="connection">', '<div class="connection" hidden>')
     board = board.replace(
@@ -48,7 +59,7 @@ def build_shell(destination: Path) -> None:
         '<script src="/monitor/topology-assets/wallet-access.js"></script></head>',
     )
     (destination / "monitor/kanban").mkdir()
-    (destination / "monitor/kanban/index.html").write_text(board)
+    (destination / "monitor/kanban/index.html").write_text(session_shell(board))
 
 
 def main() -> None:
