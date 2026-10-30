@@ -22,7 +22,11 @@ from devgraph.storage.base import (
     StorageUnavailable,
     WorkContainment,
 )
-from devgraph.storage.containment import validate_arena_page, validate_containment_subject
+from devgraph.storage.containment import (
+    validate_arena_page,
+    validate_containment_keys,
+    validate_containment_subject,
+)
 from devgraph.storage.delegated import DelegatedWorkSelector, validate_work_filter
 from devgraph.storage.migrations import count_idempotent_application
 from devgraph.storage.receipt_lookup import validate_receipt_lookup
@@ -138,6 +142,11 @@ class MemoryGraphStorage:
             key = (label, node_id)
             return self._work_containment([key])[0] if key in self._nodes else None
 
+    def work_containment_batch(self, keys):
+        validate_containment_keys(keys)
+        with self._transaction_lock:
+            return self._work_containment(sorted(keys))
+
     def arena_member_page(
         self, arena_id: str, *, after_resource: str | None = None, limit: int = 50
     ) -> list[WorkContainment]:
@@ -161,6 +170,7 @@ class MemoryGraphStorage:
         arena_ids: tuple[str, ...],
         *,
         all_resources: bool = False,
+        include_archived: bool = False,
         after_id: str | None = None,
         limit: int = 50,
     ) -> list[NodeRecord]:
@@ -168,6 +178,7 @@ class MemoryGraphStorage:
         allowed = set(arena_ids)
         if (
             type(all_resources) is not bool
+            or type(include_archived) is not bool
             or (all_resources and arena_ids)
             or (not all_resources and not arena_ids)
             or len(allowed) != len(arena_ids)
@@ -183,7 +194,7 @@ class MemoryGraphStorage:
                 for (label, node_id), node in self._nodes.items()
                 if label == "Arena"
                 and (all_resources or node_id in allowed)
-                and not node.archived
+                and (include_archived or not node.archived)
                 and (after_id is None or node_id > after_id)
             ),
             key=lambda node: node.id,

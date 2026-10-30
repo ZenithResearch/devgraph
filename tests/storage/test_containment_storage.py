@@ -86,3 +86,26 @@ def test_storage_page_rejects_duplicate_records_and_oversized_edge_groups():
 def test_storage_page_inputs_are_bounded_before_database_access(storage, options):
     with pytest.raises(ValueError):
         storage.arena_member_page('gallery', **options)
+
+
+def test_containment_batch_uses_indexed_closed_labels_and_exact_inventory():
+    row = record()
+    neo4j, calls = neo4j_rows([row])
+    assert neo4j.work_containment_batch((("Task", "task"),)) == [neo4j._containment_from_row(row)]
+    query, params = calls[0]
+    assert "MATCH (n:`Task` {id: key.id})" in query
+    assert query.count("WITH n, source, edge LIMIT 2") == 2
+    assert params == dict(keys=[dict(kind="Task", id="task")], limit=2)
+    for rows in ([], [row, deepcopy(row)]):
+        broken, _ = neo4j_rows(rows)
+        with pytest.raises(StorageUnavailable, match="invalid containment batch"):
+            broken.work_containment_batch((("Task", "task"),))
+
+
+@pytest.mark.parametrize("keys", [(), (("Task", "task"),) * 2,
+    (("Secret", "task"),), (("Task", "../../escape"),),
+    tuple(("Task", f"task-{i}") for i in range(101))])
+def test_containment_batch_rejects_invalid_input_before_database_access(keys):
+    for storage in (MemoryGraphStorage(), object.__new__(Neo4jGraphStorage)):
+        with pytest.raises(ValueError):
+            storage.work_containment_batch(keys)

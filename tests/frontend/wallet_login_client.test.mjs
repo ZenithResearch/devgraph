@@ -6,13 +6,14 @@ import {canonicalSessionJson} from '../../src/devgraph/frontend/static/credentia
 const hex=value=>Buffer.from(value).toString('hex');
 const bytes=(domain,value)=>new TextEncoder().encode(domain+'\0'+canonicalSessionJson(value));
 
-async function fixture({lost=false,cancel=false,maximum=900,acquisition=false,membership=undefined}={}){
+async function fixture({lost=false,cancel=false,maximum=900,acquisition=false,membership=undefined,arenaRequired=false,arenaGranted=false}={}){
  let now=1000,challenge,credential,state=null,statusCode=200,corruptStatus=false;const calls=[],rows=new Map();
  const issuer=await webcrypto.subtle.generateKey('Ed25519',true,['sign','verify']);
  const origin='https://graph.example',service='service:graph';
  const pin={service,issuer:'fixture',key_id:'key',public_key:hex(await webcrypto.subtle.exportKey('raw',issuer.publicKey))};
  const profile={schema:'castalia.provider-profile.v1',display_name:'Fixture',origins:[origin],membership:null,presentations:[{issuer:pin.issuer,key_id:pin.key_id,public_key:pin.public_key,audience:'devgraph',callers:[{kind:'browser',id:origin}]}]};
  const configuration={schema:'devgraph.wallet-read-configuration.v1',endpoint:'/monitor/wallet-access/v1',web_wallet_url:null,provider_profile:profile,holder_grants:{schema:'secs.holder-grant.v2',service,endpoint:'/monitor/wallet-access/v1/grants'}};
+ if(arenaRequired)configuration.monitor_required_operations=['devgraph.work.list','devgraph.arena.list'];
  if(acquisition){Object.assign(configuration.holder_grants,{v2_endpoint:'/monitor/wallet-access/v1/grants/v2',supported_schemas:['secs.holder-grant.v1','secs.holder-grant.v2']});configuration.access_requests_endpoint='/devgraph/access-requests/v2';if(membership!==undefined)configuration.membership_requirement=membership;}
  const capabilities={schema:'secs.holder-session-capabilities.v1',supported:true,profile:'secs.holder-session.v1',issuer_pin:pin,audience:'devgraph',grant_schemas:['secs.holder-grant.v2'],credential_schema:'secs.holder-session-credential.v1',presentation_schema:'secs.holder-session-presentation.v1',read_only:true,max_ttl_seconds:900,review_ttl_seconds:120,proof_max_ttl_seconds:60,challenge_path:'/holder-sessions/v1/challenges',exchange_path:'/holder-sessions/v1/exchange',status_path:'/holder-sessions/v1/status'};
  capabilities.max_ttl_seconds=maximum;
@@ -21,6 +22,7 @@ async function fixture({lost=false,cancel=false,maximum=900,acquisition=false,me
   calls.push(input.operation);
   if(input.operation==='open_session_login'){
    challenge={schema:'secs.holder-session-challenge.v1',challenge_id:'c'.repeat(32),request_id:'d'.repeat(32),nonce:'e'.repeat(64),issuer:pin.issuer,key_id:pin.key_id,service,audience:'devgraph',origin,parent_grant_id:'f'.repeat(32),parent_grant_digest:'1'.repeat(64),parent_revision:'2'.repeat(64),holder_public_key:'a'.repeat(64),installation_id:'b'.repeat(32),session_installation_id:input.session_installation_id,session_public_key:input.session_public_key,permissions:[{operation:'devgraph.work.list',resource:'https://work.zenith-research.ca/devgraph'}],issued_at:now,review_deadline:now+120,expires_at:now+900};
+   if(arenaGranted)challenge.permissions.push({operation:'devgraph.arena.list',resource:'https://work.zenith-research.ca/devgraph'});
    return{schema:'castalia.session-login-prepared.v1',loginId:input.loginId,challenge};
   }
   if(input.operation==='cancel_session_login')return{schema:'castalia.session-login-cancelled.v1',dispatched:false};
@@ -141,4 +143,18 @@ for(const requirement of ['optional','required',undefined])test('grant acquisiti
 test('invalid membership admission cannot become optional proof-free enrollment',async()=>{
  const f=await fixture({acquisition:true,membership:'not-validated'});await assert.rejects(f.client.prepareLogin(f.provider),/wallet_read_setup_required/);
  assert.equal(f.calls.length,0);assert.equal(f.rows.size,0);
+});
+
+
+test('monitor requires Arena listing before child proof or final Wallet consent',async()=>{
+ const f=await fixture({arenaRequired:true});await f.client.prepareLogin(f.provider);
+ await assert.rejects(f.client.login(),/monitor_arena_context_required/);
+ assert.equal(f.calls.includes('complete_session_login'),false);
+ assert.equal(f.rows.size,0);assert.equal(f.client.clientSession,null);
+});
+test('monitor accepts the same finite session when Work and Arena listing are granted',async()=>{
+ const f=await fixture({arenaRequired:true,arenaGranted:true});await f.client.prepareLogin(f.provider);await f.client.login();
+ assert.equal(f.client.stage,'ready');assert.equal(f.client.expiresAt,1900);
+ await f.client.read('/monitor/topology/v1');
+ assert.equal(f.calls.filter(c=>c==='complete_session_login').length,1);
 });

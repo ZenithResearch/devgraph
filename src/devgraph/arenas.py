@@ -123,6 +123,55 @@ class ArenaRepository:
                 raise ArenaConflict("invalid Arena membership or Work parentage")
             current = (edge.from_label, edge.from_id)
 
+    def membership_ids(self, keys: tuple[tuple[str, str], ...]) -> dict:
+        """Resolve placement in bounded batches without disclosing ancestor records.
+
+        Callers must separately authorize both the Work and returned Arena. The
+        canonical parent kinds form a DAG, so each frontier is at most one level
+        of the four-level Work hierarchy. Shared ancestors are fetched once.
+        """
+        if len(keys) > 10000 or len(set(keys)) != len(keys):
+            raise StorageUnavailable("Arena placement capacity exceeded")
+        captured, pending = {}, set(keys)
+        while pending:
+            frontier, pending = sorted(pending), set()
+            for offset in range(0, len(frontier), 100):
+                batch = tuple(frontier[offset:offset + 100])
+                for item in self.storage.work_containment_batch(batch):
+                    self.work._from_node(item.node)
+                    key = (item.node.label, item.node.id)
+                    arena_id = self._direct_id(item)
+                    if len(item.parents) > 1:
+                        raise ArenaConflict("multiple Work parents")
+                    parent = None
+                    if item.parents:
+                        edge = item.parents[0]
+                        if arena_id is not None or edge.from_label not in PARENT_KINDS.get(
+                            key[0], ()
+                        ):
+                            raise ArenaConflict("invalid Arena membership or Work parentage")
+                        parent = (edge.from_label, edge.from_id)
+                        if parent not in captured:
+                            pending.add(parent)
+                    captured[key] = (parent, arena_id)
+            pending.difference_update(captured)
+            if len(captured) + len(pending) > 40000:
+                raise StorageUnavailable("Arena placement capacity exceeded")
+        resolved = {}
+        for key in keys:
+            trail, current = [], key
+            while current not in resolved:
+                trail.append(current)
+                parent, arena_id = captured[current]
+                if parent is None:
+                    break
+                current = parent
+            else:
+                arena_id = resolved[current]
+            for member in trail:
+                resolved[member] = arena_id
+        return {key: resolved[key] for key in keys}
+
     def members(self, arena_id: str, *, after_resource=None, limit=50):
         validate_arena_page(arena_id, after_resource, limit)
         self.get(arena_id)

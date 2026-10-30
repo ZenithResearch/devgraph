@@ -8,6 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.testclient import TestClient
 
 from devgraph.api.wallet_monitor import register_wallet_monitor
+from devgraph.auth.arena_access import CollectionArenaReadGrant
 from devgraph.auth.enforcement import AuditLog
 from devgraph.auth.monitor_read import MonitorWorkGrant, project_monitor_read
 from devgraph.storage.memory import MemoryGraphStorage
@@ -30,7 +31,8 @@ with TestClient(app, base_url="https://graph.example") as client:
         response = client.get(path)
         shells[path] = {"body": response.text, "headers": dict(response.headers)}
 reads = {
-    path: project_monitor_read(storage, (grant,), path)
+    path: project_monitor_read(storage, (grant,
+        CollectionArenaReadGrant(scope="devgraph.arena.read", all_arenas=True)), path)
     for path in (
         "/monitor/topology/v1",
         "/todos/v2",

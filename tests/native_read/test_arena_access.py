@@ -520,9 +520,10 @@ def test_scoped_topology_carries_only_explicit_arena_records_and_real_edges():
         assert "visible-arena" in text and "CONTAINS_WORK" in text
         assert "private-arena" not in text and '"private"' not in text
         assert result["access_scope"]["arena_metadata"] is True
-        old = project_monitor_read(storage, [grant], target)
-        assert "visible-arena" not in json.dumps(old)
-        assert "CONTAINS_WORK" not in json.dumps(old)
+        from devgraph.auth.errors import ForbiddenError
+
+        with pytest.raises(ForbiddenError, match="monitor_arena_context_required"):
+            project_monitor_read(storage, [grant], target)
 
 
 @pytest.mark.parametrize("dynamic", [False, True])

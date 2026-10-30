@@ -45,6 +45,7 @@ export class WalletReadClient{
   const fetchImpl=this.fetchImpl;const response=await fetchImpl((this.serviceBinding?.claims.prefix??'')+path,{method:body===undefined?'GET':'POST',body:body===undefined?undefined:JSON.stringify(body),headers,credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal});
   let data;try{data=await response.json();}catch{throw failure('read_response_invalid',response.status);}
   if(response.status===503&&path===BASE&&body===undefined&&data?.error==='endpoint_wallet_setup_required')throw failure('endpoint_wallet_setup_required',503);
+  if(response.status===403&&data?.error==='monitor_arena_context_required')throw failure('monitor_arena_context_required',403);
   if(!response.ok)throw failure(response.status===401?'wallet_read_denied':response.status===403?'read_not_granted':response.status===409?'view_changed':'read_unavailable',response.status);
   return data;
  }

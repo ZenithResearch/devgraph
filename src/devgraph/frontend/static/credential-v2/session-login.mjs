@@ -8,6 +8,7 @@ const shape=(value,fields)=>plain(value)&&Object.keys(value).sort().join(',')===
 const error=code=>Object.assign(Error(code),{code});
 const hex=value=>Array.from(value,b=>b.toString(16).padStart(2,'0')).join('');
 const READS=['devgraph.work.list','devgraph.work.get','devgraph.work.relationships','devgraph.arena.list','devgraph.arena.get'];
+const REQUIRED=['devgraph.work.list','devgraph.arena.list'];
 
 /** One page action, one Wallet window, finite browser-owned custody. */
 export class WalletLoginClient extends WalletReadClient {
@@ -22,6 +23,13 @@ export class WalletLoginClient extends WalletReadClient {
   return service;
  }
  current(generation){if(this.generation!==generation)throw error('wallet_connection_changed');}
+ requireMonitorScope(permissions){
+  // Older servers remain compatible. This is a client requirement, never
+  // authority to add permissions to the Wallet's signed challenge.
+  const required=this.configuration?.monitor_required_operations;
+  if(required!==undefined&&(!Array.isArray(required)||canonicalSessionJson(required)!==canonicalSessionJson(REQUIRED)))throw error('holder_session_setup_invalid');
+  if(required&&!required.every(op=>permissions?.some(p=>p.operation===op)))throw Object.assign(error('monitor_arena_context_required'),{status:403,dispatched:false});
+ }
  async prepareLogin(provider){
   const generation=this.generation,service=await this.configureLogin();this.current(generation);
   if(this.configuration.membership_requirement!==undefined&&!['optional','required'].includes(this.configuration.membership_requirement))throw error('wallet_read_setup_required');
@@ -74,6 +82,7 @@ export class WalletLoginClient extends WalletReadClient {
    const prepared=await pending;this.current(generation);
    if(!shape(prepared,['schema','loginId','challenge'])||prepared.schema!=='castalia.session-login-prepared.v1'||prepared.loginId!==id||
     !Array.isArray(prepared.challenge?.permissions)||prepared.challenge.permissions.some(p=>!plain(p)||!READS.includes(p.operation)||p.resource!=='https://work.zenith-research.ca/devgraph'))throw error('invalid_holder_session');
+   this.requireMonitorScope(prepared.challenge.permissions);
    const signature=await session.prepare(prepared.challenge);this.current(generation);
    this.sessionPreparation={challenge:structuredClone(prepared.challenge),session_signature:signature,preparationId:id};
    // A lost committed reply remains recoverable after reload with this key.
@@ -151,6 +160,7 @@ export class WalletLoginClient extends WalletReadClient {
   this.stage='session_recovery';this.notice='holder_session_outcome_unknown';this.notify();return false;
  }
  async read(path,options){
+  if(['/monitor/topology/v1','/monitor/snapshot','/monitor/kanban/v2'].includes(path.split('?')[0]))this.requireMonitorScope(this.sessionPreparation?.challenge?.permissions);
   const generation=this.generation,row=await this.store.load(this.slot);this.current(generation);
   if(row?.epoch!==this.lease){this.disconnect();throw error('browser_session_changed');}
   const result=await super.read(path,options);this.current(generation);

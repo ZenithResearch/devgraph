@@ -164,6 +164,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
             "topology_revalidation": True,
+            "monitor_required_operations": ["devgraph.work.list", "devgraph.arena.list"],
             **(
                 {"service_access_point_endpoint": "/.well-known/devgraph-service.json"}
                 if getattr(app.state, "canonical_service_app", None) is not None
@@ -247,7 +248,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
 
             with request_origin(enrollment, request.headers.get("origin")):
                 return await run_in_threadpool(read, body)
-        except (UnauthenticatedError, ForbiddenError):
+        except (UnauthenticatedError, ForbiddenError) as error:
             audit_log.record(
                 actor_id="unverified",
                 session_id="none",
@@ -256,6 +257,8 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
                 operation="wallet_monitor_read_denied",
                 safe_summary={},
             )
+            if isinstance(error, ForbiddenError) and str(error) == "monitor_arena_context_required":
+                return JSONResponse({"error": "monitor_arena_context_required"}, status_code=403)
             raise
         except StorageUnavailable:
             return JSONResponse({"error": "scoped_read_unavailable"}, status_code=503)

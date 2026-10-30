@@ -1100,7 +1100,7 @@ FRONTEND_HTML = r"""<!doctype html>
         nodes = nodes.filter(node => keys.has(node.key)); const shown = new Set(nodes.map(node => node.key)); edges = edges.filter(edge => shown.has(edge.source) && shown.has(edge.target));
       }
       const membership = nodes.map(node=>`${node.key}:${graphView.layoutPlan.parents.get(node.key)||''}:${graphView.layoutPlan.arenaOf.get(node.key)||''}`).join('|');
-      const sourceMembership = JSON.stringify([overview.map(n=>n.key).sort(),context.edges.filter(e=>['HAS_CHILD','CONTAINS_WORK'].includes(e.relationship)).map(e=>`${e.source}:${e.relationship}:${e.target}`).sort()]);
+      const sourceMembership = JSON.stringify([overview.map(n=>[n.key,n.arena_key]).sort(),context.edges.filter(e=>['HAS_CHILD','CONTAINS_WORK'].includes(e.relationship)).map(e=>`${e.source}:${e.relationship}:${e.target}`).sort()]);
       const sourceChanged = graphView.sourceMembership && sourceMembership !== graphView.sourceMembership;
       const revealSignature = [...projection.families.keys()].sort().join('|');
       const revealChanged = revealSignature !== (graphView.revealSignature || '');
@@ -1471,7 +1471,7 @@ FRONTEND_HTML = r"""<!doctype html>
           if (!state.snapshot || error.status === 401 || error.status === 403) document.getElementById('connection-settings').open = true;
           state.connected = false;
           text('connection-label', error.status === 401 || error.status === 403 ? 'Access denied' : 'Connection interrupted');
-          text('status-line', `${state.snapshot ? `Showing saved snapshot from ${new Date(state.lastSuccess).toLocaleTimeString()}. ` : ''}${error.status === 401 || error.status === 403 ? 'Connect Wallet again, or ask the server administrator to review your read scope.' : 'Refresh failed. Retrying on the next update.'}`);
+          text('status-line', `${state.snapshot ? `Showing saved snapshot from ${new Date(state.lastSuccess).toLocaleTimeString()}. ` : ''}${error.code === 'monitor_arena_context_required' ? 'DevGraph Monitor needs Arena listing for the work you can read. Ask the service owner to include Arena access in your grant, then sign in again.' : error.status === 401 || error.status === 403 ? 'Connect Wallet again, or ask the server administrator to review your read scope.' : 'Refresh failed. Retrying on the next update.'}`);
         } finally {
           if (epoch === state.authEpoch) { state.refreshPromise = null; state.refreshController = null; if (state.refreshQueued) { state.refreshQueued = false; queueMicrotask(refresh); } }
         }

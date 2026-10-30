@@ -157,6 +157,9 @@ def build_monitor_snapshot(storage: GraphStorage) -> dict[str, Any]:
                 archived=node.archived,
             )
             work_node["todo_progress"] = node.properties.get("progress")
+            membership = getattr(storage, "arena_membership", None)
+            if membership is not None:
+                work_node["arena_key"] = membership[work_node["key"]]
             # Decimal strings preserve canonical i64 versions in JavaScript clients.
             version = node.properties.get("version")
             work_node["version"] = str(version) if type(version) is int and version > 0 else None
