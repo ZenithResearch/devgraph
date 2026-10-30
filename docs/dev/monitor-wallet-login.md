@@ -39,6 +39,10 @@ reusable parent and starting a temporary session each retain their explicit
 Wallet review; they occur within the same window. The grant descriptor names
 the exact supported result wrapper and v2 parent schema. The browser never
 receives the reusable parent or private enrollment authorization.
+The descriptor preserves the service's explicit membership requirement. Missing
+disclosure defaults to required; it never implies proof-free enrollment. Current
+first-use popup enrollment supports explicitly optional membership only, and
+must explain an unsupported membership requirement rather than silently omit it.
 
 Wallet returns `{schema: "castalia.session-login-prepared.v1", loginId,
 challenge}`. The browser validates the challenge and proves possession using
@@ -127,7 +131,7 @@ the exact deployed source/package and the human-approved live result separately.
 
 ## Local candidate evidence
 
-- 391 frontend unit/contract tests pass, including retained legacy clients.
+- 395 frontend unit/contract tests pass, including retained legacy clients.
 - 3,526 Python tests pass across the repository run and the separately permitted
   loopback test; 24 opt-in tests remain skipped. The native authorities were
   supplied for the holder/read integration tests.

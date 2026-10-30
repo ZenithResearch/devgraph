@@ -24,6 +24,7 @@ export class WalletLoginClient extends WalletReadClient {
  current(generation){if(this.generation!==generation)throw error('wallet_connection_changed');}
  async prepareLogin(provider){
   const generation=this.generation,service=await this.configureLogin();this.current(generation);
+  if(this.configuration.membership_requirement!==undefined&&!['optional','required'].includes(this.configuration.membership_requirement))throw error('wallet_read_setup_required');
   if(typeof provider?.readAccess!=='function'||typeof provider.getCapabilities!=='function')throw error('wallet_update_required');
   const available=await provider.getCapabilities();this.current(generation);
   if(!Array.isArray(available)||!available.includes('session_login_v1'))throw error('wallet_update_required');
@@ -48,7 +49,7 @@ export class WalletLoginClient extends WalletReadClient {
   this.loginRequest={operation:'open_session_login',loginId:this.loginId,service,session_public_key:this.clientSession.publicKey,
    session_installation_id:this.clientSession.installationId,requested_ttl_seconds:ttl,profile:structuredClone(this.configuration.provider_profile),
    ...(this.serviceBinding?{service_access_point:structuredClone(this.serviceBinding)}:{}),
-   ...(this.configuration.holder_grants.v2_endpoint?{grant_acquisition:{schema:'castalia.session-login-grant.v1',challenge_path:'/monitor/wallet-access/v1/challenges',grant_path:this.configuration.holder_grants.v2_endpoint,grant_schema:'secs.holder-grant.v2',result_schema:'devgraph.holder-grant-result.v1'}}:{}),
+   ...(this.configuration.holder_grants.v2_endpoint?{grant_acquisition:{schema:'castalia.session-login-grant.v1',challenge_path:'/monitor/wallet-access/v1/challenges',grant_path:this.configuration.holder_grants.v2_endpoint,grant_schema:'secs.holder-grant.v2',result_schema:'devgraph.holder-grant-result.v1',membership_requirement:this.configuration.membership_requirement??'required'}}:{}),
    ...(this.configuration.access_requests_endpoint==='/devgraph/access-requests/v2'?{access_request:{schema:'castalia.session-login-access.v1',challenge_path:'/devgraph/access-requests/v2/challenges',action_path:'/devgraph/access-requests/v2/actions',...(this.configuration.access_catalog_endpoint?{catalog_path:'/devgraph/access-requests/v2/catalog'}:{})}}:{})};
   this.stage='login_ready';this.notice='';this.notify();
  }
