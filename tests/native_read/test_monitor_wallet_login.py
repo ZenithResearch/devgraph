@@ -1,6 +1,7 @@
 """Login is a public shell; only the delegated session reads protected work."""
 
 import re
+from html.parser import HTMLParser
 from types import SimpleNamespace
 
 from fastapi import FastAPI
@@ -10,6 +11,16 @@ from devgraph.api.wallet_monitor import register_wallet_monitor
 from devgraph.auth.enforcement import AuditLog
 from devgraph.endpoint_read_runtime import EndpointReadBoundary
 from devgraph.storage.memory import MemoryGraphStorage
+
+
+class ScriptTags(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.nonces = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "script":
+            self.nonces.append(dict(attrs).get("nonce"))
 
 
 def client():
@@ -53,7 +64,9 @@ def test_monitor_and_board_have_compact_session_without_legacy_wizard():
             assert "Paste local" not in page.text
             csp = page.headers["content-security-policy"]
             nonce = re.search(r"script-src 'nonce-([^']+)'", csp)[1]
-            for script in re.findall(r"<script\b[^>]*>", page.text):
-                assert f'nonce="{nonce}"' in script
+            scripts = ScriptTags()
+            scripts.feed(page.text)
+            assert scripts.nonces
+            assert all(value == nonce for value in scripts.nonces)
         assert browser.get("/monitor/topology-assets/session-access.js").status_code == 200
         assert browser.get("/assets/credential-v2/private-backup.json").status_code == 404
