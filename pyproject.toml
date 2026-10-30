@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "devgraph"
-version = "0.1.0b2"
+version = "0.1.0b3"
 description = "Local work graph, ontology, and agent integrations"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -37,6 +37,9 @@ where = ["src"]
 [tool.setuptools.package-data]
 devgraph = [
   "resources/*.in",
+  "resources/ontology-ownership.json",
+  "resources/ontology-source-index.v1.json",
+  "resources/ontology-sources/*/*/*",
   "frontend/static/selection/core/*",
   "frontend/static/topology/*",
   "frontend/static/kanban/*",

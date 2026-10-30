@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/ZenithResearch/zenith-ontology",
+  "commit": "ac6dff3318ac263041418ad6064b40172dc6eb7d",
+  "policy": "Pinned dependency-free primitives; update copies and conformance fixtures together.",
+  "files": {
+    "lib/immutable-release.mjs": "4fe7cf826b863a7f51b7779c163c8daf8d54f71c77ce362b6e23bcee0a5f1b22",
+    "lib/immutable-release.test.mjs": "0dffc81af074ba4d5f2e6160ea5718b488d1d8074da89b5eebdfb3ea29590a95",
+    "release-builder.test.mjs": "338e51b05047b8b336c3cd2c004c9f12db39a95eb159410a6add2423fa19d050"
+  }
+}

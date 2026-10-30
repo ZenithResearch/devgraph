@@ -82,7 +82,7 @@ and identity/grant activation need their own machine evidence.
 
 | Surface | Current evidence |
 |---|---|
-| Ontology | `ontology/`, immutable releases `v0.1.0` through `v0.9.0`, and `scripts/build_ontology_bundle.py --check` |
+| Ontology | `ontology/source-index.v1.json`, historical runtime releases through v0.12, exact core v0.13/extension v0.1, and both release builders in check mode |
 | Storage | `src/devgraph/storage/`; parity, persistence-contract, migration-store, and opt-in Neo4j tests |
 | Domain model | `src/devgraph/model/`, `src/devgraph/relationships.py`, and `src/devgraph/services/priority.py` |
 | Authorization | `src/devgraph/auth/` and `tests/auth/` |

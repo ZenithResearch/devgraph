@@ -15,6 +15,8 @@ The beta includes a Python API/CLI, a read-only browser monitor, project-selecti
 tools, a Codex plugin, and a Hermes adapter. It runs on your machine. Publishing
 or cloning this source repository does not upload your local graph or credentials.
 
+Shared vocabulary is authored in [Zenith core](https://github.com/ZenithResearch/zenith-ontology). DevGraph imports it through its [own extension](ontology/extension/ontology.jsonld); see [ownership and release workflow](docs/ontology-ownership.md). Packaged v0.12 remains the runtime compatibility snapshot.
+
 ## Choose a starting point
 
 | You want to… | Start here |
@@ -105,8 +107,10 @@ dependency-aware scenario. Its inputs and saved drafts are local to the browser
 tab; exports are local files. It does not update canonical Work or promise a
 schedule or hard-budget solution. See [project selection](docs/user/project-selection.md).
 
-Ontology bundles through `v0.11.0` are packaged with this source candidate.
-`devgraph ontology` identifies the canonical release. `Entity`, `Person`,
+Historical ontology bundles through `v0.12.0` remain packaged for runtime
+compatibility. `devgraph ontology` preserves that snapshot's output contract;
+`devgraph ontology --format sources-v1` verifies the read-only adopted core and
+extension closure and reports exact installed resources. `Entity`, `Person`,
 `Agent`, and `Organization` are directory vocabulary with no admitted runtime
 CRUD; `Actor` remains a compatibility alias.
 

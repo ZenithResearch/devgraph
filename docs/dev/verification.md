@@ -87,6 +87,8 @@ printf 'Checking generated artifacts...\n'
 uv run python scripts/sync_zenith_tokens.py
 uv run python scripts/render_backup_costs.py --check
 uv run python scripts/build_ontology_bundle.py --check
+node --test scripts/lib/*.test.mjs scripts/release-builder.test.mjs
+node scripts/build_ontology_extension.mjs --check
 
 printf 'Running repository tests...\n'
 uv run pytest -q

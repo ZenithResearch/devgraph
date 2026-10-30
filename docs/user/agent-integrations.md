@@ -139,7 +139,12 @@ remains unknown. Report success only after a validated committed receipt.
 
 ### Existing named-v1 compatibility installations
 
-1. Confirm the agent finds the CLI and can run `devgraph ontology`.
+1. Confirm the agent finds the CLI. For ontology inspection, run
+   `devgraph ontology --format sources-v1` and require the supported
+   `devgraph.ontology-sources.v1` schema with `closureVerified: true`.
+   Read returned installed paths, not repository paths. This capability first
+   ships in 0.1.0b3; an older or absent CLI needs the supported CLI installation
+   before this ontology workflow. Plain `devgraph ontology` retains runtime-v1.
 2. Inspect `devgraph local status` and run a bounded `devgraph query work
    Initiative --limit 10` or `devgraph query arena --limit 10`.
 3. For signed work, separately check `devgraph auth status --check` and

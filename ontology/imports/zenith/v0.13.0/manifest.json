@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "ontology_id": "https://zenith-research.ca/ontology",
+  "version": "0.13.0",
+  "release": "v0.13.0",
+  "published_at": "2026-10-29T00:00:00Z",
+  "canonical_base_url": "https://zenith-research.ca/ontology/v0.13.0",
+  "discovery_url": "https://zenith-research.ca/.well-known/zenith-ontology",
+  "authority": {
+    "name": "Zenith",
+    "repository": "https://github.com/ZenithResearch/zenith-ontology",
+    "source_path": "ontology/core/"
+  },
+  "compatibility": {
+    "mode": "vocabulary-preserving-source-transfer",
+    "minimum_consumer_version": "0.1.0"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "media_type": "text/markdown",
+      "bytes": 733,
+      "sha256": "275cece2bdde0b0921eefeda21a40983b369cf33c47dba79e460943faa413424",
+      "url": "https://zenith-research.ca/ontology/v0.13.0/README.md"
+    },
+    {
+      "path": "context.jsonld",
+      "media_type": "application/ld+json",
+      "bytes": 1045,
+      "sha256": "bcb4c213b415cc4058361d7c6dbf28b90cb40a39d53ebefe506990c8dca91d6c",
+      "url": "https://zenith-research.ca/ontology/v0.13.0/context.jsonld"
+    },
+    {
+      "path": "migration.json",
+      "media_type": "application/json",
+      "bytes": 731,
+      "sha256": "5dd6fa47a5cba1b69255e99b3e58c35d575dca61c51021e525ac85e5e4ef45c0",
+      "url": "https://zenith-research.ca/ontology/v0.13.0/migration.json"
+    },
+    {
+      "path": "ontology.jsonld",
+      "media_type": "application/ld+json",
+      "bytes": 21013,
+      "sha256": "1fb2bed259098f94863ecf9fcc7da6edbf28c8b110f56e6c370545e877fb39e6",
+      "url": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld"
+    }
+  ],
+  "bundle_digest_algorithm": "sha256-file-list-v1",
+  "bundle_digest": "ef9b86221f693032e956788e17a416783fa0094c2468995b09dc1751d3022a15",
+  "imports": []
+}

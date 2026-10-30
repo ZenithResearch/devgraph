@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "zenith.core-ownership-migration.v1",
+  "from": {
+    "repository": "https://github.com/ZenithResearch/devgraph",
+    "commit": "009e91b4be47768dc65206e5bf69bf17afabc19a",
+    "version": "0.12.0",
+    "path": "ontology/releases/v0.12.0/ontology.jsonld"
+  },
+  "to": {
+    "repository": "https://github.com/ZenithResearch/zenith-ontology",
+    "version": "0.13.0",
+    "ontologyId": "https://zenith-research.ca/ontology"
+  },
+  "preservedDefinitions": 86,
+  "termIdentities": "unchanged",
+  "parentAxioms": "unchanged",
+  "legacyReleaseBytes": "unchanged",
+  "directorySplit": "Existing Rolodex split remains a separate review; no silent repinning or removal of directory terms.",
+  "runtimeAdmission": false
+}

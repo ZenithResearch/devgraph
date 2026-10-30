@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "devgraph.ontology-ownership.v1",
+  "canonicalCore": {
+    "repository": "https://github.com/ZenithResearch/zenith-ontology",
+    "commit": "142f515675d4127736676c9e7a8b1bb158621eae",
+    "sourcePath": "ontology/core/ontology.jsonld",
+    "ontologyId": "https://zenith-research.ca/ontology",
+    "version": "0.13.0",
+    "manifest": {
+      "url": "https://zenith-research.ca/ontology/v0.13.0/manifest.json",
+      "sha256": "71c80068182f46bc30c019669d201cb6a5366646274737618c949802d9434a64",
+      "bytes": 1812,
+      "mediaType": "application/json"
+    },
+    "ontologyUrl": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld"
+  },
+  "extension": {
+    "ontologyId": "https://zenith-research.ca/ontology/devgraph",
+    "discovery": "ontology/extension-discovery.json",
+    "sourcePath": "ontology/extension/ontology.jsonld"
+  },
+  "legacy": "ontology/discovery.json and ontology/releases/v0.1.0 through v0.12.0 retain historical runtime/release evidence. They do not designate the current shared-core authoring repository.",
+  "runtimeAdmission": false
+}

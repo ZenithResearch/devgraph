@@ -23,6 +23,10 @@ def source(tmp_path: Path) -> Path:
         "pyproject.toml": '[project]\nversion = "0.1.0b1"\n',
         "LICENSE": "Synthetic test license\n",
         "SECURITY.md": "Private reporting\n",
+        "src/devgraph/resources/ontology-source-index.v1.json": json.dumps({
+            "schemaVersion": "devgraph.ontology-sources.v1",
+            "runtimeCompatibility": {"version": "0.12.0"},
+        }),
     }
     for name, value in files.items():
         path = root / name
@@ -85,6 +89,9 @@ def test_release_requires_committed_review_and_bundles_both_agents(tmp_path):
     assert len(result["artifacts"]) == 3
     manifest = json.loads((output / "release-manifest.json").read_text())
     assert manifest["git_history_included"] is False
+    assert manifest["schema"] == "devgraph.beta-release.v2"
+    assert manifest["ontology"] == "0.12.0"
+    assert manifest["agent_ontology"] == "installed-cli-capability"
     with tarfile.open(output / "devgraph-0.1.0b1-hermes.tar.gz") as archive:
         assert "devgraph/skills/devgraph/SKILL.md" in archive.getnames()
         assert "devgraph/LICENSE" in archive.getnames()
