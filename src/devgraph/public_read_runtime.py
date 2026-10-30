@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from anyio import fail_after
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from devgraph.auth.delegated_contract import canonical_json
 from devgraph.auth.holder_session_transport import (
@@ -59,6 +59,23 @@ OPERATOR_POST_PATHS = frozenset(
 )
 OPERATOR_GET_PATHS = frozenset(("/monitor/access", "/monitor/access/"))
 OPERATOR_ASSET = re.compile(r"^/monitor/access-assets/[a-zA-Z0-9_.-]{1,80}$")
+
+# Private Wallet popups use these existing signed protocols. Extension origin
+# identifies transport only: every action still needs its original downstream
+# challenge, signature, service, membership, nonce and scope checks.
+POPUP_POST_PATHS = frozenset(
+    (
+        "/monitor/wallet-access/v1/challenges",
+        "/monitor/wallet-access/v1/grants/v2",
+        "/devgraph/access-requests/v2/challenges",
+        "/devgraph/access-requests/v2/actions",
+    )
+)
+EXTENSION_ORIGIN = re.compile(
+    rb"(?:chrome-extension://[a-p]{32}|"
+    rb"(?:moz-extension|safari-web-extension)://"
+    rb"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})"
+)
 
 
 def public_origin(value: str) -> str:
@@ -157,7 +174,8 @@ class PublicReadBoundary:
             await send({"type": "websocket.close", "code": 1008})
             return
         headers = scope.get("headers", [])
-        path, method = scope["path"], scope["method"]
+        original_path, method = scope["path"], scope["method"]
+        path = original_path
         if self.canonical_paths and path.startswith("/service/v1/"):
             path = path[len("/service/v1") :]
         session_route = (
@@ -170,6 +188,13 @@ class PublicReadBoundary:
         )
         hosts = [v for k, v in headers if k.lower() == b"host"]
         origins = [v for k, v in headers if k.lower() == b"origin"]
+        popup_transport = (
+            method in ("POST", "OPTIONS")
+            and path in POPUP_POST_PATHS
+            and path in self.post_paths
+            and len(origins) == 1
+            and EXTENSION_ORIGIN.fullmatch(origins[0]) is not None
+        )
         native_read = (
             method == "POST"
             and path
@@ -187,10 +212,45 @@ class PublicReadBoundary:
             or origins
             and not session_route
             and not native_read
+            and not popup_transport
             and origins != [self.origin.encode()]
             or any(k.lower() == b"authorization" for k, _ in headers)
+            or popup_transport
+            and any(k.lower() == b"cookie" for k, _ in headers)
         ):
             return await reject(421, "invalid_public_receiver")
+        if popup_transport:
+            original_send = send
+
+            async def popup_send(message):
+                if message["type"] == "http.response.start":
+                    prior = message.get("headers", [])
+                    vary = b", ".join(v for k, v in prior if k.lower() == b"vary")
+                    protected = {
+                        b"access-control-allow-origin",
+                        b"access-control-allow-credentials",
+                        b"access-control-allow-methods",
+                        b"access-control-allow-headers",
+                        b"cache-control",
+                        b"x-content-type-options",
+                        b"vary",
+                        b"set-cookie",
+                    }
+                    message = {
+                        **message,
+                        "headers": [(k, v) for k, v in prior if k.lower() not in protected]
+                        + [
+                            (b"access-control-allow-origin", origins[0]),
+                            (b"access-control-allow-methods", b"POST, OPTIONS"),
+                            (b"access-control-allow-headers", b"content-type"),
+                            (b"vary", (vary + b", " if vary else b"") + b"Origin"),
+                            (b"cache-control", b"no-store"),
+                            (b"x-content-type-options", b"nosniff"),
+                        ],
+                    }
+                await original_send(message)
+
+            send = popup_send
         if self.expired():
             return await reject(503, "pilot_window_closed")
         # Apply the SAME route, method, body and abuse limits inside the opt-in
@@ -219,16 +279,46 @@ class PublicReadBoundary:
             or (method == "POST" and path in self.post_paths)
             or operator_allowed
             or session_route
+            or popup_transport
         ):
             return await reject(404, "not_found")
         if (
             sum(len(k) + len(v) for k, v in headers) > 16384
             or len(scope.get("query_string", b"")) > 2048
             or b"%" in scope.get("raw_path", b"")
-            or method == "POST"
+            or (method == "POST" or popup_transport)
             and scope.get("query_string")
+            or popup_transport
+            and scope.get("raw_path", original_path.encode()) != original_path.encode()
         ):
             return await reject(400, "invalid_request")
+        if popup_transport:
+            if method == "OPTIONS":
+                requested_methods = [
+                    v for k, v in headers if k.lower() == b"access-control-request-method"
+                ]
+                requested_headers = [
+                    v for k, v in headers if k.lower() == b"access-control-request-headers"
+                ]
+                names = (
+                    []
+                    if not requested_headers
+                    else [v.strip().lower() for v in requested_headers[0].split(b",")]
+                )
+                if (
+                    requested_methods != [b"POST"]
+                    or len(requested_headers) > 1
+                    or len(names) != len(set(names))
+                    or any(n != b"content-type" for n in names)
+                ):
+                    return await reject(400, "invalid_popup_preflight")
+            else:
+                types = [v for k, v in headers if k.lower() == b"content-type"]
+                if (
+                    len(types) != 1
+                    or types[0].split(b";", 1)[0].strip().lower() != b"application/json"
+                ):
+                    return await reject(400, "invalid_popup_content_type")
         now = time.monotonic()
         self.tokens = min(
             self.burst_capacity, self.tokens + (now - self.last) * self.refill_per_second
@@ -255,6 +345,10 @@ class PublicReadBoundary:
                             break
             except TimeoutError:
                 return await reject(408, "request_timeout")
+            if popup_transport and method == "OPTIONS":
+                # All receiver, route, header, body and abuse limits ran first.
+                # A preflight never reaches challenge/issuance/action handlers.
+                return await Response(status_code=204)(scope, receive, send)
             delivered = False
 
             async def buffered():

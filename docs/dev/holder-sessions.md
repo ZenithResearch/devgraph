@@ -71,8 +71,11 @@ select the same canonical provider/policy. Policy drift fails closed.
 HTTP exposes GET `/holder-sessions/v1/capabilities` and POST `challenges`,
 `exchange`, `status` beneath that base (also the retained `/devgraph` aliases).
 Canonical access bindings retain the `/service/v1` prefix in returned paths.
-Only these paths permit cookie-free extension transport CORS. Existing read,
-operator and write transport boundaries are unchanged; exact TLS/Host and abuse
+Session-specific CORS remains limited to these paths. The separately bounded
+[popup setup transport](monitor-wallet-login.md) also admits validated extension
+origins to four existing grant/request POST routes, without changing any signed
+proof, membership or scope admission. Protected read, operator and write
+transport boundaries are unchanged; exact TLS/Host and abuse
 limits still apply. Unsupported configuration advertises `supported:false`.
 
 Native registration is a separate

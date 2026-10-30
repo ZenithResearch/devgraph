@@ -47,6 +47,17 @@ disclosure defaults to required; it never implies proof-free enrollment. Current
 first-use popup enrollment supports explicitly optional membership only, and
 must explain an unsupported membership requirement rather than silently omit it.
 
+Popup setup uses a separate, cookie-free extension transport on exactly four
+existing POST routes: `/monitor/wallet-access/v1/challenges`,
+`/monitor/wallet-access/v1/grants/v2`,
+`/devgraph/access-requests/v2/challenges` and
+`/devgraph/access-requests/v2/actions`. Preflights retain TLS/Host, literal-path,
+header/body, expiry and abuse limits and never call the issuer. Responses reflect
+only a validated extension origin, never credentials or cookies. CORS grants
+transport, not authority: the original signed challenge, proof, canonical
+service, membership, nonce and scope checks still run. Protected reads, operator
+actions, public configuration and arbitrary paths gain no extension CORS.
+
 Wallet returns `{schema: "castalia.session-login-prepared.v1", loginId,
 challenge}`. The browser validates the challenge and proves possession using
 its nonextractable temporary key. `complete_session_login` continues the same
@@ -135,9 +146,9 @@ the exact deployed source/package and the human-approved live result separately.
 ## Local candidate evidence
 
 - 395 frontend unit/contract tests pass, including retained legacy clients.
-- 3,526 Python tests pass across the repository run and the separately permitted
-  loopback test; 24 opt-in tests remain skipped. The native authorities were
-  supplied for the holder/read integration tests.
+- The repository tests include native holder/read authority integration and
+  transport denial cases. Record final run counts alongside the exact release;
+  opt-in external integrations remain separate.
 - Eight disposable real-browser walkthroughs exercise actual monitor/board/login
   shells, public and Tailnet origins, desktop and narrow layouts, ordinary and
   lost-reply completion, nonextractable IndexedDB custody, unchanged expiry,
