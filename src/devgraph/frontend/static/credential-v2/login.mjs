@@ -49,11 +49,14 @@ button.addEventListener('click',()=>{
  if(client.stage==='session_recovery')pending=client.reconcileLogin();
  else if(client.stage==='login_ready')pending=client.login();
  else{busy=false;void initialize(false);return;}
- render();void pending.then(()=>{if(client.stage==='ready')location.replace(destination);}).catch(async error=>{
+ render();void pending.then(()=>{if(client.stage==='ready')location.replace(destination);else if(client.notice)report(Error(client.notice));}).catch(async error=>{
   report(error);
   // A lost reply can already have issued the original credential. Try one
   // authenticated status lookup, never a second popup or issuance attempt.
-  if(client.stage==='session_recovery')try{if(await client.reconcileLogin())location.replace(destination);}catch{}
+  if(client.stage==='session_recovery')try{
+   if(await client.reconcileLogin())location.replace(destination);
+   else if(client.notice)report(Error(client.notice));
+  }catch{}
  }).finally(async()=>{
   if(client.stage!=='ready'&&client.stage!=='session_recovery')try{await prepare();}catch(error){report(error);}
   busy=false;render();
