@@ -163,6 +163,7 @@ def register_wallet_monitor(app: FastAPI, *, storage, enrollment, audit_log, web
         return {
             "schema": "devgraph.wallet-read-configuration.v1",
             "endpoint": BASE,
+            "topology_revalidation": True,
             **(
                 {"service_access_point_endpoint": "/.well-known/devgraph-service.json"}
                 if getattr(app.state, "canonical_service_app", None) is not None

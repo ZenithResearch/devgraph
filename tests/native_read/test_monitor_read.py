@@ -107,6 +107,69 @@ def test_relationship_authority_does_not_cross_product_with_unrelated_visible_it
         project_monitor_read(storage, grants, "/work/Task/second/relationships/children")
 
 
+def test_split_relationship_permissions_intersect_visible_nodes_and_reuse_selector_pages():
+    from unittest.mock import patch
+
+    from devgraph.auth.arena_activation import ArenaMonitorReadEnrollment
+    from devgraph.auth.native_read import RESOURCE
+
+    storage = MemoryGraphStorage()
+    repo = WorkObjectRepository(storage)
+    for identifier in ("root", "child", "hidden"):
+        repo.create(Task(id=identifier, title=identifier, workflow_json=None))
+    storage.create_edge("Task", "root", "HAS_CHILD", "Task", "child")
+    storage.create_edge("Task", "root", "HAS_CHILD", "Task", "hidden")
+    c = dict(scope="devgraph.work.read", operations=["list", "get", "relationships"],
+        relationship_types=["children"], work_kinds=["Task"],
+        work_ids=["Task/child", "Task/root"], include_archived=False)
+    decoder = object.__new__(ArenaMonitorReadEnrollment)
+    grants = decoder._decode_grants([dict(operation="devgraph.work."+op,
+        resource=RESOURCE, constraints=c) for op in c["operations"]])
+    with patch.object(storage, "delegated_work_page", wraps=storage.delegated_work_page) as page:
+        result = project_monitor_read(storage, grants, "/monitor/topology/v1")
+        assert page.call_count == 1, "identical list/relationship selectors share one capture"
+    assert result["graph_edges"] == [dict(source="Task:root", target="Task:child",
+        relationship="HAS_CHILD")]
+    assert {n["id"] for n in result["graph_nodes"]} == {"root", "child"}
+    # Relationship authority on another selector cannot attach visible nodes.
+    restricted = grants[2].model_copy(update={"work_ids": ("Task/hidden",)})
+    assert project_monitor_read(storage, [grants[0], restricted],
+        "/monitor/topology/v1")["graph_edges"] == []
+    assert project_monitor_read(storage, [grants[0]],
+        "/monitor/topology/v1")["graph_edges"] == []
+
+
+def test_conditional_topology_includes_filters_and_access_disclosure():
+    from devgraph.auth.arena_access import CollectionArenaReadGrant
+
+    storage = MemoryGraphStorage()
+    WorkObjectRepository(storage).create(Task(id="one", title="One", workflow_json=None))
+    grant = MonitorWorkGrant(scope="devgraph.work.read", operations=["list"],
+        relationship_types=["parent"], work_kinds=["Task"], include_archived=False)
+    target = "/monitor/topology/v1"
+    full = project_monitor_read(storage, [grant], target)
+    conditional = target + "?if_revision=" + full["representation_revision"]
+    small = project_monitor_read(storage, [grant], conditional)
+    assert small["schema"] == "devgraph.topology-not-modified.v1"
+    assert "graph_nodes" not in small and len(json.dumps(small)) < len(json.dumps(full))
+    assert "if_revision" not in full["applied_filters"]
+    changed_filter = project_monitor_read(storage, [grant], conditional + "&q=missing")
+    assert changed_filter["schema"] == "devgraph.topology.v1"
+    assert changed_filter["graph_nodes"] == []
+    changed_scope = project_monitor_read(storage, [grant,
+        CollectionArenaReadGrant(scope="devgraph.arena.read", all_arenas=True)], conditional)
+    assert changed_scope["schema"] == "devgraph.topology.v1"
+    assert changed_scope["access_scope"]["arena_metadata"] is True
+    assert changed_scope["access_scope"]["arena_membership_complete"] is False
+    # Even a valid cached revision never admits a caller without list authority.
+    from devgraph.auth.errors import ForbiddenError
+
+    with pytest.raises(ForbiddenError):
+        project_monitor_read(storage, [], conditional)
+    with pytest.raises(ValueError):
+        project_monitor_read(storage, [grant], target + "?if_revision=invalid")
+
+
 @pytest.mark.parametrize("renewals", [0, 2])
 def test_real_secs_monitor_enrollment_scoping_replay_and_revocation(
     tmp_path, monkeypatch, renewals

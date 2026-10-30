@@ -24,7 +24,10 @@ from devgraph.auth.native_read import RESOURCE, _seconds
 from devgraph.auth.selector_grants import wrap_permission
 
 READ_OPERATIONS = frozenset(
-    {"devgraph.work.get", "devgraph.work.list", "devgraph.arena.get", "devgraph.arena.list"}
+    {
+        "devgraph.work.get", "devgraph.work.list", "devgraph.work.relationships",
+        "devgraph.arena.get", "devgraph.arena.list",
+    }
 )
 SAFE = 9007199254740991
 OBSERVED_ORIGIN = ContextVar("devgraph_holder_session_origin", default=None)
@@ -264,7 +267,7 @@ class HolderSessionHost:
                 )
                 db.execute("COMMIT")
             return self.host._verified_context(
-                verified, credential, proof, current, v2=True, unbound_parent=True
+                verified, credential, proof, current, v2=True, unbound_parent=True, call=call
             )
         except (KeyError, TypeError, ValueError, OverflowError):
             raise UnauthenticatedError("invalid_holder_session_presentation") from None

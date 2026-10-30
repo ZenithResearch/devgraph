@@ -8,6 +8,50 @@ one visible Wallet review window, and a delegated browser session. This is an
 OAuth-like user experience over the existing proof-bound secS session contract;
 it does not implement OAuth 2.0. The sidebar is not a prerequisite.
 
+## Composite topology reads and loading
+
+Monitor topology, snapshot and board reads are composite read projections. A
+`devgraph.work.list` presentation admits the route; it does not imply Arena or
+relationship access. After native verification of the entire signed credential,
+current parent/subset and exact call proof, DevGraph composes only the **same
+credential's** signed Work-list, Work-relationships and Arena-list permissions.
+It checks the native matching-list permission result against that signed
+inventory before decoding it. Ordinary reads retain the native per-operation
+result. The generic verifier's matching-operation filter is unchanged; no server
+ceiling, cached parent, other credential or unverified permission is consulted.
+
+Inside one storage transaction, node visibility and relationship authority are
+captured independently and intersected. Both edge endpoints must be visible, and
+the relevant direction must be authorized on its actual endpoint. Identical
+selectors reuse captured pages within that request only. Fixed and dynamic Arena
+metadata remain independent of Work scope. Dynamic scope disclosure includes
+`arena_metadata`, `work_relationships` and `arena_membership_complete`; older
+responses remain conservatively readable when optional fields are absent.
+
+New finite sessions retain an explicitly approved `devgraph.work.relationships`
+permission. Existing sessions keep their exact signed permissions and expiry;
+an old child without relationship authority cannot acquire it automatically.
+
+The browser still revalidates each refresh with its finite proof. It skips graph
+layout/reader reconstruction when the source revision, applied filters and access
+disclosure are unchanged, while updating health and freshness. Duplicate triggers
+do not reload the check-in queue before their in-flight guard. Automatic polling
+pauses while the tab is hidden; explicit refresh remains available. No authorized
+response is placed in a shared or cross-session cache.
+
+Public configuration advertises optional `topology_revalidation: true`. A client
+may then sign the ordinary topology path with `if_revision=<64 lowercase hex>`.
+After fresh native authorization, current-parent/expiry checks and projection,
+the server compares a `representation_revision` covering source revision,
+normalized filters and access disclosure. A match returns
+`devgraph.topology-not-modified.v1` with that digest, source revision, fresh time
+and storage health, omitting graph arrays. The browser accepts it only for its
+current authenticated snapshot and exact requested representation; a mismatched
+reply fails closed. New data, different filters or disclosure changes return the
+full `devgraph.topology.v1` shape. Older clients continue receiving full results;
+new clients do not send the option to a service without the capability. This is
+payload revalidation, not an authorization cache or an HTTP shared-cache 304.
+
 ## Ownership and compatibility
 
 DevGraph owns `/login`, the browser temporary key, verified finite credential,
