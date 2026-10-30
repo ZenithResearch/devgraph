@@ -14,6 +14,17 @@ export function initializeDecision(snapshot, profile, seeds) {
     }]))});
 }
 
+/** Apply the explicit equal-weight preset as a new, validated local profile revision. */
+export function uniformProfile(profile, now = Date.now()) {
+  const next = clone(profile);
+  for (const group of [...next.goals, ...next.resources]) group.predictors.forEach(predictor => { predictor.weight = 1 / group.predictors.length; });
+  next.goals.forEach(goal => { goal.weight = 1 / next.goals.length; });
+  const version = Number(next.version);
+  next.version = String(version >= 1 && Number.isSafeInteger(version) ? version + 1 : now);
+  validateProfile(next);
+  return next;
+}
+
 /** Serializable, unsolved network schema. null is unresolved; it is never zero. */
 export function describeNetwork({nodes, dependencies, profile, observations = {}}) {
   validateProfile(profile);

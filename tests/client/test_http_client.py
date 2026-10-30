@@ -275,3 +275,44 @@ def test_real_httpx_timeout_is_safe_timeout_without_retry() -> None:
     rendered = f"{captured.value!s} {captured.value!r}"
     assert "private locked timeout" not in rendered
     assert "opaque-secret" not in rendered
+
+
+def test_problem_message_includes_redacted_detail_when_present():
+    from devgraph.client import DevgraphProblem
+
+    gated = DevgraphProblem(
+        status=409,
+        title="Invalid status transition",
+        type="about:blank",
+        detail="Use a legal workflow transition to change this subtype's progress.",
+    )
+    assert str(gated) == (
+        "Devgraph problem 409: Invalid status transition "
+        "(Use a legal workflow transition to change this subtype's progress.)"
+    )
+    assert str(DevgraphProblem(status=404, title="Work object not found", type="about:blank")) == (
+        "Devgraph problem 404: Work object not found"
+    )
+
+
+def test_every_v1_work_operation_receipt_is_accepted():
+    """A receipt the server can issue must not be rejected as an invalid envelope."""
+    from typing import get_args
+
+    from devgraph.client.http import MutationOperation
+    from devgraph.work_requests import WORK_OPERATIONS
+
+    expected = {f"devgraph.work.{op}.v1" for op in WORK_OPERATIONS}
+    missing = expected - set(get_args(MutationOperation))
+    assert not missing
+
+
+def test_problem_detail_is_scrubbed_before_cli_display():
+    problem = DevgraphProblem(
+        status=403, title="Forbidden", type="about:blank",
+        detail="Review denied: Bearer opaque-secret and password=another-secret",
+    )
+    assert "Review denied:" in str(problem)
+    assert "opaque-secret" not in str(problem)
+    assert "another-secret" not in str(problem)
+    assert "[REDACTED]" in str(problem)
