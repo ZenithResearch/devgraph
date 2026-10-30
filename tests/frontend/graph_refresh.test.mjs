@@ -5,6 +5,12 @@ import { contextWithFunctions, deferred, fakeClock, flushPromises, functionsSour
 
 function refreshMonitor() {
   const document = textDocument();
+  document.getElementById('graph-surface').classList = {
+    names: new Set(),
+    add(name) { this.names.add(name); },
+    remove(name) { this.names.delete(name); },
+    contains(name) { return this.names.has(name); },
+  };
   const requests = [], rendered = [];
   const c = contextWithFunctions([
     'synchronizeCredential', 'resetDetailState', 'applySnapshot', 'flushPendingSnapshot', 'refresh', 'topologyPath',
@@ -24,7 +30,7 @@ function refreshMonitor() {
     render(snapshot, observations, graphChanged) { rendered.push({ snapshot, observations, graphChanged }); },
     invalidateLayout() {}, announceGraph() {}, refreshCheckIn() {}, checkIn: { reset() {} }, projectFilters: { reset() {} },
     prepareGraphPreferences() { c.graphView.preferenceKey = 'fixture'; },
-    updateGraphVisibility() {}, loadSelectedDetail() {},
+    updateGraphVisibility() {}, loadSelectedDetail() {}, syncReaderPresentation() {},
     renderManagerOverview() {}, renderActivity() {}, renderObservations() {}, renderPipeline() {}, renderBars() {},
     getJson(path, options) { const task = deferred(); requests.push({ path, options, ...task }); return task.promise; },
   });
@@ -65,6 +71,22 @@ test('snapshot refresh allows one flight and coalesces multiple requests into on
   assert.equal(rendered.length, 2);
   assert.equal(requests.length, 4);
   assert.equal(c.state.refreshPromise, null);
+});
+
+test('changing sessions exits reading view and preserves the new connection status', () => {
+  const {c} = refreshMonitor();
+  const surface = c.document.getElementById('graph-surface');
+  surface.classList.add('reading-view');
+  let readerSyncs = 0;
+  c.syncReaderPresentation = () => readerSyncs++;
+  c.walletSession.value = 'synthetic-session-two';
+  c.synchronizeCredential();
+  assert.equal(surface.classList.contains('reading-view'), false);
+  assert.equal(readerSyncs, 1);
+  assert.equal(c.document.getElementById('connection-label').textContent, 'Loading graph…');
+  c.walletSession.value = '';
+  c.synchronizeCredential();
+  assert.equal(c.document.getElementById('connection-label').textContent, 'Disconnected');
 });
 
 test('unchanged authorized revisions update freshness without rebuilding the graph', () => {

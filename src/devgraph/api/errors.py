@@ -30,6 +30,7 @@ from devgraph.model.repository import (
     WorkObjectVersionConflictError,
 )
 from devgraph.policy.redaction import redact_text
+from devgraph.storage.base import StorageUnavailable
 from devgraph.supporting_material import SupportingMaterialCursorChanged
 
 _PROBLEM_CONTENT_TYPE = "application/problem+json"
@@ -65,6 +66,7 @@ def register_error_handlers(app: FastAPI) -> None:
         (SecSWorkDenied, "Named Work authority denied", 403),
         (WorkRelationshipConflict, "Work relationship conflict", 409),
         (ArenaConflict, "Arena membership or archival conflict", 409),
+        (StorageUnavailable, "Storage unavailable", 503),
     ):
         app.add_exception_handler(
             exception,
