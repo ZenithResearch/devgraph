@@ -9,23 +9,40 @@ external client copy.
 
 The frontend shell is served at `GET /`. `GET /monitor` remains a compatibility
 alias so existing bookmarks continue to work. The shell contains no embedded
-graph data or credential. After an operator supplies a `devgraph.read`
-credential, the browser calls the same scoped `/monitor/topology/v1` and
-`/initiative-observations` API routes available to other authorized clients.
+graph data or credential.
 
-Credentials are held only in the current tab's `sessionStorage`. Closing the
-tab clears them. The frontend neither mints credentials nor bypasses the
-service authorization, redaction, or projection boundaries.
+On a Wallet-enabled host, **Sign in with Wallet** on `/login` opens a separate
+Wallet window. Unlock and review the server, existing access, permissions and
+expiry there. The Wallet sidebar is not required. If access is missing, the
+same window can guide an explicit request; the service owner still decides the
+grant. Obtaining approved access, saving a reusable grant and starting a
+temporary browser session remain distinct Wallet decisions.
 
-The current bearer field is a repository-level verifier seam, not the final
-Castalia authentication design. Production integration must replace it with a
-wallet/secS Magik signing flow; root keys and `.castaway` contents must never be
-loaded into this page.
+The browser holds only the approved finite credential and its own nonextractable
+temporary signing key in same-origin IndexedDB. It sends proof-bound requests
+through the allowlisted Wallet transport. The reusable grant, recovery keys and
+password remain in Wallet. Reload and navigation between the monitor and Work
+board restore the original session after checking the issuer; they do not extend
+its expiry. Wallet may be locked while this approved session reads work.
+
+The session indicator shows the fixed end time and **Sign out** clears local
+custody, including other open tabs. Signing out does not revoke the reusable
+grant. If storage cannot be cleared, the UI reports the failure and offers retry.
+A lost response uses the original session's status, not another access request
+or automatic approval. A generic status error pauses access and preserves the
+original recovery key. The current profile permits only its approved Work/Arena
+reads; broader session writes are not implemented by this login change.
+
+Private/local compositions retain their existing read contracts. Publishing a
+shell alone does not activate Wallet authority, assign permissions or expose
+protected work. Never paste root keys, passwords or `.castaway` contents into
+the monitor. Same-origin script compromise can still use an active browser key;
+nonextractability is not isolation from compromised application code.
 
 The existing exact signed v1 snapshot receiver remains available. The new
 filtered topology route also supports an independently provisioned signed v2
-profile, with a packaged ephemeral page-proof producer. Native Wallet sign-in
-is not activated by this change. See [filtered topology](../monitor-topology-v1.md)
+profile, with a packaged ephemeral page-proof producer. See
+[filtered topology](../monitor-topology-v1.md)
 for the query contract, signed profile, limits, and compatibility details.
 
 ## Current capabilities

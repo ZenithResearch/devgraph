@@ -62,6 +62,11 @@ digest, popup identity and absolute deadlines bind the handoff. The page cannot
 supply those Chrome identities. Before possible dispatch, preserve only bounded
 nonsecret recovery metadata; never a durable approval flag or plaintext parent.
 After possible dispatch, use the original child key and original issuer status.
+A generic status HTTP error, including 401, is not evidence that the original
+session expired or was revoked. It pauses access and retains recovery custody;
+it never silently clears that key and starts another approval. Only a validated
+terminal status, locally proven expiry/invalid custody or explicit sign-out ends
+that continuation.
 
 The browser stores its nonextractable Ed25519 CryptoKey with the exact challenge,
 verified token, public issuer binding and original expiry in origin-local
@@ -122,7 +127,7 @@ the exact deployed source/package and the human-approved live result separately.
 
 ## Local candidate evidence
 
-- 389 frontend unit/contract tests pass, including retained legacy clients.
+- 391 frontend unit/contract tests pass, including retained legacy clients.
 - 3,526 Python tests pass across the repository run and the separately permitted
   loopback test; 24 opt-in tests remain skipped. The native authorities were
   supplied for the holder/read integration tests.

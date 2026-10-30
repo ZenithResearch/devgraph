@@ -104,13 +104,23 @@ export class WalletLoginClient extends WalletReadClient {
   const generation=this.generation;await this.configureLogin();this.current(generation);
   const row=await this.store.load(this.slot);this.current(generation);
   if(!row?.value){this.stage='signed_out';this.notify();return false;}
-  try{await this.restoreCheckpoint(row,generation);return await this.reconcileLogin();}
+  try{await this.restoreCheckpoint(row,generation);}
   catch(cause){
    this.current(generation);
-   const terminal=['invalid_holder_session','browser_session_invalid','browser_session_changed'].includes(cause?.code??cause?.message);
-   if(this.clientSession&&!this.clientSession.closed&&cause?.status!==401&&!terminal){this.stage='session_recovery';this.notice='holder_session_outcome_unknown';this.notify();return false;}
+   // A locally invalid/expired checkpoint cannot restore usable custody.
    await this.store.remove(this.slot,row.epoch);this.current(generation);this.clientSession?.dispose();this.clientSession=null;
    this.stage='signed_out';this.notice='read_access_expired';this.notify();return false;
+  }
+  try{return await this.reconcileLogin();}
+  catch(cause){
+   this.current(generation);
+   // A generic 401 can mean an expired status proof, replay or authority
+   // availability problem. It is NOT an authenticated terminal outcome for
+   // the original session, and must not destroy its only recovery key.
+   if(this.now()>=row.value.challenge.expires_at){
+    await this.logout();this.notice='read_access_expired';this.notify();return false;
+   }
+   this.stage='session_recovery';this.notice='holder_session_outcome_unknown';this.notify();return false;
   }
  }
  async reconcileLogin(){

@@ -89,7 +89,11 @@ try{
   });
   await page.reload();await page.getByText('Signed in with Wallet',{exact:true}).waitFor();assert.equal(await page.locator('[data-session-expiry]').textContent(),expiry);assert.deepEqual(calls,['open','complete']);
   await page.goto(origin+'/monitor/kanban/');await page.getByText('Signed in with Wallet',{exact:true}).waitFor();assert.deepEqual(calls,['open','complete']);assert.ok(statuses>=3);
-  const other=await context.newPage();await other.goto(origin+'/monitor');await other.getByText('Signed in with Wallet',{exact:true}).waitFor();
+  const other=await context.newPage();other.on('pageerror',e=>errors.push(e.message));await other.goto(origin+'/monitor');await other.getByText('Signed in with Wallet',{exact:true}).waitFor();
+  // Exercise the pagehide/pageshow hooks without claiming this synthetic event
+  // is a complete browser BFCache implementation test.
+  await other.evaluate(()=>{dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));});
+  await other.getByText('Signed in with Wallet',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.waitForURL(origin+'/login');await page.getByRole('button',{name:'Sign in with Wallet',exact:true}).waitFor();assert.equal(popups,1);
   await other.waitForURL('**/login?**');await other.close();
   assert.deepEqual(errors,[]);results.push({origin,width,scenario,popups,reads,statuses,expiry_preserved:true,nonextractable:true});await context.close();

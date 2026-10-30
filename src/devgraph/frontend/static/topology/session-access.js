@@ -20,7 +20,8 @@
    logout:async()=>{leaving=true;logoutFailed=false;try{await client?.logout();try{channel?.postMessage('signed_out');}catch{}root.location.replace('/login');}catch{logoutFailed=true;render();}}
   };
   logout.addEventListener('click',()=>void controller.logout());
-  if(root.BroadcastChannel){channel=new root.BroadcastChannel('devgraph-session-events-v1');channel.onmessage=event=>{if(event.data==='signed_out'){client?.disconnect();redirect();}};}
+  function openChannel(){if(root.BroadcastChannel){channel?.close();channel=new root.BroadcastChannel('devgraph-session-events-v1');channel.onmessage=event=>{if(event.data==='signed_out'){client?.disconnect();redirect();}};}}
+  openChannel();
   async function resume(){
    settled=false;
    try{
@@ -31,7 +32,7 @@
    }catch{redirect();}
   }
   root.addEventListener('pagehide',()=>{settled=false;root.clearInterval(clock);client?.disconnect();channel?.close();});
-  root.addEventListener('pageshow',event=>{if(event.persisted){leaving=false;void resume();clock=root.setInterval(()=>client?.expireIfNeeded(),1000);}});
+  root.addEventListener('pageshow',event=>{if(event.persisted){leaving=false;openChannel();void resume();clock=root.setInterval(()=>client?.expireIfNeeded(),1000);}});
   clock=root.setInterval(()=>client?.expireIfNeeded(),1000);
   void resume();return controller;
  }};

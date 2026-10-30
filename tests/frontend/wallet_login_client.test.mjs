@@ -7,7 +7,7 @@ const hex=value=>Buffer.from(value).toString('hex');
 const bytes=(domain,value)=>new TextEncoder().encode(domain+'\0'+canonicalSessionJson(value));
 
 async function fixture({lost=false,cancel=false,maximum=900}={}){
- let now=1000,challenge,credential,state=null,statusCode=200;const calls=[],rows=new Map();
+ let now=1000,challenge,credential,state=null,statusCode=200,corruptStatus=false;const calls=[],rows=new Map();
  const issuer=await webcrypto.subtle.generateKey('Ed25519',true,['sign','verify']);
  const origin='https://graph.example',service='service:graph';
  const pin={service,issuer:'fixture',key_id:'key',public_key:hex(await webcrypto.subtle.exportKey('raw',issuer.publicKey))};
@@ -34,12 +34,13 @@ async function fixture({lost=false,cancel=false,maximum=900}={}){
  }};
  const fetchImpl=async(path,options)=>{
   const value=String(path).endsWith('/capabilities')?capabilities:String(path).endsWith('/status')?{schema:'secs.holder-session-result.v1',request_id:challenge.request_id,challenge_id:challenge.challenge_id,state:state??(credential?'issued':'pending'),credential:state?null:credential??null,expires_at:challenge.expires_at}:String(path).endsWith('/requests')?{items:[]}:configuration;
+  if(String(path).endsWith('/status')&&corruptStatus&&value.credential)value.credential={...value.credential,signature:'0'.repeat(128)};
   if(String(path).endsWith('/status'))calls.push('issuer_status');
   return new Response(JSON.stringify(value),{status:String(path).endsWith('/status')?statusCode:200,headers:{'Content-Type':'application/json'}});
  };
  const options={origin,fetchImpl,now:()=>now,cryptoImpl:webcrypto,store};
  const make=()=>new WalletLoginClient(options);
- return{client:make(),make,provider,calls,rows,store,now:value=>{now=value;},status:(value,code=200)=>{state=value;statusCode=code;}};
+ return{client:make(),make,provider,calls,rows,store,now:value=>{now=value;},status:(value,code=200)=>{state=value;statusCode=code;},corruptStatus:value=>{corruptStatus=value;}};
 }
 
 test('one browser click opens one popup and completes the same finite delegation',async()=>{
@@ -84,10 +85,26 @@ test('an expired unissued review ends recovery and permits a fresh explicit logi
  await f.client.prepareLogin(f.provider);assert.equal(f.client.stage,'login_ready');
  assert.equal(f.calls.filter(c=>c==='open_session_login').length,1,'preparation never opens or renews a session');
 });
-test('current issuer denial clears restored custody without another Wallet call',async()=>{
+test('generic status denial preserves the original recovery key without another Wallet call',async()=>{
  const f=await fixture();await f.client.prepareLogin(f.provider);await f.client.login();f.client.disconnect();
  f.status('revoked',401);const restored=f.make();assert.equal(await restored.resumeLogin(),false);
- assert.equal(f.rows.size,0);assert.equal(restored.clientSession,null);assert.notEqual(restored.stage,'ready');
+ assert.equal(f.rows.size,1);assert.ok(restored.clientSession);assert.equal(restored.stage,'session_recovery');
+ await assert.rejects(restored.read('/todos/v2'),/wallet_read_access_required/);
+ f.status(null);assert.equal(await restored.reconcileLogin(),true);assert.equal(restored.expiresAt,1900);
+ assert.equal(f.calls.filter(c=>c==='open_session_login').length,1);
+});
+test('an authenticated terminal revocation retires local custody without requesting a replacement',async()=>{
+ const f=await fixture();await f.client.prepareLogin(f.provider);await f.client.login();f.client.disconnect();
+ f.status('revoked');const restored=f.make();assert.equal(await restored.resumeLogin(),false);
+ assert.equal(f.rows.size,0);assert.equal(restored.clientSession,null);assert.equal(restored.notice,'read_access_revoked');
+ assert.equal(f.calls.filter(c=>c==='open_session_login').length,1);
+});
+test('a bad remote credential cannot destroy the original durable recovery key',async()=>{
+ const f=await fixture({lost:true});await f.client.prepareLogin(f.provider);await assert.rejects(f.client.login());f.client.disconnect();
+ const publicKey=[...f.rows.values()][0].value.publicKey;f.corruptStatus(true);
+ const restored=f.make();assert.equal(await restored.resumeLogin(),false);assert.equal(restored.stage,'session_recovery');
+ assert.equal(restored.clientSession.closed,true);assert.equal(f.rows.size,1);assert.equal([...f.rows.values()][0].value.publicKey,publicKey);
+ f.corruptStatus(false);assert.equal(await restored.reconcileLogin(),true);assert.equal(restored.expiresAt,1900);
  assert.equal(f.calls.filter(c=>c==='open_session_login').length,1);
 });
 test('a replaced storage lease prevents an old tab reading or reviving its session',async()=>{
