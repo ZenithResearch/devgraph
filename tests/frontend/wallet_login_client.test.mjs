@@ -6,7 +6,7 @@ import {canonicalSessionJson} from '../../src/devgraph/frontend/static/credentia
 const hex=value=>Buffer.from(value).toString('hex');
 const bytes=(domain,value)=>new TextEncoder().encode(domain+'\0'+canonicalSessionJson(value));
 
-async function fixture({lost=false,cancel=false}={}){
+async function fixture({lost=false,cancel=false,maximum=900}={}){
  let now=1000,challenge,credential,state=null,statusCode=200;const calls=[],rows=new Map();
  const issuer=await webcrypto.subtle.generateKey('Ed25519',true,['sign','verify']);
  const origin='https://graph.example',service='service:graph';
@@ -14,6 +14,7 @@ async function fixture({lost=false,cancel=false}={}){
  const profile={schema:'castalia.provider-profile.v1',display_name:'Fixture',origins:[origin],membership:null,presentations:[{issuer:pin.issuer,key_id:pin.key_id,public_key:pin.public_key,audience:'devgraph',callers:[{kind:'browser',id:origin}]}]};
  const configuration={schema:'devgraph.wallet-read-configuration.v1',endpoint:'/monitor/wallet-access/v1',web_wallet_url:null,provider_profile:profile,holder_grants:{schema:'secs.holder-grant.v2',service,endpoint:'/monitor/wallet-access/v1/grants'}};
  const capabilities={schema:'secs.holder-session-capabilities.v1',supported:true,profile:'secs.holder-session.v1',issuer_pin:pin,audience:'devgraph',grant_schemas:['secs.holder-grant.v2'],credential_schema:'secs.holder-session-credential.v1',presentation_schema:'secs.holder-session-presentation.v1',read_only:true,max_ttl_seconds:900,review_ttl_seconds:120,proof_max_ttl_seconds:60,challenge_path:'/holder-sessions/v1/challenges',exchange_path:'/holder-sessions/v1/exchange',status_path:'/holder-sessions/v1/status'};
+ capabilities.max_ttl_seconds=maximum;
  const store={load:async slot=>structuredClone(rows.get(slot)??null),reserve:async(slot,epoch)=>{rows.set(slot,{epoch,value:null});},save:async(slot,epoch,value)=>{if(rows.get(slot)?.epoch!==epoch)throw Error('browser_session_changed');rows.set(slot,structuredClone({epoch,value}));},remove:async(slot,epoch)=>{if(!epoch||rows.get(slot)?.epoch===epoch)rows.delete(slot);}};
  const provider={getCapabilities:async()=>['session_login_v1'],readAccess:async input=>{
   calls.push(input.operation);
@@ -105,4 +106,10 @@ test('logout storage failure is reported and a retry can still clear the origina
  f.store.remove=async()=>{throw Error('session_storage_unavailable');};await assert.rejects(f.client.logout(),/session_storage_unavailable/);
  assert.notEqual(f.client.stage,'ready');assert.equal(f.rows.size,1);
  f.store.remove=remove;await f.client.logout();assert.equal(f.rows.size,0);
+});
+test('Wallet receives the verified service lifetime ceiling and returns the actual consented expiry',async()=>{
+ const f=await fixture({maximum:3600});await f.client.prepareLogin(f.provider);
+ assert.equal(f.client.loginRequest.requested_ttl_seconds,3600);await f.client.login();
+ assert.equal(f.client.expiresAt,1900,'actual fifteen-minute challenge remains authoritative');
+ assert.equal([...f.rows.values()][0].value.ttlSeconds,3600);
 });

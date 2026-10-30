@@ -20,8 +20,10 @@ The initial browser action calls `open_session_login` with the configured
 canonical service, public provider profile/access binding, temporary public key,
 temporary installation ID and a requested lifetime bounded by the selected service
 profile. The current
-read-only profile uses 900 seconds by default; this is not a universal Wallet
-limit. The user also requested support for eligible approved write authority and
+read-only profile defaults to 900 seconds in Wallet, with a duration choice
+bounded by the caller, verified service and signed parent. The browser sends the
+verified service ceiling (at most 3600 in the current signed contract), not an
+unlimited delegation. The user also requested support for eligible approved write authority and
 human-selected lifetime; the required parent compiler and transactional write
 receiver are documented in [the audited integration plan](service-session-delegation-plan.md).
 This release does not advertise that unimplemented profile.
@@ -120,7 +122,7 @@ the exact deployed source/package and the human-approved live result separately.
 
 ## Local candidate evidence
 
-- 388 frontend unit/contract tests pass, including retained legacy clients.
+- 389 frontend unit/contract tests pass, including retained legacy clients.
 - 3,526 Python tests pass across the repository run and the separately permitted
   loopback test; 24 opt-in tests remain skipped. The native authorities were
   supplied for the holder/read integration tests.

@@ -38,7 +38,10 @@ export class WalletLoginClient extends WalletReadClient {
    !shape(c.issuer_pin,['issuer','key_id','public_key','service'])||c.issuer_pin.service!==service||
    !this.configuration.provider_profile.presentations.some(p=>p.issuer===c.issuer_pin.issuer&&p.key_id===c.issuer_pin.key_id&&p.public_key===c.issuer_pin.public_key&&p.audience===c.audience))throw error('holder_session_setup_invalid');
   this.clientSession?.dispose();
-  const ttl=Math.min(900,c.max_ttl_seconds);
+  // This is the requested upper bound. Wallet offers a default/shorter duration
+  // after checking the signed parent and current service policy, then the human
+  // approves the exact returned challenge expiry in the popup.
+  const ttl=c.max_ttl_seconds;
   this.clientSession=await createBrowserLoginSession({origin:this.origin,service,profile:this.configuration.provider_profile,ttlSeconds:ttl,cryptoImpl:this.cryptoImpl,now:this.now});
   this.current(generation);
   this.loginProvider=provider;this.loginId=hex(this.cryptoImpl.getRandomValues(new Uint8Array(16)));
