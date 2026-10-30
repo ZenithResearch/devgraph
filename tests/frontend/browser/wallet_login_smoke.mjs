@@ -72,8 +72,12 @@ try{
   await page.getByRole('button',{name:'Sign in with Wallet',exact:true}).waitFor({state:'visible'});
   await page.screenshot({path:join(output,`login-${tailnet?'tailnet':'public'}-${width}.png`),fullPage:true});
   const popupWait=context.waitForEvent('page');await page.getByRole('button',{name:'Sign in with Wallet',exact:true}).click();const popup=await popupWait;
+  const firstRead=page.waitForResponse(response=>new URL(response.url()).pathname==='/monitor/wallet-access/v1/requests'&&response.status()===200);
   await page.getByRole('button',{name:'Continue in Wallet…',exact:true}).waitFor();await popup.getByRole('button',{name:'Approve temporary session'}).click();
   await page.waitForURL(origin+'/monitor#topology');await page.getByText('Signed in with Wallet',{exact:true}).waitFor();
+  // Authentication is rendered before graph loading completes. Wait for a real
+  // authenticated read, rather than racing its asynchronous fetch in CI.
+  await firstRead;
   const expiry=await page.locator('[data-session-expiry]').textContent();assert.equal(popups,1);assert.deepEqual(calls,['open','complete']);assert.ok(reads>0);
   assert.equal(await page.locator('.wallet-connection-steps').count(),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
