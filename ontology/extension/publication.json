@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "ontology_id": "https://zenith-research.ca/ontology/devgraph",
-  "version": "0.1.0",
-  "release": "v0.1.0",
-  "published_at": "2026-10-29T00:00:00Z",
-  "canonical_base_url": "https://zenith-research.ca/ontology/devgraph/v0.1.0",
+  "version": "0.2.0",
+  "release": "v0.2.0",
+  "published_at": "2026-11-17T00:00:00Z",
+  "canonical_base_url": "https://zenith-research.ca/ontology/devgraph/v0.2.0",
   "discovery_url": "https://zenith-research.ca/.well-known/devgraph-ontology",
   "authority": {
     "name": "DevGraph",
@@ -66,20 +66,39 @@
       "source": "ontology/zenith-local-space.json",
       "target": "zenith-local-space.json",
       "media_type": "application/json"
+    },
+    {
+      "source": "ontology/extension/legacy-term-mappings.json",
+      "target": "legacy-term-mappings.json",
+      "media_type": "application/json"
     }
   ],
   "imports": [
     {
-      "path": "ontology/imports/zenith/v0.13.0/manifest.json",
-      "ontologyId": "https://zenith-research.ca/ontology",
-      "version": "0.13.0",
+      "path": "ontology/imports/zenith-normalized/v0.1.0/manifest.json",
+      "ontologyId": "https://zenith-research.ca/ontology/normalized",
+      "version": "0.1.0",
       "manifest": {
-        "url": "https://zenith-research.ca/ontology/v0.13.0/manifest.json",
-        "sha256": "71c80068182f46bc30c019669d201cb6a5366646274737618c949802d9434a64",
-        "bytes": 1812,
+        "url": "https://zenith-research.ca/ontology/normalized/v0.1.0/manifest.json",
+        "sha256": "d73a66b7f780b8ebc1ec1ac1f7d3791eec91a0259dca90faf37927636ad08a4a",
+        "bytes": 8112,
         "mediaType": "application/json"
       },
-      "ontologyUrl": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld"
+      "ontologyUrl": "https://zenith-research.ca/ontology/normalized/v0.1.0/ontology.jsonld"
+    }
+  ],
+  "supported_versions": [
+    "0.2.0",
+    "0.1.0"
+  ],
+  "retainedPackages": [
+    {
+      "source": "ontology/imports/zenith/v0.13.0",
+      "target": "core/v0.13.0"
+    },
+    {
+      "source": "ontology/extension/releases/v0.1.0",
+      "target": "extension/v0.1.0"
     }
   ]
 }

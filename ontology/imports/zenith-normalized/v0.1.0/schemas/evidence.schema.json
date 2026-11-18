@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/evidence.schema.json",
+  "title": "Zenith evidence references",
+  "$defs": {
+    "EvidencePointer": {
+      "type": "object",
+      "properties": {
+        "artifact": {
+          "$ref": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/core.schema.json#/$defs/ArtifactRef"
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^(?:/.*)?$"
+        }
+      },
+      "required": [
+        "artifact",
+        "pointer"
+      ],
+      "additionalProperties": false
+    },
+    "SourceValueAssertion": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+        },
+        "source": {
+          "$ref": "#/$defs/EvidencePointer"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "SourcedRelation": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+        },
+        "predicate": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+        },
+        "object": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+        },
+        "source": {
+          "$ref": "#/$defs/EvidencePointer"
+        }
+      },
+      "required": [
+        "subject",
+        "predicate",
+        "object",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

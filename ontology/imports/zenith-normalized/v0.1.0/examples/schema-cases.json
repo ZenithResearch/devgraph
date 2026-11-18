@@ -1,0 +1,59 @@
+[
+  {
+    "name": "Entity conformance",
+    "schema": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/core.schema.json#/$defs/EntityProjection",
+    "valid": true,
+    "data": {
+      "id": "urn:example:person:one",
+      "types": [
+        "https://zenith-research.ca/ontology/terms/Person"
+      ],
+      "invocationContract": {
+        "id": "urn:example:contract:one",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "byteLength": 100,
+        "mediaType": "application/json"
+      }
+    }
+  },
+  {
+    "name": "Entity missing invocation contract",
+    "schema": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/core.schema.json#/$defs/EntityProjection",
+    "valid": false,
+    "data": {
+      "id": "urn:example:person:one",
+      "types": [
+        "https://zenith-research.ca/ontology/terms/Person"
+      ]
+    }
+  },
+  {
+    "name": "General request submission",
+    "schema": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/request.schema.json#/$defs/GeneralRequest",
+    "valid": true,
+    "data": {
+      "id": "urn:example:request:one",
+      "type": "https://zenith-research.ca/ontology/terms/Request",
+      "requestedOutcome": "Replace the intake valve",
+      "requester": "urn:example:person:one",
+      "recipient": "urn:example:org:service"
+    }
+  },
+  {
+    "name": "Directory entry",
+    "schema": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/directory.schema.json#/$defs/DirectoryEntry",
+    "valid": true,
+    "data": {
+      "entity": "urn:example:person:one",
+      "directoryKey": "person-1"
+    }
+  },
+  {
+    "name": "Collection identity",
+    "schema": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/collection.schema.json",
+    "valid": true,
+    "data": {
+      "id": "urn:example:directory:one"
+    }
+  }
+]

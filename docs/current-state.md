@@ -82,7 +82,7 @@ and identity/grant activation need their own machine evidence.
 
 | Surface | Current evidence |
 |---|---|
-| Ontology | `ontology/source-index.v1.json`, historical runtime releases through v0.12, exact core v0.13/extension v0.1, and both release builders in check mode |
+| Ontology | `ontology/source-index.v1.json`, historical runtime releases through v0.12, exact normalized Zenith v0.1.0/Devgraph extension v0.2.0, and both release builders in check mode |
 | Storage | `src/devgraph/storage/`; parity, persistence-contract, migration-store, and opt-in Neo4j tests |
 | Domain model | `src/devgraph/model/`, `src/devgraph/relationships.py`, and `src/devgraph/services/priority.py` |
 | Authorization | `src/devgraph/auth/` and `tests/auth/` |

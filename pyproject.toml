@@ -40,6 +40,8 @@ devgraph = [
   "resources/ontology-ownership.json",
   "resources/ontology-source-index.v1.json",
   "resources/ontology-sources/*/*/*",
+  "resources/ontology-sources/*/*/.gitignore",
+  "resources/ontology-sources/*/*/*/*",
   "frontend/static/selection/core/*",
   "frontend/static/topology/*",
   "frontend/static/kanban/*",
@@ -56,6 +58,7 @@ pythonpath = ["src", "."]
 testpaths = ["tests"]
 
 [tool.ruff]
+extend-exclude = ["src/devgraph/resources/ontology-sources"]
 line-length = 100
 src = ["src", "tests"]
 

@@ -1,10 +1,28 @@
 # Core and extension ownership
 
-ZenithResearch/zenith-ontology owns the shared core vocabulary formerly authored in DevGraph v0.12.0. The successor is Zenith core v0.13.0; its 86 term records and parent axioms are unchanged. DevGraph imports that exact release and owns its operation, validation and storage/runtime profiles.
+[Zenith normalized v0.1.0](https://github.com/ZenithResearch/zenith-ontology-normalized/releases/tag/v0.1.0)
+is Devgraph's adopted vocabulary. Devgraph extension v0.2.0 imports it and owns
+its local class declarations, operation contracts, and runtime profiles.
+The normalized release has a new ontology identity and retains the shared
+term namespace. Legacy Zenith v0.13.0 and extension v0.1.0 remain available
+with their original identities and hashes.
 
-Author new shared definitions in Zenith, publish a new immutable core release, then explicitly update ontology/extension/publication.json and ontology/ownership.json when DevGraph adopts it. Run `node scripts/build_ontology_extension.mjs` and `node scripts/build_ontology_extension.mjs --check`; changed bytes at an existing extension version are rejected. Never regenerate Zenith vocabulary from DevGraph. The legacy builder is retained for `--check` only.
+Publish an immutable shared release before adopting it in Devgraph. Update
+`ontology/extension/publication.json` and `ontology/ownership.json` with an
+exact pin, and vendor the release bytes. The canonical IRIs identify the
+documents inside the archive. The archive URL in the ownership lock provides a
+separate distribution location. Run `node scripts/build_ontology_extension.mjs`
+and then its `--check` mode. The legacy Devgraph builder supports `--check`
+for the historical runtime bundle.
 
-The extension initially adds no class definitions; it declares a pinned OWL import and carries the existing runtime profile files byte for byte. Independent core updates do not automatically upgrade DevGraph, Zendo or other dependents. Existing immutable releases, packaged CLI runtime pins and database schemas stay compatible. `devgraph ontology` reports both the packaged runtime snapshot and additive current vocabulary/extension metadata. This source change does not deploy a host or migrate its graph.
+The [extension](../ontology/extension/README.md) describes the local classes.
+[Legacy term mappings](../ontology/extension/legacy-term-mappings.json) record
+the boundary for each of the 22 older terms outside the normalized bundle.
+Compatibility readers continue to accept historical identifiers. Graph labels
+and operation payloads continue to follow the versioned runtime contract.
+Keep the legacy and normalized RDF import closures separate. Coordinate
+changes to the exact legacy Seat IRI and approved preset snapshots with the
+configuration and directory readers before migrating any data.
 
 ## Distribution and compatibility contract
 

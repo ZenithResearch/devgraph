@@ -1,0 +1,230 @@
+{
+  "@context": {
+    "zn": "https://zenith-research.ca/ontology/terms/",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "label": "rdfs:label",
+    "comment": "rdfs:comment",
+    "domain": {
+      "@id": "rdfs:domain",
+      "@type": "@id"
+    },
+    "range": {
+      "@id": "rdfs:range",
+      "@type": "@id"
+    },
+    "subClassOf": {
+      "@id": "rdfs:subClassOf",
+      "@type": "@id"
+    },
+    "versionIRI": {
+      "@id": "owl:versionIRI",
+      "@type": "@id"
+    },
+    "versionInfo": "owl:versionInfo",
+    "canonicalAuthority": {
+      "@id": "zn:canonicalAuthority",
+      "@type": "@id"
+    },
+    "semanticOperation": {
+      "@id": "zn:semanticOperation",
+      "@type": "@id"
+    },
+    "equivalentClass": {
+      "@id": "owl:equivalentClass",
+      "@type": "@id"
+    },
+    "imports": {
+      "@id": "owl:imports",
+      "@type": "@id"
+    }
+  },
+  "@graph": [
+    {
+      "@id": "https://zenith-research.ca/ontology/normalized/modules/work",
+      "@type": "owl:Ontology",
+      "versionIRI": "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/work.jsonld",
+      "versionInfo": "0.1.0",
+      "imports": [
+        "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/core.jsonld"
+      ]
+    },
+    {
+      "@id": "zn:Todo",
+      "@type": "owl:Class",
+      "label": "Todo",
+      "comment": "Common base for committed or proposed work objects.",
+      "subClassOf": "owl:Thing"
+    },
+    {
+      "@id": "zn:Proposal",
+      "@type": "owl:Class",
+      "label": "Proposal",
+      "comment": "Proposed work whose acceptance requires Decision provenance.",
+      "subClassOf": "zn:Todo"
+    },
+    {
+      "@id": "zn:Initiative",
+      "@type": "owl:Class",
+      "label": "Initiative",
+      "comment": "Strategic work container larger than a Project.",
+      "subClassOf": "zn:Todo"
+    },
+    {
+      "@id": "zn:Project",
+      "@type": "owl:Class",
+      "label": "Project",
+      "comment": "Delivery container for issues, tasks, and milestones.",
+      "subClassOf": "zn:Todo"
+    },
+    {
+      "@id": "zn:Issue",
+      "@type": "owl:Class",
+      "label": "Issue",
+      "comment": "A work item tracking a problem, question or requested change through assessment and resolution.",
+      "subClassOf": "zn:Todo"
+    },
+    {
+      "@id": "zn:Task",
+      "@type": "owl:Class",
+      "label": "Task",
+      "comment": "An actionable unit of work undertaken to achieve an intended outcome.",
+      "subClassOf": "zn:Todo"
+    },
+    {
+      "@id": "zn:Arena",
+      "@type": "owl:Class",
+      "label": "Arena",
+      "comment": "A continuing area of responsibility grouping Initiatives and standalone Tasks. Arena membership is separate from Work parentage; direct members have no incoming HAS_CHILD work-parent edge. Separate Arena runtime type; see arena-contract.json and arena-runtime.md.",
+      "subClassOf": "owl:Thing"
+    },
+    {
+      "@id": "zn:Requirement",
+      "@type": "owl:Class",
+      "label": "Requirement",
+      "comment": "Required behavior or condition.",
+      "subClassOf": "owl:Thing"
+    },
+    {
+      "@id": "zn:AcceptanceCriterion",
+      "@type": "owl:Class",
+      "label": "Acceptance Criterion",
+      "comment": "Checkable condition for accepting work or a requirement.",
+      "subClassOf": "owl:Thing"
+    },
+    {
+      "@id": "zn:Blocker",
+      "@type": "owl:Class",
+      "label": "Blocker",
+      "comment": "Explicit impediment to work.",
+      "subClassOf": "owl:Thing"
+    },
+    {
+      "@id": "zn:Decision",
+      "@type": "owl:Class",
+      "label": "Decision",
+      "comment": "Accepted design or scope choice with provenance.",
+      "subClassOf": "owl:Thing"
+    },
+    {
+      "@id": "zn:Milestone",
+      "@type": "owl:Class",
+      "label": "Milestone",
+      "comment": "Grouped delivery marker.",
+      "subClassOf": "owl:Thing"
+    },
+    {
+      "@id": "zn:CONTAINS",
+      "@type": "owl:ObjectProperty",
+      "label": "contains",
+      "comment": "Hierarchical work containment."
+    },
+    {
+      "@id": "zn:DEPENDS_ON",
+      "@type": "owl:ObjectProperty",
+      "label": "depends on",
+      "comment": "Source work cannot complete before target work."
+    },
+    {
+      "@id": "zn:BLOCKS",
+      "@type": "owl:ObjectProperty",
+      "label": "blocks",
+      "comment": "Source prevents target work from progressing."
+    },
+    {
+      "@id": "zn:HAS_REQUIREMENT",
+      "@type": "owl:ObjectProperty",
+      "label": "has requirement"
+    },
+    {
+      "@id": "zn:HAS_ACCEPTANCE_CRITERION",
+      "@type": "owl:ObjectProperty",
+      "label": "has acceptance criterion"
+    },
+    {
+      "@id": "zn:ACCEPTED_BY_DECISION",
+      "@type": "owl:ObjectProperty",
+      "label": "accepted by decision"
+    },
+    {
+      "@id": "zn:HAS_DECISION",
+      "@type": "owl:ObjectProperty",
+      "label": "has decision"
+    },
+    {
+      "@id": "zn:HAS_MILESTONE",
+      "@type": "owl:ObjectProperty",
+      "label": "has milestone"
+    },
+    {
+      "@id": "zn:CONTAINS_WORK",
+      "@type": "owl:ObjectProperty",
+      "label": "contains work",
+      "domain": "zn:Arena",
+      "range": "zn:Todo",
+      "comment": "Direct Arena membership, restricted by arena-contract.json to parentless Initiative or Task records. Optional, at most one direct Arena per member; not a HAS_CHILD parent, authority grant."
+    },
+    {
+      "@id": "zn:hasWorkflowDecision",
+      "@type": "owl:ObjectProperty",
+      "label": "has workflow decision",
+      "comment": "Authorized workflow approval or resolution Decision; separate from Proposal acceptance provenance.",
+      "domain": "zn:Todo",
+      "range": "zn:Decision"
+    },
+    {
+      "@id": "zn:workflowMetadata",
+      "@type": "owl:DatatypeProperty",
+      "label": "workflow metadata",
+      "comment": "Optional versioned workflow assignment and exact stage, separate from lifecycle and containment. Absent legacy values are preserved.",
+      "domain": "zn:Todo",
+      "range": "xsd:string"
+    },
+    {
+      "@id": "zn:progress",
+      "@type": "owl:DatatypeProperty",
+      "label": "Todo progress",
+      "domain": "zn:Todo",
+      "range": "xsd:string",
+      "comment": "Exactly not_started, in_progress or done. Absent historical values require classification; absence is not a fourth state. See todo-progress.md."
+    },
+    {
+      "@id": "zn:archived",
+      "@type": "owl:DatatypeProperty",
+      "label": "Archived",
+      "domain": "zn:Todo",
+      "range": "xsd:boolean",
+      "comment": "Independent visibility attribute. Archive and restore preserve progress, stage, evidence and history."
+    },
+    {
+      "@id": "zn:REJECTED_BY_DECISION",
+      "@type": "owl:ObjectProperty",
+      "label": "Rejected by Decision",
+      "domain": "zn:Proposal",
+      "range": "zn:Decision",
+      "comment": "Recorded rejection disposition. Does not complete any linked delivery work."
+    }
+  ]
+}

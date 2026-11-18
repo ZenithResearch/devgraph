@@ -43,6 +43,7 @@
     "owl:imports": {
       "@id": "http://www.w3.org/2002/07/owl#imports",
       "@type": "@id"
-    }
+    },
+    "devgraph": "https://zenith-research.ca/ontology/devgraph/terms/"
   }
 }

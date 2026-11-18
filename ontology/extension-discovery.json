@@ -7,15 +7,16 @@
     "source_path": "ontology/extension/"
   },
   "current": {
-    "version": "0.1.0",
-    "release": "v0.1.0",
-    "manifest_url": "https://zenith-research.ca/ontology/devgraph/v0.1.0/manifest.json",
-    "manifest_sha256": "ea5ad93dcccccb16c291949ccf8928e583fe42d14e37e5010b6cafed899aa141",
-    "bundle_digest": "abbfd96f7917daa3356c92968c1128ee9d993e413606c0bf669fa47efce150e4",
-    "ontology_url": "https://zenith-research.ca/ontology/devgraph/v0.1.0/ontology.jsonld",
-    "context_url": "https://zenith-research.ca/ontology/devgraph/v0.1.0/context.jsonld"
+    "version": "0.2.0",
+    "release": "v0.2.0",
+    "manifest_url": "https://zenith-research.ca/ontology/devgraph/v0.2.0/manifest.json",
+    "manifest_sha256": "832c51699ae1563dc82e21e063384dcbbe40164ad8db9392b2c6b2941994fdc6",
+    "bundle_digest": "81defece7bfcf5c549ff356e8e3021f7a8852a90d3b6b19361490ea2c8fd4e3d",
+    "ontology_url": "https://zenith-research.ca/ontology/devgraph/v0.2.0/ontology.jsonld",
+    "context_url": "https://zenith-research.ca/ontology/devgraph/v0.2.0/context.jsonld"
   },
   "supported_versions": [
+    "0.2.0",
     "0.1.0"
   ],
   "compatibility_policy": "Pin exact manifests and complete imports. Update each maintainer-owned source independently; retained releases are immutable."

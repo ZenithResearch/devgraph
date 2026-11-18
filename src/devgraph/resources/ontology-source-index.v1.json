@@ -2,32 +2,36 @@
   "schemaVersion": "devgraph.ontology-sources.v1",
   "pathBase": "package-resources",
   "adoptedCore": {
-    "repository": "https://github.com/ZenithResearch/zenith-ontology",
-    "commit": "142f515675d4127736676c9e7a8b1bb158621eae",
-    "sourcePath": "ontology/core/ontology.jsonld",
-    "ontologyId": "https://zenith-research.ca/ontology",
-    "version": "0.13.0",
+    "repository": "https://github.com/ZenithResearch/zenith-ontology-normalized",
+    "commit": "4a5e54d744c0b1ed0e4dc5750ad98eb52dd11bc2",
+    "sourcePath": "ontology.jsonld",
+    "ontologyId": "https://zenith-research.ca/ontology/normalized",
+    "version": "0.1.0",
     "manifest": {
-      "url": "https://zenith-research.ca/ontology/v0.13.0/manifest.json",
-      "sha256": "71c80068182f46bc30c019669d201cb6a5366646274737618c949802d9434a64",
-      "bytes": 1812,
+      "url": "https://zenith-research.ca/ontology/normalized/v0.1.0/manifest.json",
+      "sha256": "d73a66b7f780b8ebc1ec1ac1f7d3791eec91a0259dca90faf37927636ad08a4a",
+      "bytes": 8112,
       "mediaType": "application/json"
     },
-    "ontologyUrl": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld",
-    "resourcePath": "ontology-sources/core/v0.13.0"
+    "ontologyUrl": "https://zenith-research.ca/ontology/normalized/v0.1.0/ontology.jsonld",
+    "distribution": {
+      "url": "https://github.com/ZenithResearch/zenith-ontology-normalized/releases/download/v0.1.0/zenith-ontology-normalized-v0.1.0.zip",
+      "sha256": "6ab9289cad7d811d0cdb2078a6261a538fbd77dbfa53db144e686bc7feafe91d"
+    },
+    "resourcePath": "ontology-sources/core/v0.1.0"
   },
   "extension": {
     "repository": "https://github.com/ZenithResearch/devgraph",
     "ontologyId": "https://zenith-research.ca/ontology/devgraph",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "manifest": {
-      "url": "https://zenith-research.ca/ontology/devgraph/v0.1.0/manifest.json",
-      "sha256": "ea5ad93dcccccb16c291949ccf8928e583fe42d14e37e5010b6cafed899aa141",
-      "bytes": 4027,
+      "url": "https://zenith-research.ca/ontology/devgraph/v0.2.0/manifest.json",
+      "sha256": "832c51699ae1563dc82e21e063384dcbbe40164ad8db9392b2c6b2941994fdc6",
+      "bytes": 4353,
       "mediaType": "application/json"
     },
-    "ontologyUrl": "https://zenith-research.ca/ontology/devgraph/v0.1.0/ontology.jsonld",
-    "resourcePath": "ontology-sources/extension/v0.1.0"
+    "ontologyUrl": "https://zenith-research.ca/ontology/devgraph/v0.2.0/ontology.jsonld",
+    "resourcePath": "ontology-sources/extension/v0.2.0"
   },
   "runtimeCompatibility": {
     "ontologyId": "https://zenith-research.ca/ontology",
