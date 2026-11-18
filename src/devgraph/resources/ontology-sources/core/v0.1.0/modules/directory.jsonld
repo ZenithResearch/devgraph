@@ -1,0 +1,76 @@
+{
+  "@context": {
+    "zn": "https://zenith-research.ca/ontology/terms/",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "label": "rdfs:label",
+    "comment": "rdfs:comment",
+    "domain": {
+      "@id": "rdfs:domain",
+      "@type": "@id"
+    },
+    "range": {
+      "@id": "rdfs:range",
+      "@type": "@id"
+    },
+    "subClassOf": {
+      "@id": "rdfs:subClassOf",
+      "@type": "@id"
+    },
+    "versionIRI": {
+      "@id": "owl:versionIRI",
+      "@type": "@id"
+    },
+    "versionInfo": "owl:versionInfo",
+    "canonicalAuthority": {
+      "@id": "zn:canonicalAuthority",
+      "@type": "@id"
+    },
+    "semanticOperation": {
+      "@id": "zn:semanticOperation",
+      "@type": "@id"
+    },
+    "equivalentClass": {
+      "@id": "owl:equivalentClass",
+      "@type": "@id"
+    },
+    "imports": {
+      "@id": "owl:imports",
+      "@type": "@id"
+    }
+  },
+  "@graph": [
+    {
+      "@id": "https://zenith-research.ca/ontology/normalized/modules/directory",
+      "@type": "owl:Ontology",
+      "versionIRI": "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/directory.jsonld",
+      "versionInfo": "0.1.0",
+      "imports": [
+        "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/core.jsonld"
+      ]
+    },
+    {
+      "@id": "zn:ContactInformation",
+      "@type": "owl:Class",
+      "label": "ContactInformation",
+      "comment": "Contact details describing an Entity.",
+      "subClassOf": "zn:Artifact"
+    },
+    {
+      "@id": "zn:Directory",
+      "@type": "owl:Class",
+      "label": "Directory",
+      "comment": "A maintained collection organizing contacts; names are not yet asserted equivalent.",
+      "subClassOf": "zn:Collection"
+    },
+    {
+      "@id": "zn:DirectoryEntry",
+      "@type": "owl:Class",
+      "label": "DirectoryEntry",
+      "comment": "Contact information listed in a particular directory and identified within that directory by a local key.",
+      "subClassOf": "zn:ContactInformation"
+    }
+  ]
+}

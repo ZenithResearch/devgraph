@@ -1,0 +1,157 @@
+{
+  "schemaVersion": "devgraph.legacy-ontology-mappings.v1",
+  "legacyCoreVersionIri": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld",
+  "normalizedCoreVersionIri": "https://zenith-research.ca/ontology/normalized/v0.1.0/ontology.jsonld",
+  "interpretation": "Directional vocabulary guidance. The runtime keeps existing record labels and readers.",
+  "entries": [
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/ReviewPacket",
+      "ownerBoundary": "devgraph",
+      "representation": "schema",
+      "recordOrType": "ReviewPacket",
+      "projection": "https://zenith-research.ca/ontology/terms/Artifact"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/EventReceipt",
+      "ownerBoundary": "devgraph",
+      "representation": "schema",
+      "recordOrType": "EventReceipt",
+      "projection": "https://zenith-research.ca/ontology/terms/Receipt"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/ReadinessAssessment",
+      "ownerBoundary": "devgraph",
+      "representation": "schema",
+      "recordOrType": "ReadinessAssessment",
+      "projection": "https://zenith-research.ca/ontology/terms/Artifact"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/StatusTransition",
+      "ownerBoundary": "devgraph",
+      "representation": "rule schema",
+      "recordOrType": "StatusTransition",
+      "relatedSharedType": "https://zenith-research.ca/ontology/terms/Event"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/SessionRef",
+      "ownerBoundary": "devgraph",
+      "representation": "class",
+      "recordOrType": "SessionRef",
+      "ontologyClass": "https://zenith-research.ca/ontology/devgraph/terms/SessionRef"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/ClaudeSessionRef",
+      "ownerBoundary": "devgraph",
+      "representation": "schema profile",
+      "recordOrType": "ClaudeSessionRef",
+      "schemaBase": "SessionRef"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/CodexSessionRef",
+      "ownerBoundary": "devgraph",
+      "representation": "schema profile",
+      "recordOrType": "CodexSessionRef",
+      "schemaBase": "SessionRef"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/GrokSessionRef",
+      "ownerBoundary": "devgraph",
+      "representation": "schema profile",
+      "recordOrType": "GrokSessionRef",
+      "schemaBase": "SessionRef"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/HermesSessionRef",
+      "ownerBoundary": "devgraph",
+      "representation": "schema profile",
+      "recordOrType": "HermesSessionRef",
+      "schemaBase": "SessionRef"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/SessionLink",
+      "ownerBoundary": "devgraph",
+      "representation": "class",
+      "recordOrType": "SessionLink",
+      "ontologyClass": "https://zenith-research.ca/ontology/devgraph/terms/SessionLink"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/SessionWorkState",
+      "ownerBoundary": "devgraph",
+      "representation": "schema",
+      "recordOrType": "SessionWorkState"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/LocalResourceRegistration",
+      "ownerBoundary": "devgraph",
+      "representation": "schema",
+      "recordOrType": "LocalResourceRegistration",
+      "optionalProjection": "https://zenith-research.ca/ontology/terms/Artifact"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/LocalResourceRegistry",
+      "ownerBoundary": "devgraph",
+      "representation": "class",
+      "recordOrType": "LocalResourceRegistry",
+      "ontologyClass": "https://zenith-research.ca/ontology/devgraph/terms/LocalResourceRegistry"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/ServiceInstance",
+      "ownerBoundary": "devgraph",
+      "representation": "class",
+      "recordOrType": "ServiceInstance",
+      "ontologyClass": "https://zenith-research.ca/ontology/devgraph/terms/ServiceInstance"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/ZenithLocalSpace",
+      "ownerBoundary": "devgraph",
+      "representation": "configuration schema",
+      "recordOrType": "ZenithLocalSpace"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/ZenithRepository",
+      "ownerBoundary": "devgraph",
+      "representation": "class",
+      "recordOrType": "ZenithRepository",
+      "ontologyClass": "https://zenith-research.ca/ontology/devgraph/terms/ZenithRepository"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/SyncShadow",
+      "ownerBoundary": "devgraph",
+      "representation": "schema",
+      "recordOrType": "SyncShadow"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/CredentialPreset",
+      "ownerBoundary": "operator-configuration",
+      "representation": "schema profile",
+      "recordOrType": "CredentialPreset",
+      "projection": "https://zenith-research.ca/ontology/terms/Artifact"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/CredentialPresetRevision",
+      "ownerBoundary": "operator-configuration",
+      "representation": "revision schema",
+      "recordOrType": "CredentialPresetRevision",
+      "optionalProjection": "https://zenith-research.ca/ontology/terms/Artifact",
+      "schemaBase": "CredentialPreset"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/Seat",
+      "ownerBoundary": "organizational-directory",
+      "representation": "class",
+      "recordOrType": "Seat"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/SeatType",
+      "ownerBoundary": "organizational-directory",
+      "representation": "classification schema",
+      "recordOrType": "SeatType"
+    },
+    {
+      "legacyIri": "https://zenith-research.ca/ontology/terms/SeatAssignment",
+      "ownerBoundary": "organizational-directory",
+      "representation": "qualified relationship schema",
+      "recordOrType": "SeatAssignment"
+    }
+  ]
+}

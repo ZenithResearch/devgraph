@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/directory.schema.json",
+  "title": "Directory contact schemas",
+  "$defs": {
+    "ContactInformation": {
+      "description": "Contact details for the referenced Entity.",
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/IRIReference",
+          "description": "Identifier of the Entity this record concerns."
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 1
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      },
+      "type": "object",
+      "required": [
+        "entity"
+      ]
+    },
+    "IRIReference": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+    },
+    "DirectoryEntry": {
+      "$ref": "#/$defs/ContactInformation",
+      "description": "Contact information listed in a particular directory and identified within that directory by a local key.",
+      "properties": {
+        "directoryKey": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A directoryKey uniquely identifies an entry within its containing directory."
+        }
+      },
+      "required": [
+        "directoryKey"
+      ]
+    },
+    "ContactDirectoryContent": {
+      "title": "ContactDirectoryContent",
+      "type": "object",
+      "description": "A contact directory containing DirectoryEntry values. Validate directoryKey uniqueness within each directory.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DirectoryEntry",
+            "unevaluatedProperties": false
+          }
+        },
+        "relatedVocabularies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+          },
+          "uniqueItems": true,
+          "description": "Optional vocabulary references for labels/classification. A vocabulary is not the contact collection or its entries."
+        }
+      },
+      "required": [
+        "title",
+        "entries"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/collection.schema.json",
+  "title": "Collection identity",
+  "description": "Shared identity fields for a logical collection. Subtype schemas represent the membership relationship.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:",
+      "description": "Stable collection IRI, preserved as membership changes."
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional human-readable collection name."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}

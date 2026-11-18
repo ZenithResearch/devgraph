@@ -1,24 +1,28 @@
 {
   "schemaVersion": "devgraph.ontology-ownership.v1",
   "canonicalCore": {
-    "repository": "https://github.com/ZenithResearch/zenith-ontology",
-    "commit": "142f515675d4127736676c9e7a8b1bb158621eae",
-    "sourcePath": "ontology/core/ontology.jsonld",
-    "ontologyId": "https://zenith-research.ca/ontology",
-    "version": "0.13.0",
+    "repository": "https://github.com/ZenithResearch/zenith-ontology-normalized",
+    "commit": "4a5e54d744c0b1ed0e4dc5750ad98eb52dd11bc2",
+    "sourcePath": "ontology.jsonld",
+    "ontologyId": "https://zenith-research.ca/ontology/normalized",
+    "version": "0.1.0",
     "manifest": {
-      "url": "https://zenith-research.ca/ontology/v0.13.0/manifest.json",
-      "sha256": "71c80068182f46bc30c019669d201cb6a5366646274737618c949802d9434a64",
-      "bytes": 1812,
+      "url": "https://zenith-research.ca/ontology/normalized/v0.1.0/manifest.json",
+      "sha256": "d73a66b7f780b8ebc1ec1ac1f7d3791eec91a0259dca90faf37927636ad08a4a",
+      "bytes": 8112,
       "mediaType": "application/json"
     },
-    "ontologyUrl": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld"
+    "ontologyUrl": "https://zenith-research.ca/ontology/normalized/v0.1.0/ontology.jsonld",
+    "distribution": {
+      "url": "https://github.com/ZenithResearch/zenith-ontology-normalized/releases/download/v0.1.0/zenith-ontology-normalized-v0.1.0.zip",
+      "sha256": "6ab9289cad7d811d0cdb2078a6261a538fbd77dbfa53db144e686bc7feafe91d"
+    }
   },
   "extension": {
     "ontologyId": "https://zenith-research.ca/ontology/devgraph",
     "discovery": "ontology/extension-discovery.json",
     "sourcePath": "ontology/extension/ontology.jsonld"
   },
-  "legacy": "ontology/discovery.json and ontology/releases/v0.1.0 through v0.12.0 retain historical runtime/release evidence. They do not designate the current shared-core authoring repository.",
+  "legacy": "The v0.12.0 runtime release, the legacy Zenith v0.13.0 import, and Devgraph extension v0.1.0 retain their exact historical bytes and identities.",
   "runtimeAdmission": false
 }

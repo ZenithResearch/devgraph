@@ -4,7 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {publishTree, generatedFile, safeRelative, verifyTree} from './lib/immutable-release.mjs';
+import {publishTree, generatedFile, inventory, safeRelative, verifyTree} from './lib/immutable-release.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const bytes=v=>Buffer.from(JSON.stringify(v,null,2)+'\n');
@@ -28,12 +28,28 @@ for(const f of config.files)files.set(safe(f.target),await read(f.source));
 const digest=list=>hash(list.toSorted((a,b)=>a.path<b.path?-1:a.path>b.path?1:0).map(f=>`${f.sha256}  ${f.path}\n`).join(''));
 for(const dependency of config.imports){
  const raw=await read(dependency.path);assert.equal(hash(raw),dependency.manifest.sha256,'Import manifest changed');assert.equal(raw.length,dependency.manifest.bytes);
- const manifest=JSON.parse(raw);assert.equal(manifest.ontology_id,dependency.ontologyId);assert.equal(manifest.authority.repository,ownership.canonicalCore.repository,'Ownership repository drift');assert.equal(manifest.version,dependency.version);assert.equal(digest(manifest.files),manifest.bundle_digest);
+ const manifest=JSON.parse(raw), normalized=manifest.schemaVersion==='normalized-ontology-release.v1';
+ assert.equal(manifest.ontologyId??manifest.ontology_id,dependency.ontologyId);
+ if(normalized){
+  assert.equal(manifest.publisher,'zn');
+  assert.equal(manifest.versionIri,dependency.ontologyUrl,'Root version IRI drift');
+ }else{
+  assert.equal(manifest.authority.repository,ownership.canonicalCore.repository,'Ownership repository drift');
+ }
+ assert.equal(manifest.version,dependency.version);
+ assert.equal(digest(manifest.files),manifest.bundleDigest??manifest.bundle_digest);
  const imported=new Map([['manifest.json',raw]]);
  for(const f of manifest.files){const b=await read(path.posix.join(path.posix.dirname(dependency.path),safe(f.path)));assert.equal(hash(b),f.sha256,'Import artifact changed');assert.equal(b.length,f.bytes);imported.set(f.path,b);}
  await verifyTree(path.join(root,path.posix.dirname(dependency.path)),imported);
  assert.equal(dependency.ontologyId,ownership.canonicalCore.ontologyId,'Unsupported unindexed import');
  for(const [name,b]of imported)packageFiles.set('core/v'+dependency.version+'/'+name,b);
+}
+for(const {source,target} of config.retainedPackages??[]){
+ for(const [name,content] of await inventory(path.join(root,safe(source)))){
+  const destination=safe(target)+'/'+safe(name);
+  assert(!packageFiles.has(destination),'Retained package overlaps active import: '+destination);
+  packageFiles.set(destination,content);
+ }
 }
 const ontology=JSON.parse(files.get('ontology.jsonld')),metadata=ontology['@graph'].find(n=>n['@id']===config.ontology_id);
 assert(metadata,'Missing authored ontology identity');assert.equal(metadata.versionInfo,config.version);assert.equal(metadata.canonicalAuthority,config.authority.repository);
@@ -46,7 +62,7 @@ if(config.authority.name==='Zenith'){
 const records=[...files].map(([name,b])=>({path:name,media_type:config.files.find(f=>f.target===name).media_type,bytes:b.length,sha256:hash(b),url:config.canonical_base_url+'/'+name})).sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
 const manifest={schema_version:1,ontology_id:config.ontology_id,version:config.version,release:config.release,published_at:config.published_at,canonical_base_url:config.canonical_base_url,discovery_url:config.discovery_url,authority:config.authority,compatibility:config.compatibility,files:records,bundle_digest_algorithm:'sha256-file-list-v1',bundle_digest:digest(records),imports:config.imports.map(({path:_,...d})=>d)};
 files.set('manifest.json',bytes(manifest));
-const discovery={schema_version:1,ontology_id:config.ontology_id,canonical_authority:config.authority,current:{version:config.version,release:config.release,manifest_url:config.canonical_base_url+'/manifest.json',manifest_sha256:hash(files.get('manifest.json')),bundle_digest:manifest.bundle_digest,ontology_url:config.canonical_base_url+'/ontology.jsonld',context_url:config.canonical_base_url+'/context.jsonld'},supported_versions:[config.version],compatibility_policy:'Pin exact manifests and complete imports. Update each maintainer-owned source independently; retained releases are immutable.'};
+const discovery={schema_version:1,ontology_id:config.ontology_id,canonical_authority:config.authority,current:{version:config.version,release:config.release,manifest_url:config.canonical_base_url+'/manifest.json',manifest_sha256:hash(files.get('manifest.json')),bundle_digest:manifest.bundle_digest,ontology_url:config.canonical_base_url+'/ontology.jsonld',context_url:config.canonical_base_url+'/context.jsonld'},supported_versions:config.supported_versions??[config.version],compatibility_policy:'Pin exact manifests and complete imports. Update each maintainer-owned source independently; retained releases are immutable.'};
 const releaseRoot=path.join(root,'ontology/extension/releases',config.release);
 const check=process.argv.includes('--check');
 const runtimePath='ontology/releases/v0.12.0/manifest.json',runtimeRaw=await read(runtimePath),runtime=JSON.parse(runtimeRaw);

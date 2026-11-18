@@ -1,0 +1,65 @@
+{
+  "entityConformance": {
+    "target": "zn:Entity",
+    "profile": "Addressable/Invocable",
+    "kind": "mandatory conformance profile, not a participant subclass",
+    "inheritedBy": [
+      "zn:Person",
+      "zn:Organization",
+      "zn:Agent"
+    ],
+    "schemaDefinitionNames": [
+      "EntityProjection",
+      "InvocationContract",
+      "OperationDefinition",
+      "Message",
+      "Reply",
+      "ArtifactRef"
+    ],
+    "contract": "Stable Entity IRI; msg(message) → reply; declared operations and typed input/output/error schemas. Mandatory admission requires explicit legacy migration; original participant identity is retained."
+  },
+  "invocationSchema": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/core.schema.json",
+  "artifactMembership": [
+    {
+      "id": "zn:HAS_ARTIFACT",
+      "label": "contains",
+      "from": "zn:Directory",
+      "to": "zn:DirectoryEntry",
+      "kind": "relationship",
+      "scope": "class",
+      "cardinality": "0..*",
+      "meaning": "Directory contains zero or more DirectoryEntry artifacts. An entry's directoryKey is scoped to this directory.",
+      "globalDomainOrRangeAdded": false
+    },
+    {
+      "id": "zn:HAS_ARTIFACT",
+      "label": "contains",
+      "from": "zn:Outbox",
+      "to": "zn:Artifact",
+      "kind": "relationship",
+      "scope": "class",
+      "cardinality": "0..*",
+      "status": "Existing predicate reused for proposed Outbox artifact membership.",
+      "meaning": "Links the logical Outbox to an Artifact held as a member. This is membership, not subclass inheritance; holding a reference alone does not assert membership.",
+      "predicateLabel": "has artifact",
+      "globalDomainOrRangeAdded": false
+    },
+    {
+      "id": "zn:HAS_ARTIFACT",
+      "label": "contains",
+      "to": "zn:Artifact",
+      "kind": "relationship",
+      "scope": "class",
+      "cardinality": "0..*",
+      "status": "Existing predicate reused for proposed Inbox artifact membership.",
+      "meaning": "Reuse optional HAS_ARTIFACT only for Artifacts held as members. A stored reference alone does not establish membership.",
+      "predicateLabel": "has artifact",
+      "globalDomainOrRangeAdded": false,
+      "from": "zn:Inbox"
+    }
+  ],
+  "casePlanVersioning": {
+    "schema": "https://zenith-research.ca/ontology/normalized/v0.1.0/schemas/case-plan.schema.json",
+    "supersessionProperty": "zn:supersededBy"
+  }
+}

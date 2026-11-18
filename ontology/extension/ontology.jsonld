@@ -1,24 +1,62 @@
 {
-  "@context": "https://zenith-research.ca/ontology/devgraph/v0.1.0/context.jsonld",
+  "@context": "https://zenith-research.ca/ontology/devgraph/v0.2.0/context.jsonld",
   "@graph": [
     {
       "@id": "https://zenith-research.ca/ontology/devgraph",
       "@type": "owl:Ontology",
       "label": "DevGraph ontology",
-      "comment": "DevGraph implementation extension of the shared Zenith core. Work and directory term definitions are imported; DevGraph owns operation, validation and runtime profiles.",
-      "versionIRI": "https://zenith-research.ca/ontology/devgraph/v0.1.0/ontology.jsonld",
-      "versionInfo": "0.1.0",
+      "comment": "Repository-owned Devgraph ontology. It imports normalized Zenith and carries separate operation profiles for historical runtime compatibility.",
+      "versionIRI": "https://zenith-research.ca/ontology/devgraph/v0.2.0/ontology.jsonld",
+      "versionInfo": "0.2.0",
       "canonicalAuthority": "https://github.com/ZenithResearch/devgraph",
       "owl:imports": [
         {
-          "@id": "https://zenith-research.ca/ontology/v0.13.0/ontology.jsonld"
+          "@id": "https://zenith-research.ca/ontology/normalized/v0.1.0/ontology.jsonld"
         }
       ],
       "rdfs:seeAlso": [
         {
-          "@id": "https://zenith-research.ca/ontology/devgraph/v0.1.0/operations.json"
+          "@id": "https://zenith-research.ca/ontology/devgraph/v0.2.0/operations.json"
+        },
+        {
+          "@id": "https://zenith-research.ca/ontology/devgraph/v0.2.0/legacy-term-mappings.json"
         }
       ]
+    },
+    {
+      "@id": "devgraph:SessionRef",
+      "@type": "owl:Class",
+      "label": "SessionRef",
+      "comment": "Identified reference to a session owned by a native application. Identity is scoped by application, source instance, and external session ID.",
+      "subClassOf": "zn:ExternalLink"
+    },
+    {
+      "@id": "devgraph:SessionLink",
+      "@type": "owl:Class",
+      "label": "SessionLink",
+      "comment": "Independently identified witness to a relation between sessions. Records relation direction, source event, attempt, and observation basis.",
+      "subClassOf": "zn:Artifact"
+    },
+    {
+      "@id": "devgraph:LocalResourceRegistry",
+      "@type": "owl:Class",
+      "label": "LocalResourceRegistry",
+      "comment": "Identified logical collection of per-user local resource registrations. Membership is advisory discovery information.",
+      "subClassOf": "zn:Collection"
+    },
+    {
+      "@id": "devgraph:ServiceInstance",
+      "@type": "owl:Class",
+      "label": "ServiceInstance",
+      "comment": "A configured instance of a service with its own identity. Endpoint-bound discovery identifiers are binding keys.",
+      "subClassOf": "owl:Thing"
+    },
+    {
+      "@id": "devgraph:ZenithRepository",
+      "@type": "owl:Class",
+      "label": "ZenithRepository",
+      "comment": "Independently identified Git project adopting the Zenith repository contract. A checkout location and a remote URL can change independently of the project identity.",
+      "subClassOf": "owl:Thing"
     }
   ]
 }

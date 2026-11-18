@@ -1,11 +1,12 @@
 // Run after explicitly packing/installing the tarball in the selected external directory.
-// The consumer uses only its installed SDK, TypeScript and Vite; no Rust/Git/build hooks.
+// The consumer uses only its installed SDK, TypeScript and esbuild; no Rust/Git/build hooks.
 import {runtimeFiles} from '../scripts/artifact-files.mjs';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {createServer} from 'node:http';
 import {readFile, writeFile, mkdir, readdir} from 'node:fs/promises';
+import {createRequire} from 'node:module';
 import {dirname, resolve, extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium, firefox, webkit} from 'playwright';
@@ -23,6 +24,8 @@ const tarballName=`devgraph-web-${packageJson.version}.tgz`;
 const tarball=await readFile(resolve(consumer,tarballName));
 assert.equal(hash(tarball),hash(await readFile(resolve(root,'packages/web',tarballName))),
   'consumer evidence must name the current packed artifact');
+const consumerRequire=createRequire(resolve(consumer,'package.json'));
+const esbuild=consumerRequire('esbuild');
 const lock=JSON.parse(await readFile(resolve(consumer,'package-lock.json')));
 assert.equal(lock.packages['node_modules/@devgraph/web'].integrity,
   'sha512-'+createHash('sha512').update(tarball).digest('base64'),
@@ -64,7 +67,8 @@ await assert.rejects(initialize({wasm:new Uint8Array([1,2,3])}),{code:'initializ
 await assert.rejects(connectCastalia(),{code:'capability_unavailable'});
 console.log('external plain ESM and custom WASM initialization passed');
 `);
-await writeFile(resolve(consumer,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,noEmit:true,lib:['ES2022','DOM'],types:['vite/client']},include:['types.ts','main.ts']},null,2));
+await writeFile(resolve(consumer,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,noEmit:true,lib:['ES2022','DOM'],types:[]},include:['types.ts','main.ts','wasm.d.ts']},null,2));
+await writeFile(resolve(consumer,'wasm.d.ts'),"declare module '@devgraph/web/wasm' { const url: string; export default url; }\n");
 await writeFile(resolve(consumer,'types.ts'),`
 import type {Client,PreparedOperation,CastaliaConnection,Work,WorkRequestInput,MutationOutcome,CypherResult} from '@devgraph/web';
 type IsNotAny<T> = 0 extends (1 & T) ? false : true;
@@ -102,10 +106,10 @@ function usesResults(work:Work,result:MutationOutcome,cypher:CypherResult,prepar
 }
 void [workResultIsTyped,canonicalBytesAreTyped,profileIsTyped,cypherResultIsTyped,valid,stringVersion,nullPatch,missingVersion,badKind,wrongAccept,nonemptyArchive,usesResults];
 `);
-await writeFile(resolve(consumer,'index.html'),'<!doctype html><meta charset="utf-8"><title>Installed Devgraph SDK qualification</title><pre id="result">Starting</pre><script type="module" src="/main.ts"></script>');
+const consumerHtml='<!doctype html><meta charset="utf-8"><title>Installed Devgraph SDK qualification</title><pre id="result">Starting</pre><script type="module" src="/assets/main.js"></script>';
 await writeFile(resolve(consumer,'main.ts'),`
 import {initialize,connectCastalia,exportJson} from '@devgraph/web';
-import wasmUrl from '@devgraph/web/wasm?url';
+import wasmUrl from '@devgraph/web/wasm';
 const result=document.querySelector('#result')!;
 const body='{"id":"example","kind":"Issue","title":"Fixture","description":"","status":"draft","version":9223372036854775807,"priority":-9223372036854775808,"artifact_ids":[],"external_link_ids":[]}';
 const bytes=new TextEncoder().encode(body);
@@ -158,8 +162,18 @@ void main().catch(error=>{result.textContent=JSON.stringify({passed:false,error:
 const ssr=run(resolve(consumer,'ssr.mjs')).trim();
 const esm=run(resolve(consumer,'plain-esm.mjs')).trim();
 const types=run(resolve(consumer,'node_modules/typescript/bin/tsc'),['--noEmit']);
-const build=run(resolve(consumer,'node_modules/vite/bin/vite.js'),['build']);
 const built=resolve(consumer,'dist');
+await esbuild.build({
+  absWorkingDir:consumer,
+  entryPoints:['main.ts'],
+  outfile:'dist/assets/main.js',
+  bundle:true,
+  platform:'browser',
+  format:'esm',
+  publicPath:'/assets',
+  loader:{'.wasm':'file'},
+});
+await writeFile(resolve(built,'index.html'),consumerHtml);
 const violations=[];
 const server=createServer(async(req,res)=>{
   const path=new URL(req.url,'http://localhost').pathname;
@@ -193,12 +207,12 @@ try{
 }finally{await new Promise(resolve=>server.close(resolve))}
 assert.deepEqual(violations,[],'browser console errors/CSP violations');
 const evidence={scope:'External installed tarball; fixture transport only, no native/provider authority claim',
-  source_commit:sourceManifest.source_commit,consumer_directory:consumer,node:process.version,typescript:'5.9.3',vite:'7.3.7',playwright:'1.61.1',
+  source_commit:sourceManifest.source_commit,consumer_directory:consumer,node:process.version,typescript:'5.9.3',playwright:'1.61.1',
   package:packageJson.name,version:packageJson.version,tarball_sha256:hash(tarball),
   wasm_sha256:hash(installedWasm),runtime_js_sha256:hash(Buffer.concat(await Promise.all(runtimeFiles.map(file=>readFile(resolve(installed,'dist',file)))))),
-  installation:'npm install --ignore-scripts; only SDK tarball plus pinned TypeScript/Vite dependencies',
+  installation:'npm install --ignore-scripts; only SDK tarball plus pinned TypeScript and esbuild dependencies',
   no_lifecycle_downloads:true,ssr,esm,types:{passed:true,positive_and_expected_error_assertions:true,compiler_output:types},
-  vite:{passed:true,output:build.trim(),assets:await readdir(resolve(built,'assets'))},engines};
+  bundler:{name:'esbuild',version:esbuild.version,passed:true,assets:await readdir(resolve(built,'assets'))},engines};
 await mkdir(resolve(root,'.sdk-validation'),{recursive:true});
 await writeFile(resolve(root,'.sdk-validation/installed-consumers.json'),JSON.stringify(evidence,null,2)+'\n');
-console.log(JSON.stringify({ssr,esm,types:'passed',vite:'passed',engines:engines.map(({name})=>name),tarball_sha256:evidence.tarball_sha256}));
+console.log(JSON.stringify({ssr,esm,types:'passed',bundler:'esbuild',engines:engines.map(({name})=>name),tarball_sha256:evidence.tarball_sha256}));

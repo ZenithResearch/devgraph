@@ -1,0 +1,58 @@
+[
+  {
+    "id": "urn:zn:domain:core",
+    "type": "zn:Domain",
+    "key": "zn/core",
+    "publisher": "zn",
+    "label": "Core",
+    "scope": "Shared participant identities, Artifacts, Collections and domain identities. Entities conform to the shared invocation profile."
+  },
+  {
+    "id": "urn:zn:domain:work",
+    "type": "zn:Domain",
+    "key": "zn/work",
+    "publisher": "zn",
+    "label": "Work",
+    "scope": "Existing Todo family and other work concepts; no Work superclass."
+  },
+  {
+    "id": "urn:zn:domain:directory",
+    "type": "zn:Domain",
+    "key": "zn/directory",
+    "publisher": "zn",
+    "label": "Directory",
+    "scope": "Directory concepts and contact information reuse Core participant identities. The remaining candidate inheritance paths are under review."
+  },
+  {
+    "id": "urn:zn:domain:request-management",
+    "type": "zn:Domain",
+    "key": "zn/request-management",
+    "publisher": "zn",
+    "label": "Request Management",
+    "scope": "Requests and optional handling cases; service-specific workflows do not define universal taxonomy."
+  },
+  {
+    "id": "urn:zn:domain:vocabulary",
+    "type": "zn:Domain",
+    "key": "zn/vocabulary",
+    "publisher": "zn",
+    "label": "Vocabulary",
+    "scope": "Shared status sets and values; optional SKOS sidecar."
+  },
+  {
+    "id": "urn:zn:domain:evidence",
+    "type": "zn:Domain",
+    "key": "zn/evidence",
+    "publisher": "zn",
+    "label": "Evidence",
+    "scope": "Evidence content schemas reuse Artifact; no automatic class per schema."
+  },
+  {
+    "id": "urn:zn:domain:messaging",
+    "type": "zn:Domain",
+    "key": "zn/messaging",
+    "publisher": "zn",
+    "label": "Messaging",
+    "scope": "Shared inbound and outbound information collections; application protocols and schemas remain bindings."
+  }
+]

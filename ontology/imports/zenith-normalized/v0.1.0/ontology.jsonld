@@ -1,0 +1,123 @@
+{
+  "@context": {
+    "zn": "https://zenith-research.ca/ontology/terms/",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "label": "rdfs:label",
+    "comment": "rdfs:comment",
+    "domain": {
+      "@id": "rdfs:domain",
+      "@type": "@id"
+    },
+    "range": {
+      "@id": "rdfs:range",
+      "@type": "@id"
+    },
+    "subClassOf": {
+      "@id": "rdfs:subClassOf",
+      "@type": "@id"
+    },
+    "versionIRI": {
+      "@id": "owl:versionIRI",
+      "@type": "@id"
+    },
+    "versionInfo": "owl:versionInfo",
+    "canonicalAuthority": {
+      "@id": "zn:canonicalAuthority",
+      "@type": "@id"
+    },
+    "semanticOperation": {
+      "@id": "zn:semanticOperation",
+      "@type": "@id"
+    },
+    "equivalentClass": {
+      "@id": "owl:equivalentClass",
+      "@type": "@id"
+    },
+    "imports": {
+      "@id": "owl:imports",
+      "@type": "@id"
+    }
+  },
+  "@graph": [
+    {
+      "@id": "https://zenith-research.ca/ontology/normalized",
+      "@type": "owl:Ontology",
+      "versionIRI": "https://zenith-research.ca/ontology/normalized/v0.1.0/ontology.jsonld",
+      "versionInfo": "0.1.0",
+      "imports": [
+        "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/core.jsonld",
+        "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/work.jsonld",
+        "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/directory.jsonld",
+        "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/request-management.jsonld",
+        "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/vocabulary.jsonld",
+        "https://zenith-research.ca/ontology/normalized/v0.1.0/modules/messaging.jsonld"
+      ]
+    },
+    {
+      "@id": "urn:zn:domain:core",
+      "@type": [
+        "owl:NamedIndividual",
+        "zn:Domain"
+      ],
+      "label": "Core",
+      "comment": "Shared participant identities, Artifacts, Collections and domain identities. Entities conform to the shared invocation profile."
+    },
+    {
+      "@id": "urn:zn:domain:work",
+      "@type": [
+        "owl:NamedIndividual",
+        "zn:Domain"
+      ],
+      "label": "Work",
+      "comment": "Existing Todo family and other work concepts; no Work superclass."
+    },
+    {
+      "@id": "urn:zn:domain:directory",
+      "@type": [
+        "owl:NamedIndividual",
+        "zn:Domain"
+      ],
+      "label": "Directory",
+      "comment": "Directory concepts and contact information reuse Core participant identities. The remaining candidate inheritance paths are under review."
+    },
+    {
+      "@id": "urn:zn:domain:request-management",
+      "@type": [
+        "owl:NamedIndividual",
+        "zn:Domain"
+      ],
+      "label": "Request Management",
+      "comment": "Requests and optional handling cases; service-specific workflows do not define universal taxonomy."
+    },
+    {
+      "@id": "urn:zn:domain:vocabulary",
+      "@type": [
+        "owl:NamedIndividual",
+        "zn:Domain"
+      ],
+      "label": "Vocabulary",
+      "comment": "Shared status sets and values; optional SKOS sidecar."
+    },
+    {
+      "@id": "urn:zn:domain:evidence",
+      "@type": [
+        "owl:NamedIndividual",
+        "zn:Domain"
+      ],
+      "label": "Evidence",
+      "comment": "Evidence content schemas reuse Artifact; no automatic class per schema."
+    },
+    {
+      "@id": "urn:zn:domain:messaging",
+      "@type": [
+        "owl:NamedIndividual",
+        "zn:Domain"
+      ],
+      "label": "Messaging",
+      "comment": "Shared inbound and outbound information collections; application protocols and schemas remain bindings."
+    }
+  ]
+}
